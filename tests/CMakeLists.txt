@@ -10,4 +10,5 @@ target_link_libraries(forma_tests PRIVATE forma::core Catch2::Catch2WithMain)
 
 forma_configure_target(forma_tests)
 
-catch_discover_tests(forma_tests)
+# Testele sunt descoperite la rularea ctest, nu la build, ca un test blocat să nu blocheze build-ul.
+catch_discover_tests(forma_tests DISCOVERY_MODE PRE_TEST)
