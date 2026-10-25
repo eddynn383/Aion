@@ -1,0 +1,26 @@
+BasedOnStyle: WebKit
+Standard: c++20
+ColumnLimit: 110
+IndentWidth: 4
+PointerAlignment: Left
+NamespaceIndentation: None
+FixNamespaceComments: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterClass: false
+  AfterStruct: false
+  AfterNamespace: false
+  AfterControlStatement: Never
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<Q'
+    Priority: 2
+  - Regex: '^<(glm|catch2|nlohmann)/'
+    Priority: 3
+  - Regex: '^<'
+    Priority: 4

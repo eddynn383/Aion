@@ -1,0 +1,15 @@
+build/
+out/
+.cache/
+compile_commands.json
+CMakeUserPresets.json
+vcpkg_installed/
+
+# IDE
+.idea/
+.vscode/
+*.user
+.qtcreator/
+
+# macOS
+.DS_Store

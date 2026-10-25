@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos:
+    name: macOS (Debug, ASan + UBSan)
+    runs-on: macos-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalează Ninja
+        run: brew install ninja
+
+      - name: Instalează Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          modules: qtshadertools
+          cache: true
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-${{ runner.os }}-
+
+      - name: Instalează vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Configurare
+        run: cmake --preset mac-debug -DFORMA_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset mac-debug
+
+      - name: Teste
+        run: ctest --preset mac-debug
