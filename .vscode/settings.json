@@ -1,0 +1,7 @@
+{
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnOpen": true,
+  "clangd.arguments": ["--compile-commands-dir=${workspaceFolder}/build/mac-debug"],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "files.associations": { "*.qml": "qml" }
+}

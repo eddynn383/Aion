@@ -15,45 +15,47 @@ Planul complet de implementare se află în [`PLAN.md`](PLAN.md).
 | `tests/` | Teste Catch2 |
 | `docs/decisions/` | Decizii de arhitectură (ADR) |
 
-## Instalare pe macOS
+## Pornire rapidă (macOS)
 
-### 1. Unelte de bază
 ```bash
-xcode-select --install          # compilatorul clang
-brew install cmake ninja git
+make setup   # o singură dată: Xcode CLT, Homebrew, CMake, Ninja, Qt, vcpkg
+make run     # compilează și pornește aplicația
 ```
 
-### 2. Qt 6.8
-Variantă recomandată: instalatorul oficial de la <https://www.qt.io/download-qt-installer-oss>.
-Alege **Qt 6.8.x → macOS** și modulul **Qt Shader Tools**.
+| Comandă | Ce face |
+|---|---|
+| `make setup` | Instalează uneltele lipsă; se poate rula oricând, sare peste ce e deja instalat |
+| `make build` | Compilează (prima dată durează câteva minute: vcpkg compilează dependențele) |
+| `make test` | Compilează și rulează testele |
+| `make run` | Compilează și pornește aplicația; mesajele ei apar în terminal |
+| `make clean` | Șterge folderul de build |
+| `make reconfigure` | Reface configurarea CMake (după schimbări în preseturi) |
 
+Implicit se folosește build-ul de debug, cu AddressSanitizer + UBSan.
+Pentru build-ul optimizat: `make run CONFIG=release`.
+
+### În VS Code
+Instalează extensiile recomandate (VS Code le propune la deschiderea proiectului), apoi:
+- **⇧⌘B** compilează;
+- **F5** compilează și pornește aplicația cu debugger (configurația „Forma (debug)”).
+
+### Instalare manuală (dacă nu vrei `make setup`)
+1. `xcode-select --install`
+2. Homebrew de la <https://brew.sh>, apoi `brew install cmake ninja qt`
+3. vcpkg:
+   ```bash
+   git clone https://github.com/microsoft/vcpkg "$HOME/vcpkg"
+   "$HOME/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+   ```
+4. În `~/.zshrc`:
+   ```bash
+   export VCPKG_ROOT="$HOME/vcpkg"
+   export QT_ROOT_DIR="$(brew --prefix qt)"
+   ```
+
+Comenzile CMake de bază, fără `make`:
 ```bash
-export QT_ROOT_DIR="$HOME/Qt/6.8.3/macos"
-```
-
-Variantă rapidă, cu Homebrew:
-```bash
-brew install qt
-export QT_ROOT_DIR="$(brew --prefix qt)"
-```
-
-### 3. vcpkg
-```bash
-git clone https://github.com/microsoft/vcpkg "$HOME/vcpkg"
-"$HOME/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
-export VCPKG_ROOT="$HOME/vcpkg"
-```
-
-Adaugă cele două `export` (`QT_ROOT_DIR` și `VCPKG_ROOT`) în `~/.zshrc`, ca să rămână setate.
-
-## Build și rulare
-
-```bash
-cmake --preset mac-debug          # prima dată durează câteva minute (vcpkg compilează dependențele)
-cmake --build --preset mac-debug
-ctest --preset mac-debug
-
-open build/mac-debug/app/Forma.app
+cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset mac-debug
 ```
 
 | Preset | Pentru ce |

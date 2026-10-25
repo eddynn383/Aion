@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Forma (debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/mac-debug/app/Forma.app/Contents/MacOS/Forma",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Forma: build"
+    },
+    {
+      "name": "Teste (debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/mac-debug/tests/forma_tests",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Forma: build"
+    }
+  ]
+}

@@ -7,7 +7,11 @@ vcpkg_installed/
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/settings.json
 *.user
 .qtcreator/
 
