@@ -14,6 +14,12 @@ set_target_properties(forma_app PROPERTIES
     WIN32_EXECUTABLE ON
 )
 
+# Header-ele cu QML_ELEMENT trebuie găsite prin include path de fișierul de înregistrare generat.
+target_include_directories(forma_app PRIVATE src)
+
+# Fiecare subfolder cu fișiere .qml primește propriul qmldir.
+qt_policy(SET QTP0004 NEW)
+
 qt_add_qml_module(forma_app
     URI Forma
     VERSION 1.0
