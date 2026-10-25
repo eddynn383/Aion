@@ -28,23 +28,20 @@ make reconfigure   # după schimbări în CMakePresets.json
 Variabile necesare: `VCPKG_ROOT` (implicit `~/vcpkg`), `QT_ROOT_DIR` (implicit `$(brew --prefix qt)`).
 Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 
-## Stadiu (la predarea din sesiunea cloud)
-- **Faza 0** e scrisă. Pe Mac-ul utilizatorului configurarea și build-ul `mac-debug` au reușit.
-- De verificat acum, pe Mac:
-  1. `./build/mac-debug/tests/forma_tests` trece? Anterior, descoperirea testelor de către Catch2
-     (care rulează executabilul de teste) părea să se blocheze. Bănuieli: două build-uri simultane
-     în același folder, sau AddressSanitizer pe macOS 26. Descoperirea a fost mutată la `ctest`
-     (`DISCOVERY_MODE PRE_TEST`). Dacă testele se blochează cu ASan, încearcă `-DFORMA_ENABLE_SANITIZERS=OFF`.
-  2. Aplicația pornește (`make run`) și arată shell-ul: titlebar, panouri laterale, viewport gol cu gradient, toolbar plutitor, status bar.
-  3. Tripletele vcpkg din `triplets/` (deployment target 13.0) elimină avertismentele `ld: ... built for newer macOS version`. Netestat încă.
-  4. `make setup` / `make run` (scripts/) încă netestate pe Mac.
-- Avertisment cunoscut, inofensiv: `FindWrapOpenGL ... /usr/X11R6/lib` (XQuartz e instalat). Nu folosim OpenGL pe macOS.
-- Proiectul nu e încă pe GitHub; CI-ul (`.github/workflows/ci.yml`) nu a rulat niciodată.
+## Stadiu
+- **Faza 0** verificată pe Mac (2026-10-26): `make setup`, `make test` (4/4) și `make run` merg. Rămâne doar CI-ul,
+  care nu a rulat niciodată (proiectul nu e încă pe GitHub).
+- **ASan e blocat pe acest Mac** (Apple clang 17 + macOS 26.6: deadlock în `AsanInitInternal`, chiar și la un `int main(){}`).
+  `cmake/FormaOptions.cmake` testează la configurare dacă ASan pornește; dacă nu, folosește doar UBSan (cu avertisment).
+- **Atenție la `timeout` din `/usr/local/bin`:** e binar Intel, iar tot ce rulează sub el trece prin Rosetta
+  (CMake vede `x86_64` și alege tripletul `x64-osx`). Pentru limite de timp folosește `perl -e 'alarm N; exec @ARGV' ...`.
+- Verificare vizuală fără permisiuni de screen recording: `FORMA_SCREENSHOT=/cale.png [FORMA_THEME=light|dark] Forma.app/Contents/MacOS/Forma`
+  salvează fereastra după randare și închide aplicația.
+- Avertismente cunoscute, inofensive: `FindWrapOpenGL ... /usr/X11R6/lib` (XQuartz), și `ld: ... built for newer macOS version`
+  pentru framework-urile Qt din Homebrew (deployment target-ul nostru e 13.0; contează abia la distribuție, Faza 10).
 
 ## Următorii pași
-1. Termină verificările de mai sus și bifează Faza 0 în `PLAN.md`.
-2. Faza 1: fonturi Inter / Geist Mono, iconițe Lucide, componentele de bază, command palette (⌘K),
-   titlebar integrat pe macOS, viewport `QQuickRhiItem` cu grid infinit, axe și camera orbit/pan/zoom.
+Faza 1 (vezi `PLAN.md`).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `forma::`,

@@ -241,9 +241,9 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 - [x] `CMakePresets.json`: `mac-debug` (cu ASan/UBSan), `mac-release`, plus `core-debug` (fără Qt)
 - [x] `vcpkg.json` cu glm, nlohmann-json, catch2, earcut-hpp, tinygltf
 - [x] Găsirea Qt 6 prin `CMAKE_PREFIX_PATH` = `$QT_ROOT_DIR` (documentată în README)
-- [~] Aplicație Qt Quick care deschide o fereastră (shell schițat cu tema dark/light; de verificat pe Mac)
+- [x] Aplicație Qt Quick care deschide o fereastră (shell schițat cu tema dark/light, verificat pe Mac cu Metal)
 - [x] Teste Catch2 care trec (versiune, toleranțe)
-- [~] GitHub Actions: build + teste pe `macos-latest` (scris; de verificat după primul push)
+- [~] GitHub Actions: build + teste pe `macos-latest` (scris; de verificat după primul push – proiectul nu e încă pe GitHub)
 - [x] `README.md` cu pașii de instalare pe Mac (Xcode CLT, Homebrew, cmake, ninja, Qt, vcpkg)
 
 **Gata când:** `cmake --preset mac-debug && cmake --build --preset mac-debug && ctest` merge pe un Mac curat urmând README-ul, iar CI e verde.

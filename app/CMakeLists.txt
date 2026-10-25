@@ -20,6 +20,9 @@ target_include_directories(forma_app PRIVATE src)
 # Fiecare subfolder cu fișiere .qml primește propriul qmldir.
 qt_policy(SET QTP0004 NEW)
 
+# Trebuie setat înainte de qt_add_qml_module, altfel Theme nu apare ca singleton în qmldir.
+set_source_files_properties(qml/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_qml_module(forma_app
     URI Forma
     VERSION 1.0
@@ -32,8 +35,6 @@ qt_add_qml_module(forma_app
         qml/shell/StatusBar.qml
         qml/shell/Toolbar.qml
 )
-
-set_source_files_properties(qml/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 target_link_libraries(forma_app PRIVATE
     forma::core

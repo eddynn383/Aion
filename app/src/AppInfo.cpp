@@ -20,3 +20,15 @@ QString AppInfo::graphicsApi() const
 {
     return forma::render::graphicsApiName(QQuickWindow::graphicsApi());
 }
+
+int AppInfo::themeOverride() const
+{
+    const QString theme = qEnvironmentVariable("FORMA_THEME");
+    if (theme == QLatin1String("light")) {
+        return 1;
+    }
+    if (theme == QLatin1String("dark")) {
+        return 2;
+    }
+    return 0;
+}

@@ -1,6 +1,7 @@
 pragma Singleton
 
 import QtQuick
+import Forma
 
 // Design tokens (PLAN.md, secțiunea 5.3).
 // Componentele folosesc numai valori de aici, fără culori hardcodate.
@@ -8,7 +9,7 @@ QtObject {
     id: theme
 
     // 0 = urmează sistemul, 1 = light, 2 = dark
-    property int mode: 0
+    property int mode: AppInfo.themeOverride
 
     readonly property bool dark: mode === 0
         ? Qt.styleHints.colorScheme !== Qt.ColorScheme.Light
