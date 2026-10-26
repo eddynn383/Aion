@@ -8,6 +8,7 @@ Rectangle {
     property int framesPerSecond: 0
     property bool orthographic: false
     property string selectionText: ""
+    property string unitText: "mm"
 
     height: Theme.statusBarHeight
     color: Theme.bgPanel
@@ -35,7 +36,7 @@ Rectangle {
         Repeater {
             model: [
                 root.selectionText,
-                "Unități: mm",
+                "Unități: " + root.unitText,
                 root.orthographic ? "Paralelă" : "Perspectivă",
                 AppInfo.graphicsApi,
                 root.framesPerSecond > 0 ? root.framesPerSecond + " fps" : "",

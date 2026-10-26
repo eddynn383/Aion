@@ -3,6 +3,7 @@ import Aion
 import Aion.Render
 import QtQuick.Shapes
 import QtQuick.Dialogs
+import QtCore
 
 Window {
     id: window
@@ -84,7 +85,9 @@ Window {
             { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
-            { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" }
+            { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" },
+            { id: "app.preferences", title: "Preferințe…", category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
+            { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" }
         ]
         // Toate uneltele din toolbar, cu scurtăturile lor.
         for (const t of toolbar.allTools)
@@ -169,6 +172,8 @@ Window {
             break
         }
         case "ui.theme": Theme.cycleMode(); break
+        case "app.preferences": preferencesDialog.open(); break
+        case "app.about": aboutDialog.open(); break
         case "debug.storybook": storybookLoader.active = true; break
         case "debug.benchmark": viewport.startTurntable(4); break
         default:
@@ -310,6 +315,7 @@ Window {
             // Cât timp se tastează în Measurements box, literele sunt unități („m”, „cm”), nu unelte.
             enabled: modelData.shortcut.length > 0 && !palette.opened
                      && !(window.vcbText.length > 0 && modelData.shortcut.length === 1)
+                     && !(window.nativeMenu && modelData.shortcut.indexOf("Ctrl+") >= 0)
             onActivated: window.runCommand(modelData.id)
         }
     }
@@ -343,6 +349,73 @@ Window {
             enabled: doc.hasMeasurement && !palette.opened
             onActivated: doc.arrowKey(modelData)
         }
+    }
+
+    // --- Meniul nativ, preferințe, fișiere deschise din afară ---
+
+    // Pe macOS, scurtăturile ⌘… sunt ale meniului nativ (altfel ar rula de două ori).
+    readonly property bool nativeMenu: Qt.platform.os === "osx"
+
+    function openPalette() {
+        palette.open()
+    }
+
+    Instantiator {
+        model: window.nativeMenu ? 1 : 0
+        delegate: AppMenuBar {
+            host: window
+            document: doc
+            onAboutRequested: aboutDialog.open()
+            onPreferencesRequested: preferencesDialog.open()
+        }
+    }
+
+    // Tema și latitudinea se păstrează între sesiuni (unitățile le păstrează Document).
+    Settings {
+        id: preferences
+        category: "ui"
+        property int themeMode: 0
+        property real latitude: 45
+    }
+    Component.onCompleted: {
+        if (AppInfo.themeOverride === 0)
+            Theme.mode = preferences.themeMode
+        viewport.latitude = preferences.latitude
+        window.openPendingFiles()
+    }
+    Connections {
+        target: Theme
+        function onModeChanged() { preferences.themeMode = Theme.mode }
+    }
+    Connections {
+        target: viewport
+        function onAppearanceChanged() { preferences.latitude = viewport.latitude }
+    }
+
+    // Fișierele deschise din Finder (dublu-click pe un .aion, „Open With”) sau date în linia de comandă.
+    function openPendingFiles() {
+        const files = AppInfo.takePendingFiles()
+        for (const path of files) {
+            if (path.toLowerCase().endsWith(".aion"))
+                window.confirmDiscard(() => doc.openFile(path))
+            else
+                doc.importFile(path)
+        }
+    }
+    Connections {
+        target: AppInfo
+        function onFileOpenRequested() { window.openPendingFiles() }
+    }
+
+    PreferencesDialog {
+        id: preferencesDialog
+        parent: window.contentItem
+        document: doc
+        viewport: viewport
+    }
+    AboutDialog {
+        id: aboutDialog
+        parent: window.contentItem
     }
 
     // --- Fișiere ---
@@ -938,6 +1011,7 @@ Window {
                : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata"
         selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
+        unitText: ["Auto", "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"
     }
 
     CommandPalette {
