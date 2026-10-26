@@ -7,6 +7,7 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlExtensionPlugin>
 #include <QQuickWindow>
@@ -63,6 +64,10 @@ int main(int argc, char* argv[])
     QGuiApplication::setApplicationName(QStringLiteral("Aion"));
     QGuiApplication::setOrganizationName(QStringLiteral("Aion"));
     QGuiApplication::setOrganizationDomain(QStringLiteral("aion.dev"));
+#ifndef Q_OS_MACOS
+    // Pe macOS iconița vine din bundle (Aion.icns); în rest, din SVG.
+    QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/aion/branding/aion-icon.svg")));
+#endif
 
     loadFonts();
 

@@ -417,7 +417,7 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 
 ### Faza 10 – Finisare macOS și distribuție (v1.0 macOS)
 - [ ] Meniul nativ macOS (App menu, Preferences cu Cmd+,), Dark Mode, scurtături standard
-- [ ] Iconița aplicației, ecran „About”, asociere cu fișierele `.aion`
+- [~] Iconița aplicației, ecran „About”, asociere cu fișierele `.aion` — iconița e gata (conceptul „Axe”, `resources/branding/`, `.icns` generat la compilare)
 - [ ] Performanță: modele cu ≥ 100.000 de fețe; profilare cu Instruments; BVH pentru picking și inferență
 - [ ] Preferințe: unități, precizie, scurtături personalizabile
 - [ ] Build **Universal** (arm64 + x86_64)
