@@ -1,11 +1,11 @@
 #pragma once
 
-#include "forma/core/view/Camera.h"
+#include "aion/core/view/Camera.h"
 
 // Mișcările camerei care se întind pe mai multe cadre: tranziții animate între vederi,
 // inerția după orbit și zoom-ul lin. Viewport-ul apelează update() la fiecare cadru
 // cât timp isActive() e adevărat.
-namespace forma::view {
+namespace aion::view {
 
 class CameraMotion {
 public:
@@ -47,4 +47,4 @@ private:
     bool m_reducedMotion = false;
 };
 
-} // namespace forma::view
+} // namespace aion::view

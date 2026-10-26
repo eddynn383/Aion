@@ -1,5 +1,5 @@
 import QtQuick
-import Forma
+import Aion
 
 // Panou lateral: antet (titlu sau tab-uri) și conținut așezat sub el.
 Rectangle {

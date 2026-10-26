@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Fereastră plutitoare (meniuri, command palette, detalii) cu umbră moale.
 T.Popup {
@@ -9,6 +9,9 @@ T.Popup {
 
     padding: Theme.space2
     margins: Theme.space2
+    // Templates nu calculează mărimea implicită; fără ea, popover-ul ar avea 0 × 0.
+    implicitWidth: Math.max(implicitBackgroundWidth, implicitContentWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(implicitBackgroundHeight, implicitContentHeight + topPadding + bottomPadding)
 
     enter: Transition {
         ParallelAnimation {

@@ -1,24 +1,19 @@
 #pragma once
 
-#include <glm/mat4x4.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
+#include "aion/core/math/Ray.h"
+#include "aion/core/math/Vec.h"
 
 #include <optional>
 
 // Camera de navigare: orbitează în jurul unei ținte, cu axa Z în sus (ca în SketchUp).
 // Unitățile sunt mm; coordonatele de ecran sunt în pixeli logici, cu originea în colțul
 // din stânga-sus și y în jos (ca evenimentele de mouse).
-namespace forma::view {
+namespace aion::view {
 
-using Vec2d = glm::dvec2;
-using Vec3d = glm::dvec3;
-using Mat4d = glm::dmat4;
-
-struct Ray {
-    Vec3d origin;
-    Vec3d direction; // normalizat
-};
+using math::Mat4d;
+using math::Ray;
+using math::Vec2d;
+using math::Vec3d;
 
 enum class Projection { Perspective, Orthographic };
 
@@ -94,4 +89,4 @@ private:
     Vec2d m_viewport { 1.0, 1.0 };
 };
 
-} // namespace forma::view
+} // namespace aion::view

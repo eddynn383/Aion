@@ -8,7 +8,7 @@
 #include <vector>
 
 // Datele pe care Viewport (firul GUI) le predă renderer-ului (firul de randare) la fiecare cadru.
-namespace forma::render {
+namespace aion::render {
 
 struct LineInstance {
     glm::vec3 a;
@@ -57,4 +57,4 @@ struct ViewportFrame {
     unsigned meshRevision = 0;
 };
 
-} // namespace forma::render
+} // namespace aion::render

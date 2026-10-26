@@ -1,7 +1,7 @@
 #pragma once
 
-#include "forma/core/view/Camera.h"
-#include "forma/core/view/CameraMotion.h"
+#include "aion/core/view/Camera.h"
+#include "aion/core/view/CameraMotion.h"
 
 #include <QColor>
 #include <QCursor>
@@ -15,7 +15,7 @@
 #include <atomic>
 #include <deque>
 
-namespace forma::render {
+namespace aion::render {
 
 struct ViewportFrame;
 
@@ -76,7 +76,7 @@ public:
     double cameraDistance() const { return m_camera.pose().distance; }
     int framesPerSecond() const { return m_fps; }
 
-    Q_INVOKABLE void setStandardView(forma::render::Viewport::StandardView view);
+    Q_INVOKABLE void setStandardView(aion::render::Viewport::StandardView view);
     Q_INVOKABLE void zoomExtents();
     Q_INVOKABLE void toggleProjection();
     // Rotește camera continuu timp de `seconds` secunde (pentru măsurarea fps-ului).
@@ -160,4 +160,4 @@ private:
     int m_fps = 0;
 };
 
-} // namespace forma::render
+} // namespace aion::render

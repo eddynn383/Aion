@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace forma {
+namespace aion {
 
 struct Version {
     int major;
@@ -13,4 +13,4 @@ struct Version {
 Version version() noexcept;
 std::string_view versionString() noexcept;
 
-} // namespace forma
+} // namespace aion

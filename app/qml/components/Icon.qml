@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Window
-import Forma
+import Aion
 
 // Iconiță Lucide (SVG), recolorată după temă și randată la rezoluția ecranului.
 Image {

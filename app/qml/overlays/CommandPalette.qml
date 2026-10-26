@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Command palette (⌘K): caută fuzzy printre comenzi și le execută cu Enter.
 Popover {

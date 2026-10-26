@@ -8,7 +8,7 @@
 // Căutare fuzzy pentru command palette: literele din interogare trebuie să apară în text,
 // în ordine, dar nu neapărat una lângă alta. Ignoră majusculele și diacriticele românești
 // („comuta” găsește „Comută tema”).
-namespace forma::text {
+namespace aion::text {
 
 struct FuzzyMatch {
     // Mai mare = potrivire mai bună. Are sens doar pentru comparații între rezultate.
@@ -20,4 +20,4 @@ struct FuzzyMatch {
 // Textele sunt UTF-8. Interogarea goală se potrivește cu orice text, cu scor 0.
 [[nodiscard]] std::optional<FuzzyMatch> fuzzyMatch(std::string_view query, std::string_view text);
 
-} // namespace forma::text
+} // namespace aion::text

@@ -1,8 +1,8 @@
-#include "forma/render/GraphicsApi.h"
+#include "aion/render/GraphicsApi.h"
 
 #include <QQuickWindow>
 
-namespace forma::render {
+namespace aion::render {
 
 void selectPreferredGraphicsApi()
 {
@@ -34,4 +34,4 @@ QString graphicsApiName(QSGRendererInterface::GraphicsApi api)
     }
 }
 
-} // namespace forma::render
+} // namespace aion::render

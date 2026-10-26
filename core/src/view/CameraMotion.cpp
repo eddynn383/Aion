@@ -1,11 +1,11 @@
-#include "forma/core/view/CameraMotion.h"
+#include "aion/core/view/CameraMotion.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
 
 #include <cmath>
 
-namespace forma::view {
+namespace aion::view {
 
 namespace {
 
@@ -120,4 +120,4 @@ bool CameraMotion::update(Camera& camera, double dtSeconds)
     return changed;
 }
 
-} // namespace forma::view
+} // namespace aion::view

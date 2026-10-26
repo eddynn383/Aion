@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Comutator on/off, cu etichetă în stânga.
 T.Switch {

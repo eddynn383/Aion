@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Tooltip de tip „pill”: text mic plus scurtătura, deasupra elementului.
 T.ToolTip {

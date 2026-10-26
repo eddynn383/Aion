@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Câmp de text, cu iconiță opțională în stânga.
 T.TextField {

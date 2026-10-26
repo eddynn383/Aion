@@ -1,5 +1,5 @@
 import QtQuick
-import Forma
+import Aion
 
 // Bara de sus, integrată în fereastră (pe macOS, sub butoanele native).
 // Se poate trage pentru a muta fereastra; dublu-click o maximizează.
@@ -55,7 +55,7 @@ Rectangle {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "Forma"
+            text: "Aion"
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold

@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Buton cu text și iconiță opțională. Variante: "primary", "secondary", "ghost".
 T.Button {

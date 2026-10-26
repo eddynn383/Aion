@@ -7,12 +7,12 @@
 Faza 1 introduce viewport-ul 3D, camera de navigare și design system-ul. PLAN.md plasa camera în `render/`.
 
 ## Decizie
-- **Camera (`forma::view::Camera`, `CameraMotion`) stă în `core/view`**, nu în `render/`. E matematică pură (glm),
+- **Camera (`aion::view::Camera`, `CameraMotion`) stă în `core/view`**, nu în `render/`. E matematică pură (glm),
   se testează fără Qt, iar uneltele din `core/tools` (Faza 3) au nevoie de razele din cameră fără să depindă de randare.
   `render/` doar o folosește. Convenție: Z în sus, unități mm, matrici în stil OpenGL; `render/` aplică
   `QRhi::clipSpaceCorrMatrix()` pentru fiecare backend.
-- **`render/` este un modul QML static (`Forma.Render`)** cu `Viewport` (`QQuickRhiItem`, MSAA 4x).
-  Aplicația îl importă cu `Q_IMPORT_QML_PLUGIN(Forma_RenderPlugin)`. QRhi vine prin `Qt6::GuiPrivate` (API semi-public).
+- **`render/` este un modul QML static (`Aion.Render`)** cu `Viewport` (`QQuickRhiItem`, MSAA 4x).
+  Aplicația îl importă cu `Q_IMPORT_QML_PLUGIN(Aion_RenderPlugin)`. QRhi vine prin `Qt6::GuiPrivate` (API semi-public).
 - **Shaderele** sunt GLSL 440 compilate cu `qt_add_shaders` pentru MSL 1.2, HLSL 5.0 și GLSL 330 / ES 300
   (ES 300 pentru WebGL 2 în Faza 12). Toate folosesc un singur uniform buffer (`Frame`).
 - **Grid-ul infinit** e un shader full-screen (intersecția razei cu planul Z = 0), cu pas adaptiv în puteri ale lui 10.

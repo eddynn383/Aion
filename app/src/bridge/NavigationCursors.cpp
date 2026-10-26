@@ -1,7 +1,7 @@
 #include "NavigationCursors.h"
 
 #include "IconProvider.h"
-#include "forma/render/Viewport.h"
+#include "aion/render/Viewport.h"
 
 #include <QCursor>
 #include <QPainter>
@@ -41,7 +41,7 @@ void installNavigationCursors(QQuickWindow* window)
     }
     const QCursor orbit = makeCursor(QStringLiteral("rotate-3d"));
     const QCursor zoom = makeCursor(QStringLiteral("zoom-in"));
-    const auto viewports = window->contentItem()->findChildren<forma::render::Viewport*>();
+    const auto viewports = window->contentItem()->findChildren<aion::render::Viewport*>();
     for (auto* viewport : viewports) {
         viewport->setNavigationCursors(orbit, zoom);
     }

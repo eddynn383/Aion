@@ -2,7 +2,7 @@
 
 #include <QQuickImageProvider>
 
-// Randează o iconiță Lucide din resurse (:/forma/icons/<nume>.svg) în culoarea și grosimea de linie date.
+// Randează o iconiță Lucide din resurse (:/aion/icons/<nume>.svg) în culoarea și grosimea de linie date.
 // Întoarce o imagine goală dacă iconița lipsește.
 QImage renderLucideIcon(const QString& name, const QColor& color, QSize size, double strokeWidth = 1.75);
 

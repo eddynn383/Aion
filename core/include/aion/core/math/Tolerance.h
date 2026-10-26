@@ -7,7 +7,7 @@
 
 // Toate comparațiile numerice din core trec prin funcțiile de aici.
 // Nu comparăm niciodată valori double direct cu ==.
-namespace forma::tol {
+namespace aion::tol {
 
 // Unitatea internă este milimetrul.
 inline constexpr double kLength = 1e-3;
@@ -45,4 +45,4 @@ using Vec3d = glm::dvec3;
     return std::abs(glm::dot(a, b)) <= eps;
 }
 
-} // namespace forma::tol
+} // namespace aion::tol

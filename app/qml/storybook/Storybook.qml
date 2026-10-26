@@ -1,5 +1,5 @@
 import QtQuick
-import Forma
+import Aion
 
 // Pagină internă (numai în debug) cu toate componentele, pentru review vizual în ambele teme.
 Rectangle {
@@ -125,7 +125,7 @@ Rectangle {
                 width: column.width
                 title: "Input și NumberField"
                 Input { width: 260; placeholderText: "Caută…"; iconName: "search" }
-                Input { width: 200; text: "Casa.forma" }
+                Input { width: 200; text: "Casa.aion" }
                 NumberField { width: 140; label: "X"; unit: "mm"; value: 2500 }
                 NumberField { width: 140; label: "Y"; unit: "mm"; value: -1200 }
                 NumberField { width: 120; label: "∠"; unit: "°"; value: 45; decimals: 1; step: 0.5 }
@@ -162,6 +162,26 @@ Rectangle {
                     spacing: Theme.space3
                     Separator { width: 200 }
                     Separator { width: 200; color: Theme.borderStrong }
+                }
+            }
+
+            Specimen {
+                width: column.width
+                title: "Menu"
+                Button {
+                    id: menuButton
+                    text: "Deschide meniul"
+                    iconName: "chevron-down"
+                    onClicked: demoMenu.open()
+                    Menu {
+                        id: demoMenu
+                        y: menuButton.height + Theme.space1
+                        items: [
+                            { id: "move", icon: "move", name: "Move", shortcut: "M", checked: true },
+                            { id: "rotate", icon: "rotate-cw", name: "Rotate", shortcut: "Q" },
+                            { id: "scale", icon: "scale-3d", name: "Scale", shortcut: "S", enabled: false }
+                        ]
+                    }
                 }
             }
 

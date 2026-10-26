@@ -1,5 +1,5 @@
 import QtQuick
-import Forma
+import Aion
 
 // Secțiune dintr-un panou: titlu mic și conținut așezat pe verticală.
 Column {
