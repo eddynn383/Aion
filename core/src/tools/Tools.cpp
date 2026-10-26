@@ -77,7 +77,7 @@ bool deleteSelection(ToolContext& ctx)
     return ctx.stack.run("Delete", [&](model::Model& model) {
         eraseGeometry(model.mesh(ctx.context));
         for (model::InstanceId i : doomed.instances) {
-            if (model.instances().contains(i)) {
+            if (model.instances().contains(i) && !model.instance(i).locked) {
                 model::eraseInstance(model, i);
             }
         }
@@ -816,7 +816,7 @@ private:
     void mark(ToolContext& ctx, Vec2d screen)
     {
         const view::PickResult hit = pickWithInstances(ctx, screen, { -1.0, 6.0 });
-        if (hit.kind == view::PickResult::Kind::Instance) {
+        if (hit.kind == view::PickResult::Kind::Instance && !ctx.model->instance(hit.instance).locked) {
             m_markedInstances.insert(hit.instance);
         }
         if (hit.kind == view::PickResult::Kind::Edge) {

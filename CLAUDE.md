@@ -75,9 +75,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   (`aion-icon.svg` mare, `aion-icon-small.svg` pentru 16/32 px, `aion-mark.svg` fără fundal). `Aion.icns` se generează la
   compilare cu `tools/iconrender` (Qt Svg) + `iconutil`; nu se pun imagini binare în repo.
 
+- **Faza 6** făcută pe `feature/faza-6`: `model::Model` (definiții, instanțe, tag-uri, undo pe structură),
+  `Camera::inContext`, Make Group/Component, Explode, Make Unique, Outliner, Tag-uri, Entity Info, context de editare.
+  Designul: `docs/decisions/0008-model-grupuri-componente.md`. Comenzi în palette: categoria „Organizare” (⌘G, ⇧⌘G).
+
 ## Următorii pași
-1. Utilizatorul testează Fazele 3–5 în aplicație; merge `feature/faza-5`.
-2. Faza 6: grupuri, componente, tag-uri (PLAN.md).
+1. Utilizatorul testează Faza 6 în aplicație; merge `feature/faza-6`.
+2. Faza 7: fișiere (.aion), export OBJ/glTF, import (PLAN.md).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

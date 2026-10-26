@@ -346,15 +346,16 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 6 – Grupuri, componente, organizare
-- [ ] **Group:** încapsulează geometria, are transformare proprie; dublu-click intră în editare, Esc iese; restul modelului se estompează
-- [ ] **Component:** definiție + instanțe; editarea unei instanțe le modifică pe toate; „Make Unique”
-- [ ] Explode (dezgrupare)
-- [ ] **Tags (layere):** vizibilitate și culoare per tag
-- [ ] **Outliner:** arborele modelului (grupuri/componente), cu redenumire și vizibilitate
-- [ ] **Entity Info:** panou cu proprietățile selecției (lungime, arie, tag, material, nume)
-- [ ] Hide/Unhide, Lock
+- [x] **Group:** încapsulează geometria, are transformare proprie; dublu-click intră în editare, Esc iese; restul modelului se estompează
+- [x] **Component:** definiție + instanțe; editarea unei instanțe le modifică pe toate; „Make Unique”
+- [x] Explode (dezgrupare)
+- [x] **Tags (layere):** vizibilitate și culoare per tag
+- [x] **Outliner:** arborele modelului (grupuri/componente), cu redenumire și vizibilitate
+- [x] **Entity Info:** panou cu proprietățile selecției (lungime, arie, tag, material, nume) — materialele vin în Faza 8
+- [~] Hide/Unhide, Lock — pentru grupuri și componente; fețele și muchiile simple nu se pot ascunde încă
 
 **Gata când:** poți crea un scaun ca o componentă, îl copiezi de 4 ori, modifici unul și se actualizează toate.
+✓ Testul `Faza 6, „gata când”` (plus Make Unique) și, în aplicație, intrarea în componentă cu restul modelului estompat (ADR 0008).
 
 ---
 

@@ -159,6 +159,18 @@ private:
     glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
     glm::vec4 tintColor(inference::Tint tint) const;
     void appendDocument(ViewportFrame& f) const;
+    // Cum se desenează o definiție: estompată (în afara grupului editat), selectată, sub cursor, marcată de gumă.
+    struct DrawStyle {
+        bool dim = false;
+        bool selected = false;
+        bool hovered = false;
+        bool marked = false;
+    };
+    // Desenează definiția și tot ce conține. `pathIndex`: câte instanțe din calea contextului s-au parcurs
+    // (egal cu lungimea căii = contextul editat; -1 = în afara căii).
+    void appendDefinition(ViewportFrame& f, const Document& doc, model::DefinitionId definition,
+        const math::Transform& toWorld, int pathIndex, DrawStyle style, const view::PickResult& hover,
+        const tools::Overlay& overlay) const;
     void showTransientCursor(const QCursor& cursor);
     void onCameraMoved();
     void requestAnimationFrame();

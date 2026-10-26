@@ -2,6 +2,8 @@
 
 #include "aion/render/Document.h"
 
+#include "aion/core/model/Operations.h"
+
 #include "ViewportFrame.h"
 #include "ViewportRenderer.h"
 
@@ -257,74 +259,45 @@ void Viewport::afterToolEvent()
 void Viewport::appendDocument(ViewportFrame& f) const
 {
     const Document& doc = *m_document;
-    const geom::Mesh& mesh = doc.mesh();
-    const geom::Selection& selection = doc.selection();
     const view::PickResult hover = doc.tool() ? doc.tool()->hover() : view::PickResult {};
     const tools::Overlay overlay = doc.tool() ? doc.tool()->overlay() : tools::Overlay {};
+    appendDefinition(f, doc, doc.model().root(), math::Transform {}, 0, {}, hover, overlay);
 
-    for (const auto& [faceId, tri] : doc.triangles()) {
-        const geom::Face* face = mesh.faces().find(faceId);
-        if (face == nullptr) {
-            continue;
-        }
-        const glm::vec3 normal(face->plane.normal);
-        const float state = selection.contains(faceId) ? 2.0f
-            : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
-                                                                                   : 0.0f;
-        f.hasSelectedFaces = f.hasSelectedFaces || state > 1.5f;
-        // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
-        std::vector<geom::VertexId> ids = mesh.loopVertices(face->outer);
-        for (const geom::Loop& h : face->inner) {
-            const auto hv = mesh.loopVertices(h);
-            ids.insert(ids.end(), hv.begin(), hv.end());
-        }
-        for (std::uint32_t i : tri.indices) {
-            const glm::vec3 n = i < ids.size() ? glm::vec3(smoothNormal(mesh, faceId, ids[i])) : normal;
-            f.triangles.push_back({ glm::vec3(tri.points[i]), n, state });
+    // Overlay-ul uneltei e în coordonatele contextului editat.
+    const math::Transform ctx = doc.contextTransform();
+    const auto w = [&](const math::Vec3d& p) { return glm::vec3(ctx.applyToPoint(p)); };
+
+    // Grupul editat: cutia lui, punctată (ca în SketchUp).
+    if (!doc.path().empty()) {
+        const auto [lo, hi] = model::bounds(doc.model(), doc.activeDefinition());
+        if (lo.x <= hi.x) {
+            std::array<glm::vec3, 8> c {};
+            for (std::size_t k = 0; k < 8; ++k) {
+                c[k] = w({ (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z });
+            }
+            constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
+                { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+            for (const auto& [a, b] : kEdges) {
+                f.lines.push_back({ c[std::size_t(a)], c[std::size_t(b)], withAlpha(m_preview, 0.55f), { 1.0f, 4.0f } });
+            }
         }
     }
 
-    const std::set<geom::EdgeId> marked(overlay.markedEdges.begin(), overlay.markedEdges.end());
-    const glm::vec4 edge = toVec4(m_edge);
-    const glm::vec4 freeEdge = toVec4(m_freeEdge);
     const glm::vec4 accent = toVec4(m_accent);
-    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
-        const geom::EdgeId id = mesh.edges().keys()[i];
-        const geom::Edge& e = mesh.edges().values()[i];
-        glm::vec4 color = e.faces.empty() ? freeEdge : edge;
-        float width = kEdgeWidth;
-        const bool highlighted = marked.contains(id) || selection.contains(id)
-            || (hover.kind == view::PickResult::Kind::Edge && hover.edge == id);
-        if (e.soft && !highlighted) {
-            continue; // muchiile soft (laturile unui cilindru) nu se desenează
-        }
-        if (marked.contains(id)) {
-            color = toVec4(m_erase);
-            width = kHighlightedEdgeWidth;
-        } else if (selection.contains(id)) {
-            color = accent;
-            width = kHighlightedEdgeWidth;
-        } else if (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) {
-            color = withAlpha(m_accent, 0.75f);
-            width = kHighlightedEdgeWidth;
-        }
-        f.lines.push_back({ glm::vec3(mesh.position(e.v0)), glm::vec3(mesh.position(e.v1)), color, { width, 0.0f } });
-    }
-
     const glm::vec4 preview = toVec4(m_preview);
     for (const tools::OverlayLine& l : overlay.lines) {
         if (l.onTop) {
-            f.topLines.push_back({ glm::vec3(l.a), glm::vec3(l.b), tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
+            f.topLines.push_back({ w(l.a), w(l.b), tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
         } else {
-            f.lines.push_back({ glm::vec3(l.a), glm::vec3(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
+            f.lines.push_back({ w(l.a), w(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
         }
     }
     for (const math::Vec3d& p : overlay.points) {
-        f.points.push_back({ glm::vec3(p), accent, 7.0f });
+        f.points.push_back({ w(p), accent, 7.0f });
     }
     // Marcajul inferenței: un disc colorat cu margine în culoarea fundalului, peste tot restul.
     if (overlay.marker) {
-        const glm::vec3 p(overlay.marker->point);
+        const glm::vec3 p = w(overlay.marker->point);
         if (overlay.marker->kind == inference::Kind::Ground) {
             f.topPoints.push_back({ p, preview, 6.0f });
         } else {
@@ -333,7 +306,101 @@ void Viewport::appendDocument(ViewportFrame& f) const
         }
     }
     if (hover.kind == view::PickResult::Kind::Vertex) {
-        f.points.push_back({ glm::vec3(hover.point), accent, 9.0f });
+        f.points.push_back({ w(hover.point), accent, 9.0f });
+    }
+}
+
+void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::DefinitionId definition,
+    const math::Transform& toWorld, int pathIndex, DrawStyle style, const view::PickResult& hover,
+    const tools::Overlay& overlay) const
+{
+    const model::Model& model = doc.model();
+    const geom::Mesh& mesh = model.mesh(definition);
+    const auto& path = doc.path();
+    const bool active = pathIndex == static_cast<int>(path.size());
+    const bool ancestor = pathIndex >= 0 && !active;
+    // Geometria proprie a unei definiții de pe calea contextului (dar nu a contextului) e estompată.
+    const bool dim = style.dim || ancestor;
+    const geom::Selection& selection = doc.selection();
+
+    const auto stateOf = [&](geom::FaceId faceId) {
+        if (active) {
+            return selection.contains(faceId) ? 2.0f
+                : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
+                                                                                       : 0.0f;
+        }
+        return dim ? 3.0f : style.selected || style.marked ? 2.0f : style.hovered ? 1.0f : 0.0f;
+    };
+    for (const auto& [faceId, tri] : doc.triangles(definition)) {
+        const geom::Face* face = mesh.faces().find(faceId);
+        if (face == nullptr) {
+            continue;
+        }
+        const float state = stateOf(faceId);
+        f.hasSelectedFaces = f.hasSelectedFaces || (state > 1.5f && state < 2.5f);
+        // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
+        std::vector<geom::VertexId> ids = mesh.loopVertices(face->outer);
+        for (const geom::Loop& h : face->inner) {
+            const auto hv = mesh.loopVertices(h);
+            ids.insert(ids.end(), hv.begin(), hv.end());
+        }
+        for (std::uint32_t i : tri.indices) {
+            const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
+            f.triangles.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
+                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state });
+        }
+    }
+
+    const std::set<geom::EdgeId> marked(overlay.markedEdges.begin(), overlay.markedEdges.end());
+    const glm::vec4 accent = toVec4(m_accent);
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        const geom::EdgeId id = mesh.edges().keys()[i];
+        const geom::Edge& e = mesh.edges().values()[i];
+        glm::vec4 color = e.faces.empty() ? toVec4(m_freeEdge) : toVec4(m_edge);
+        float width = kEdgeWidth;
+        const bool isMarked = active ? marked.contains(id) : style.marked;
+        const bool isSelected = active ? selection.contains(id) : style.selected;
+        const bool isHovered
+            = active ? (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) : style.hovered;
+        if (e.soft && !(isMarked || (active && (isSelected || isHovered)))) {
+            continue; // muchiile soft (laturile unui cilindru) nu se desenează
+        }
+        if (isMarked) {
+            color = toVec4(m_erase);
+            width = kHighlightedEdgeWidth;
+        } else if (isSelected) {
+            color = accent;
+            width = active ? kHighlightedEdgeWidth : kEdgeWidth;
+        } else if (isHovered) {
+            color = withAlpha(m_accent, 0.75f);
+            width = active ? kHighlightedEdgeWidth : kEdgeWidth;
+        } else if (dim) {
+            color.a *= 0.3f;
+        }
+        f.lines.push_back({ glm::vec3(toWorld.applyToPoint(mesh.position(e.v0))),
+            glm::vec3(toWorld.applyToPoint(mesh.position(e.v1))), color, { width, 0.0f } });
+    }
+
+    // Instanțele din definiție.
+    const std::set<model::InstanceId> markedInstances(overlay.markedInstances.begin(), overlay.markedInstances.end());
+    for (model::InstanceId child : model.childrenOf(definition)) {
+        if (!model.isVisible(child)) {
+            continue;
+        }
+        const model::Instance& inst = model.instance(child);
+        const math::Transform childToWorld = toWorld * inst.transform;
+        if (ancestor && path[static_cast<std::size_t>(pathIndex)] == child) {
+            appendDefinition(f, doc, inst.definition, childToWorld, pathIndex + 1, {}, hover, overlay);
+            continue;
+        }
+        DrawStyle childStyle = style;
+        if (active) {
+            childStyle.selected = selection.contains(child);
+            childStyle.hovered = hover.kind == view::PickResult::Kind::Instance && hover.instance == child;
+            childStyle.marked = markedInstances.contains(child);
+        }
+        childStyle.dim = dim;
+        appendDefinition(f, doc, inst.definition, childToWorld, -1, childStyle, hover, overlay);
     }
 }
 
@@ -387,9 +454,10 @@ void Viewport::updateAnnotations()
         const tools::Overlay overlay = m_document->tool()->overlay();
         constexpr double kMinDimensionPx = 36.0;
         constexpr double kDimensionOffsetPx = 14.0;
+        const math::Transform ctx = m_document->contextTransform();
         for (const tools::Dimension& d : overlay.dimensions) {
-            const auto a = m_camera.project(d.a);
-            const auto b = m_camera.project(d.b);
+            const auto a = m_camera.project(ctx.applyToPoint(d.a));
+            const auto b = m_camera.project(ctx.applyToPoint(d.b));
             if (!a || !b || glm::length(*b - *a) < kMinDimensionPx) {
                 continue;
             }
@@ -408,7 +476,7 @@ void Viewport::updateAnnotations()
             });
         }
         if (overlay.marker && !overlay.marker->label.empty()) {
-            if (const auto p = m_camera.project(overlay.marker->point)) {
+            if (const auto p = m_camera.project(ctx.applyToPoint(overlay.marker->point))) {
                 const glm::vec4 c = markerColor(overlay.marker->kind, overlay.marker->tint);
                 list.append(QVariantMap {
                     { QStringLiteral("kind"), QStringLiteral("inference") },
@@ -518,13 +586,11 @@ void Viewport::startTurntable(double seconds)
 
 void Viewport::sceneBounds(view::Vec3d& min, view::Vec3d& max) const
 {
-    if (m_document && !m_document->mesh().vertices().empty()) {
-        min = view::Vec3d(std::numeric_limits<double>::max());
-        max = view::Vec3d(std::numeric_limits<double>::lowest());
-        for (const geom::Vertex& v : m_document->mesh().vertices().values()) {
-            min = glm::min(min, v.position);
-            max = glm::max(max, v.position);
-        }
+    const auto bounds = m_document ? model::bounds(m_document->model(), m_document->model().root())
+                                   : std::pair { view::Vec3d { 1.0 }, view::Vec3d { -1.0 } };
+    if (bounds.first.x <= bounds.second.x) {
+        min = bounds.first;
+        max = bounds.second;
         if (m_demoVisible) {
             min = glm::min(min, kDemoMin);
             max = glm::max(max, kDemoMax);

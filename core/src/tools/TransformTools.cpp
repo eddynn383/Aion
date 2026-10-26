@@ -46,7 +46,7 @@ Target targetAt(const ToolContext& ctx, Vec2d screen)
         switch (hit.kind) {
         case view::PickResult::Kind::Instance:
             t.selection.instances.insert(hit.instance);
-            return t;
+            break;
         case view::PickResult::Kind::Vertex:
             t.vertices.insert(hit.vertex);
             return t;
@@ -59,6 +59,10 @@ Target targetAt(const ToolContext& ctx, Vec2d screen)
         case view::PickResult::Kind::None:
             break;
         }
+    }
+    // Obiectele blocate nu se mută, nu se rotesc și nu se scalează.
+    if (ctx.model != nullptr) {
+        std::erase_if(t.selection.instances, [&](model::InstanceId i) { return ctx.model->instance(i).locked; });
     }
     t.vertices = geom::verticesOf(ctx.mesh, t.selection);
     return t;

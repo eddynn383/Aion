@@ -44,6 +44,16 @@ Window {
             { id: "edit.selectAll", title: "Selectează tot", category: "Editare", shortcut: "Ctrl+A",
               icon: "square-dashed-mouse-pointer" },
             { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
+            { id: "org.makeGroup", title: "Make Group", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
+            { id: "org.makeComponent", title: "Make Component", category: "Organizare", shortcut: "Ctrl+Shift+G", icon: "component" },
+            { id: "org.explode", title: "Explode", category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.makeUnique", title: "Make Unique", category: "Organizare", shortcut: "", icon: "component" },
+            { id: "org.enter", title: "Editează grupul selectat", category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.exit", title: "Ieși din grupul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
+            { id: "org.hide", title: "Ascunde selecția", category: "Organizare", shortcut: "", icon: "eye-off" },
+            { id: "org.unhideAll", title: "Arată tot", category: "Organizare", shortcut: "", icon: "eye" },
+            { id: "org.lock", title: "Blochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
+            { id: "org.unlock", title: "Deblochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
             { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
@@ -76,6 +86,16 @@ Window {
         case "edit.delete": doc.deleteSelection(); break
         case "edit.selectAll": doc.selectAll(); break
         case "edit.selectNone": doc.clearSelection(); break
+        case "org.makeGroup": doc.makeGroup(); break
+        case "org.makeComponent": doc.makeComponent(""); break
+        case "org.explode": doc.explodeSelection(); break
+        case "org.makeUnique": doc.makeUniqueSelection(); break
+        case "org.enter": doc.enterInstance(0); break
+        case "org.exit": doc.exitContext(); break
+        case "org.hide": doc.hideSelection(); break
+        case "org.unhideAll": doc.unhideAll(); break
+        case "org.lock": doc.setSelectionLocked(true); break
+        case "org.unlock": doc.setSelectionLocked(false); break
         case "ui.leftPanel": window.leftPanelVisible = !window.leftPanelVisible; break
         case "ui.rightPanel": window.rightPanelVisible = !window.rightPanelVisible; break
         case "ui.panels": {
@@ -271,23 +291,15 @@ Window {
             model: ["Outliner", "Tag-uri"]
         }
 
-        Column {
-            width: parent.width
-            spacing: Theme.space2
-            Text {
-                text: leftTabs.currentIndex === 0 ? (doc.faceCount + doc.edgeCount > 0 ? "Geometrie liberă" : "Modelul e gol") : "Niciun tag"
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeMd
-            }
-            Text {
-                width: parent.width
-                wrapMode: Text.Wrap
-                text: leftTabs.currentIndex === 0
-                      ? "Grupurile și componentele vor apărea aici (Faza 6)."
-                      : "Tag-urile (straturile) vor apărea aici (Faza 6)."
-                color: Theme.textTertiary
-                font.pixelSize: Theme.fontSizeSm
-            }
+        Outliner {
+            anchors.fill: parent
+            visible: leftTabs.currentIndex === 0
+            document: doc
+        }
+        TagsPanel {
+            anchors.fill: parent
+            visible: leftTabs.currentIndex === 1
+            document: doc
         }
     }
 
@@ -367,6 +379,57 @@ Window {
             typed: window.vcbText
         }
 
+        // Contextul de editare: „Model › Casa › Fereastră”, cu ieșire.
+        Rectangle {
+            visible: doc.contextPath.length > 0
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.margins: Theme.space3
+            width: contextRow.implicitWidth + Theme.space2 * 2
+            height: 32
+            radius: 16
+            color: Theme.bgElevated
+            border.color: Theme.borderStrong
+
+            Row {
+                id: contextRow
+                anchors.centerIn: parent
+                spacing: Theme.space1
+
+                Repeater {
+                    model: ["Model"].concat(doc.contextPath)
+                    delegate: Row {
+                        required property string modelData
+                        required property int index
+                        spacing: Theme.space1
+                        Icon {
+                            visible: parent.index > 0
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "chevron-right"
+                            size: 12
+                            color: Theme.textTertiary
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: parent.modelData
+                            color: parent.index === doc.contextPath.length ? Theme.textPrimary : Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeSm
+                            font.weight: parent.index === doc.contextPath.length ? Font.DemiBold : Font.Normal
+                        }
+                    }
+                }
+                IconButton {
+                    width: 24
+                    height: 24
+                    anchors.verticalCenter: parent.verticalCenter
+                    iconName: "x"
+                    iconSize: 12
+                    tooltip: "Ieși din grup (Esc)"
+                    onClicked: doc.exitContext()
+                }
+            }
+        }
+
         NavigationGizmo {
             anchors.top: parent.top
             anchors.right: parent.right
@@ -403,12 +466,9 @@ Window {
             width: parent.width
             spacing: Theme.space6
 
-            Text {
+            EntityInfo {
                 width: parent.width
-                wrapMode: Text.Wrap
-                text: doc.selectionSummary.length > 0 ? doc.selectionSummary : "Nimic selectat"
-                color: doc.selectionSummary.length > 0 ? Theme.textPrimary : Theme.textTertiary
-                font.pixelSize: Theme.fontSizeMd
+                document: doc
             }
 
             Section {
