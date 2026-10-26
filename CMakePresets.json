@@ -48,6 +48,41 @@
       }
     },
     {
+      "name": "win-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "win-debug",
+      "displayName": "Windows Debug (MSVC, Ninja; din „Developer PowerShell for VS”)",
+      "inherits": "win-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "win-release",
+      "displayName": "Windows Release (MSVC, Ninja)",
+      "inherits": "win-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "core-debug",
       "displayName": "Doar core + teste, fără Qt (orice platformă)",
       "inherits": "base",
@@ -80,6 +115,14 @@
       "configurePreset": "mac-release"
     },
     {
+      "name": "win-debug",
+      "configurePreset": "win-debug"
+    },
+    {
+      "name": "win-release",
+      "configurePreset": "win-release"
+    },
+    {
       "name": "core-debug",
       "configurePreset": "core-debug"
     },
@@ -105,6 +148,16 @@
       "name": "mac-release",
       "inherits": "test-base",
       "configurePreset": "mac-release"
+    },
+    {
+      "name": "win-debug",
+      "inherits": "test-base",
+      "configurePreset": "win-debug"
+    },
+    {
+      "name": "win-release",
+      "inherits": "test-base",
+      "configurePreset": "win-release"
     },
     {
       "name": "core-debug",

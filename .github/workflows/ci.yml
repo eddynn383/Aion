@@ -46,6 +46,43 @@ jobs:
       - name: Teste
         run: ctest --preset mac-debug
 
+  windows:
+    name: Windows (MSVC, Debug)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mediul MSVC (cl, Ninja în PATH)
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Instalează Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.1"
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          cache: true
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\vcpkg\archives
+          key: vcpkg-win-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-win-
+
+      - name: Configurare
+        shell: pwsh
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake --preset win-debug
+
+      - name: Build
+        run: cmake --build --preset win-debug
+
+      - name: Teste
+        run: ctest --preset win-debug
+
   wasm-core:
     name: WebAssembly (core + teste în Node)
     runs-on: ubuntu-latest

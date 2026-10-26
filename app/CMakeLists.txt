@@ -132,6 +132,23 @@ if(APPLE)
     endif()
 endif()
 
+if(WIN32)
+    # Iconița din Explorer și din bara de activități: un .ico generat din aceleași SVG-uri, legat printr-un .rc.
+    set(AION_ICON_DIR "${CMAKE_CURRENT_BINARY_DIR}/icon")
+    add_custom_command(
+        OUTPUT "${AION_ICON_DIR}/Aion.ico"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${AION_ICON_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=offscreen
+                $<TARGET_FILE:aion_iconrender> "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon.svg"
+                "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon-small.svg" "${AION_ICON_DIR}/Aion.ico"
+        DEPENDS aion_iconrender
+        COMMENT "Iconița aplicației (Aion.ico)"
+        VERBATIM
+    )
+    file(WRITE "${AION_ICON_DIR}/Aion.rc" "IDI_ICON1 ICON \"Aion.ico\"\n")
+    target_sources(aion_app PRIVATE "${AION_ICON_DIR}/Aion.rc" "${AION_ICON_DIR}/Aion.ico")
+endif()
+
 target_link_libraries(aion_app PRIVATE
     aion::core
     aion::render

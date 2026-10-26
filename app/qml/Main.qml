@@ -16,7 +16,8 @@ Window {
     title: doc.fileName + (doc.modified ? " — modificat" : "") + " · Aion"
     color: Theme.bgApp
     // Conținutul continuă sub bara de titlu (macOS: butoanele native rămân, fără fundal propriu).
-    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+    // Pe Windows și Linux rămâne bara de titlu a sistemului (TitleBar-ul nostru stă sub ea).
+    flags: Qt.platform.os === "osx" ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
 
     property bool leftPanelVisible: true
     property bool rightPanelVisible: true

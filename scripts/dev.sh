@@ -11,7 +11,8 @@ config="${2:-debug}"
 
 case "$(uname)" in
     Darwin) preset="mac-$config" ;;
-    *)      preset="core-debug" ;; # pe alte platforme deocamdată doar core + teste
+    MINGW*|MSYS*|CYGWIN*) preset="win-$config" ;; # Git Bash; compilatorul MSVC trebuie să fie în PATH
+    *)      preset="core-debug" ;; # Linux: deocamdată doar core + teste
 esac
 
 # Valori implicite, ca scriptul să meargă și dintr-un terminal fără ~/.zshrc încărcat
@@ -53,6 +54,9 @@ case "$command" in
         if [[ "$(uname)" == "Darwin" ]]; then
             # Rulăm direct executabilul, ca mesajele aplicației să apară în terminal.
             "$app/Contents/MacOS/Aion"
+        elif [[ "$preset" == win-* ]]; then
+            # Qt-ul trebuie să fie în PATH (DLL-urile); windeployqt e doar pentru pachet.
+            PATH="$QT_ROOT_DIR/bin:$PATH" "$build_dir/app/Aion.exe"
         else
             echo "Aplicația se poate rula deocamdată doar pe macOS."
         fi

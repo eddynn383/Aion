@@ -43,7 +43,9 @@ endif()
 # Setări comune pentru toate țintele noastre (nu și pentru dependențe).
 function(aion_configure_target target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8 /Zc:__cplusplus)
+        # getenv, fopen etc. sunt „nesigure” pentru MSVC; le folosim corect, fără variantele _s nestandard.
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
         if(AION_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE /WX)
         endif()

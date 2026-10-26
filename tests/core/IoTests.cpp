@@ -176,7 +176,8 @@ TEST_CASE("OBJ: export și import înapoi păstrează forma (fețele coplanare s
 TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân legate", "[core][io]")
 {
     const Model original = sampleModel();
-    const auto path = tempPath("aion-export.glb");
+    // Diacriticele din cale trebuie să meargă și pe Windows (căile nu trec prin codepage-ul local).
+    const auto path = tempPath("aion-export-ăîșț.glb");
     std::string error;
     REQUIRE(io::exportGltf(original, path, true, {}, &error));
     REQUIRE(std::filesystem::file_size(path) > 1000);

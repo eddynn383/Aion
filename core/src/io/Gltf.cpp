@@ -22,6 +22,14 @@ namespace aion::io {
 
 namespace {
 
+// tinygltf primește căi UTF-8 (pe Windows le convertește singur în UTF-16); path::string() ar folosi codepage-ul local.
+std::string utf8(const std::filesystem::path& path)
+{
+    const std::u8string text = path.u8string();
+    return { text.begin(), text.end() };
+}
+
+
 // Rotația care duce Z-sus în Y-sus: (x, y, z) → (x, z, −y).
 math::Mat4d zUpToYUp()
 {
@@ -266,7 +274,7 @@ bool exportGltf(const model::Model& model, const std::filesystem::path& path, bo
     gltf.defaultScene = 0;
 
     tinygltf::TinyGLTF writer;
-    if (!writer.WriteGltfSceneToFile(&gltf, path.string(), true, true, !binary, binary)) {
+    if (!writer.WriteGltfSceneToFile(&gltf, utf8(path), true, true, !binary, binary)) {
         if (error != nullptr) {
             *error = "Fișierul glTF nu a putut fi scris.";
         }
@@ -290,8 +298,8 @@ ImportResult importGltf(
     std::string err;
     std::string warn;
     const std::string ext = path.extension().string();
-    const bool ok = (ext == ".glb" || ext == ".GLB") ? loader.LoadBinaryFromFile(&gltf, &err, &warn, path.string())
-                                                     : loader.LoadASCIIFromFile(&gltf, &err, &warn, path.string());
+    const bool ok = (ext == ".glb" || ext == ".GLB") ? loader.LoadBinaryFromFile(&gltf, &err, &warn, utf8(path))
+                                                     : loader.LoadASCIIFromFile(&gltf, &err, &warn, utf8(path));
     if (!ok) {
         result.error = "Fișierul glTF nu poate fi citit" + (err.empty() ? std::string(".") : ": " + err);
         return result;
@@ -347,7 +355,7 @@ ImportResult importGltf(
     };
 
     // Grupul importului: transformarea din Y-sus în Z-sus.
-    const model::DefinitionId top = model.addDefinition({ path.stem().string(), true });
+    const model::DefinitionId top = model.addDefinition({ utf8(path.stem()), true });
     std::function<void(int, model::DefinitionId)> addNode;
     addNode = [&](int index, model::DefinitionId into) {
         const tinygltf::Node& node = gltf.nodes[static_cast<std::size_t>(index)];
