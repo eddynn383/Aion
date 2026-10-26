@@ -2,6 +2,9 @@ find_package(glm CONFIG REQUIRED)
 
 add_library(forma_core STATIC
     src/Version.cpp
+    src/math/Intersect.cpp
+    src/math/Plane.cpp
+    src/math/Transform.cpp
     src/text/FuzzyMatch.cpp
     src/view/Camera.cpp
     src/view/CameraMotion.cpp

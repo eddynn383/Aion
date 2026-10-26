@@ -1,8 +1,7 @@
 #pragma once
 
-#include <glm/mat4x4.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
+#include "forma/core/math/Ray.h"
+#include "forma/core/math/Vec.h"
 
 #include <optional>
 
@@ -11,14 +10,10 @@
 // din stânga-sus și y în jos (ca evenimentele de mouse).
 namespace forma::view {
 
-using Vec2d = glm::dvec2;
-using Vec3d = glm::dvec3;
-using Mat4d = glm::dmat4;
-
-struct Ray {
-    Vec3d origin;
-    Vec3d direction; // normalizat
-};
+using math::Mat4d;
+using math::Ray;
+using math::Vec2d;
+using math::Vec3d;
 
 enum class Projection { Perspective, Orthographic };
 
