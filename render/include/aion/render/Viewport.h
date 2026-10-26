@@ -3,6 +3,7 @@
 #include "aion/core/tools/Tool.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/CameraMotion.h"
+#include "aion/core/view/SceneAnimation.h"
 #include "aion/render/Document.h"
 
 #include <QByteArray>
@@ -74,6 +75,12 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(double clipStart READ clipStart WRITE setClipStart NOTIFY navigationSettingsChanged)
     Q_PROPERTY(double clipEnd READ clipEnd WRITE setClipEnd NOTIFY navigationSettingsChanged)
 
+    // Animația scenelor: redare în timp real și export cadru cu cadru.
+    Q_PROPERTY(bool scenesPlaying READ scenesPlaying NOTIFY sceneAnimationChanged)
+    Q_PROPERTY(int playingScene READ playingScene NOTIFY sceneAnimationChanged)
+    Q_PROPERTY(double exportProgress READ exportProgress NOTIFY sceneAnimationChanged)
+    Q_PROPERTY(bool exporting READ exporting NOTIFY sceneAnimationChanged)
+
     Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY cameraChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
     // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit", "pan" sau "zoom".
@@ -141,6 +148,17 @@ public:
     // Poziția camerei pentru scene: { tx, ty, tz, yaw, pitch, distance, ortho }; și tranziția animată spre una.
     Q_INVOKABLE QVariantMap cameraState() const;
     Q_INVOKABLE void animateToCamera(const QVariantMap& state);
+    // `states`: pozițiile scenelor (ca cameraState()). Orice click sau scroll în viewport oprește redarea.
+    Q_INVOKABLE void playScenes(const QVariantList& states, double transition, double delay, bool loop);
+    Q_INVOKABLE void stopScenes();
+    // Randează animația în PNG-uri (`directory`/frame_00000.png …); la sfârșit emite animationExported.
+    Q_INVOKABLE void exportScenes(const QVariantList& states, double transition, double delay, bool loop,
+        const QString& directory, int fps);
+    Q_INVOKABLE void cancelExport();
+    bool scenesPlaying() const { return m_sceneAnimation.has_value() && !m_exporting; }
+    int playingScene() const { return m_playingScene; }
+    double exportProgress() const { return m_exportProgress; }
+    bool exporting() const { return m_exporting; }
     // Încadrează selecția documentului (sau tot modelul, dacă nu e nimic selectat).
     Q_INVOKABLE void zoomToSelection();
     Q_INVOKABLE void toggleProjection();
@@ -165,6 +183,9 @@ signals:
     void annotationsChanged();
     void pointerPositionChanged();
     void navigationSettingsChanged();
+    void sceneAnimationChanged();
+    // Export terminat: `frames` cadre în `directory` (0 = anulat sau eșuat).
+    void animationExported(const QString& directory, int frames, int fps);
 
 protected:
     QQuickRhiItemRenderer* createRenderer() override;
@@ -198,6 +219,21 @@ private:
     view::Vec3d zoomAnchor(QPointF position);
     // Cutia scenei pentru planurile de tăiere ale camerei (după fiecare schimbare a modelului).
     void updateSceneBounds();
+
+    void advanceSceneAnimation(double dt);
+    void exportNextFrame();
+
+    std::optional<view::SceneAnimation> m_sceneAnimation;
+    double m_sceneTime = 0.0;
+    bool m_loopScenes = false;
+    int m_playingScene = -1;
+    bool m_exporting = false;
+    double m_exportProgress = 0.0;
+    int m_exportFrame = 0;
+    int m_exportFrames = 0;
+    int m_exportFps = 30;
+    QString m_exportDirectory;
+    QTimer* m_exportTimer = nullptr;
 
     int m_orbitPivotMode = 0;
     bool m_trackpadOrbiting = false;

@@ -178,6 +178,15 @@ std::string toJson(const model::Model& model)
             { "locked", inst.locked },
             { "material", inst.material.value },
         });
+        if (inst.behavior.kind != model::Behavior::Kind::None) {
+            instances.back()["behavior"] = {
+                { "kind", static_cast<int>(inst.behavior.kind) },
+                { "anchor", static_cast<int>(inst.behavior.anchor) },
+                { "amount", inst.behavior.amount },
+                { "duration", inst.behavior.duration },
+                { "open", inst.behavior.open },
+            };
+        }
     }
     json tags = json::array();
     for (std::size_t i : sortedIndices(model.tags())) {
@@ -295,6 +304,13 @@ LoadResult fromJson(std::string_view text)
             inst.hidden = i.value("hidden", false);
             inst.locked = i.value("locked", false);
             inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
+            if (const auto b = i.find("behavior"); b != i.end()) {
+                inst.behavior.kind = static_cast<model::Behavior::Kind>(std::clamp(b->value("kind", 0), 0, 2));
+                inst.behavior.anchor = static_cast<model::Behavior::Anchor>(std::clamp(b->value("anchor", 0), 0, 5));
+                inst.behavior.amount = b->value("amount", 90.0);
+                inst.behavior.duration = b->value("duration", 0.6);
+                inst.behavior.open = b->value("open", false);
+            }
             changes.instances[model::InstanceId { i.at("id").get<std::uint64_t>() }].after = std::move(inst);
         }
         for (const json& t : doc.at("tags")) {

@@ -17,11 +17,6 @@ constexpr double kMinOrbitSpeed = 0.01; // rad/s
 constexpr double kZoomRate = 18.0;
 constexpr double kMinZoomLog = 1e-4;
 
-double easeInOutCubic(double t)
-{
-    return t < 0.5 ? 4.0 * t * t * t : 1.0 - std::pow(-2.0 * t + 2.0, 3.0) / 2.0;
-}
-
 // Diferența unghiulară cea mai scurtă, în (−π, π].
 double shortestAngle(double from, double to)
 {
@@ -35,7 +30,14 @@ double shortestAngle(double from, double to)
     return d;
 }
 
-CameraPose interpolate(const CameraPose& a, const CameraPose& b, double t)
+} // namespace
+
+double easeInOutCubic(double t)
+{
+    return t < 0.5 ? 4.0 * t * t * t : 1.0 - std::pow(-2.0 * t + 2.0, 3.0) / 2.0;
+}
+
+CameraPose interpolatePose(const CameraPose& a, const CameraPose& b, double t)
 {
     CameraPose p;
     p.target = a.target + (b.target - a.target) * t;
@@ -46,7 +48,7 @@ CameraPose interpolate(const CameraPose& a, const CameraPose& b, double t)
     return p;
 }
 
-} // namespace
+
 
 void CameraMotion::animateTo(const Camera& camera, const CameraPose& target, double durationSeconds)
 {
@@ -87,7 +89,7 @@ bool CameraMotion::update(Camera& camera, double dtSeconds)
         const double t = m_transition->duration <= 0.0
             ? 1.0
             : std::min(m_transition->elapsed / m_transition->duration, 1.0);
-        camera.setPose(interpolate(m_transition->from, m_transition->to, easeInOutCubic(t)));
+        camera.setPose(interpolatePose(m_transition->from, m_transition->to, easeInOutCubic(t)));
         if (t >= 1.0) {
             m_transition.reset();
         }

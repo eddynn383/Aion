@@ -123,6 +123,14 @@ const guides = {
         steps: ["Alege un material din panoul Materiale", "Click pe o față"],
         tip: "⌥ ia materialul de pe o față; ⇧ înlocuiește peste tot același material"
     },
+    interact: {
+        title: "Interact",
+        summary: "Deschide și închide ușile, sertarele și clapetele cărora le-ai dat o interacțiune.",
+        steps: ["Selectează un grup și alege în Entity Info → Interacțiune: Balama sau Glisare",
+                "Alege latura balamalei (sau direcția) și unghiul (sau distanța)",
+                "Cu Interact, click pe obiect: se deschide; încă un click: se închide"],
+        tip: "Starea deschis / închis se salvează în fișier și are undo"
+    },
     orbit: {
         title: "Orbit",
         summary: "Rotește camera în jurul modelului.",
@@ -149,4 +157,4 @@ function guide(id) {
 
 // Ordinea din turul aplicației.
 const tourOrder = ["select", "line", "rectangle", "pushpull", "move", "rotate", "scale", "offset", "arc", "circle",
-                   "polygon", "eraser", "paint", "tape", "protractor", "dimension", "text", "section", "orbit", "pan", "zoom"]
+                   "polygon", "eraser", "paint", "tape", "protractor", "dimension", "text", "section", "interact", "orbit", "pan", "zoom"]

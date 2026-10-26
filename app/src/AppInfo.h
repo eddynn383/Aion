@@ -46,6 +46,9 @@ public:
     Q_INVOKABLE void simulateMove(QQuickItem* item, const QPointF& position) const;
     // Click cu butonul drept (meniul contextual).
     Q_INVOKABLE void simulateRightClick(QQuickItem* item, const QPointF& position) const;
+    // Animația scenelor: cadrele PNG din `directory` → video MP4 la `output` (AVFoundation pe macOS, altfel ffmpeg).
+    // Întoarce un text gol la succes (și șterge cadrele), altfel motivul. Fără encoder, cadrele rămân pe disc.
+    Q_INVOKABLE QString encodeVideo(const QString& directory, int fps, const QString& output) const;
     // Rotița mouse-ului (pași de 120 = o treaptă; pozitiv = apropiere).
     Q_INVOKABLE void simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const;
 

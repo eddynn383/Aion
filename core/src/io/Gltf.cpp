@@ -355,14 +355,14 @@ ImportResult importGltf(
         const math::Mat4d local = scaleTranslation * localMatrix(node) * glm::inverse(scaleTranslation);
         const math::Transform transform(local);
         if (node.children.empty() && node.mesh >= 0) {
-            model.addInstance({ into, meshDefinition(node.mesh), transform, node.name, {}, false, false, {} });
+            model.addInstance({ into, meshDefinition(node.mesh), transform, node.name, {}, false, false, {}, {} });
             return;
         }
         const model::DefinitionId group
             = model.addDefinition({ node.name.empty() ? "Nod " + std::to_string(index + 1) : node.name, true });
-        model.addInstance({ into, group, transform, {}, {}, false, false, {} });
+        model.addInstance({ into, group, transform, {}, {}, false, false, {}, {} });
         if (node.mesh >= 0) {
-            model.addInstance({ group, meshDefinition(node.mesh), {}, {}, {}, false, false, {} });
+            model.addInstance({ group, meshDefinition(node.mesh), {}, {}, {}, false, false, {}, {} });
         }
         for (int child : node.children) {
             addNode(child, group);
@@ -382,7 +382,7 @@ ImportResult importGltf(
     if (options.yUp) {
         axes = glm::inverse(zUpToYUp());
     }
-    result.instance = model.addInstance({ parent, top, math::Transform(axes), {}, {}, false, false, {} });
+    result.instance = model.addInstance({ parent, top, math::Transform(axes), {}, {}, false, false, {}, {} });
     if (result.faces == 0) {
         result.error = "Fișierul nu conține geometrie (triunghiuri).";
     }

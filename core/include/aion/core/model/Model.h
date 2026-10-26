@@ -103,6 +103,23 @@ struct Definition {
     bool operator==(const Definition&) const = default;
 };
 
+// Comportamentul la click cu unealta Interact (ca la componentele dinamice din SketchUp): o ușă pe balama sau
+// un sertar care glisează. Axele și punctele se calculează din cutia definiției, în coordonatele ei.
+struct Behavior {
+    enum class Kind { None, Rotate, Slide };
+    // Rotate: latura balamalei (Left, Right = verticală; Top, Bottom = orizontală), deschidere spre față (−Y).
+    // Slide: direcția (Front = −Y, Back = +Y, Left = −X, Right = +X, Top = +Z, Bottom = −Z).
+    enum class Anchor { Left, Right, Front, Back, Top, Bottom };
+
+    Kind kind = Kind::None;
+    Anchor anchor = Anchor::Left;
+    double amount = 90.0; // grade (Rotate) sau mm (Slide); negativ = sens invers
+    double duration = 0.6; // secunde
+    bool open = false; // starea curentă (transformarea instanței e cea „deschisă” când e true)
+
+    bool operator==(const Behavior&) const = default;
+};
+
 // O plasare a unei definiții în altă definiție (`parent`), cu transformarea local → părinte.
 struct Instance {
     DefinitionId parent;
@@ -114,6 +131,7 @@ struct Instance {
     bool locked = false;
     // Materialul cu care se văd fețele fără material din interior (ca „vopsirea” unui grup în SketchUp).
     MaterialId material;
+    Behavior behavior;
 
     bool operator==(const Instance&) const = default;
 };

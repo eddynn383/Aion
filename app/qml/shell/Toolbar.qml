@@ -12,7 +12,8 @@ Item {
 
     readonly property var groups: [
         { id: "select", tools: [
-            { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 } ] },
+            { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 },
+            { id: "interact", icon: "hand-pointer", name: "Interact", key: "I", phase: 0 } ] },
         { id: "lines", tools: [
             { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3 },
             { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 } ] },

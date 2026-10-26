@@ -249,6 +249,17 @@ public:
     void selectForContextMenu(const view::Camera& camera, math::Vec2d screen);
     // Cutia selecției în coordonate globale (pentru „Zoom la selecție”); nullopt dacă selecția e goală.
     std::optional<std::pair<math::Vec3d, math::Vec3d>> selectionBounds() const;
+    // --- Interacțiuni (unealta Interact) ---
+    // Click: comută instanța interactivă de sub cursor, cu animație. Întoarce false dacă nu e nimic interactiv.
+    bool interactAt(const view::Camera& camera, math::Vec2d screen);
+    // Avansează animațiile; întoarce true cât timp mai există una (viewport-ul cere cadre).
+    bool advanceInteractions(double dt);
+    // Transformarea de afișat pentru o instanță în mișcare (altfel nullopt: cea din model).
+    std::optional<math::Transform> displayTransform(model::InstanceId instance) const;
+    unsigned interactionRevision() const { return m_interactionRevision; }
+    // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
+    Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
+
     // Punctul de pe model (fețe, muchii, grupuri și obiecte vizibile) de sub cursor, în coordonate globale.
     // `camera` e camera globală a viewport-ului. Pentru zoom spre suprafață și orbita în jurul cursorului.
     std::optional<math::Vec3d> surfacePoint(const view::Camera& camera, math::Vec2d screen) const;
@@ -279,6 +290,15 @@ signals:
     void changed();
 
 private:
+    struct InteractionAnimation {
+        model::InstanceId instance;
+        double elapsed = 0.0;
+        double duration = 0.6;
+        bool opening = true;
+    };
+    std::vector<InteractionAnimation> m_interactions;
+    unsigned m_interactionRevision = 0;
+
     bool m_snapToGrid = false;
     double m_gridStep = 0.0;
 

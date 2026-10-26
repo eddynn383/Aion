@@ -561,6 +561,21 @@ Canvas {
             d.polygon([[-2, -1.8, z], [2, -1.8, z], [2, 1.8, z], [-2, 1.8, z]], Qt.rgba(0.96, 0.62, 0.04, 0.10), "#F59E0B", 1.4)
             d.cursor(t < 0.25 ? approach(d, t, [1.8, -1.8, z], 0.22) : d.p(1.8, -1.8, z), d.clickK(t, 0.25), "hand")
         },
+        interact: function(d, t, c) {
+            d.grid()
+            // Un dulap cu ușa pe balamaua din stânga; click pe ușă → se deschide spre față.
+            d.box([-1.2, -0.8, 0], [2.4, 1.6, 1.8], {})
+            const open = t < 0.3 ? 0 : t < 0.55 ? phase(t, 0.3, 0.55) : t < 0.72 ? 1 : 1 - phase(t, 0.72, 0.95)
+            const angle = -open * Math.PI / 2
+            const pivot = [-1.2, -0.8]
+            const rot = q => {
+                const x = q[0] - pivot[0], y = q[1] - pivot[1]
+                return [pivot[0] + x * Math.cos(angle) - y * Math.sin(angle), pivot[1] + x * Math.sin(angle) + y * Math.cos(angle), q[2]]
+            }
+            d.box([-1.2, -0.88, 0.05], [2.4, 0.08, 1.7], { transform: rot, normalRotation: angle, color: "#B08154" })
+            const knob = rot([0.9, -0.92, 0.9])
+            d.cursor(t < 0.28 ? approach(d, t, knob, 0.24) : d.p(...knob), Math.max(d.clickK(t, 0.28), d.clickK(t, 0.7)), "hand")
+        },
         orbit: function(d, t, c) {
             d.view.yaw = Math.sin(t * Math.PI * 2) * 0.7
             d.grid()
