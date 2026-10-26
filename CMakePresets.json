@@ -103,6 +103,19 @@
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
       }
+    },
+    {
+      "name": "wasm-app",
+      "displayName": "Aplicația completă pentru web (Qt for WebAssembly; QT_ROOT_DIR = Qt wasm, QT_HOST_PATH = Qt desktop)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AION_BUILD_TESTS": "OFF",
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{QT_ROOT_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
+        "QT_HOST_PATH": "$env{QT_HOST_PATH}"
+      }
     }
   ],
   "buildPresets": [
@@ -129,6 +142,10 @@
     {
       "name": "wasm-core",
       "configurePreset": "wasm-core"
+    },
+    {
+      "name": "wasm-app",
+      "configurePreset": "wasm-app"
     }
   ],
   "testPresets": [

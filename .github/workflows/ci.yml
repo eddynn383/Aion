@@ -123,3 +123,76 @@ jobs:
 
       - name: Mărimea bibliotecii
         run: ls -l build/wasm-core/core/libaion_core.a build/wasm-core/tests/aion_tests.*
+
+  wasm-app:
+    name: Web (aplicația completă, Qt for WebAssembly)
+    runs-on: ubuntu-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalează Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      # Qt pentru WebAssembly are nevoie de Qt-ul desktop de aceeași versiune (unelte rulate la build: moc, qsb…).
+      - name: Instalează Qt desktop (unelte de build)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.1"
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: qtshadertools
+          cache: true
+
+      - name: Reține Qt-ul desktop ca QT_HOST_PATH
+        run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Instalează Qt pentru WebAssembly
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.1"
+          host: all_os
+          target: wasm
+          arch: wasm_singlethread
+          modules: qtshadertools
+          cache: true
+
+      # Qt 6.10 cere Emscripten 4.0.7 (https://doc.qt.io/qt-6.10/wasm.html).
+      - name: Instalează Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: "4.0.7"
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-wasm-app-${{ hashFiles('vcpkg.json', 'triplets/wasm32-emscripten.cmake') }}
+          restore-keys: vcpkg-wasm-app-
+
+      - name: Instalează vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Configurare
+        run: cmake --preset wasm-app
+
+      - name: Build
+        run: cmake --build --preset wasm-app
+
+      - name: Pagina web (HTML + JS + WASM)
+        run: |
+          mkdir -p web
+          cp build/wasm-app/app/Aion.html web/index.html
+          cp build/wasm-app/app/Aion.js build/wasm-app/app/Aion.wasm build/wasm-app/app/qtloader.js web/
+          cp resources/branding/aion-icon.svg web/ 2>/dev/null || true
+          ls -l web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aion-web
+          path: web

@@ -35,6 +35,9 @@ std::filesystem::path toPath(const QString& path)
     return std::filesystem::path(path.toStdU16String());
 }
 
+// Copia de recuperare, pe web (unde fișierele nu persistă).
+const QString kRecoveryDataKey = QStringLiteral("recovery/data");
+
 
 QString plural(std::size_t n, const char* one, const char* many)
 {
@@ -100,6 +103,16 @@ Document::Document(QObject* parent)
     setActiveTool(QStringLiteral("select"));
 
     // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate.
+#ifdef Q_OS_WASM
+    // În browser, fișierele sunt doar în memorie: copia de recuperare stă în QSettings (IndexedDB / localStorage).
+    {
+        const QByteArray data = QSettings().value(kRecoveryDataKey).toByteArray();
+        QFile file(autosavePath());
+        if (!data.isEmpty() && !file.exists() && file.open(QIODevice::WriteOnly)) {
+            file.write(data);
+        }
+    }
+#endif
     m_hasRecovery = QFile::exists(autosavePath());
     m_autosaveTimer.setInterval(60'000);
     connect(&m_autosaveTimer, &QTimer::timeout, this, &Document::autosave);
@@ -390,6 +403,12 @@ void Document::autosave()
         QSettings settings;
         settings.setValue(kRecoverySourceKey, m_filePath);
         settings.setValue(kRecoveryTimeKey, QDateTime::currentDateTime());
+#ifdef Q_OS_WASM
+        QFile file(autosavePath());
+        if (file.open(QIODevice::ReadOnly)) {
+            settings.setValue(kRecoveryDataKey, file.readAll());
+        }
+#endif
     }
 }
 
@@ -399,6 +418,7 @@ void Document::removeAutosave()
     QSettings settings;
     settings.remove(kRecoverySourceKey);
     settings.remove(kRecoveryTimeKey);
+    settings.remove(kRecoveryDataKey);
     if (m_hasRecovery) {
         m_hasRecovery = false;
         emit recoveryChanged();
