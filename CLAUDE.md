@@ -32,8 +32,8 @@ Variabile necesare: `VCPKG_ROOT` (implicit `~/vcpkg`), `QT_ROOT_DIR` (implicit `
 Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 
 ## Stadiu
-- **Faza 0** verificată pe Mac (2026-10-26): `make setup`, `make test` (4/4) și `make run` merg. Rămâne doar CI-ul,
-  care nu a rulat niciodată (proiectul nu e încă pe GitHub).
+- **Faza 0** verificată pe Mac (2026-10-26): `make setup`, `make test` și `make run` merg.
+- Repo: <https://github.com/eddynn383/Aion> (urcat pe 2026-10-26; `main` e ramura principală).
 - **ASan e blocat pe acest Mac** (Apple clang 17 + macOS 26.6: deadlock în `AsanInitInternal`, chiar și la un `int main(){}`).
   `cmake/AionOptions.cmake` testează la configurare dacă ASan pornește; dacă nu, folosește doar UBSan (cu avertisment).
 - **Atenție la `timeout` din `/usr/local/bin`:** e binar Intel, iar tot ce rulează sub el trece prin Rosetta
@@ -48,13 +48,15 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - Unelte de verificare (variabile de mediu): `AION_SCREENSHOT`, `AION_SCREENSHOT_DELAY_MS`, `AION_THEME`,
   `AION_STORYBOOK=1`, `AION_STARTUP="view.top;palette:zoom;debug.benchmark"` (afișează fps în consolă).
 
-- **Faza 2** făcută pe `feature/faza-2`: `core/math`, `geom::Mesh` (topologie, primitive Euler, înregistrarea
+- **Faza 2** făcută și unită în `main`: `core/math`, `geom::Mesh` (topologie, primitive Euler, înregistrarea
   schimbărilor, `validate()`), `geom::drawLine` / `drawPolygon` / `eraseEdge` cu recalcularea fețelor pe plan,
   triangulare earcut, `commands::CommandStack`. 62 de teste, inclusiv fuzz de 10 000 de operații (~40 s în debug).
   Designul: `docs/decisions/0003-nucleu-geometric.md`. Lipsește doar rularea sub ASan (vezi mai sus).
 
+- Toolbar-ul are unelte grupate ca în Figma (`shell/ToolGroupButton.qml`, `components/Menu.qml`).
+
 ## Următorii pași
-1. Merge `feature/faza-2` în `main` după confirmarea utilizatorului.
+1. Verifică primul run al CI-ului pe GitHub (n-a mai rulat niciodată; include ASan pe runner-ul macOS).
 2. Prototipul WebAssembly pentru `aion_core` (PLAN, secțiunea 9, pasul 4), apoi Faza 3.
 
 ## Convenții
