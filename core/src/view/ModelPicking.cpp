@@ -1,4 +1,5 @@
 #include "aion/core/view/ModelPicking.h"
+#include "aion/core/view/Picking.h"
 
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/math/Intersect.h"
@@ -21,6 +22,11 @@ std::optional<math::Vec3d> nearestHit(
     std::optional<math::Vec3d> best;
     double bestT = std::numeric_limits<double>::infinity();
     const geom::Mesh& mesh = model.mesh(definition);
+    // Toată definiția ratată: nimic de testat înăuntru.
+    const auto [blo, bhi] = model::bounds(model, definition);
+    if (blo.x > bhi.x || !rayHitsBox(ray, blo, bhi, 1.0)) {
+        return std::nullopt;
+    }
     for (geom::FaceId f : mesh.faces().keys()) {
         const geom::FaceTriangles tri = geom::triangulateFace(mesh, f);
         for (std::size_t i = 0; i + 2 < tri.indices.size(); i += 3) {

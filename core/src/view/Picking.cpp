@@ -3,12 +3,14 @@
 #include "aion/core/geom/Mesh.h"
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/math/Intersect.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <limits>
 #include <optional>
+#include <utility>
 
 namespace aion::view {
 
@@ -28,6 +30,17 @@ FaceHit nearestFace(const Mesh& mesh, const math::Ray& ray)
 {
     FaceHit best;
     for (FaceId f : mesh.faces().keys()) {
+        // Testul rapid pe cutia conturului: majoritatea fețelor nu sunt sub cursor.
+        Vec3d lo { std::numeric_limits<double>::infinity() };
+        Vec3d hi { -std::numeric_limits<double>::infinity() };
+        for (const geom::EdgeUse& u : mesh.face(f).outer.uses) {
+            const Vec3d& p = mesh.position(mesh.useStart(u));
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+        }
+        if (!rayHitsBox(ray, lo, hi, tol::kLength)) {
+            continue;
+        }
         const geom::FaceTriangles tri = geom::triangulateFace(mesh, f);
         for (std::size_t i = 0; i + 2 < tri.indices.size(); i += 3) {
             const auto t = math::intersectRayTriangle(
@@ -117,6 +130,35 @@ struct Rect2 {
 };
 
 } // namespace
+
+bool rayHitsBox(const math::Ray& ray, const Vec3d& lo, const Vec3d& hi, double margin)
+{
+    double tmin = -std::numeric_limits<double>::infinity();
+    double tmax = std::numeric_limits<double>::infinity();
+    for (int axis = 0; axis < 3; ++axis) {
+        const double o = ray.origin[axis];
+        const double d = ray.direction[axis];
+        const double a = lo[axis] - margin;
+        const double b = hi[axis] + margin;
+        if (std::abs(d) < 1e-15) {
+            if (o < a || o > b) {
+                return false;
+            }
+            continue;
+        }
+        double t0 = (a - o) / d;
+        double t1 = (b - o) / d;
+        if (t0 > t1) {
+            std::swap(t0, t1);
+        }
+        tmin = std::max(tmin, t0);
+        tmax = std::min(tmax, t1);
+        if (tmin > tmax) {
+            return false;
+        }
+    }
+    return tmax >= 0.0;
+}
 
 PickResult pick(const Mesh& mesh, const Camera& camera, Vec2d screen, PickOptions options)
 {
