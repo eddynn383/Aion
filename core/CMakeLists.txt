@@ -22,6 +22,8 @@ add_library(aion_core STATIC
     src/inference/Inference.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp
+    src/tools/ToolHelpers.cpp
+    src/tools/TransformTools.cpp
 )
 add_library(aion::core ALIAS aion_core)
 

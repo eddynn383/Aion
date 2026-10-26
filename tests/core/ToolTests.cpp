@@ -2,11 +2,13 @@
 #include "aion/core/tools/Tool.h"
 #include "aion/core/view/Picking.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
 using namespace aion;
+using Catch::Approx;
 using geom::Mesh;
 using math::Vec2d;
 using math::Vec3d;
@@ -354,4 +356,117 @@ TEST_CASE("Unelte: Push/Pull prin tragere, prin VCB și dublu-click", "[core][to
         hi = glm::max(hi, s.mesh.position(v));
     }
     CHECK(std::abs(hi.z - 2800) < 1e-6);
+}
+
+namespace {
+
+double maxCoord(const Mesh& mesh, int axis)
+{
+    double hi = -1e18;
+    for (geom::VertexId v : mesh.vertices().keys()) {
+        hi = std::max(hi, mesh.position(v)[axis]);
+    }
+    return hi;
+}
+
+// Cutie 2000 × 1000 × 1000 desenată cu uneltele.
+void toolBox(Scene& s)
+{
+    auto rect = tools::makeTool("rectangle");
+    s.click(*rect, { 0, 0, 0 });
+    rect->pointerMove(s.ctx, Scene::at(s.screen({ 2000, 1000, 0 })));
+    REQUIRE(rect->applyMeasurement(s.ctx, "2000,1000"));
+    geom::pushPull(s.mesh, s.mesh.faces().keys().front(), -1000);
+    REQUIRE(s.mesh.faces().size() == 6);
+}
+
+} // namespace
+
+TEST_CASE("Unelte: Move cu distanța tastată, copiere și array", "[core][tools][transform]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 2000, 1000, 500 }, 0, 0, 14000 }));
+    toolBox(s);
+    auto move = tools::makeTool("move");
+    auto select = tools::makeTool("select");
+    s.click(*select, { 1000, 500, 1000 }, {}, 3); // triplu-click: toată cutia
+    REQUIRE(s.selection.faces.size() == 6);
+
+    // Mutare de 500 pe axa roșie.
+    s.click(*move, { 0, 0, 1000 });
+    move->pointerMove(s.ctx, Scene::at(s.screen({ 800, 0, 1000 })));
+    REQUIRE(move->applyMeasurement(s.ctx, "500"));
+    CHECK(maxCoord(s.mesh, 0) == Approx(2500));
+    CHECK(s.stack.undoName() == "Move");
+    CHECK(s.selection.faces.size() == 6);
+
+    // Copie cu Option la 3000, apoi x3: în total trei copii.
+    tools::Modifiers option;
+    option.alt = true;
+    s.click(*move, { 500, 0, 1000 }, option);
+    move->pointerMove(s.ctx, { s.screen({ 1500, 0, 1000 }), option, 1 });
+    REQUIRE(move->applyMeasurement(s.ctx, "3000"));
+    CHECK(s.mesh.faces().size() == 12);
+    REQUIRE(move->applyMeasurement(s.ctx, "x3"));
+    CHECK(s.mesh.faces().size() == 24);
+    CHECK(maxCoord(s.mesh, 0) == Approx(2500 + 9000));
+
+    // „/2” după o copie nouă: copia se înlocuiește cu două, la jumătate și la capăt.
+    s.stack.undo();
+    REQUIRE(s.mesh.faces().size() == 12);
+    CHECK_FALSE(move->applyMeasurement(s.ctx, "/2")); // ultima comandă nu mai e o copiere
+}
+
+TEST_CASE("Unelte: Rotate cu unghiul tastat și Scale cu factorul tastat", "[core][tools][transform]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 0, 0, 500 }, 0, 0, 12000 }));
+    toolBox(s);
+    auto select = tools::makeTool("select");
+    s.click(*select, { 1000, 500, 1000 }, {}, 3);
+    REQUIRE(s.selection.faces.size() == 6);
+
+    // Centrul pe colțul de sus (0, 0, 1000). Colțul e și pe fețele laterale, deci alegem axa cu săgeata sus.
+    auto rotate = tools::makeTool("rotate");
+    rotate->pointerMove(s.ctx, Scene::at(s.screen({ 0, 0, 1000 })));
+    REQUIRE(rotate->key(s.ctx, { tools::Key::Up, {} }));
+    s.click(*rotate, { 0, 0, 1000 });
+    s.click(*rotate, { 2000, 0, 1000 }); // referința: capătul laturii de pe axa roșie
+    rotate->pointerMove(s.ctx, Scene::at(s.screen({ 100, 1500, 1000 })));
+    REQUIRE(rotate->applyMeasurement(s.ctx, "90"));
+    CHECK(s.stack.undoName() == "Rotate");
+    // Cutia stă acum între x = −1000 și 0, y = 0 și 2000.
+    CHECK(maxCoord(s.mesh, 1) == Approx(2000));
+    CHECK(maxCoord(s.mesh, 0) == Approx(0).margin(1e-6));
+
+    auto scale = tools::makeTool("scale");
+    s.click(*scale, { 0, 0, 1000 });
+    s.click(*scale, { 0, 2000, 1000 });
+    scale->pointerMove(s.ctx, Scene::at(s.screen({ 0, 2500, 1000 })));
+    REQUIRE(scale->applyMeasurement(s.ctx, "2"));
+    CHECK(maxCoord(s.mesh, 1) == Approx(4000));
+    CHECK(maxCoord(s.mesh, 2) == Approx(1000));
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
+}
+
+TEST_CASE("Unelte: acoperiș în două ape cu Move pe linia de coamă (săgeata sus)", "[core][tools][transform]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 500, 500 }, 0, 0, 9000 }));
+    toolBox(s);
+    auto line = tools::makeTool("line");
+    // Coama: între mijloacele laturilor scurte ale feței de sus.
+    s.click(*line, { 0, 500, 1000 });
+    s.click(*line, { 2000, 500, 1000 });
+    line->key(s.ctx, { tools::Key::Escape, {} });
+    REQUIRE(s.mesh.faces().size() == 7);
+
+    auto move = tools::makeTool("move");
+    s.click(*move, { 1000, 500, 1000 }); // fără selecție: mută muchia de sub cursor
+    REQUIRE(move->key(s.ctx, { tools::Key::Up, {} }));
+    move->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 500, 1600 })));
+    REQUIRE(move->applyMeasurement(s.ctx, "800"));
+    CHECK(maxCoord(s.mesh, 2) == Approx(1800));
+    CHECK(s.mesh.faces().size() == 7);
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
 }

@@ -4,6 +4,8 @@
 #include "aion/core/tools/Tool.h"
 #include "aion/core/units/Length.h"
 
+#include "ToolHelpers.h"
+
 #include <glm/geometric.hpp>
 
 #include <array>
@@ -13,9 +15,6 @@
 namespace aion::tools {
 
 namespace {
-
-// Distanța minimă (în pixeli) de la care o apăsare devine tragere.
-constexpr double kDragThresholdPx = 4.0;
 
 const math::Plane kGround = math::Plane::fromPointNormal({ 0.0, 0.0, 0.0 }, { 0.0, 0.0, 1.0 });
 
@@ -182,77 +181,6 @@ private:
     bool m_dragging = false;
     view::PickResult m_hover;
 };
-
-// --- Inferență (comun pentru Line și Rectangle) -----------------------------------------------
-
-void appendInference(Overlay& o, const inference::Inference& inf)
-{
-    for (const inference::Guide& g : inf.guides) {
-        o.lines.push_back({ g.a, g.b, g.dashed, g.tint, true });
-    }
-    if (inf.valid()) {
-        const inference::Tint tint = inf.guides.empty() ? inference::Tint::Neutral : inf.guides.front().tint;
-        o.marker = InferenceMarker { inf.point, inf.kind, tint, std::string(inference::label(inf)), inf.locked };
-    }
-}
-
-// Ce se evidențiază sub cursor: muchia sau fața pe care stă punctul inferat (capetele au marcajul lor).
-view::PickResult inferenceHover(const inference::Inference& inf)
-{
-    view::PickResult h;
-    switch (inf.kind) {
-    case inference::Kind::OnEdge:
-    case inference::Kind::Midpoint:
-    case inference::Kind::Intersection:
-        if (inf.edge) {
-            h.kind = view::PickResult::Kind::Edge;
-            h.edge = inf.edge;
-            h.point = inf.point;
-        }
-        break;
-    case inference::Kind::OnFace:
-        h.kind = view::PickResult::Kind::Face;
-        h.face = inf.face;
-        h.point = inf.point;
-        break;
-    default:
-        break;
-    }
-    return h;
-}
-
-// Săgețile: → axa roșie, ← verde, ↑ albastră, ↓ paralel cu muchia de referință.
-bool handleArrow(inference::Engine& engine, Key key)
-{
-    switch (key) {
-    case Key::Right:
-        engine.toggleAxisLock(inference::Axis::X);
-        return true;
-    case Key::Left:
-        engine.toggleAxisLock(inference::Axis::Y);
-        return true;
-    case Key::Up:
-        engine.toggleAxisLock(inference::Axis::Z);
-        return true;
-    case Key::Down:
-        engine.toggleReferenceLock();
-        return true;
-    default:
-        return false;
-    }
-}
-
-// Shift ținut apăsat blochează inferența curentă; eliberat, o deblochează (doar lock-ul pus de el).
-void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock)
-{
-    if (shift && !shiftLock && !engine.locked()) {
-        engine.lockCurrent();
-        shiftLock = engine.locked();
-    } else if (!shift && shiftLock) {
-        engine.unlock();
-        shiftLock = false;
-    }
-}
 
 // --- Line -----------------------------------------------------------------------------------
 
@@ -858,6 +786,15 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     }
     if (id == "pushpull") {
         return std::make_unique<PushPullTool>();
+    }
+    if (id == "move") {
+        return makeMoveTool();
+    }
+    if (id == "rotate") {
+        return makeRotateTool();
+    }
+    if (id == "scale") {
+        return makeScaleTool();
     }
     if (id == "eraser") {
         return std::make_unique<EraserTool>();

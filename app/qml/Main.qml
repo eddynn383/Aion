@@ -136,7 +136,7 @@ Window {
     }
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
-    readonly property var modelingTools: ["select", "line", "rectangle", "pushpull", "eraser"]
+    readonly property var modelingTools: ["select", "line", "rectangle", "pushpull", "move", "rotate", "scale", "eraser"]
     property string pendingToolMessage: ""
 
     function selectTool(id) {
@@ -171,7 +171,8 @@ Window {
         const t = event.text
         if (t.length !== 1)
             return
-        const allowed = vcbText.length > 0 ? /[0-9.,;'"+\- a-zA-Z]/ : /[0-9.,;'"+\-]/
+        // „x3” / „/3” (array după copiere) încep cu x, * sau /.
+        const allowed = vcbText.length > 0 ? /[0-9.,;'"+\-*\/ a-zA-Z]/ : /[0-9.,;'"+\-*\/xX]/
         if (allowed.test(t)) {
             vcbText += t
             event.accepted = true
