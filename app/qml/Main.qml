@@ -96,7 +96,8 @@ Window {
     }
 
     // Comenzile din AION_STARTUP, rulate pe rând: „palette:text” deschide command palette,
-    // „wait:ms” așteaptă, „clickw:x,y,z” dă click în punctul 3D dat, „key:escape” apasă Esc.
+    // „wait:ms” așteaptă, „clickw:x,y,z” dă click în punctul 3D dat, „movew:x,y,z” mută doar cursorul,
+    // „type:text” tastează în Measurements box, „key:escape|enter|left|right|up|down” apasă tasta.
     property int startupIndex: 0
     Timer {
         id: startupTimer
@@ -116,8 +117,17 @@ Window {
                 } else if (action.startsWith("clickw:")) {
                     const c = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(viewport, viewport.projectToScreen(Qt.vector3d(c[0], c[1], c[2])))
+                } else if (action.startsWith("movew:")) {
+                    const m = action.slice(6).split(",").map(Number)
+                    AppInfo.simulateMove(viewport, viewport.projectToScreen(Qt.vector3d(m[0], m[1], m[2])))
+                } else if (action.startsWith("type:")) {
+                    window.vcbText = action.slice(5)
                 } else if (action === "key:escape") {
-                    doc.escape()
+                    window.escapePressed()
+                } else if (action === "key:enter") {
+                    window.enterPressed()
+                } else if (["key:left", "key:right", "key:up", "key:down"].includes(action)) {
+                    doc.arrowKey(action.slice(4))
                 } else {
                     window.runCommand(action)
                 }
@@ -139,6 +149,50 @@ Window {
     Document {
         id: doc
         activeTool: window.modelingTools.includes(window.activeTool) ? window.activeTool : ""
+        onActiveToolChanged: window.vcbText = ""
+    }
+
+    // Measurements box: ce a tastat utilizatorul (gol = arată valoarea curentă a uneltei).
+    property string vcbText: ""
+
+    // Tastele care ajung în Measurements box: cifre, separatori și (după prima cifră) unitățile.
+    function vcbKey(event) {
+        if (!doc.hasMeasurement || palette.opened)
+            return
+        if (event.modifiers & (Qt.ControlModifier | Qt.MetaModifier))
+            return
+        if (event.key === Qt.Key_Backspace) {
+            if (vcbText.length > 0) {
+                vcbText = vcbText.slice(0, -1)
+                event.accepted = true
+            }
+            return
+        }
+        const t = event.text
+        if (t.length !== 1)
+            return
+        const allowed = vcbText.length > 0 ? /[0-9.,;'"+\- a-zA-Z]/ : /[0-9.,;'"+\-]/
+        if (allowed.test(t)) {
+            vcbText += t
+            event.accepted = true
+        }
+    }
+
+    function escapePressed() {
+        if (vcbText.length > 0)
+            vcbText = ""
+        else
+            doc.escape()
+    }
+
+    function enterPressed() {
+        if (vcbText.length === 0) {
+            doc.enter()
+        } else if (doc.applyMeasurement(vcbText)) {
+            vcbText = ""
+        } else {
+            measurementsBox.flashInvalid()
+        }
     }
 
     // Scurtăturile comenzilor, generate din aceeași listă ca și command palette.
@@ -147,7 +201,9 @@ Window {
         delegate: Shortcut {
             required property var modelData
             sequence: modelData.shortcut
+            // Cât timp se tastează în Measurements box, literele sunt unități („m”, „cm”), nu unelte.
             enabled: modelData.shortcut.length > 0 && !palette.opened
+                     && !(window.vcbText.length > 0 && modelData.shortcut.length === 1)
             onActivated: window.runCommand(modelData.id)
         }
     }
@@ -155,21 +211,32 @@ Window {
         sequence: "Ctrl+K"
         onActivated: palette.opened ? palette.close() : palette.open()
     }
-    // Tastele care nu sunt comenzi: Esc (anulează / deselectează), Enter (termină), Backspace (șterge, pe Mac).
+    // Tastele care nu sunt comenzi: Esc (anulează / deselectează), Enter (termină sau aplică valoarea tastată),
+    // Backspace (șterge selecția, pe Mac; în timpul tastării, ultimul caracter).
     Shortcut {
         sequence: "Escape"
         enabled: !palette.opened
-        onActivated: doc.escape()
+        onActivated: window.escapePressed()
     }
     Shortcut {
         sequences: ["Return", "Enter"]
         enabled: !palette.opened
-        onActivated: doc.enter()
+        onActivated: window.enterPressed()
     }
     Shortcut {
         sequence: "Backspace"
-        enabled: !palette.opened
+        enabled: !palette.opened && window.vcbText.length === 0
         onActivated: doc.deleteSelection()
+    }
+    // Săgețile blochează inferența pe o axă: → roșie, ← verde, ↑ albastră, ↓ paralel cu muchia atinsă.
+    Instantiator {
+        model: ["left", "right", "up", "down"]
+        delegate: Shortcut {
+            required property string modelData
+            sequence: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+            enabled: doc.hasMeasurement && !palette.opened
+            onActivated: doc.arrowKey(modelData)
+        }
     }
 
     TitleBar {
@@ -251,7 +318,11 @@ Window {
         accentColor: Theme.accent
         previewColor: Theme.textPrimary
         eraseColor: Theme.danger
+        inferenceCyanColor: Theme.inferenceCyan
+        inferenceMagentaColor: Theme.inferenceMagenta
         document: doc
+        focus: true
+        Keys.onPressed: (event) => window.vcbKey(event)
         reducedMotion: Theme.reduceMotion
         navigationTool: window.navigationTools.includes(window.activeTool) ? window.activeTool : ""
 
@@ -274,6 +345,24 @@ Window {
                 PathLine { x: 0; y: viewport.selectionRect.height }
                 PathLine { x: 0; y: 0 }
             }
+        }
+
+        ViewportAnnotations {
+            anchors.fill: parent
+            annotations: viewport.annotations
+        }
+
+        MeasurementsBox {
+            id: measurementsBox
+            readonly property real offset: 18
+            visible: doc.hasMeasurement && (window.vcbText.length > 0
+                     || (viewport.pointerInside && doc.measurementValue.length > 0))
+            // Lângă cursor, dar întotdeauna în interiorul viewport-ului.
+            x: Math.min(viewport.pointerPosition.x + offset, viewport.width - width - Theme.space2)
+            y: Math.min(viewport.pointerPosition.y + offset, viewport.height - height - Theme.space2)
+            label: doc.measurementLabel
+            value: doc.measurementValue
+            typed: window.vcbText
         }
 
         NavigationGizmo {

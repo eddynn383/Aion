@@ -55,6 +55,9 @@ struct ViewportFrame {
     ViewportColors colors {};
     std::vector<LineInstance> lines;
     std::vector<PointInstance> points;
+    // Desenate după tot restul, fără test de adâncime: ghidajele și marcajele inferenței.
+    std::vector<LineInstance> topLines;
+    std::vector<PointInstance> topPoints;
     std::vector<MeshVertex> triangles;
     // Crește când `triangles` se schimbă, ca renderer-ul să reîncarce buffer-ul numai atunci.
     unsigned meshRevision = 0;

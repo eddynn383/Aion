@@ -83,6 +83,23 @@ QString Document::selectionSummary() const
     return parts.join(QStringLiteral(", ")) + (total == 1 ? QStringLiteral(" selectată") : QStringLiteral(" selectate"));
 }
 
+bool Document::hasMeasurement() const
+{
+    return m_tool && m_tool->measurement().has_value();
+}
+
+QString Document::measurementLabel() const
+{
+    const auto m = m_tool ? m_tool->measurement() : std::nullopt;
+    return m ? QString::fromStdString(m->label) : QString();
+}
+
+QString Document::measurementValue() const
+{
+    const auto m = m_tool ? m_tool->measurement() : std::nullopt;
+    return m ? QString::fromStdString(m->value) : QString();
+}
+
 template <class Fn>
 void Document::withTool(const view::Camera& camera, Fn&& fn)
 {
@@ -112,6 +129,8 @@ void Document::pointerDown(const view::Camera& camera, const tools::PointerEvent
 
 void Document::pointerMove(const view::Camera& camera, const tools::PointerEvent& e)
 {
+    m_lastCamera = camera;
+    m_lastPointer = e;
     withTool(camera, [&](tools::Tool& t, tools::ToolContext& ctx) { t.pointerMove(ctx, e); });
 }
 
@@ -128,6 +147,48 @@ void Document::escape()
 void Document::enter()
 {
     withTool(view::Camera {}, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Enter, {} }); });
+}
+
+void Document::replayPointer()
+{
+    if (m_tool && m_lastPointer) {
+        tools::ToolContext ctx { m_mesh, m_stack, m_selection, m_lastCamera };
+        m_tool->pointerMove(ctx, *m_lastPointer);
+    }
+}
+
+bool Document::arrowKey(const QString& direction)
+{
+    tools::Key key = tools::Key::Other;
+    if (direction == QLatin1String("left")) {
+        key = tools::Key::Left;
+    } else if (direction == QLatin1String("right")) {
+        key = tools::Key::Right;
+    } else if (direction == QLatin1String("up")) {
+        key = tools::Key::Up;
+    } else if (direction == QLatin1String("down")) {
+        key = tools::Key::Down;
+    }
+    bool used = false;
+    withTool(m_lastCamera, [&](tools::Tool& t, tools::ToolContext& ctx) {
+        used = t.key(ctx, { key, {} });
+        if (used) {
+            replayPointer();
+        }
+    });
+    return used;
+}
+
+bool Document::applyMeasurement(const QString& text)
+{
+    bool applied = false;
+    withTool(m_lastCamera, [&](tools::Tool& t, tools::ToolContext& ctx) {
+        applied = t.applyMeasurement(ctx, text.toStdString());
+        if (applied) {
+            replayPointer();
+        }
+    });
+    return applied;
 }
 
 void Document::undo()

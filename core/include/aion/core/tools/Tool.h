@@ -54,6 +54,7 @@ struct OverlayLine {
 struct InferenceMarker {
     Vec3d point { 0.0 };
     inference::Kind kind = inference::Kind::None;
+    inference::Tint tint = inference::Tint::Neutral; // culoarea direcției (axă, magenta), dacă există
     std::string label;
     bool locked = false;
 };

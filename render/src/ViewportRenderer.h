@@ -52,6 +52,8 @@ private:
     std::unique_ptr<QRhiGraphicsPipeline> m_gridPipeline;
     std::unique_ptr<QRhiGraphicsPipeline> m_linePipeline;
     std::unique_ptr<QRhiGraphicsPipeline> m_pointPipeline;
+    std::unique_ptr<QRhiGraphicsPipeline> m_topLinePipeline;
+    std::unique_ptr<QRhiGraphicsPipeline> m_topPointPipeline;
 
     // Conturul selecției: masca fețelor selectate vizibile, apoi un contur în screen-space.
     QSize m_maskSize;

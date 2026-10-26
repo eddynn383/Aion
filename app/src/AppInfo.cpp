@@ -85,3 +85,15 @@ void AppInfo::simulateClick(QQuickItem* item, const QPointF& position) const
     send(QEvent::MouseButtonPress, Qt::LeftButton, Qt::LeftButton);
     send(QEvent::MouseButtonRelease, Qt::LeftButton, Qt::NoButton);
 }
+
+void AppInfo::simulateMove(QQuickItem* item, const QPointF& position) const
+{
+    if (item == nullptr || item->window() == nullptr) {
+        return;
+    }
+    QQuickWindow* window = item->window();
+    const QPointF scenePos = item->mapToScene(position);
+    QMouseEvent e(QEvent::MouseMove, scenePos, scenePos, window->mapToGlobal(scenePos), Qt::NoButton, Qt::NoButton,
+        Qt::NoModifier);
+    QCoreApplication::sendEvent(window, &e);
+}

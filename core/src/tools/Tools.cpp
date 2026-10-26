@@ -191,7 +191,8 @@ void appendInference(Overlay& o, const inference::Inference& inf)
         o.lines.push_back({ g.a, g.b, g.dashed, g.tint, true });
     }
     if (inf.valid()) {
-        o.marker = InferenceMarker { inf.point, inf.kind, std::string(inference::label(inf)), inf.locked };
+        const inference::Tint tint = inf.guides.empty() ? inference::Tint::Neutral : inf.guides.front().tint;
+        o.marker = InferenceMarker { inf.point, inf.kind, tint, std::string(inference::label(inf)), inf.locked };
     }
 }
 

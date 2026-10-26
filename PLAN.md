@@ -311,18 +311,19 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 4 – Inferența (snap)
-- [ ] `InferenceEngine` în `core/inference`, care primește raza cursorului și contextul (ultimul punct, entități din apropiere)
-- [ ] Puncte: Endpoint (verde), Midpoint (cyan), On Edge (roșu), On Face (albastru), Intersection, Center (cerc)
-- [ ] Direcții: paralel cu axele X/Y/Z (linie colorată), paralel sau perpendicular pe o muchie (magenta)
-- [ ] Inferențe de tip „from point”: urmărirea unui punct de referință pe o axă (linie punctată)
-- [ ] Lock: Shift blochează inferența curentă; săgețile ←↑→ blochează pe o axă
-- [ ] Prioritizare și histerezis, ca snap-ul să nu „sară” între candidați
-- [ ] Indicii vizuale: marcaj colorat animat discret + tooltip „pill” („Endpoint”, „On Red Axis”)
-- [ ] **Measurements box (VCB):** câmp plutitor lângă cursor, în Geist Mono. În timpul desenării tastezi o lungime (`2500`, `2.5m`, `3',6"`) și Enter. Pentru dreptunghi: `3000,2000`
-- [ ] Dimensiuni „live” afișate pe muchie în timpul desenării (ca în Figma)
-- [ ] Teste unitare pentru fiecare tip de inferență pe scene sintetice
+- [x] `InferenceEngine` în `core/inference`, care primește raza cursorului și contextul (ultimul punct, entități din apropiere)
+- [~] Puncte: Endpoint (verde), Midpoint (cyan), On Edge (roșu), On Face (albastru), Intersection, Center (cerc) — Center vine cu cercurile (Faza 5)
+- [x] Direcții: paralel cu axele X/Y/Z (linie colorată), paralel sau perpendicular pe o muchie (magenta)
+- [x] Inferențe de tip „from point”: urmărirea unui punct de referință pe o axă (linie punctată)
+- [x] Lock: Shift blochează inferența curentă; săgețile ←↑→ blochează pe o axă
+- [x] Prioritizare și histerezis, ca snap-ul să nu „sară” între candidați
+- [~] Indicii vizuale: marcaj colorat animat discret + tooltip „pill” („Endpoint”, „On Red Axis”) — marcajul nu e încă animat
+- [x] **Measurements box (VCB):** câmp plutitor lângă cursor, în Geist Mono. În timpul desenării tastezi o lungime (`2500`, `2.5m`, `3',6"`) și Enter. Pentru dreptunghi: `3000,2000`
+- [x] Dimensiuni „live” afișate pe muchie în timpul desenării (ca în Figma)
+- [x] Teste unitare pentru fiecare tip de inferență pe scene sintetice
 
 **Gata când:** poți desena exact o cameră de 4 × 3 m cu pereți perpendiculari numai din inferențe și VCB, fără să lovești manual punctele.
+✓ Testul `Unelte: o cameră de 4 × 3 m numai din inferențe și Measurements box` și verificarea prin input simulat în aplicație (ADR 0005).
 
 ---
 

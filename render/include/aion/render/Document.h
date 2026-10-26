@@ -11,6 +11,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 namespace aion::render {
@@ -30,6 +31,10 @@ class Document : public QObject, private geom::MeshObserver {
     Q_PROPERTY(QString undoName READ undoName NOTIFY historyChanged)
     Q_PROPERTY(QString redoName READ redoName NOTIFY historyChanged)
     Q_PROPERTY(QString selectionSummary READ selectionSummary NOTIFY selectionChanged)
+    // Measurements box: dacă unealta primește valori tastate, eticheta („Lungime”) și valoarea curentă.
+    Q_PROPERTY(bool hasMeasurement READ hasMeasurement NOTIFY toolStatusChanged)
+    Q_PROPERTY(QString measurementLabel READ measurementLabel NOTIFY toolStatusChanged)
+    Q_PROPERTY(QString measurementValue READ measurementValue NOTIFY toolStatusChanged)
     Q_PROPERTY(int faceCount READ faceCount NOTIFY modelChanged)
     Q_PROPERTY(int edgeCount READ edgeCount NOTIFY modelChanged)
 
@@ -45,6 +50,9 @@ public:
     QString undoName() const;
     QString redoName() const;
     QString selectionSummary() const;
+    bool hasMeasurement() const;
+    QString measurementLabel() const;
+    QString measurementValue() const;
     int faceCount() const { return static_cast<int>(m_mesh.faces().size()); }
     int edgeCount() const { return static_cast<int>(m_mesh.edges().size()); }
 
@@ -56,6 +64,10 @@ public:
     // Esc: anulează operația uneltei; dacă nu era nimic de anulat, unealta decide (Select deselectează).
     Q_INVOKABLE void escape();
     Q_INVOKABLE void enter();
+    // "left", "right", "up", "down": lock-ul inferenței pe o axă. Întoarce true dacă unealta a folosit tasta.
+    Q_INVOKABLE bool arrowKey(const QString& direction);
+    // Valoarea din Measurements box („2500”, „2.5m”, „3000,2000”). Întoarce false dacă nu e validă.
+    Q_INVOKABLE bool applyMeasurement(const QString& text);
 
     // --- Pentru Viewport ---
     const geom::Mesh& mesh() const { return m_mesh; }
@@ -85,6 +97,8 @@ private:
     template <class Fn>
     void withTool(const view::Camera& camera, Fn&& fn);
     void afterInteraction(const geom::Selection& before);
+    // După o tastă, unealta reia ultima poziție a cursorului, ca previzualizarea să fie la zi.
+    void replayPointer();
     void touch();
 
     geom::Mesh m_mesh;
@@ -94,6 +108,8 @@ private:
     QString m_toolId;
     std::unordered_map<geom::FaceId, geom::FaceTriangles> m_triangles;
     unsigned m_revision = 1;
+    view::Camera m_lastCamera;
+    std::optional<tools::PointerEvent> m_lastPointer;
 };
 
 } // namespace aion::render

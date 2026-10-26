@@ -180,7 +180,8 @@ void Viewport::setDocument(Document* document)
     }
     m_document = document;
     if (m_document) {
-        connect(m_document, &Document::changed, this, &QQuickItem::update);
+        // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
+        connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
     }
     emit documentChanged();
     update();
@@ -215,6 +216,7 @@ void Viewport::afterToolEvent()
         m_selectionCrossing = crossing;
         emit selectionRectChanged();
     }
+    updateAnnotations();
     update();
 }
 
@@ -265,14 +267,128 @@ void Viewport::appendDocument(ViewportFrame& f) const
 
     const glm::vec4 preview = toVec4(m_preview);
     for (const tools::OverlayLine& l : overlay.lines) {
-        f.lines.push_back({ glm::vec3(l.a), glm::vec3(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
+        if (l.onTop) {
+            f.topLines.push_back({ glm::vec3(l.a), glm::vec3(l.b), tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
+        } else {
+            f.lines.push_back({ glm::vec3(l.a), glm::vec3(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
+        }
     }
     for (const math::Vec3d& p : overlay.points) {
         f.points.push_back({ glm::vec3(p), accent, 7.0f });
     }
+    // Marcajul inferenței: un disc colorat cu margine în culoarea fundalului, peste tot restul.
+    if (overlay.marker) {
+        const glm::vec3 p(overlay.marker->point);
+        if (overlay.marker->kind == inference::Kind::Ground) {
+            f.topPoints.push_back({ p, preview, 6.0f });
+        } else {
+            f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.9f), 13.0f });
+            f.topPoints.push_back({ p, markerColor(overlay.marker->kind, overlay.marker->tint), 9.0f });
+        }
+    }
     if (hover.kind == view::PickResult::Kind::Vertex) {
         f.points.push_back({ glm::vec3(hover.point), accent, 9.0f });
     }
+}
+
+glm::vec4 Viewport::tintColor(inference::Tint tint) const
+{
+    switch (tint) {
+    case inference::Tint::X:
+        return toVec4(m_axisX);
+    case inference::Tint::Y:
+        return toVec4(m_axisY);
+    case inference::Tint::Z:
+        return toVec4(m_axisZ);
+    case inference::Tint::Magenta:
+        return toVec4(m_inferenceMagenta);
+    case inference::Tint::Neutral:
+        break;
+    }
+    return withAlpha(m_preview, 0.8f);
+}
+
+// Culorile din SketchUp: capăt verde, mijloc cyan, pe muchie roșu, pe față albastru;
+// direcțiile au culoarea axei sau magenta.
+glm::vec4 Viewport::markerColor(inference::Kind kind, inference::Tint tint) const
+{
+    switch (kind) {
+    case inference::Kind::Endpoint:
+        return toVec4(m_axisY);
+    case inference::Kind::Midpoint:
+        return toVec4(m_inferenceCyan);
+    case inference::Kind::OnEdge:
+        return toVec4(m_axisX);
+    case inference::Kind::OnFace:
+        return toVec4(m_axisZ);
+    case inference::Kind::OnAxis:
+    case inference::Kind::Parallel:
+    case inference::Kind::Perpendicular:
+    case inference::Kind::FromPoint:
+    case inference::Kind::Intersection:
+        return tint == inference::Tint::Neutral ? toVec4(m_preview) : tintColor(tint);
+    case inference::Kind::None:
+    case inference::Kind::Ground:
+        break;
+    }
+    return toVec4(m_preview);
+}
+
+void Viewport::updateAnnotations()
+{
+    QVariantList list;
+    if (m_document && m_document->tool()) {
+        const tools::Overlay overlay = m_document->tool()->overlay();
+        constexpr double kMinDimensionPx = 36.0;
+        constexpr double kDimensionOffsetPx = 14.0;
+        for (const tools::Dimension& d : overlay.dimensions) {
+            const auto a = m_camera.project(d.a);
+            const auto b = m_camera.project(d.b);
+            if (!a || !b || glm::length(*b - *a) < kMinDimensionPx) {
+                continue;
+            }
+            // Eticheta stă lângă mijlocul segmentului, deplasată perpendicular (spre partea de sus a ecranului).
+            const view::Vec2d dir = glm::normalize(*b - *a);
+            view::Vec2d normal { -dir.y, dir.x };
+            if (normal.y > 0.0) {
+                normal = -normal;
+            }
+            const view::Vec2d p = (*a + *b) * 0.5 + normal * kDimensionOffsetPx;
+            list.append(QVariantMap {
+                { QStringLiteral("kind"), QStringLiteral("dimension") },
+                { QStringLiteral("x"), p.x },
+                { QStringLiteral("y"), p.y },
+                { QStringLiteral("text"), QString::fromStdString(d.text) },
+            });
+        }
+        if (overlay.marker && !overlay.marker->label.empty()) {
+            if (const auto p = m_camera.project(overlay.marker->point)) {
+                const glm::vec4 c = markerColor(overlay.marker->kind, overlay.marker->tint);
+                list.append(QVariantMap {
+                    { QStringLiteral("kind"), QStringLiteral("inference") },
+                    { QStringLiteral("x"), p->x },
+                    { QStringLiteral("y"), p->y },
+                    { QStringLiteral("text"), QString::fromStdString(overlay.marker->label) },
+                    { QStringLiteral("color"), QColor::fromRgbF(c.r, c.g, c.b, c.a) },
+                    { QStringLiteral("locked"), overlay.marker->locked },
+                });
+            }
+        }
+    }
+    if (list != m_annotations) {
+        m_annotations = list;
+        emit annotationsChanged();
+    }
+}
+
+void Viewport::setPointer(QPointF position, bool inside)
+{
+    if (position == m_hoverPosition && inside == m_pointerInside) {
+        return;
+    }
+    m_hoverPosition = position;
+    m_pointerInside = inside;
+    emit pointerPositionChanged();
 }
 
 QQuickRhiItemRenderer* Viewport::createRenderer()
@@ -426,6 +542,7 @@ ViewportFrame Viewport::frameForRendering() const
 
 void Viewport::onCameraMoved()
 {
+    updateAnnotations();
     emit cameraChanged();
     update();
 }
@@ -528,6 +645,8 @@ void Viewport::beginDrag(Drag drag, QPointF position)
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
+    // Tastele (Measurements box, săgețile) ajung la viewport după un click în el.
+    forceActiveFocus(Qt::MouseFocusReason);
     const auto mods = event->modifiers();
     const bool shift = mods.testFlag(Qt::ShiftModifier);
     // Pe macOS, Qt raportează tasta Control ca MetaModifier (Cmd devine ControlModifier).
@@ -577,7 +696,7 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
     const QPointF delta = event->position() - m_lastPointer;
     m_lastPointer = event->position();
-    m_hoverPosition = event->position();
+    setPointer(event->position(), contains(event->position()));
 
     if (m_drag == Drag::Orbit) {
         m_camera.orbit(-delta.x() * kOrbitRadiansPerPixel, -delta.y() * kOrbitRadiansPerPixel);
@@ -657,7 +776,7 @@ view::Vec2d Viewport::orbitReleaseVelocity() const
 void Viewport::wheelEvent(QWheelEvent* event)
 {
     const QPointF pos = event->position();
-    m_hoverPosition = pos;
+    setPointer(pos, true);
     const auto mods = event->modifiers();
     // Trackpad-ul trimite evenimente cu fază (început, mișcare, inerție); rotița clasică nu.
     const bool trackpad = event->phase() != Qt::NoScrollPhase
@@ -693,9 +812,15 @@ void Viewport::wheelEvent(QWheelEvent* event)
     event->accept();
 }
 
+void Viewport::hoverEnterEvent(QHoverEvent* event)
+{
+    setPointer(event->position(), true);
+    QQuickRhiItem::hoverEnterEvent(event);
+}
+
 void Viewport::hoverMoveEvent(QHoverEvent* event)
 {
-    m_hoverPosition = event->position();
+    setPointer(event->position(), true);
     // În timpul navigării cu butonul din mijloc nu actualizăm unealta (evenimentele vin prin mouseMove).
     if (m_document && m_drag == Drag::None && !m_toolPressed) {
         m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers()));
@@ -707,6 +832,7 @@ void Viewport::hoverMoveEvent(QHoverEvent* event)
 void Viewport::hoverLeaveEvent(QHoverEvent* event)
 {
     QQuickRhiItem::hoverLeaveEvent(event);
+    setPointer(m_hoverPosition, false);
     update();
 }
 

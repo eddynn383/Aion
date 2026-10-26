@@ -181,6 +181,8 @@ void ViewportRenderer::createPipelines()
         { 1, 4, QRhiVertexInputAttribute::Float2, offsetof(LineInstance, style) },
     });
     m_linePipeline = makePipeline(QStringLiteral("line.vert"), QStringLiteral("line.frag"), lineLayout, Depth::Test, true);
+    m_topLinePipeline
+        = makePipeline(QStringLiteral("line.vert"), QStringLiteral("line.frag"), lineLayout, Depth::None, true);
 
     QRhiVertexInputLayout pointLayout;
     pointLayout.setBindings({
@@ -195,6 +197,8 @@ void ViewportRenderer::createPipelines()
     });
     m_pointPipeline
         = makePipeline(QStringLiteral("point.vert"), QStringLiteral("point.frag"), pointLayout, Depth::Test, true);
+    m_topPointPipeline
+        = makePipeline(QStringLiteral("point.vert"), QStringLiteral("point.frag"), pointLayout, Depth::None, true);
 }
 
 void ViewportRenderer::releaseMaskTarget()
@@ -316,17 +320,32 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
 
     updateUniforms(batch);
 
+    // Instanțele „de deasupra” stau în același buffer, după cele obișnuite.
     const auto lineCount = static_cast<quint32>(m_frame.lines.size());
+    const auto topLineCount = static_cast<quint32>(m_frame.topLines.size());
     const auto pointCount = static_cast<quint32>(m_frame.points.size());
-    if (lineCount > 0) {
+    const auto topPointCount = static_cast<quint32>(m_frame.topPoints.size());
+    if (lineCount + topLineCount > 0) {
         const auto bytes = static_cast<quint32>(lineCount * sizeof(LineInstance));
-        ensureInstanceBuffer(m_lineInstances, bytes);
-        batch->updateDynamicBuffer(m_lineInstances.get(), 0, bytes, m_frame.lines.data());
+        const auto topBytes = static_cast<quint32>(topLineCount * sizeof(LineInstance));
+        ensureInstanceBuffer(m_lineInstances, bytes + topBytes);
+        if (bytes > 0) {
+            batch->updateDynamicBuffer(m_lineInstances.get(), 0, bytes, m_frame.lines.data());
+        }
+        if (topBytes > 0) {
+            batch->updateDynamicBuffer(m_lineInstances.get(), bytes, topBytes, m_frame.topLines.data());
+        }
     }
-    if (pointCount > 0) {
+    if (pointCount + topPointCount > 0) {
         const auto bytes = static_cast<quint32>(pointCount * sizeof(PointInstance));
-        ensureInstanceBuffer(m_pointInstances, bytes);
-        batch->updateDynamicBuffer(m_pointInstances.get(), 0, bytes, m_frame.points.data());
+        const auto topBytes = static_cast<quint32>(topPointCount * sizeof(PointInstance));
+        ensureInstanceBuffer(m_pointInstances, bytes + topBytes);
+        if (bytes > 0) {
+            batch->updateDynamicBuffer(m_pointInstances.get(), 0, bytes, m_frame.points.data());
+        }
+        if (topBytes > 0) {
+            batch->updateDynamicBuffer(m_pointInstances.get(), bytes, topBytes, m_frame.topPoints.data());
+        }
     }
     if (m_uploadedMeshRevision != m_frame.meshRevision) {
         m_uploadedMeshRevision = m_frame.meshRevision;
@@ -423,6 +442,28 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         };
         cb->setVertexInput(0, 2, inputs);
         cb->draw(6, pointCount);
+    }
+
+    if (topLineCount > 0) {
+        cb->setGraphicsPipeline(m_topLinePipeline.get());
+        cb->setShaderResources();
+        const QRhiCommandBuffer::VertexInput inputs[] = {
+            { m_quadCorners.get(), 0 },
+            { m_lineInstances.get(), lineCount * quint32(sizeof(LineInstance)) },
+        };
+        cb->setVertexInput(0, 2, inputs);
+        cb->draw(6, topLineCount);
+    }
+
+    if (topPointCount > 0) {
+        cb->setGraphicsPipeline(m_topPointPipeline.get());
+        cb->setShaderResources();
+        const QRhiCommandBuffer::VertexInput inputs[] = {
+            { m_pointCorners.get(), 0 },
+            { m_pointInstances.get(), pointCount * quint32(sizeof(PointInstance)) },
+        };
+        cb->setVertexInput(0, 2, inputs);
+        cb->draw(6, topPointCount);
     }
 
     cb->endPass();

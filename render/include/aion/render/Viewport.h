@@ -13,8 +13,11 @@
 #include <QRectF>
 #include <QQuickRhiItem>
 #include <QTimer>
+#include <QVariantList>
 #include <QVector3D>
 #include <QtQml/qqmlregistration.h>
+
+#include <glm/vec4.hpp>
 
 #include <atomic>
 #include <deque>
@@ -44,6 +47,9 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(QColor accentColor MEMBER m_accent NOTIFY appearanceChanged)
     Q_PROPERTY(QColor previewColor MEMBER m_preview NOTIFY appearanceChanged)
     Q_PROPERTY(QColor eraseColor MEMBER m_erase NOTIFY appearanceChanged)
+    // Culorile inferenței care nu sunt ale axelor: mijloc (cyan), paralel/perpendicular (magenta).
+    Q_PROPERTY(QColor inferenceCyanColor MEMBER m_inferenceCyan NOTIFY appearanceChanged)
+    Q_PROPERTY(QColor inferenceMagentaColor MEMBER m_inferenceMagenta NOTIFY appearanceChanged)
     Q_PROPERTY(bool gridVisible MEMBER m_gridVisible NOTIFY appearanceChanged)
     Q_PROPERTY(bool demoVisible MEMBER m_demoVisible NOTIFY appearanceChanged)
 
@@ -63,6 +69,12 @@ class Viewport : public QQuickRhiItem {
     // Dreptunghiul de selecție în curs (gol dacă nu există), pentru desenul din QML.
     Q_PROPERTY(QRectF selectionRect READ selectionRect NOTIFY selectionRectChanged)
     Q_PROPERTY(bool selectionCrossing READ selectionCrossing NOTIFY selectionRectChanged)
+    // Etichetele desenate de QML peste viewport: inferența („Endpoint”) și cotele live.
+    // Fiecare element: { kind: "inference" | "dimension", x, y, text, color, locked }.
+    Q_PROPERTY(QVariantList annotations READ annotations NOTIFY annotationsChanged)
+    // Poziția cursorului în viewport (pentru Measurements box) și dacă e deasupra lui.
+    Q_PROPERTY(QPointF pointerPosition READ pointerPosition NOTIFY pointerPositionChanged)
+    Q_PROPERTY(bool pointerInside READ pointerInside NOTIFY pointerPositionChanged)
 
     // Cadre pe secundă în ultima secundă (0 când viewport-ul nu se redesenează).
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY framesPerSecondChanged)
@@ -83,6 +95,9 @@ public:
     void setDocument(Document* document);
     QRectF selectionRect() const { return m_selectionRect; }
     bool selectionCrossing() const { return m_selectionCrossing; }
+    QVariantList annotations() const { return m_annotations; }
+    QPointF pointerPosition() const { return m_hoverPosition; }
+    bool pointerInside() const { return m_pointerInside; }
 
     QString navigationTool() const { return m_navigationTool; }
     void setNavigationTool(const QString& tool);
@@ -115,6 +130,8 @@ signals:
     void framesPerSecondChanged();
     void documentChanged();
     void selectionRectChanged();
+    void annotationsChanged();
+    void pointerPositionChanged();
 
 protected:
     QQuickRhiItemRenderer* createRenderer() override;
@@ -128,6 +145,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void hoverMoveEvent(QHoverEvent* event) override;
+    void hoverEnterEvent(QHoverEvent* event) override;
     void hoverLeaveEvent(QHoverEvent* event) override;
 
 private:
@@ -136,6 +154,10 @@ private:
     void updateCursor();
     tools::PointerEvent toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount = 1) const;
     void afterToolEvent();
+    void updateAnnotations();
+    void setPointer(QPointF position, bool inside);
+    glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
+    glm::vec4 tintColor(inference::Tint tint) const;
     void appendDocument(ViewportFrame& f) const;
     void showTransientCursor(const QCursor& cursor);
     void onCameraMoved();
@@ -168,6 +190,8 @@ private:
     QPointF m_lastClickPosition;
     QRectF m_selectionRect;
     bool m_selectionCrossing = false;
+    QVariantList m_annotations;
+    bool m_pointerInside = false;
     view::Vec3d m_zoomDragAnchor { 0.0, 0.0, 0.0 };
 
     QCursor m_orbitCursor { Qt::SizeAllCursor };
@@ -190,6 +214,8 @@ private:
     QColor m_accent { 0x3B, 0x82, 0xF6 };
     QColor m_preview { 0xED, 0xED, 0xED };
     QColor m_erase { 0xEF, 0x44, 0x44 };
+    QColor m_inferenceCyan { 0x06, 0xB6, 0xD4 };
+    QColor m_inferenceMagenta { 0xD9, 0x46, 0xEF };
     bool m_gridVisible = true;
     bool m_demoVisible = false;
     bool m_reducedMotion = false;

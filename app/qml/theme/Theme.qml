@@ -64,6 +64,10 @@ QtObject {
     readonly property color axisY: "#22C55E"
     readonly property color axisZ: "#3B82F6"
 
+    // Inferență (snap): capăt = axisY, pe muchie = axisX, pe față = axisZ; în plus:
+    readonly property color inferenceCyan: "#06B6D4" // mijloc
+    readonly property color inferenceMagenta: "#D946EF" // paralel / perpendicular
+
     // Raze
     readonly property int radiusSm: 6
     readonly property int radiusMd: 8
