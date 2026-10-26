@@ -134,6 +134,7 @@ Item {
                             iconSize: Theme.iconSizeMd
                             tooltip: modelData.name
                             shortcut: modelData.key
+                            guideId: modelData.id
                             checked: root.activeTool === modelData.id
                             solidChecked: false
                             onClicked: root.toolSelected(modelData.id)

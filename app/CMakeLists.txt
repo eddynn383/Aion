@@ -38,7 +38,7 @@ target_include_directories(aion_app PRIVATE src src/bridge)
 qt_policy(SET QTP0004 NEW)
 
 # Trebuie setat înainte de qt_add_qml_module, altfel Theme nu apare ca singleton în qmldir.
-set_source_files_properties(qml/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/theme/Theme.qml qml/theme/UserPrefs.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(aion_app
     URI Aion
@@ -46,6 +46,7 @@ qt_add_qml_module(aion_app
     QML_FILES
         qml/Main.qml
         qml/theme/Theme.qml
+        qml/theme/UserPrefs.qml
         qml/components/Button.qml
         qml/components/Icon.qml
         qml/components/IconButton.qml
@@ -77,8 +78,14 @@ qt_add_qml_module(aion_app
         qml/overlays/MeasurementsBox.qml
         qml/overlays/PreferencesDialog.qml
         qml/overlays/AboutDialog.qml
+        qml/overlays/ToolTour.qml
+        qml/components/ToolDemo.qml
+        qml/components/GuideCard.qml
+        qml/components/RichTooltip.qml
+        qml/shell/ToolGuides.js
         qml/shell/AppMenuBar.qml
         qml/storybook/Storybook.qml
+        qml/storybook/DemoGallery.qml
 )
 
 # Fonturile (OFL) și iconițele Lucide (ISC), incluse în aplicație.

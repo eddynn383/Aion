@@ -93,8 +93,12 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   temă, latitudine), asocierea `.aion` (`app/macos/Info.plist.in`, QFileOpenEvent, argumente), `make package`
   (DMG în `dist/`), `docs/qa-checklist.md`. ADR 0012. Lipsesc build-ul Universal și semnarea reală (certificat).
 
+- **Ghiduri animate** pe `feature/tur-unelte`: `ToolDemo.qml` (scene Canvas per unealtă), `ToolGuides.js` (texte),
+  `RichTooltip` la hover lung (1,3 s), `ToolTour` (meniul Ajutor / palette). ADR 0013. Acțiuni de script:
+  `moves:x,y` (hover în fereastră), `debug.demos` (galeria animațiilor).
+
 ## Următorii pași
-1. Tururi / tooltip-uri bogate la hover lung (cerute de utilizator), apoi Fazele 11 (Windows) și 12 (Web).
+1. Fazele 11 (Windows) și 12 (Web).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

@@ -425,6 +425,7 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 - [ ] Build **Universal** (arm64 + x86_64) — cere un Qt universal (vezi ADR 0012)
 - [x] `macdeployqt`, **semnare** (Developer ID), **notarizare** Apple, DMG — `scripts/package-macos.sh` / `make package` (semnarea reală cere certificatul tău)
 - [ ] Raportare crash-uri (opțional)
+- [x] Ghiduri animate la hover lung pe unelte și turul uneltelor (ADR 0013)
 - [x] Testare manuală cu o listă de scenarii (`docs/qa-checklist.md`)
 
 **Gata când:** DMG-ul semnat și notarizat se instalează și rulează pe un Mac curat (Apple Silicon și Intel).

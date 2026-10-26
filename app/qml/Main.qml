@@ -87,7 +87,8 @@ Window {
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
             { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" },
             { id: "app.preferences", title: "Preferințe…", category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
-            { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" }
+            { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" },
+            { id: "app.tour", title: "Turul uneltelor (cum se folosește fiecare)", category: "Ajutor", shortcut: "", icon: "info" }
         ]
         // Toate uneltele din toolbar, cu scurtăturile lor.
         for (const t of toolbar.allTools)
@@ -100,6 +101,7 @@ Window {
         }
         if (AppInfo.debugBuild)
             list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
+                      { id: "debug.demos", title: "Galeria animațiilor din ghiduri", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
         return list
     }
@@ -174,7 +176,9 @@ Window {
         case "ui.theme": Theme.cycleMode(); break
         case "app.preferences": preferencesDialog.open(); break
         case "app.about": aboutDialog.open(); break
+        case "app.tour": toolTour.open(); break
         case "debug.storybook": storybookLoader.active = true; break
+        case "debug.demos": demoGalleryLoader.active = true; break
         case "debug.benchmark": viewport.startTurntable(4); break
         default:
             if (id.startsWith("tool."))
@@ -228,6 +232,10 @@ Window {
                 } else if (action.startsWith("movew:")) {
                     const m = action.slice(6).split(",").map(Number)
                     AppInfo.simulateMove(viewport, viewport.projectToScreen(Qt.vector3d(m[0], m[1], m[2])))
+                } else if (action.startsWith("moves:")) {
+                    // Hover în coordonatele ferestrei (de exemplu pe un buton din toolbar).
+                    const ms = action.slice(6).split(",").map(Number)
+                    AppInfo.simulateMove(window.contentItem, Qt.point(ms[0], ms[1]))
                 } else if (action.startsWith("type:")) {
                     window.vcbText = action.slice(5)
                 } else if (action === "key:escape") {
@@ -416,6 +424,12 @@ Window {
     AboutDialog {
         id: aboutDialog
         parent: window.contentItem
+    }
+    ToolTour {
+        id: toolTour
+        parent: window.contentItem
+        shortcuts: toolbar.allTools.reduce((map, tool) => { map[tool.id] = tool.key || ""; return map }, {})
+        onTryTool: (id) => window.selectTool(id)
     }
 
     // --- Fișiere ---
@@ -1028,6 +1042,16 @@ Window {
         active: AppInfo.storybookOnStart
         sourceComponent: Storybook {
             onCloseRequested: storybookLoader.active = false
+        }
+    }
+
+    Loader {
+        id: demoGalleryLoader
+        anchors.fill: parent
+        z: 100
+        active: false
+        sourceComponent: DemoGallery {
+            onCloseRequested: demoGalleryLoader.active = false
         }
     }
 

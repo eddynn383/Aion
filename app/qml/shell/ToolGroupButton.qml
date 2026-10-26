@@ -23,6 +23,7 @@ Row {
         iconName: root.currentTool.icon
         tooltip: root.currentTool.name
         shortcut: root.currentTool.key || ""
+        guideId: root.currentTool.id
         checked: root.active
         onClicked: root.toolSelected(root.currentTool.id)
     }
