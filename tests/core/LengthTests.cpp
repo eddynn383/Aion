@@ -67,3 +67,19 @@ TEST_CASE("Lungimi: formatare", "[core][units]")
     CHECK(formatLength(1234.5678) == "1.235 m");
     CHECK(formatLength(-2500) == "-2.5 m");
 }
+
+TEST_CASE("Lungimi: unitatea de afișare din Preferințe", "[core][units]")
+{
+    using aion::units::DisplaySettings;
+    using aion::units::Unit;
+    aion::units::setDisplaySettings({ Unit::Centimeter, 1 });
+    CHECK(formatLength(1234) == "123.4 cm");
+    CHECK(*parseLength("250") == Approx(2500)); // fără unitate: centimetri
+    CHECK(*parseLength("250mm") == Approx(250));
+    aion::units::setDisplaySettings({ Unit::Meter, 2 });
+    CHECK(formatLength(1234) == "1.23 m");
+    aion::units::setDisplaySettings({ Unit::Foot, -1 });
+    CHECK(formatLength(1066.8) == "3' 6\"");
+    aion::units::setDisplaySettings({});
+    CHECK(formatLength(850) == "850 mm");
+}

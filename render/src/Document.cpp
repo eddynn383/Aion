@@ -80,6 +80,13 @@ Document::Document(QObject* parent)
     : QObject(parent)
 {
     m_model.addObserver(this);
+    {
+        QSettings settings;
+        units::DisplaySettings display;
+        display.unit = static_cast<units::Unit>(std::clamp(settings.value(QStringLiteral("units/unit"), 0).toInt(), 0, 5));
+        display.decimals = std::clamp(settings.value(QStringLiteral("units/decimals"), -1).toInt(), -1, 6);
+        units::setDisplaySettings(display);
+    }
     m_stack.setOnChanged([this] { emit historyChanged(); });
     // În debug, un model invalid oprește aplicația (CommandStack); în release nu se verifică.
     retriangulate(m_model.root());
@@ -99,6 +106,55 @@ Document::~Document()
         removeAutosave();
     }
     m_model.removeObserver(this);
+}
+
+// --- Preferințe de afișare ---
+
+int Document::displayUnit() const
+{
+    return static_cast<int>(units::displaySettings().unit);
+}
+
+void Document::setDisplayUnit(int unit)
+{
+    units::DisplaySettings display = units::displaySettings();
+    const auto value = static_cast<units::Unit>(std::clamp(unit, 0, 5));
+    if (display.unit == value) {
+        return;
+    }
+    display.unit = value;
+    units::setDisplaySettings(display);
+    QSettings().setValue(QStringLiteral("units/unit"), unit);
+    emit unitsChanged();
+    emit selectionChanged(); // Entity Info
+    emit toolStatusChanged(); // Measurements box
+    emit changed(); // cotele din viewport
+}
+
+int Document::displayDecimals() const
+{
+    return units::displaySettings().decimals;
+}
+
+void Document::setDisplayDecimals(int decimals)
+{
+    units::DisplaySettings display = units::displaySettings();
+    const int value = std::clamp(decimals, -1, 6);
+    if (display.decimals == value) {
+        return;
+    }
+    display.decimals = value;
+    units::setDisplaySettings(display);
+    QSettings().setValue(QStringLiteral("units/decimals"), value);
+    emit unitsChanged();
+    emit selectionChanged();
+    emit toolStatusChanged();
+    emit changed();
+}
+
+QString Document::formatLength(double mm) const
+{
+    return QString::fromStdString(units::formatLength(mm));
 }
 
 // --- Fișiere ---

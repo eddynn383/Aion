@@ -7,11 +7,44 @@
 #include <QCoreApplication>
 #include <QKeySequence>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QQuickWindow>
+
+#include <utility>
+
+namespace {
+
+QStringList& pendingFiles()
+{
+    static QStringList files;
+    return files;
+}
+
+QPointer<AppInfo>& instance()
+{
+    static QPointer<AppInfo> appInfo;
+    return appInfo;
+}
+
+} // namespace
 
 AppInfo::AppInfo(QObject* parent)
     : QObject(parent)
 {
+    instance() = this;
+}
+
+void AppInfo::queueFileOpen(const QString& path)
+{
+    pendingFiles().append(path);
+    if (instance()) {
+        emit instance()->fileOpenRequested();
+    }
+}
+
+QStringList AppInfo::takePendingFiles()
+{
+    return std::exchange(pendingFiles(), {});
 }
 
 QString AppInfo::version() const

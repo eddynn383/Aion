@@ -3,7 +3,7 @@
 
 CONFIG ?= debug
 
-.PHONY: setup build test run clean reconfigure
+.PHONY: setup build test run clean reconfigure package
 
 setup:        ## Instalează uneltele necesare (o singură dată)
 	@scripts/setup.sh
@@ -22,3 +22,6 @@ clean:        ## Șterge folderul de build
 
 reconfigure:  ## Reface configurarea CMake (după modificări în CMakeLists sau preseturi)
 	@scripts/dev.sh reconfigure $(CONFIG)
+
+package:      ## Pachet de distribuție macOS (dist/Aion-<versiune>.dmg); vezi scripts/package-macos.sh
+	@scripts/package-macos.sh

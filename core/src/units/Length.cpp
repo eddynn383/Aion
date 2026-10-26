@@ -97,6 +97,40 @@ std::string trimZeros(std::string s)
 
 } // namespace
 
+namespace {
+
+DisplaySettings g_display;
+
+double unitInMm(Unit unit)
+{
+    switch (unit) {
+    case Unit::Centimeter:
+        return 10.0;
+    case Unit::Meter:
+        return 1000.0;
+    case Unit::Inch:
+        return kMmPerInch;
+    case Unit::Foot:
+        return kMmPerFoot;
+    case Unit::Auto:
+    case Unit::Millimeter:
+        break;
+    }
+    return 1.0;
+}
+
+} // namespace
+
+void setDisplaySettings(const DisplaySettings& settings)
+{
+    g_display = settings;
+}
+
+const DisplaySettings& displaySettings()
+{
+    return g_display;
+}
+
 std::optional<double> parseLength(std::string_view text)
 {
     Parser p(trim(text));
@@ -141,7 +175,7 @@ std::optional<double> parseLength(std::string_view text)
     } else if (p.acceptWord("ft")) {
         mm = *first * kMmPerFoot;
     } else {
-        mm = *first;
+        mm = *first * unitInMm(g_display.unit); // fără unitate: unitatea de afișare
     }
     p.skipSpaces();
     if (!p.atEnd()) {
@@ -182,6 +216,36 @@ std::string formatLength(double mm)
 {
     char buffer[64];
     const double a = std::abs(mm);
+    const auto fixed = [&](double value, int decimals, const char* suffix) {
+        std::snprintf(buffer, sizeof buffer, "%.*f", decimals, value);
+        std::string s = trimZeros(buffer);
+        if (s == "-0") {
+            s = "0";
+        }
+        return s + suffix;
+    };
+    const int d = g_display.decimals;
+    switch (g_display.unit) {
+    case Unit::Millimeter:
+        return fixed(mm, d >= 0 ? d : 1, " mm");
+    case Unit::Centimeter:
+        return fixed(mm / 10.0, d >= 0 ? d : 1, " cm");
+    case Unit::Meter:
+        return fixed(mm / 1000.0, d >= 0 ? d : 3, " m");
+    case Unit::Inch:
+        return fixed(mm / kMmPerInch, d >= 0 ? d : 2, "\"");
+    case Unit::Foot: {
+        // Picioare și inci: 3' 6.5"
+        const double inches = a / kMmPerInch;
+        const int feet = static_cast<int>(inches / 12.0);
+        const double rest = inches - feet * 12.0;
+        std::snprintf(buffer, sizeof buffer, "%s%d' %s\"", mm < 0 ? "-" : "", feet,
+            trimZeros(std::to_string(std::round(rest * 100.0) / 100.0)).c_str());
+        return buffer;
+    }
+    case Unit::Auto:
+        break;
+    }
     if (a >= 1000.0) {
         std::snprintf(buffer, sizeof buffer, "%.3f", mm / 1000.0);
         return trimZeros(buffer) + " m";

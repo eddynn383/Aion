@@ -26,6 +26,8 @@ set_target_properties(aion_app PROPERTIES
     MACOSX_BUNDLE_GUI_IDENTIFIER dev.aion.Aion
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+    # Asocierea cu fișierele .aion (CFBundleDocumentTypes, UTExportedTypeDeclarations).
+    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/macos/Info.plist.in
     WIN32_EXECUTABLE ON
 )
 
@@ -73,6 +75,9 @@ qt_add_qml_module(aion_app
         qml/overlays/CommandPalette.qml
         qml/overlays/ViewportAnnotations.qml
         qml/overlays/MeasurementsBox.qml
+        qml/overlays/PreferencesDialog.qml
+        qml/overlays/AboutDialog.qml
+        qml/shell/AppMenuBar.qml
         qml/storybook/Storybook.qml
 )
 

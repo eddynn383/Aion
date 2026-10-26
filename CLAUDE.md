@@ -37,8 +37,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - Repo: <https://github.com/eddynn383/Aion> (urcat pe 2026-10-26; `main` e ramura principală).
 - **ASan e blocat pe acest Mac** (Apple clang 17 + macOS 26.6: deadlock în `AsanInitInternal`, chiar și la un `int main(){}`).
   `cmake/AionOptions.cmake` testează la configurare dacă ASan pornește; dacă nu, folosește doar UBSan (cu avertisment).
-- **Atenție la `timeout` din `/usr/local/bin`:** e binar Intel, iar tot ce rulează sub el trece prin Rosetta
-  (CMake vede `x86_64` și alege tripletul `x64-osx`). Pentru limite de timp folosește `perl -e 'alarm N; exec @ARGV' ...`.
+- **Atenție la `timeout` și `perl` din `/usr/local/bin`:** sunt binare Intel, iar tot ce rulează sub el trece prin Rosetta
+  (CMake vede `x86_64` și alege tripletul `x64-osx`). Pentru limite de timp folosește `/usr/bin/perl -e 'alarm N; exec @ARGV' ...` (calea completă).
 - Verificare vizuală fără permisiuni de screen recording: `AION_SCREENSHOT=/cale.png [AION_THEME=light|dark] Aion.app/Contents/MacOS/Aion`
   salvează fereastra după randare și închide aplicația.
 - Avertismente cunoscute, inofensive: `FindWrapOpenGL ... /usr/X11R6/lib` (XQuartz), și `ld: ... built for newer macOS version`
@@ -89,8 +89,12 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Faza 9** pe `feature/faza-9`: ghidaje, Tape Measure, Protractor, Dimension, Text, Section Plane, Intersect Faces,
   booleene (Manifold), Scene. ADR 0011.
 
+- **Faza 10** pe `feature/faza-10`: meniul nativ (`shell/AppMenuBar.qml`), About, Preferințe (⌘,: unități, precizie,
+  temă, latitudine), asocierea `.aion` (`app/macos/Info.plist.in`, QFileOpenEvent, argumente), `make package`
+  (DMG în `dist/`), `docs/qa-checklist.md`. ADR 0012. Lipsesc build-ul Universal și semnarea reală (certificat).
+
 ## Următorii pași
-1. Faza 10: finisare macOS și distribuție (PLAN.md).
+1. Tururi / tooltip-uri bogate la hover lung (cerute de utilizator), apoi Fazele 11 (Windows) și 12 (Web).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

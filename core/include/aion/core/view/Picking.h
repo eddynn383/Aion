@@ -30,6 +30,9 @@ struct PickOptions {
     double edgeRadiusPx = 5.0;
 };
 
+// Raza atinge cutia aliniată cu axele (cu o margine)? Testul rapid de dinaintea triangulării unei fețe.
+[[nodiscard]] bool rayHitsBox(const math::Ray& ray, const math::Vec3d& lo, const math::Vec3d& hi, double margin = 0.0);
+
 // Prioritate: vârf, apoi muchie, apoi față. Muchiile și vârfurile ascunse în spatele unei fețe nu se aleg.
 [[nodiscard]] PickResult pick(const geom::Mesh& mesh, const Camera& camera, Vec2d screen, PickOptions options = {});
 

@@ -1,9 +1,12 @@
+#include "AppInfo.h"
 #include "bridge/IconProvider.h"
 #include "bridge/NavigationCursors.h"
 #include "aion/render/GraphicsApi.h"
 #include "platform/Platform.h"
 
 #include <QDirIterator>
+#include <QFileInfo>
+#include <QFileOpenEvent>
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -54,6 +57,22 @@ void scheduleScreenshotIfRequested(QQmlApplicationEngine& engine)
     });
 }
 
+// macOS trimite fișierele deschise din Finder (dublu-click, „Open With”, tras pe iconiță) ca QFileOpenEvent.
+class FileOpenFilter : public QObject {
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (event->type() == QEvent::FileOpen) {
+            AppInfo::queueFileOpen(static_cast<QFileOpenEvent*>(event)->file());
+            return true;
+        }
+        return QObject::eventFilter(watched, event);
+    }
+};
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -70,6 +89,16 @@ int main(int argc, char* argv[])
 #endif
 
     loadFonts();
+
+    FileOpenFilter fileOpenFilter;
+    app.installEventFilter(&fileOpenFilter);
+    // `Aion model.aion` din terminal deschide fișierul.
+    const QStringList args = QCoreApplication::arguments();
+    for (qsizetype i = 1; i < args.size(); ++i) {
+        if (!args[i].startsWith(QLatin1Char('-')) && QFileInfo::exists(args[i])) {
+            AppInfo::queueFileOpen(QFileInfo(args[i]).absoluteFilePath());
+        }
+    }
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new IconProvider); // engine-ul preia obiectul

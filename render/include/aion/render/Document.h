@@ -88,6 +88,11 @@ class Document : public QObject, private model::ModelObserver {
     // Ultima eroare de fișier (pentru un mesaj în interfață).
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorChanged)
 
+    // Preferințe de afișare a lungimilor (păstrate în QSettings): 0 Auto, 1 mm, 2 cm, 3 m, 4 inci, 5 picioare;
+    // zecimale: -1 = implicit.
+    Q_PROPERTY(int displayUnit READ displayUnit WRITE setDisplayUnit NOTIFY unitsChanged)
+    Q_PROPERTY(int displayDecimals READ displayDecimals WRITE setDisplayDecimals NOTIFY unitsChanged)
+
 public:
     explicit Document(QObject* parent = nullptr);
     ~Document() override;
@@ -118,6 +123,12 @@ public:
     bool hasRecovery() const { return m_hasRecovery; }
     QString recoveryInfo() const;
     QString lastError() const { return m_lastError; }
+    int displayUnit() const;
+    void setDisplayUnit(int unit);
+    int displayDecimals() const;
+    void setDisplayDecimals(int decimals);
+    // Exemplu de lungime formatată cu setările curente (pentru dialogul de preferințe).
+    Q_INVOKABLE QString formatLength(double mm) const;
     QVariantList libraryMaterials() const;
     QVariantList modelMaterials() const;
     QVariantMap currentMaterial() const;
@@ -248,6 +259,7 @@ signals:
     void errorChanged();
     void materialChanged();
     void editingAnnotationChanged();
+    void unitsChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
