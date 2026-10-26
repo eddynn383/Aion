@@ -9,14 +9,17 @@ qt_add_executable(aion_app
     src/bridge/NavigationCursors.cpp
     src/bridge/NavigationCursors.h
     src/platform/Platform.h
+    src/platform/Video.h
 )
 
 if(APPLE)
     enable_language(OBJCXX)
-    target_sources(aion_app PRIVATE src/platform/PlatformMac.mm)
-    target_link_libraries(aion_app PRIVATE "-framework AppKit")
+    target_sources(aion_app PRIVATE src/platform/PlatformMac.mm src/platform/VideoMac.mm)
+    set_source_files_properties(src/platform/VideoMac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_link_libraries(aion_app PRIVATE "-framework AppKit" "-framework AVFoundation" "-framework CoreVideo"
+        "-framework CoreMedia")
 else()
-    target_sources(aion_app PRIVATE src/platform/PlatformOther.cpp)
+    target_sources(aion_app PRIVATE src/platform/PlatformOther.cpp src/platform/VideoOther.cpp)
 endif()
 
 set_target_properties(aion_app PROPERTIES

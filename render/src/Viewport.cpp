@@ -11,6 +11,7 @@
 #include <QNativeGestureEvent>
 #include <QPointingDevice>
 #include <QBuffer>
+#include <QDir>
 #include <QGuiApplication>
 #include <QLineF>
 #include <QQuickWindow>
@@ -809,20 +810,157 @@ QVariantMap Viewport::cameraState() const
         { QStringLiteral("distance"), p.distance }, { QStringLiteral("ortho"), isOrthographic() } };
 }
 
-void Viewport::animateToCamera(const QVariantMap& state)
+namespace {
+
+view::CameraPose poseFromState(const QVariantMap& state)
 {
-    if (state.isEmpty()) {
-        return;
-    }
     view::CameraPose pose;
     pose.target = { state.value(QStringLiteral("tx")).toDouble(), state.value(QStringLiteral("ty")).toDouble(),
         state.value(QStringLiteral("tz")).toDouble() };
     pose.yaw = state.value(QStringLiteral("yaw")).toDouble();
     pose.pitch = state.value(QStringLiteral("pitch")).toDouble();
     pose.distance = state.value(QStringLiteral("distance")).toDouble();
+    return pose;
+}
+
+std::vector<view::CameraPose> posesFromStates(const QVariantList& states)
+{
+    std::vector<view::CameraPose> poses;
+    for (const QVariant& s : states) {
+        poses.push_back(poseFromState(s.toMap()));
+    }
+    return poses;
+}
+
+} // namespace
+
+void Viewport::animateToCamera(const QVariantMap& state)
+{
+    if (state.isEmpty()) {
+        return;
+    }
     setOrthographic(state.value(QStringLiteral("ortho")).toBool());
-    m_motion.animateTo(m_camera, pose);
+    m_motion.animateTo(m_camera, poseFromState(state));
     requestAnimationFrame();
+}
+
+void Viewport::playScenes(const QVariantList& states, double transition, double delay, bool loop)
+{
+    if (states.isEmpty() || m_exporting) {
+        return;
+    }
+    m_motion.stop();
+    m_sceneAnimation.emplace(posesFromStates(states), transition, delay, loop);
+    m_loopScenes = loop;
+    m_sceneTime = 0.0;
+    m_playingScene = 0;
+    emit sceneAnimationChanged();
+    requestAnimationFrame();
+}
+
+void Viewport::stopScenes()
+{
+    if (!m_sceneAnimation || m_exporting) {
+        return;
+    }
+    m_sceneAnimation.reset();
+    m_playingScene = -1;
+    emit sceneAnimationChanged();
+}
+
+void Viewport::advanceSceneAnimation(double dt)
+{
+    m_sceneTime += dt;
+    // Fără buclă, redarea se oprește la sfârșit; cu buclă, o luăm de la capăt.
+    if (m_sceneTime >= m_sceneAnimation->duration()) {
+        // (Animația cu buclă se termină pe prima scenă, de unde reîncepe.)
+        m_camera.setPose(m_sceneAnimation->poseAt(m_sceneAnimation->duration()));
+        onCameraMoved();
+        if (m_sceneAnimation->duration() > 0.0 && m_loopScenes) {
+            m_sceneTime = std::fmod(m_sceneTime, m_sceneAnimation->duration());
+        } else {
+            stopScenes();
+            return;
+        }
+    }
+    m_camera.setPose(m_sceneAnimation->poseAt(m_sceneTime));
+    onCameraMoved();
+    const int scene = static_cast<int>(m_sceneAnimation->sceneAt(m_sceneTime));
+    if (scene != m_playingScene) {
+        m_playingScene = scene;
+        emit sceneAnimationChanged();
+    }
+}
+
+void Viewport::exportScenes(const QVariantList& states, double transition, double delay, bool loop,
+    const QString& directory, int fps)
+{
+    if (states.isEmpty() || m_exporting) {
+        return;
+    }
+    QDir().mkpath(directory);
+    m_motion.stop();
+    m_sceneAnimation.emplace(posesFromStates(states), transition, delay, loop);
+    m_exporting = true;
+    m_exportFps = std::clamp(fps, 1, 120);
+    m_exportFrame = 0;
+    m_exportFrames = std::max(1, static_cast<int>(std::ceil(m_sceneAnimation->duration() * m_exportFps)) + 1);
+    m_exportDirectory = directory;
+    m_exportProgress = 0.0;
+    m_playingScene = 0;
+    emit sceneAnimationChanged();
+    if (m_exportTimer == nullptr) {
+        m_exportTimer = new QTimer(this);
+        m_exportTimer->setSingleShot(true);
+        m_exportTimer->setInterval(0);
+        connect(m_exportTimer, &QTimer::timeout, this, &Viewport::exportNextFrame);
+    }
+    m_exportTimer->start();
+}
+
+void Viewport::exportNextFrame()
+{
+    if (!m_exporting || !m_sceneAnimation) {
+        return;
+    }
+    const double t = static_cast<double>(m_exportFrame) / m_exportFps;
+    m_camera.setPose(m_sceneAnimation->poseAt(t));
+    onCameraMoved();
+    const int scene = static_cast<int>(m_sceneAnimation->sceneAt(t));
+    if (scene != m_playingScene) {
+        m_playingScene = scene; // QML schimbă stilul scenei înainte de randare
+        emit sceneAnimationChanged();
+    }
+    const QString file = QStringLiteral("%1/frame_%2.png").arg(m_exportDirectory).arg(m_exportFrame, 5, 10, QLatin1Char('0'));
+    if (!saveImage(file)) {
+        cancelExport();
+        return;
+    }
+    ++m_exportFrame;
+    m_exportProgress = static_cast<double>(m_exportFrame) / m_exportFrames;
+    emit sceneAnimationChanged();
+    if (m_exportFrame < m_exportFrames) {
+        m_exportTimer->start();
+        return;
+    }
+    const int frames = m_exportFrame;
+    m_exporting = false;
+    m_sceneAnimation.reset();
+    m_playingScene = -1;
+    emit sceneAnimationChanged();
+    emit animationExported(m_exportDirectory, frames, m_exportFps);
+}
+
+void Viewport::cancelExport()
+{
+    if (!m_exporting) {
+        return;
+    }
+    m_exporting = false;
+    m_sceneAnimation.reset();
+    m_playingScene = -1;
+    emit sceneAnimationChanged();
+    emit animationExported(m_exportDirectory, 0, m_exportFps);
 }
 
 QImage Viewport::renderImage()
@@ -1077,13 +1215,16 @@ void Viewport::onAfterAnimating()
     if (m_motion.update(m_camera, dt)) {
         onCameraMoved();
     }
+    if (m_sceneAnimation && !m_exporting) {
+        advanceSceneAnimation(dt);
+    }
     if (m_turntableSecondsLeft > 0.0) {
         constexpr double kTurntableRadiansPerSecond = 0.8;
         m_camera.orbit(kTurntableRadiansPerSecond * dt, 0.0);
         m_turntableSecondsLeft -= dt;
         onCameraMoved();
     }
-    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0) {
+    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting)) {
         update();
     } else {
         m_ticking = false;
@@ -1153,6 +1294,7 @@ void Viewport::beginDrag(Drag drag, QPointF position)
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
+    stopScenes(); // ca în SketchUp: orice click oprește animația
     // Tastele (Measurements box, săgețile) ajung la viewport după un click în el.
     forceActiveFocus(Qt::MouseFocusReason);
     const auto mods = event->modifiers();
@@ -1302,6 +1444,7 @@ view::Vec2d Viewport::orbitReleaseVelocity() const
 
 void Viewport::wheelEvent(QWheelEvent* event)
 {
+    stopScenes();
     const QPointF pos = event->position();
     setPointer(pos, true);
     const auto mods = event->modifiers();

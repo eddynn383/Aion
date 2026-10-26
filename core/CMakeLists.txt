@@ -30,6 +30,7 @@ add_library(aion_core STATIC
     src/text/FuzzyMatch.cpp
     src/view/Camera.cpp
     src/view/CameraMotion.cpp
+    src/view/SceneAnimation.cpp
     src/view/Picking.cpp
     src/view/ModelPicking.cpp
     src/inference/Inference.cpp

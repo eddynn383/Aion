@@ -1,6 +1,7 @@
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/CameraMotion.h"
+#include "aion/core/view/SceneAnimation.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
@@ -320,4 +321,31 @@ TEST_CASE("Aproape de un detaliu mic, planurile de tăiere păstrează și detal
     c.setClipOverride(0.5, 300000.0);
     CHECK(c.nearPlane() == Catch::Approx(0.5));
     CHECK(c.farPlane() == Catch::Approx(300000.0));
+}
+
+TEST_CASE("Animația scenelor: pauze, tranziții, buclă", "[core][view][animation]")
+{
+    const CameraPose a { { 0, 0, 0 }, 0.0, -0.3, 5000.0 };
+    const CameraPose b { { 1000, 0, 0 }, 1.0, -0.5, 8000.0 };
+    const CameraPose c { { 0, 2000, 0 }, 2.0, -0.2, 3000.0 };
+
+    const SceneAnimation once({ a, b, c }, 2.0, 1.0, false);
+    CHECK(once.duration() == Catch::Approx(3 * 1.0 + 2 * 2.0));
+    CHECK(samePoint(once.poseAt(0.5).target, a.target));
+    CHECK(once.sceneAt(0.5) == 0);
+    // La jumătatea tranziției a → b: ease-in-out simetric, deci exact la mijloc pentru țintă.
+    CHECK(samePoint(once.poseAt(2.0).target, { 500, 0, 0 }, 1e-6));
+    CHECK(once.sceneAt(2.0) == 1);
+    CHECK(samePoint(once.poseAt(3.5).target, b.target));
+    CHECK(samePoint(once.poseAt(once.duration()).target, c.target));
+    CHECK(samePoint(once.poseAt(100.0).target, c.target));
+
+    const SceneAnimation loop({ a, b, c }, 2.0, 1.0, true);
+    CHECK(loop.duration() == Catch::Approx(3 * 1.0 + 3 * 2.0));
+    CHECK(samePoint(loop.poseAt(loop.duration() - 0.001).target, a.target, 1.0));
+    CHECK(samePoint(loop.poseAt(loop.duration()).target, a.target));
+
+    const SceneAnimation single({ a }, 2.0, 1.0, true);
+    CHECK(single.duration() == Catch::Approx(1.0));
+    CHECK(samePoint(single.poseAt(0.4).target, a.target));
 }
