@@ -63,10 +63,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   Line/Rectangle cu inferență, lock-uri (Shift, săgeți), VCB, cote live. Designul: `docs/decisions/0005-inferenta-si-vcb.md`.
   Verificare: `AION_STARTUP="view.top;wait:900;tool.line;clickw:-2000,-1500,0;movew:-500,-1460,0;type:4m;key:enter;..."`
   (`movew:` = doar hover, `type:` = text în VCB, `key:enter|escape|left|right|up|down`). Punctele trebuie să fie în viewport.
-- Merge-ul în `main` îl face utilizatorul (sau aprobă explicit): `feature/faza-3`, PR #1 (`feature/wasm-core`), `feature/faza-4`.
+- Fazele 3–4 și PR #1 (WebAssembly) unite în `main` pe 2026-10-26.
 
 ## Următorii pași
-1. Utilizatorul testează Fazele 3–4 și face merge (sau îl aprobă).
+1. Utilizatorul testează Fazele 3–4 în aplicație.
 2. Faza 5: Push/Pull și transformări.
 
 ## Convenții
