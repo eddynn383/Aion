@@ -199,6 +199,10 @@ std::string_view label(const Inference& inference)
         return "Perpendicular to Edge";
     case Kind::FromPoint:
         return "From Point";
+    case Kind::GuidePoint:
+        return "Guide Point";
+    case Kind::OnGuide:
+        return "On Guide";
     }
     return {};
 }
@@ -251,6 +255,43 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
             out.kind = Kind::Endpoint;
             out.vertex = bestVertex;
             out.point = mesh.position(bestVertex);
+            return out;
+        }
+    }
+
+    // 1b. Punctele de construcție și intersecțiile dintre două linii de construcție.
+    {
+        double best = m_options.pointRadiusPx;
+        std::optional<Vec3d> hit;
+        for (const GuideRef& g : m_guides) {
+            if (g.direction == Vec3d { 0.0 }) {
+                const double d = screenDistance(camera, g.point, screen);
+                if (d <= best) {
+                    best = d;
+                    hit = g.point;
+                }
+            }
+        }
+        const double eps = std::max(camera.worldPerPixelAtTarget(), tol::kLength);
+        for (std::size_t i = 0; i < m_guides.size(); ++i) {
+            for (std::size_t j = i + 1; j < m_guides.size(); ++j) {
+                const GuideRef& a = m_guides[i];
+                const GuideRef& b = m_guides[j];
+                if (a.direction == Vec3d { 0.0 } || b.direction == Vec3d { 0.0 }) {
+                    continue;
+                }
+                if (const auto x = intersectLines(a.point, glm::normalize(a.direction), b.point, glm::normalize(b.direction), eps)) {
+                    const double d = screenDistance(camera, *x, screen);
+                    if (d <= best) {
+                        best = d;
+                        hit = *x;
+                    }
+                }
+            }
+        }
+        if (hit) {
+            out.kind = Kind::GuidePoint;
+            out.point = *hit;
             return out;
         }
     }
@@ -402,6 +443,27 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         }
     }
 
+    // 4c. O direcție care taie o linie de construcție.
+    if (linear) {
+        const double eps = std::max(camera.worldPerPixelAtTarget(), tol::kLength);
+        for (const GuideRef& g : m_guides) {
+            if (g.direction == Vec3d { 0.0 }) {
+                continue;
+            }
+            if (const auto x = intersectLines(*from, linear->direction.dir, g.point, glm::normalize(g.direction), eps)) {
+                if (screenDistance(camera, *x, screen) <= m_options.pointRadiusPx && !tol::samePoint(*x, *from)) {
+                    out.kind = Kind::Intersection;
+                    out.point = *x;
+                    out.direction = linear->direction.dir;
+                    out.directionKind = linear->direction.kind;
+                    out.axis = linear->direction.axis;
+                    out.guides.push_back({ *from, *x, directionTint(linear->direction.kind, linear->direction.axis), false });
+                    return out;
+                }
+            }
+        }
+    }
+
     // 5. Pe o muchie. Câștigă în fața unei direcții doar dacă e mai aproape de cursor.
     const view::PickResult edgePick = view::pick(mesh, camera, screen, { -1.0, m_options.edgeRadiusPx });
     if (edgePick.kind == view::PickResult::Kind::Edge) {
@@ -419,6 +481,29 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         out.point = linear->point;
         withDirection(out, *linear);
         return out;
+    }
+
+    // 5b. Pe o linie de construcție.
+    {
+        double best = m_options.edgeRadiusPx;
+        std::optional<Vec3d> hit;
+        for (const GuideRef& g : m_guides) {
+            if (g.direction == Vec3d { 0.0 }) {
+                continue;
+            }
+            if (const auto p = pointOnLineUnderCursor(camera, screen, g.point, glm::normalize(g.direction))) {
+                const double d = screenDistance(camera, *p, screen);
+                if (d <= best && visible(ray, facePick, *p)) {
+                    best = d;
+                    hit = p;
+                }
+            }
+        }
+        if (hit) {
+            out.kind = Kind::OnGuide;
+            out.point = *hit;
+            return out;
+        }
     }
 
     // Punctul „liber”: pe fața de sub cursor sau pe planul de lucru.

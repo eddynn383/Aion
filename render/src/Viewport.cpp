@@ -521,6 +521,9 @@ glm::vec4 Viewport::markerColor(inference::Kind kind, inference::Tint tint) cons
     case inference::Kind::FromPoint:
     case inference::Kind::Intersection:
         return tint == inference::Tint::Neutral ? toVec4(m_preview) : tintColor(tint);
+    case inference::Kind::GuidePoint:
+    case inference::Kind::OnGuide:
+        return toVec4(m_inferenceMagenta);
     case inference::Kind::None:
     case inference::Kind::Ground:
         break;

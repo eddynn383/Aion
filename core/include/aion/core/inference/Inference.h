@@ -8,6 +8,7 @@
 
 #include <deque>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -34,6 +35,14 @@ enum class Kind {
     Parallel, // paralel cu muchia de referință
     Perpendicular, // perpendicular pe muchia de referință
     FromPoint, // aliniat pe o axă cu un punct de referință
+    GuidePoint, // un punct de construcție (Tape Measure)
+    OnGuide, // pe o linie de construcție
+};
+
+// Un ghidaj în coordonatele contextului: punct (`direction` nul) sau linie infinită.
+struct GuideRef {
+    Vec3d point { 0.0 };
+    Vec3d direction { 0.0 };
 };
 
 enum class Axis { None, X, Y, Z };
@@ -96,6 +105,13 @@ public:
     {
     }
 
+    // Ghidajele contextului (linii și puncte de construcție), folosite la următoarele inferențe.
+    Engine& withGuides(std::span<const GuideRef> guides)
+    {
+        m_guides.assign(guides.begin(), guides.end());
+        return *this;
+    }
+
     // `from`: punctul de pornire al operației (de exemplu începutul liniei), dacă există.
     // `plane`: planul de lucru când cursorul nu atinge nimic (implicit solul, Z = 0).
     Inference infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen, std::optional<Vec3d> from,
@@ -145,6 +161,7 @@ private:
     std::optional<geom::EdgeId> m_referenceEdge;
     std::optional<Vec3d> m_referenceDirection;
     std::optional<math::Plane> m_lastFacePlane;
+    std::vector<GuideRef> m_guides;
 };
 
 } // namespace aion::inference

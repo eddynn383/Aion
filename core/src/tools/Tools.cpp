@@ -206,10 +206,10 @@ private:
         if (hit.kind == view::PickResult::Kind::Edge) {
             // O muchie a unei curbe (cerc, arc) selectează toată curba.
             for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
-                s.add(e.clickCount >= 2 ? geom::edgeWithFaces(ctx.mesh, edge) : geom::Selection { { edge }, {} });
+                s.add(e.clickCount >= 2 ? geom::edgeWithFaces(ctx.mesh, edge) : geom::Selection { { edge }, {}, {} });
             }
         } else if (hit.kind == view::PickResult::Kind::Face) {
-            s = e.clickCount >= 2 ? geom::faceWithEdges(ctx.mesh, hit.face) : geom::Selection { {}, { hit.face } };
+            s = e.clickCount >= 2 ? geom::faceWithEdges(ctx.mesh, hit.face) : geom::Selection { {}, { hit.face }, {} };
         }
         if (e.clickCount >= 3 && !s.empty()) {
             s = geom::connectedTo(ctx.mesh, s);
@@ -327,7 +327,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
-        m_inference = m_engine.infer(ctx.mesh, ctx.camera, e.screen, m_start);
+        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, m_start);
         if (m_inference.valid()) {
             m_current = m_inference.point;
         }
@@ -475,7 +475,7 @@ private:
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
         // Colțul opus nu folosește direcții din primul colț (ar da un dreptunghi degenerat),
         // dar folosește capetele, muchiile și alinierea cu punctele de referință, proiectate pe plan.
-        m_inference = m_engine.infer(ctx.mesh, ctx.camera, e.screen, std::nullopt,
+        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, std::nullopt,
             m_origin ? std::optional(m_plane) : std::nullopt);
         if (m_inference.valid()) {
             m_current = m_origin ? m_plane.project(m_inference.point) : m_inference.point;
@@ -693,7 +693,7 @@ private:
     {
         // Adâncimea se poate lua dintr-un punct al geometriei (capăt, mijloc, muchie) sau de pe o față
         // paralelă; altfel e punctul de pe normală cel mai apropiat de cursor.
-        inference::Inference inf = m_engine.infer(ctx.mesh, ctx.camera, screen, std::nullopt);
+        inference::Inference inf = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, screen, std::nullopt);
         const double depth = glm::dot(inf.point - m_origin, m_normal);
         const bool fromPoint = (inf.kind == inference::Kind::Endpoint || inf.kind == inference::Kind::Midpoint
                                    || inf.kind == inference::Kind::OnEdge)
@@ -884,6 +884,21 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     }
     if (id == "polygon") {
         return makePolygonTool();
+    }
+    if (id == "tape") {
+        return makeTapeMeasureTool();
+    }
+    if (id == "protractor") {
+        return makeProtractorTool();
+    }
+    if (id == "dimension") {
+        return makeDimensionTool();
+    }
+    if (id == "text") {
+        return makeTextTool();
+    }
+    if (id == "section") {
+        return makeSectionTool();
     }
     if (id == "paint") {
         return makePaintTool();

@@ -54,7 +54,7 @@ TEST_CASE("Move: fața de sus a unei cutii, mutată în sus, întinde laturile",
 {
     Mesh mesh;
     box(mesh, 2000, 1000, 1000);
-    const auto verts = geom::verticesOf(mesh, { {}, { topFace(mesh) } });
+    const auto verts = geom::verticesOf(mesh, { {}, { topFace(mesh) }, {} });
     REQUIRE(verts.size() == 4);
     REQUIRE(geom::transformVertices(mesh, verts, Transform::translation({ 0, 0, 500 })));
     requireValid(mesh);
@@ -74,7 +74,7 @@ TEST_CASE("Move: acoperiș în două ape din linia de coamă mutată în sus", "
     REQUIRE(mesh.faces().size() == 7);
     const geom::EdgeId ridge = mesh.findEdge(vertexAt(mesh, { 0, 1500, 2500 }), vertexAt(mesh, { 4000, 1500, 2500 }));
     REQUIRE(ridge);
-    REQUIRE(geom::transformVertices(mesh, geom::verticesOf(mesh, { { ridge }, {} }), Transform::translation({ 0, 0, 1500 })));
+    REQUIRE(geom::transformVertices(mesh, geom::verticesOf(mesh, { { ridge }, {}, {} }), Transform::translation({ 0, 0, 1500 })));
     requireValid(mesh);
     // Cele două ape și frontoanele (pereții de capăt devin pentagoane) rămân plane: nimic nu s-a pliat.
     CHECK(mesh.faces().size() == 7);

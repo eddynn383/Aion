@@ -670,3 +670,73 @@ TEST_CASE("Unelte: Paint Bucket vopsește, cu Cmd tot ce e conectat, cu Option i
     REQUIRE(requests.sampledMaterial);
     CHECK(*requests.sampledMaterial == ctx.paintMaterial);
 }
+
+TEST_CASE("Unelte: Tape Measure lasă ghidaje (de care se prinde inferența), cote, text, secțiune", "[core][tools][measure]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    stack.setValidation(true, geom::ValidationLevel::Full);
+    stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 1000, 1000, 0 }, 0, 0, 6000 }));
+    tools::ToolRequests requests;
+    std::vector<inference::GuideRef> guides;
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    ctx.requests = &requests;
+    const auto refreshGuides = [&] {
+        guides.clear();
+        for (const model::Guide& g : m.guides().values()) {
+            guides.push_back({ g.point, g.direction });
+        }
+        ctx.guides = guides;
+    };
+    const auto at = [&](Vec3d p) { return *camera.project(p); };
+    const auto click = [&](tools::Tool& t, Vec3d p) {
+        const tools::PointerEvent e { at(p), {}, 1 };
+        t.pointerMove(ctx, e);
+        t.pointerDown(ctx, e);
+        t.pointerUp(ctx, e);
+    };
+    stack.run("Linie", [](geom::Mesh& mesh) { geom::drawLine(mesh, { 0, 0, 0 }, { 2000, 0, 0 }); });
+
+    // De pe muchie, 600 în sus pe verde: o linie de construcție paralelă cu muchia, la y = 600.
+    auto tape = tools::makeTool("tape");
+    click(*tape, { 700, 0, 0 });
+    tape->pointerMove(ctx, { at({ 700, 400, 0 }), {}, 1 });
+    REQUIRE(tape->applyMeasurement(ctx, "600"));
+    REQUIRE(m.guides().size() == 1);
+    const model::Guide& g = m.guides().values().front();
+    CHECK(g.isLine());
+    CHECK(std::abs(g.point.y - 600) < 1e-6);
+    CHECK(std::abs(std::abs(g.direction.x) - 1) < 1e-9);
+
+    // Linia se prinde de ghidaj.
+    refreshGuides();
+    auto line = tools::makeTool("line");
+    line->pointerMove(ctx, { at({ 1500, 603, 0 }), {}, 1 });
+    CHECK(line->overlay().marker->label == "On Guide");
+
+    // O cotă și un text.
+    auto dim = tools::makeTool("dimension");
+    click(*dim, { 0, 0, 0 });
+    click(*dim, { 2000, 0, 0 });
+    click(*dim, { 1000, -400, 0 });
+    REQUIRE(m.annotations().size() == 1);
+    CHECK(std::abs(m.annotations().values().front().offset.y + 400) < 30);
+
+    auto text = tools::makeTool("text");
+    click(*text, { 1000, 0, 0 });
+    REQUIRE(m.annotations().size() == 2);
+    CHECK(requests.editAnnotation);
+
+    // Secțiune pe sol.
+    auto section = tools::makeTool("section");
+    click(*section, { 500, 500, 0 });
+    REQUIRE(m.sections().size() == 1);
+    CHECK(m.sections().values().front().active);
+    CHECK(m.sections().values().front().normal.z > 0.99);
+}

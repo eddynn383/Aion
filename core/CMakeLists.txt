@@ -41,6 +41,7 @@ add_library(aion_core STATIC
     src/tools/TransformTools.cpp
     src/tools/ShapeTools.cpp
     src/tools/PaintTool.cpp
+    src/tools/MeasureTools.cpp
 )
 add_library(aion::core ALIAS aion_core)
 
