@@ -61,4 +61,11 @@ function(aion_configure_target target)
         target_compile_options(${target} PRIVATE ${AION_SANITIZER_FLAGS} -fno-omit-frame-pointer)
         target_link_options(${target} PRIVATE ${AION_SANITIZER_FLAGS})
     endif()
+
+    # WebAssembly: excepții native (ca dependențele din tripletul nostru) și memorie care poate crește.
+    if(EMSCRIPTEN)
+        target_compile_options(${target} PRIVATE -fwasm-exceptions)
+        target_link_options(${target} PRIVATE -fwasm-exceptions -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=4MB
+            -sEXIT_RUNTIME=1)
+    endif()
 endfunction()

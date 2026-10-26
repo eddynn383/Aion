@@ -1,6 +1,10 @@
 {
   "version": 6,
-  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "base",
@@ -16,7 +20,11 @@
       "name": "mac-base",
       "hidden": true,
       "inherits": "base",
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
       "cacheVariables": {
         "CMAKE_OSX_DEPLOYMENT_TARGET": "13.0",
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets"
@@ -48,21 +56,65 @@
         "AION_BUILD_APP": "OFF",
         "AION_ENABLE_SANITIZERS": "ON"
       }
+    },
+    {
+      "name": "wasm-core",
+      "displayName": "Doar core + teste, pentru WebAssembly (Emscripten; testele rulează în Node)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AION_BUILD_APP": "OFF",
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "mac-debug", "configurePreset": "mac-debug" },
-    { "name": "mac-release", "configurePreset": "mac-release" },
-    { "name": "core-debug", "configurePreset": "core-debug" }
+    {
+      "name": "mac-debug",
+      "configurePreset": "mac-debug"
+    },
+    {
+      "name": "mac-release",
+      "configurePreset": "mac-release"
+    },
+    {
+      "name": "core-debug",
+      "configurePreset": "core-debug"
+    },
+    {
+      "name": "wasm-core",
+      "configurePreset": "wasm-core"
+    }
   ],
   "testPresets": [
     {
       "name": "test-base",
       "hidden": true,
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
     },
-    { "name": "mac-debug", "inherits": "test-base", "configurePreset": "mac-debug" },
-    { "name": "mac-release", "inherits": "test-base", "configurePreset": "mac-release" },
-    { "name": "core-debug", "inherits": "test-base", "configurePreset": "core-debug" }
+    {
+      "name": "mac-debug",
+      "inherits": "test-base",
+      "configurePreset": "mac-debug"
+    },
+    {
+      "name": "mac-release",
+      "inherits": "test-base",
+      "configurePreset": "mac-release"
+    },
+    {
+      "name": "core-debug",
+      "inherits": "test-base",
+      "configurePreset": "core-debug"
+    },
+    {
+      "name": "wasm-core",
+      "inherits": "test-base",
+      "configurePreset": "wasm-core"
+    }
   ]
 }
