@@ -259,11 +259,14 @@ void Viewport::setDocument(Document* document)
     if (m_document) {
         // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
+        connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
+            updateSceneBounds();
             zoomExtents();
         });
     }
+    updateSceneBounds();
     emit documentChanged();
     update();
 }
@@ -867,6 +870,65 @@ QByteArray Viewport::captureThumbnail()
     return bytes;
 }
 
+void Viewport::setOrbitPivot(int mode)
+{
+    mode = std::clamp(mode, 0, 2);
+    if (mode != m_orbitPivotMode) {
+        m_orbitPivotMode = mode;
+        emit navigationSettingsChanged();
+    }
+}
+
+void Viewport::setClipStart(double mm)
+{
+    m_clipStart = std::max(mm, 0.0);
+    m_camera.setClipOverride(m_clipStart, m_clipEnd);
+    emit navigationSettingsChanged();
+    update();
+}
+
+void Viewport::setClipEnd(double mm)
+{
+    m_clipEnd = std::max(mm, 0.0);
+    m_camera.setClipOverride(m_clipStart, m_clipEnd);
+    emit navigationSettingsChanged();
+    update();
+}
+
+void Viewport::beginOrbitAt(QPointF position)
+{
+    std::optional<view::Vec3d> pivot;
+    if (m_document && m_orbitPivotMode == 1) {
+        if (const auto bounds = m_document->selectionBounds()) {
+            pivot = (bounds->first + bounds->second) * 0.5;
+        }
+    } else if (m_document && m_orbitPivotMode == 2) {
+        pivot = m_document->surfacePoint(m_camera, toVec2(position));
+    }
+    m_camera.setOrbitPivot(pivot);
+}
+
+view::Vec3d Viewport::zoomAnchor(QPointF position)
+{
+    if (m_zoomToSurface && m_document) {
+        if (const auto surface = m_document->surfacePoint(m_camera, toVec2(position))) {
+            // Ținta la adâncimea suprafeței: pasul zoom-ului (proporțional cu distanța) devine mic lângă
+            // detaliile mici, iar zoom-ul nu mai trece prin ele.
+            m_camera.retargetToDepth(*surface);
+            return *surface;
+        }
+    }
+    return m_camera.zoomAnchorAt(toVec2(position));
+}
+
+void Viewport::updateSceneBounds()
+{
+    view::Vec3d lo;
+    view::Vec3d hi;
+    sceneBounds(lo, hi);
+    m_camera.setSceneBounds(lo, hi);
+}
+
 void Viewport::zoomToSelection()
 {
     const auto bounds = m_document ? m_document->selectionBounds() : std::nullopt;
@@ -975,6 +1037,10 @@ ViewportFrame Viewport::frameForRendering() const
     f.meshRevision = (m_document ? m_document->revision() : 0u) * 2u + (m_demoVisible ? 1u : 0u);
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
+    // Pivotul orbitei, cât timp se orbitează în jurul lui.
+    if (m_drag == Drag::Orbit && m_camera.orbitPivot()) {
+        f.points.push_back({ glm::vec3(*m_camera.orbitPivot()), toVec4(m_accent), 8.0f });
+    }
     return f;
 }
 
@@ -1056,7 +1122,7 @@ bool Viewport::event(QEvent* event)
             // value() e variația relativă a distanței dintre degete (pozitivă = depărtare = apropiere).
             const double factor = 1.0 / std::max(0.05, 1.0 + gesture->value());
             m_motion.stop();
-            m_camera.zoomAbout(factor, m_camera.zoomAnchorAt(toVec2(pos)));
+            m_camera.zoomAbout(factor, zoomAnchor(pos));
             onCameraMoved();
             showTransientCursor(m_zoomCursor);
             gesture->accept();
@@ -1130,7 +1196,9 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     }
     beginDrag(drag, event->position());
     if (drag == Drag::Zoom) {
-        m_zoomDragAnchor = m_camera.zoomAnchorAt(toVec2(event->position()));
+        m_zoomDragAnchor = zoomAnchor(event->position());
+    } else if (drag == Drag::Orbit) {
+        beginOrbitAt(event->position());
     }
     updateCursor();
     event->accept();
@@ -1193,7 +1261,8 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
     // Dublu-click cu butonul din mijloc centrează vederea pe punctul de sub cursor (ca în SketchUp).
     if (event->button() == Qt::MiddleButton) {
         auto pose = m_camera.pose();
-        pose.target = m_camera.zoomAnchorAt(toVec2(event->position()));
+        const auto surface = m_document ? m_document->surfacePoint(m_camera, toVec2(event->position())) : std::nullopt;
+        pose.target = surface ? *surface : m_camera.zoomAnchorAt(toVec2(event->position()));
         m_motion.animateTo(m_camera, pose);
         requestAnimationFrame();
         event->accept();
@@ -1243,8 +1312,16 @@ void Viewport::wheelEvent(QWheelEvent* event)
             m_camera.pan(toVec2(d));
             showTransientCursor(Qt::ClosedHandCursor);
         } else {
+            // Pivotul se alege la începutul gestului (sau la fiecare eveniment, dacă dispozitivul nu are faze).
+            if (event->phase() == Qt::ScrollBegin || event->phase() == Qt::NoScrollPhase || !m_trackpadOrbiting) {
+                beginOrbitAt(pos);
+                m_trackpadOrbiting = true;
+            }
             m_camera.orbit(-d.x() * kOrbitRadiansPerPixel, -d.y() * kOrbitRadiansPerPixel);
             showTransientCursor(m_orbitCursor);
+        }
+        if (event->phase() == Qt::ScrollEnd) {
+            m_trackpadOrbiting = false;
         }
         onCameraMoved();
         event->accept();
@@ -1260,7 +1337,7 @@ void Viewport::wheelEvent(QWheelEvent* event)
         return;
     }
     const double factor = std::pow(kWheelZoomStep, steps);
-    m_motion.zoomSmoothly(factor, m_camera.zoomAnchorAt(toVec2(pos)));
+    m_motion.zoomSmoothly(factor, zoomAnchor(pos));
     showTransientCursor(m_zoomCursor);
     requestAnimationFrame();
     event->accept();

@@ -263,3 +263,61 @@ TEST_CASE("Camera: în contextul unui grup, razele și proiecțiile sunt în coo
     CHECK(glm::length(toP - along) < 1e-6);
     CHECK(local.worldPerPixelAtTarget() * 2.0 == Catch::Approx(world.worldPerPixelAtTarget()));
 }
+
+TEST_CASE("Orbit în jurul unui pivot îl ține pe loc pe ecran", "[core][view][camera]")
+{
+    Camera c = makeCamera();
+    const Vec3d pivot { 2500.0, 1200.0, 300.0 };
+    const auto before = c.project(pivot);
+    REQUIRE(before);
+    c.setOrbitPivot(pivot);
+    c.orbit(0.6, -0.3);
+    c.orbit(-0.2, 0.15);
+    const auto after = c.project(pivot);
+    REQUIRE(after);
+    CHECK(sameScreen(*before, *after));
+    // Distanța de la cameră la pivot nu se schimbă (rotație rigidă).
+    Camera reference = makeCamera();
+    CHECK(glm::length(c.eye() - pivot) == Catch::Approx(glm::length(reference.eye() - pivot)).epsilon(1e-9));
+
+    // Fără pivot: orbita clasică, în jurul țintei.
+    c.setOrbitPivot(std::nullopt);
+    const Vec3d target = c.pose().target;
+    c.orbit(0.3, 0.1);
+    CHECK(samePoint(c.pose().target, target, 1e-9));
+}
+
+TEST_CASE("Reîncadrarea la adâncimea unui punct nu mișcă imaginea", "[core][view][camera]")
+{
+    Camera c = makeCamera();
+    const Vec3d point { 1300.0, -350.0, 150.0 };
+    const auto before = c.project(point);
+    const Vec3d eye = c.eye();
+    c.retargetToDepth(point);
+    CHECK(samePoint(c.eye(), eye, 1e-6));
+    const auto after = c.project(point);
+    REQUIRE(before);
+    REQUIRE(after);
+    CHECK(sameScreen(*before, *after));
+    CHECK(c.pose().distance == Catch::Approx(glm::dot(point - eye, c.forward())));
+}
+
+TEST_CASE("Aproape de un detaliu mic, planurile de tăiere păstrează și detaliul, și restul scenei", "[core][view][camera]")
+{
+    Camera c = makeCamera();
+    c.setSceneBounds({ -20000.0, -20000.0, 0.0 }, { 20000.0, 20000.0, 5000.0 });
+    // Detaliu de 2 mm, privit de la 5 mm.
+    CameraPose pose = c.pose();
+    pose.target = { 100.0, 100.0, 0.0 };
+    pose.distance = 5.0;
+    c.setPose(pose);
+    CHECK(c.nearPlane() < 1.0);
+    const double farthest = glm::length(Vec3d { -20000.0, -20000.0, 5000.0 } - c.eye());
+    CHECK(c.farPlane() >= farthest);
+    CHECK(c.farPlane() / c.nearPlane() <= 1.0e6 * 1.0001);
+
+    // Valorile manuale (Preferințe) au prioritate.
+    c.setClipOverride(0.5, 300000.0);
+    CHECK(c.nearPlane() == Catch::Approx(0.5));
+    CHECK(c.farPlane() == Catch::Approx(300000.0));
+}

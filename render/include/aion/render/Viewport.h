@@ -67,6 +67,13 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(int sunMonth MEMBER m_sunMonth NOTIFY appearanceChanged)
     Q_PROPERTY(double latitude MEMBER m_latitude NOTIFY appearanceChanged)
 
+    // Navigare (Preferințe): centrul orbitei 0 = centrul vederii, 1 = selecția, 2 = punctul de sub cursor;
+    // zoom spre suprafața de sub cursor („auto depth”); planurile de tăiere manuale, în mm (0 = automat).
+    Q_PROPERTY(int orbitPivot READ orbitPivot WRITE setOrbitPivot NOTIFY navigationSettingsChanged)
+    Q_PROPERTY(bool zoomToSurface MEMBER m_zoomToSurface NOTIFY navigationSettingsChanged)
+    Q_PROPERTY(double clipStart READ clipStart WRITE setClipStart NOTIFY navigationSettingsChanged)
+    Q_PROPERTY(double clipEnd READ clipEnd WRITE setClipEnd NOTIFY navigationSettingsChanged)
+
     Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY cameraChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
     // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit", "pan" sau "zoom".
@@ -157,6 +164,7 @@ signals:
     void contextMenuRequested(QPointF position);
     void annotationsChanged();
     void pointerPositionChanged();
+    void navigationSettingsChanged();
 
 protected:
     QQuickRhiItemRenderer* createRenderer() override;
@@ -173,8 +181,29 @@ protected:
     void hoverEnterEvent(QHoverEvent* event) override;
     void hoverLeaveEvent(QHoverEvent* event) override;
 
+public:
+    int orbitPivot() const { return m_orbitPivotMode; }
+    void setOrbitPivot(int mode);
+    double clipStart() const { return m_clipStart; }
+    void setClipStart(double mm);
+    double clipEnd() const { return m_clipEnd; }
+    void setClipEnd(double mm);
+
 private:
     enum class Drag { None, Orbit, Pan, Zoom };
+
+    // Pivotul orbitei la începutul unei orbite (după orbitPivot), în coordonate globale.
+    void beginOrbitAt(QPointF position);
+    // Ancora zoom-ului: suprafața de sub cursor (cu ținta mutată la adâncimea ei) sau planul obișnuit.
+    view::Vec3d zoomAnchor(QPointF position);
+    // Cutia scenei pentru planurile de tăiere ale camerei (după fiecare schimbare a modelului).
+    void updateSceneBounds();
+
+    int m_orbitPivotMode = 0;
+    bool m_trackpadOrbiting = false;
+    bool m_zoomToSurface = true;
+    double m_clipStart = 0.0;
+    double m_clipEnd = 0.0;
 
     void updateCursor();
     tools::PointerEvent toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount = 1) const;

@@ -11,6 +11,10 @@ Platform.MenuBar {
     property var host // fereastra principală (commands, runCommand)
     property var document
 
+    property var toolCommandIds: []
+    onHostChanged: if (host && toolCommandIds.length === 0)
+        toolCommandIds = host.commands.filter(c => c.id.startsWith("tool.")).map(c => c.id)
+
     signal aboutRequested()
     signal preferencesRequested()
 
@@ -112,6 +116,7 @@ Platform.MenuBar {
         title: "Vedere"
         commandIds: ["view.iso", "view.top", "view.front", "view.right", "view.back", "view.left", "view.bottom", "-",
                      "view.extents", "view.zoomSelection", "view.projection", "view.grid", "-",
+                     "nav.pivotView", "nav.pivotSelection", "nav.pivotCursor", "-",
                      "ui.leftPanel", "ui.rightPanel", "ui.panels", "ui.theme"]
     }
     CommandMenu {
@@ -130,7 +135,9 @@ Platform.MenuBar {
     CommandMenu {
         bar: root
         title: "Unelte"
-        commandIds: (root.host ? root.host.commands : []).filter(c => c.id.startsWith("tool.")).map(c => c.id)
+        // Lista uneltelor nu se schimbă: o calculăm o dată (altfel meniul s-ar reconstrui la fiecare schimbare
+        // a comenzilor, de exemplu a titlului „Undo …”).
+        commandIds: root.toolCommandIds
     }
     Platform.Menu {
         title: "Ajutor"
