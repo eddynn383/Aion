@@ -31,7 +31,8 @@ make run     # compilează și pornește aplicația
 | `make clean` | Șterge folderul de build |
 | `make reconfigure` | Reface configurarea CMake (după schimbări în preseturi) |
 
-Implicit se folosește build-ul de debug, cu AddressSanitizer + UBSan.
+Implicit se folosește build-ul de debug, cu AddressSanitizer + UBSan. Dacă ASan nu poate porni pe sistemul tău
+(de exemplu Apple clang 17 pe macOS 26), CMake detectează asta și folosește doar UBSan.
 Pentru build-ul optimizat: `make run CONFIG=release`.
 
 ### În VS Code
@@ -64,12 +65,31 @@ cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset m
 | `mac-release` | build optimizat |
 | `core-debug` | doar nucleul și testele, fără Qt (orice platformă) |
 
-## Scurtături disponibile acum
+## Navigare și scurtături
+
+| Acțiune | Mouse | Trackpad |
+|---|---|---|
+| Orbit | buton din mijloc (sau unealta Orbit, `O`) | două degete |
+| Pan | Shift + buton din mijloc (sau unealta Pan, `H`) | Shift + două degete |
+| Zoom spre cursor | rotița | pinch (sau ⌘ + două degete) |
+| Centrează pe punct | dublu-click cu butonul din mijloc | — |
+| Zoom Extents | `⇧Z` | dublu-tap cu două degete |
 
 | Scurtătură | Acțiune |
 |---|---|
-| `⌘ \` | Ascunde/arată panourile laterale |
-| butonul ☾/☀ din dreapta sus | Comută tema: Sistem → Light → Dark |
+| `⌘K` | Command palette (toate comenzile, căutare fuzzy) |
+| `⌘0` … `⌘6` | Vederi: Iso, Sus, Față, Dreapta, Spate, Stânga, Jos |
+| `⌘ \` | Mod focus: ascunde/arată panourile laterale |
+
+Gizmo-ul din colțul viewport-ului: click pe o axă = vederea dinspre ea, click pe centru = Iso.
+
+### Variabile de mediu pentru dezvoltare
+| Variabilă | Efect |
+|---|---|
+| `FORMA_THEME=light\|dark` | Forțează tema |
+| `FORMA_SCREENSHOT=cale.png` | Salvează fereastra după randare și închide aplicația (`FORMA_SCREENSHOT_DELAY_MS` = întârzierea) |
+| `FORMA_STORYBOOK=1` | Deschide pagina cu componente (doar debug) |
+| `FORMA_STARTUP="view.top;palette:zoom"` | Rulează comenzi la pornire; `debug.benchmark` măsoară fps-ul |
 
 ## Convenții
 Vezi secțiunea „Convenții de lucru” din [`PLAN.md`](PLAN.md).

@@ -1,5 +1,6 @@
 import QtQuick
 import Forma
+import Forma.Render
 
 Window {
     id: window
@@ -11,12 +12,118 @@ Window {
     visible: true
     title: "Forma"
     color: Theme.bgApp
+    // Conținutul continuă sub bara de titlu (macOS: butoanele native rămân, fără fundal propriu).
+    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
 
-    property bool sidePanelsVisible: true
+    property bool leftPanelVisible: true
+    property bool rightPanelVisible: true
+    property string activeTool: "select"
 
+    // Toate comenzile aplicației; apar în command palette și au scurtături.
+    readonly property var commands: {
+        const list = [
+            { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
+            { id: "view.top",    title: "Vedere de sus",     category: "Vedere", shortcut: "Ctrl+1", icon: "arrow-down" },
+            { id: "view.front",  title: "Vedere din față",   category: "Vedere", shortcut: "Ctrl+2", icon: "arrow-up" },
+            { id: "view.right",  title: "Vedere din dreapta", category: "Vedere", shortcut: "Ctrl+3", icon: "arrow-left" },
+            { id: "view.back",   title: "Vedere din spate",  category: "Vedere", shortcut: "Ctrl+4", icon: "arrow-down" },
+            { id: "view.left",   title: "Vedere din stânga", category: "Vedere", shortcut: "Ctrl+5", icon: "arrow-right" },
+            { id: "view.bottom", title: "Vedere de jos",     category: "Vedere", shortcut: "Ctrl+6", icon: "arrow-up" },
+            { id: "view.extents", title: "Zoom Extents",     category: "Vedere", shortcut: "Shift+Z", icon: "scan" },
+            { id: "view.projection", title: viewport.orthographic ? "Proiecție în perspectivă" : "Proiecție paralelă (ortografică)",
+              category: "Vedere", shortcut: "", icon: "focus" },
+            { id: "view.grid",   title: viewport.gridVisible ? "Ascunde grid-ul" : "Arată grid-ul", category: "Vedere", shortcut: "", icon: "grid-3x3" },
+            { id: "view.demo",   title: viewport.demoVisible ? "Ascunde cutia demo" : "Arată cutia demo", category: "Vedere", shortcut: "", icon: "box" },
+            { id: "tool.orbit",  title: "Orbit",  category: "Unelte", shortcut: "O", icon: "orbit" },
+            { id: "tool.pan",    title: "Pan",    category: "Unelte", shortcut: "H", icon: "hand" },
+            { id: "tool.select", title: "Select", category: "Unelte", shortcut: "Space", icon: "mouse-pointer-2" },
+            { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
+            { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
+            { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
+            { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" }
+        ]
+        if (AppInfo.debugBuild)
+            list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
+                      { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
+        return list
+    }
+
+    function runCommand(id) {
+        switch (id) {
+        case "view.iso": viewport.setStandardView(Viewport.Iso); break
+        case "view.top": viewport.setStandardView(Viewport.Top); break
+        case "view.front": viewport.setStandardView(Viewport.Front); break
+        case "view.right": viewport.setStandardView(Viewport.Right); break
+        case "view.back": viewport.setStandardView(Viewport.Back); break
+        case "view.left": viewport.setStandardView(Viewport.Left); break
+        case "view.bottom": viewport.setStandardView(Viewport.Bottom); break
+        case "view.extents": viewport.zoomExtents(); break
+        case "view.projection": viewport.toggleProjection(); break
+        case "view.grid": viewport.gridVisible = !viewport.gridVisible; break
+        case "view.demo": viewport.demoVisible = !viewport.demoVisible; break
+        case "tool.orbit": window.activeTool = "orbit"; break
+        case "tool.pan": window.activeTool = "pan"; break
+        case "tool.select": window.activeTool = "select"; break
+        case "ui.leftPanel": window.leftPanelVisible = !window.leftPanelVisible; break
+        case "ui.rightPanel": window.rightPanelVisible = !window.rightPanelVisible; break
+        case "ui.panels": {
+            const show = !(window.leftPanelVisible || window.rightPanelVisible)
+            window.leftPanelVisible = show
+            window.rightPanelVisible = show
+            break
+        }
+        case "ui.theme": Theme.cycleMode(); break
+        case "debug.storybook": storybookLoader.active = true; break
+        case "debug.benchmark": viewport.startTurntable(4); break
+        default: console.warn("Comandă necunoscută:", id)
+        }
+    }
+
+    // Comenzile din FORMA_STARTUP; „palette:text” deschide command palette cu textul dat.
+    Timer {
+        running: AppInfo.startupActions.length > 0
+        interval: 300
+        onTriggered: {
+            for (const action of AppInfo.startupActions) {
+                if (action.startsWith("palette:"))
+                    palette.openWithQuery(action.slice(8))
+                else
+                    window.runCommand(action)
+            }
+        }
+    }
+
+    function selectTool(id) {
+        window.activeTool = id
+        if (id !== "select" && id !== "orbit" && id !== "pan")
+            statusBar.message = "Unealta „" + id + "” vine în Faza 3"
+        else
+            statusBar.message = "Gata"
+    }
+
+    // Scurtăturile comenzilor, generate din aceeași listă ca și command palette.
+    Instantiator {
+        model: window.commands
+        delegate: Shortcut {
+            required property var modelData
+            sequence: modelData.shortcut
+            enabled: modelData.shortcut.length > 0 && !palette.opened
+            onActivated: window.runCommand(modelData.id)
+        }
+    }
     Shortcut {
-        sequences: ["Ctrl+\\"]
-        onActivated: window.sidePanelsVisible = !window.sidePanelsVisible
+        sequence: "Ctrl+K"
+        onActivated: palette.opened ? palette.close() : palette.open()
+    }
+    // Uneltele de desen (doar vizual, până în Faza 3).
+    Instantiator {
+        model: toolbar.tools.filter(t => t.key && t.key.length === 1 && t.id !== "orbit" && t.id !== "pan")
+        delegate: Shortcut {
+            required property var modelData
+            sequence: modelData.key
+            enabled: !palette.opened
+            onActivated: window.selectTool(modelData.id)
+        }
     }
 
     TitleBar {
@@ -24,115 +131,170 @@ Window {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        onCommandPaletteRequested: statusBar.message = "Command palette vine în Faza 1"
+        z: 2
+        leftPanelVisible: window.leftPanelVisible
+        rightPanelVisible: window.rightPanelVisible
+        onCommandPaletteRequested: palette.open()
+        onToggleLeftPanel: window.leftPanelVisible = !window.leftPanelVisible
+        onToggleRightPanel: window.rightPanelVisible = !window.rightPanelVisible
     }
 
     Panel {
         id: leftPanel
-        title: "Straturi"
         anchors.top: titleBar.bottom
         anchors.bottom: statusBar.top
         anchors.left: parent.left
-        width: window.sidePanelsVisible ? Theme.sidePanelWidth : 0
+        width: window.leftPanelVisible ? Theme.sidePanelWidth : 0
         visible: width > 0
         clip: true
 
         Behavior on width { NumberAnimation { duration: Theme.motionNormal; easing.type: Easing.OutCubic } }
 
-        Text {
-            text: "Modelul e gol"
-            color: Theme.textTertiary
-            font.pixelSize: Theme.fontSizeMd
+        header: Tabs {
+            id: leftTabs
+            anchors.fill: parent
+            model: ["Outliner", "Tag-uri"]
+        }
+
+        Column {
+            width: parent.width
+            spacing: Theme.space2
+            Text {
+                text: leftTabs.currentIndex === 0 ? "Modelul e gol" : "Niciun tag"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeMd
+            }
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: leftTabs.currentIndex === 0
+                      ? "Grupurile și componentele vor apărea aici (Faza 6)."
+                      : "Tag-urile (straturile) vor apărea aici (Faza 6)."
+                color: Theme.textTertiary
+                font.pixelSize: Theme.fontSizeSm
+            }
         }
     }
 
-    Rectangle {
+    Separator {
         anchors.top: leftPanel.top
         anchors.bottom: leftPanel.bottom
         anchors.left: leftPanel.right
-        width: 1
-        color: Theme.borderSubtle
         visible: leftPanel.visible
     }
 
-    // Loc rezervat pentru viewport-ul 3D (QQuickRhiItem, Faza 1).
-    Item {
+    Viewport {
         id: viewport
+        onFramesPerSecondChanged: if (AppInfo.startupActions.length > 0) console.info("fps:", framesPerSecond)
         anchors.top: titleBar.bottom
         anchors.bottom: statusBar.top
         anchors.left: leftPanel.right
         anchors.right: rightPanel.left
 
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Theme.viewportTop }
-                GradientStop { position: 1.0; color: Theme.viewportBottom }
-            }
-        }
+        backgroundTop: Theme.viewportTop
+        backgroundBottom: Theme.viewportBottom
+        gridMinorColor: Theme.gridMinor
+        gridMajorColor: Theme.gridMajor
+        axisXColor: Theme.axisX
+        axisYColor: Theme.axisY
+        axisZColor: Theme.axisZ
+        edgeColor: Theme.edge
+        faceFrontColor: Theme.faceFront
+        faceBackColor: Theme.faceBack
+        reducedMotion: Theme.reduceMotion
+        navigationTool: window.activeTool === "orbit" || window.activeTool === "pan" ? window.activeTool : ""
 
-        Column {
-            anchors.centerIn: parent
-            spacing: Theme.space2
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.space2
-                Repeater {
-                    model: [Theme.axisX, Theme.axisY, Theme.axisZ]
-                    delegate: Rectangle {
-                        required property color modelData
-                        width: 24; height: 3; radius: 1.5
-                        color: modelData
-                    }
-                }
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "Viewport 3D"
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeLg
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "Randarea începe în Faza 1"
-                color: Theme.textTertiary
-                font.pixelSize: Theme.fontSizeSm
-            }
+        NavigationGizmo {
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: Theme.space2
+            cameraRight: viewport.cameraRight
+            cameraUp: viewport.cameraUp
+            cameraForward: viewport.cameraForward
+            onViewRequested: (view) => viewport.setStandardView(Viewport[view])
         }
 
         Toolbar {
+            id: toolbar
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: Theme.space6
+            activeTool: window.activeTool
+            onToolSelected: (id) => window.selectTool(id)
         }
     }
 
     Panel {
         id: rightPanel
-        title: "Inspector"
         anchors.top: titleBar.bottom
         anchors.bottom: statusBar.top
         anchors.right: parent.right
-        width: window.sidePanelsVisible ? Theme.sidePanelWidth : 0
+        width: window.rightPanelVisible ? Theme.sidePanelWidth : 0
         visible: width > 0
         clip: true
+        title: "Inspector"
 
         Behavior on width { NumberAnimation { duration: Theme.motionNormal; easing.type: Easing.OutCubic } }
 
-        Text {
-            text: "Nimic selectat"
-            color: Theme.textTertiary
-            font.pixelSize: Theme.fontSizeMd
+        Column {
+            width: parent.width
+            spacing: Theme.space6
+
+            Text {
+                text: "Nimic selectat"
+                color: Theme.textTertiary
+                font.pixelSize: Theme.fontSizeMd
+            }
+
+            Section {
+                width: parent.width
+                title: "Vizualizare"
+
+                Tabs {
+                    width: parent.width
+                    model: ["Perspectivă", "Paralelă"]
+                    currentIndex: viewport.orthographic ? 1 : 0
+                    onCurrentIndexChanged: viewport.orthographic = currentIndex === 1
+                }
+                Toggle {
+                    width: parent.width
+                    text: "Grid"
+                    checked: viewport.gridVisible
+                    onToggled: viewport.gridVisible = checked
+                }
+                Toggle {
+                    width: parent.width
+                    text: "Cutie demo"
+                    checked: viewport.demoVisible
+                    onToggled: viewport.demoVisible = checked
+                }
+            }
+
+            Section {
+                width: parent.width
+                title: "Cameră"
+
+                NumberField {
+                    width: parent.width
+                    label: "Dist."
+                    unit: "mm"
+                    readOnly: true
+                    value: viewport.cameraDistance
+                }
+                Button {
+                    width: parent.width
+                    text: "Zoom Extents"
+                    iconName: "scan"
+                    onClicked: viewport.zoomExtents()
+                }
+            }
         }
     }
 
-    Rectangle {
+    Separator {
         anchors.top: rightPanel.top
         anchors.bottom: rightPanel.bottom
         anchors.right: rightPanel.left
-        width: 1
-        color: Theme.borderSubtle
         visible: rightPanel.visible
     }
 
@@ -141,5 +303,24 @@ Window {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
+        framesPerSecond: viewport.framesPerSecond
+        orthographic: viewport.orthographic
+    }
+
+    CommandPalette {
+        id: palette
+        parent: window.contentItem
+        commands: window.commands
+        onCommandTriggered: (id) => window.runCommand(id)
+    }
+
+    Loader {
+        id: storybookLoader
+        anchors.fill: parent
+        z: 100
+        active: AppInfo.storybookOnStart
+        sourceComponent: Storybook {
+            onCloseRequested: storybookLoader.active = false
+        }
     }
 }

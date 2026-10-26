@@ -5,15 +5,15 @@ Rectangle {
     id: root
 
     property string message: "Gata"
+    property int framesPerSecond: 0
+    property bool orthographic: false
 
     height: Theme.statusBarHeight
     color: Theme.bgPanel
 
-    Rectangle {
+    Separator {
         anchors.top: parent.top
         width: parent.width
-        height: 1
-        color: Theme.borderSubtle
     }
 
     Text {
@@ -25,13 +25,28 @@ Rectangle {
         font.pixelSize: Theme.fontSizeSm
     }
 
-    Text {
+    Row {
         anchors.right: parent.right
         anchors.rightMargin: Theme.space4
         anchors.verticalCenter: parent.verticalCenter
-        text: "Unități: mm  ·  " + AppInfo.graphicsApi + "  ·  Temă: " + Theme.modeLabel
-              + "  ·  v" + AppInfo.version
-        color: Theme.textTertiary
-        font.pixelSize: Theme.fontSizeSm
+        spacing: Theme.space3
+
+        Repeater {
+            model: [
+                "Unități: mm",
+                root.orthographic ? "Paralelă" : "Perspectivă",
+                AppInfo.graphicsApi,
+                root.framesPerSecond > 0 ? root.framesPerSecond + " fps" : "",
+                "v" + AppInfo.version
+            ]
+            delegate: Text {
+                required property string modelData
+                visible: modelData.length > 0
+                text: modelData
+                color: Theme.textTertiary
+                font.pixelSize: Theme.fontSizeSm
+                font.family: modelData.indexOf("fps") >= 0 ? Theme.fontMono : Theme.fontUi
+            }
+        }
     }
 }

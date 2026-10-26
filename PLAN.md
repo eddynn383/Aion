@@ -251,22 +251,22 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 ---
 
 ### Faza 1 – Shell UI, design system, viewport și cameră
-- [ ] `Theme.qml` cu toți tokenii din secțiunea 5.3, dark + light, comutare automată după sistem
-- [ ] Fonturile Inter și Geist Mono încărcate din resurse
-- [ ] Componente de bază: Button, IconButton, Input, NumberField, Tooltip, Popover, Panel, Tabs, Separator
-- [ ] Pagină internă de „storybook” (vizibilă numai în debug) care arată toate componentele în ambele teme
-- [ ] Shell: fereastră cu titlebar integrat (macOS: conținut sub bara de titlu, butoanele native păstrate), panouri laterale ascunzibile, toolbar plutitor, status bar
-- [ ] Command palette (Cmd+K) cu căutare fuzzy (inițial doar comenzi de vizualizare)
-- [ ] `Viewport` bazat pe `QQuickRhiItem` (backend Metal pe macOS), integrat în shell
-- [ ] Shadere de bază (compilate cu `qsb`): fețe cu iluminare simplă, linii, puncte
-- [ ] Fundal cu gradient, **grid infinit** care se estompează și cele 3 axe colorate (roșu X, verde Y, albastru Z, cu Z în sus)
-- [ ] `Camera`: orbit (butonul din mijloc sau Orbit tool), pan (Shift+mijloc), zoom spre cursor (scroll / trackpad pinch)
-- [ ] Suport trackpad macOS: două degete = orbit/pan, pinch = zoom
-- [ ] Proiecție perspectivă și ortografică; vederi standard (Top, Front, Right, Iso) cu tranziții animate; „Zoom Extents”
-- [ ] Inerție lină la orbit și zoom
-- [ ] Gizmo de navigare (ViewCube minimalist) în colțul viewport-ului
-- [ ] Linii cu grosime constantă în pixeli (desenate ca quad-uri în shader, cu anti-aliasing analitic)
-- [ ] Anti-aliasing (MSAA 4x), suport ecrane Retina (device pixel ratio)
+- [x] `Theme.qml` cu toți tokenii din secțiunea 5.3, dark + light, comutare automată după sistem
+- [x] Fonturile Inter și Geist Mono încărcate din resurse
+- [x] Componente de bază: Button, IconButton, Input, NumberField, Tooltip, Popover, Panel, Tabs, Separator (+ Icon, Kbd, Toggle, Section)
+- [x] Pagină internă de „storybook” (vizibilă numai în debug) care arată toate componentele în ambele teme
+- [~] Shell: fereastră cu titlebar integrat (macOS: conținut sub bara de titlu, butoanele native păstrate), panouri laterale ascunzibile, toolbar plutitor, status bar (făcut; de verificat vizual poziția butoanelor native)
+- [x] Command palette (Cmd+K) cu căutare fuzzy (inițial doar comenzi de vizualizare)
+- [x] `Viewport` bazat pe `QQuickRhiItem` (backend Metal pe macOS), integrat în shell
+- [x] Shadere de bază (compilate cu `qsb`): fețe cu iluminare simplă, linii, puncte
+- [x] Fundal cu gradient, **grid infinit** care se estompează și cele 3 axe colorate (roșu X, verde Y, albastru Z, cu Z în sus)
+- [~] `Camera`: orbit (butonul din mijloc sau Orbit tool), pan (Shift+mijloc), zoom spre cursor (scroll / trackpad pinch) (logica testată în core; de testat manual cu mouse-ul)
+- [~] Suport trackpad macOS: două degete = orbit/pan, pinch = zoom (scris; de testat manual)
+- [x] Proiecție perspectivă și ortografică; vederi standard (Top, Front, Right, Iso) cu tranziții animate; „Zoom Extents”
+- [x] Inerție lină la orbit și zoom
+- [x] Gizmo de navigare (ViewCube minimalist) în colțul viewport-ului
+- [x] Linii cu grosime constantă în pixeli (desenate ca quad-uri în shader, cu anti-aliasing analitic)
+- [x] Anti-aliasing (MSAA 4x), suport ecrane Retina (device pixel ratio)
 
 **Gata când:** fereastra arată ca în schița din 5.2 în ambele teme, afișează grid-ul și axele la 60 fps pe Retina, iar navigarea se simte naturală cu mouse-ul și cu trackpad-ul.
 

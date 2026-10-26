@@ -2,7 +2,9 @@
 
 #include "forma/core/Version.h"
 #include "forma/render/GraphicsApi.h"
+#include "platform/Platform.h"
 
+#include <QKeySequence>
 #include <QQuickWindow>
 
 AppInfo::AppInfo(QObject* parent)
@@ -31,4 +33,36 @@ int AppInfo::themeOverride() const
         return 2;
     }
     return 0;
+}
+
+bool AppInfo::reduceMotion() const
+{
+    return platform::prefersReducedMotion();
+}
+
+bool AppInfo::debugBuild() const
+{
+#ifdef QT_DEBUG
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool AppInfo::storybookOnStart() const
+{
+    return debugBuild() && qEnvironmentVariableIntValue("FORMA_STORYBOOK") == 1;
+}
+
+QStringList AppInfo::startupActions() const
+{
+    return qEnvironmentVariable("FORMA_STARTUP").split(QLatin1Char(';'), Qt::SkipEmptyParts);
+}
+
+QString AppInfo::shortcutText(const QString& sequence) const
+{
+    if (sequence.isEmpty()) {
+        return {};
+    }
+    return QKeySequence(sequence).toString(QKeySequence::NativeText);
 }
