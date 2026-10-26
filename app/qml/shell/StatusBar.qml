@@ -9,6 +9,10 @@ Rectangle {
     property bool orthographic: false
     property string selectionText: ""
     property string unitText: "mm"
+    property bool snapToGrid: false
+    property string gridText: "auto"
+
+    signal snapToggled()
 
     height: Theme.statusBarHeight
     color: Theme.bgPanel
@@ -32,6 +36,40 @@ Rectangle {
         anchors.rightMargin: Theme.space4
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.space3
+
+        // Comutatorul pentru snap la grid (click = pornit/oprit).
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: snapRow.implicitWidth + Theme.space2 * 2
+            height: 20
+            radius: 10
+            color: root.snapToGrid ? Theme.accentSubtle : snapArea.containsMouse ? Theme.bgHover : "transparent"
+            border.color: root.snapToGrid ? Theme.accent : Theme.borderSubtle
+            Row {
+                id: snapRow
+                anchors.centerIn: parent
+                spacing: Theme.space1
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "grid-3x3"
+                    size: 12
+                    color: root.snapToGrid ? Theme.accent : Theme.textTertiary
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.snapToGrid ? "Snap " + root.gridText : "Snap oprit"
+                    color: root.snapToGrid ? Theme.textPrimary : Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
+                }
+            }
+            MouseArea {
+                id: snapArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.snapToggled()
+            }
+        }
 
         Repeater {
             model: [

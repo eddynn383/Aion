@@ -86,6 +86,7 @@ Window {
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
             { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" },
+            { id: "view.snapGrid", title: doc.snapToGrid ? "Oprește snap la grid" : "Snap la grid", category: "Vedere", shortcut: "Alt+G", icon: "grid-3x3" },
             { id: "nav.pivotView", title: "Orbitează în jurul centrului vederii", category: "Vedere", shortcut: "", icon: "orbit" },
             { id: "nav.pivotSelection", title: "Orbitează în jurul selecției", category: "Vedere", shortcut: "", icon: "orbit" },
             { id: "nav.pivotCursor", title: "Orbitează în jurul punctului de sub cursor", category: "Vedere", shortcut: "", icon: "orbit" },
@@ -177,6 +178,10 @@ Window {
             break
         }
         case "ui.theme": Theme.cycleMode(); break
+        case "view.snapGrid":
+            doc.snapToGrid = !doc.snapToGrid
+            toast.show(doc.snapToGrid ? "Snap la grid: pornit (" + (doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : "pas automat") + ")" : "Snap la grid: oprit")
+            break
         case "nav.pivotView": viewport.orbitPivot = 0; toast.show("Orbita: în jurul centrului vederii"); break
         case "nav.pivotSelection": viewport.orbitPivot = 1; toast.show("Orbita: în jurul selecției"); break
         case "nav.pivotCursor": viewport.orbitPivot = 2; toast.show("Orbita: în jurul punctului de sub cursor"); break
@@ -403,6 +408,8 @@ Window {
         property bool zoomToSurface: true
         property real clipStart: 0
         property real clipEnd: 0
+        property bool snapToGrid: false
+        property real gridStep: 0
     }
     Component.onCompleted: {
         if (AppInfo.themeOverride === 0)
@@ -412,6 +419,8 @@ Window {
         viewport.zoomToSurface = preferences.zoomToSurface
         viewport.clipStart = preferences.clipStart
         viewport.clipEnd = preferences.clipEnd
+        doc.snapToGrid = preferences.snapToGrid
+        doc.gridStep = preferences.gridStep
         window.openPendingFiles()
     }
     Connections {
@@ -437,6 +446,13 @@ Window {
                 window.confirmDiscard(() => doc.openFile(path))
             else
                 doc.importFile(path)
+        }
+    }
+    Connections {
+        target: doc
+        function onGridSnapChanged() {
+            preferences.snapToGrid = doc.snapToGrid
+            preferences.gridStep = doc.gridStep
         }
     }
     Connections {
@@ -1055,6 +1071,9 @@ Window {
         selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
         unitText: ["Auto", "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"
+        snapToGrid: doc.snapToGrid
+        gridText: doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : "auto"
+        onSnapToggled: window.runCommand("view.snapGrid")
     }
 
     CommandPalette {

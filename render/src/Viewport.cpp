@@ -260,6 +260,7 @@ void Viewport::setDocument(Document* document)
         // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
         connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
+        connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
             updateSceneBounds();
@@ -989,6 +990,9 @@ ViewportFrame Viewport::frameForRendering() const
     f.targetDistance = m_camera.pose().distance;
     f.orthographic = isOrthographic();
     f.gridVisible = m_gridVisible;
+    if (m_document && m_document->property("snapToGrid").toBool()) {
+        f.gridStep = m_document->property("gridStep").toDouble();
+    }
     f.devicePixelRatio = window() ? static_cast<float>(window()->effectiveDevicePixelRatio()) : 1.0f;
 
     f.colors.backgroundTop = toVec4(m_backgroundTop);

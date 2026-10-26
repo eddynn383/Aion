@@ -113,6 +113,19 @@ Popover {
             }
             Toggle {
                 width: parent.width
+                text: "Snap la grid (⌥G)"
+                checked: root.document ? root.document.snapToGrid : false
+                onToggled: if (root.document) root.document.snapToGrid = checked
+            }
+            Tabs {
+                width: parent.width
+                readonly property var steps: [0, 1, 5, 10, 50, 100, 500, 1000]
+                model: ["Auto", "1 mm", "5 mm", "1 cm", "5 cm", "10 cm", "50 cm", "1 m"]
+                currentIndex: root.document ? Math.max(0, steps.indexOf(root.document.gridStep)) : 0
+                onCurrentIndexChanged: if (root.document) root.document.gridStep = steps[currentIndex]
+            }
+            Toggle {
+                width: parent.width
                 text: "Zoom spre suprafața de sub cursor"
                 checked: root.viewport ? root.viewport.zoomToSurface : true
                 onToggled: if (root.viewport) root.viewport.zoomToSurface = checked

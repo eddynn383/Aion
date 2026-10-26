@@ -100,6 +100,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Navigare precisă** (ADR 0016): orbită în jurul selecției / cursorului, zoom spre suprafață, planuri de tăiere
   adaptive + Clip start/end în Preferințe. Acțiune de script: `wheelw:x,y,z,trepte`.
 
+- **Snap la grid**: `Engine::withGridSnap` (doar puncte libere și distanțe pe direcții), `autoGridStep` = regula din
+  grid.frag, `ToolContext::gridStep`, Document `snapToGrid`/`gridStep`, pas fix desenat prin `params.z` în grid.frag.
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 

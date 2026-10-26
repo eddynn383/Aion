@@ -13,6 +13,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Zoom cu rotița spre un detaliu de 1–5 mm: se apropie lin, nu trece prin el, nu se blochează
 - [ ] Foarte aproape de un detaliu mic, restul modelului (zeci de metri) rămâne vizibil
 - [ ] Clip start / Clip end manuale schimbă tăierea; 0 revine la automat
+## Snap la grid
+- [ ] ⌥G / chip-ul „Snap” din bara de jos / meniul Vedere pornesc și opresc snap-ul
+- [ ] Pas automat: punctele de pe sol cad pe liniile vizibile ale grid-ului (se schimbă cu zoom-ul)
+- [ ] Pas fix (Preferințe: 1 mm … 1 m): grid-ul desenat arată pasul ales; lungimile pe axe sunt multipli de pas
+- [ ] Capetele, mijloacele și muchiile câștigă în fața grid-ului; pe fețe orizontale/verticale snap în planul feței
 ## Desen și inferență
 - [ ] Line: snap pe capăt / mijloc / muchie / față / axe; Shift și săgețile blochează; VCB (`4m`, `2500`, `3'6"`)
 - [ ] Camera de 4 × 3 m numai din inferențe și VCB se închide într-o față
