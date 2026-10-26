@@ -445,7 +445,7 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 12 – Web
-- [ ] Compilarea `aion_core` cu **Emscripten** (ar trebui să meargă fără modificări datorită regulii „zero Qt în core”)
+- [x] Compilarea `aion_core` cu **Emscripten** (ar trebui să meargă fără modificări datorită regulii „zero Qt în core”)
 - [x] Variantă A: **Qt for WebAssembly** pentru întreaga aplicație (Qt Quick + backend WebGL). Cel mai puțin cod nou; efectele grafice scumpe pot fi reduse pe web
 - [ ] Variantă B (dacă A e prea grea sau lentă): UI web nativ (TypeScript) + `aion_core` în WASM, cu randare WebGL/WebGPU
 - [x] Decizia A vs. B documentată într-un ADR (0015; de reconfirmat cu măsurători), după un prototip de măsurare (dimensiune, timp de încărcare, fps)
