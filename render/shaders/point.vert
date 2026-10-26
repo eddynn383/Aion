@@ -22,6 +22,7 @@ layout(std140, binding = 0) uniform Frame {
     vec4 faceFront;
     vec4 faceBack;
     vec4 forward;      // xyz = direcția de privire, w = 1 pentru proiecție ortografică
+    vec4 accent;       // culoarea selecției
     vec4 params;       // x = 1 dacă y crește în sus în NDC
 } frame;
 

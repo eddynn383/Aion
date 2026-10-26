@@ -31,6 +31,7 @@ struct FrameUniforms {
     float faceFront[4];
     float faceBack[4];
     float forward[4];
+    float accent[4];
     float params[4];
 };
 
@@ -151,6 +152,7 @@ void ViewportRenderer::createPipelines()
     meshLayout.setAttributes({
         { 0, 0, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, position) },
         { 0, 1, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, normal) },
+        { 0, 2, QRhiVertexInputAttribute::Float, offsetof(MeshVertex, state) },
     });
     m_meshPipeline = makePipeline(QStringLiteral("mesh.vert"), QStringLiteral("mesh.frag"), meshLayout, Depth::TestAndWrite, false);
 
@@ -227,6 +229,7 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     copy4(u.faceFront, m_frame.colors.faceFront);
     copy4(u.faceBack, m_frame.colors.faceBack);
     copy4(u.forward, m_frame.forward, m_frame.orthographic ? 1.0 : 0.0);
+    copy4(u.accent, m_frame.colors.accent);
     u.params[0] = m_rhi->isYUpInNDC() ? 1.0f : 0.0f;
 
     batch->updateDynamicBuffer(m_uniforms.get(), 0, sizeof(u), &u);

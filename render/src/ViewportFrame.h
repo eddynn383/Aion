@@ -28,6 +28,7 @@ static_assert(sizeof(PointInstance) == 32);
 struct MeshVertex {
     glm::vec3 position;
     glm::vec3 normal;
+    float state = 0.0f; // 0 = normal, 1 = sub cursor, 2 = selectat
 };
 
 struct ViewportColors {
@@ -37,6 +38,7 @@ struct ViewportColors {
     glm::vec4 gridMajor;
     glm::vec4 faceFront;
     glm::vec4 faceBack;
+    glm::vec4 accent;
 };
 
 struct ViewportFrame {

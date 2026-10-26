@@ -1,6 +1,7 @@
 import QtQuick
 import Aion
 import Aion.Render
+import QtQuick.Shapes
 
 Window {
     id: window
@@ -35,15 +36,22 @@ Window {
               category: "Vedere", shortcut: "", icon: "focus" },
             { id: "view.grid",   title: viewport.gridVisible ? "Ascunde grid-ul" : "Arată grid-ul", category: "Vedere", shortcut: "", icon: "grid-3x3" },
             { id: "view.demo",   title: viewport.demoVisible ? "Ascunde cutia demo" : "Arată cutia demo", category: "Vedere", shortcut: "", icon: "box" },
-            { id: "tool.orbit",  title: "Orbit",  category: "Unelte", shortcut: "O", icon: "orbit" },
-            { id: "tool.pan",    title: "Pan",    category: "Unelte", shortcut: "H", icon: "hand" },
-            { id: "tool.zoom",   title: "Zoom",   category: "Unelte", shortcut: "Z", icon: "zoom-in" },
-            { id: "tool.select", title: "Select", category: "Unelte", shortcut: "Space", icon: "mouse-pointer-2" },
+            { id: "edit.undo", title: doc.canUndo ? "Undo " + doc.undoName : "Undo", category: "Editare",
+              shortcut: "Ctrl+Z", icon: "undo-2" },
+            { id: "edit.redo", title: doc.canRedo ? "Redo " + doc.redoName : "Redo", category: "Editare",
+              shortcut: "Ctrl+Shift+Z", icon: "redo-2" },
+            { id: "edit.delete", title: "Șterge selecția", category: "Editare", shortcut: "Delete", icon: "trash-2" },
+            { id: "edit.selectAll", title: "Selectează tot", category: "Editare", shortcut: "Ctrl+A",
+              icon: "square-dashed-mouse-pointer" },
+            { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
             { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
             { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" }
         ]
+        // Toate uneltele din toolbar, cu scurtăturile lor.
+        for (const t of toolbar.allTools)
+            list.push({ id: "tool." + t.id, title: t.name, category: "Unelte", shortcut: t.key || "", icon: t.icon })
         if (AppInfo.debugBuild)
             list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
@@ -63,10 +71,11 @@ Window {
         case "view.projection": viewport.toggleProjection(); break
         case "view.grid": viewport.gridVisible = !viewport.gridVisible; break
         case "view.demo": viewport.demoVisible = !viewport.demoVisible; break
-        case "tool.orbit": window.activeTool = "orbit"; break
-        case "tool.pan": window.activeTool = "pan"; break
-        case "tool.zoom": window.activeTool = "zoom"; break
-        case "tool.select": window.activeTool = "select"; break
+        case "edit.undo": doc.undo(); break
+        case "edit.redo": doc.redo(); break
+        case "edit.delete": doc.deleteSelection(); break
+        case "edit.selectAll": doc.selectAll(); break
+        case "edit.selectNone": doc.clearSelection(); break
         case "ui.leftPanel": window.leftPanelVisible = !window.leftPanelVisible; break
         case "ui.rightPanel": window.rightPanelVisible = !window.rightPanelVisible; break
         case "ui.panels": {
@@ -78,7 +87,11 @@ Window {
         case "ui.theme": Theme.cycleMode(); break
         case "debug.storybook": storybookLoader.active = true; break
         case "debug.benchmark": viewport.startTurntable(4); break
-        default: console.warn("Comandă necunoscută:", id)
+        default:
+            if (id.startsWith("tool."))
+                window.selectTool(id.slice(5))
+            else
+                console.warn("Comandă necunoscută:", id)
         }
     }
 
@@ -96,13 +109,20 @@ Window {
         }
     }
 
+    // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
+    readonly property var modelingTools: ["select", "line", "rectangle", "eraser"]
+    property string pendingToolMessage: ""
+
     function selectTool(id) {
         window.activeTool = id
         const tool = toolbar.toolInfo(id)
-        if (tool && tool.phase && id !== "select")
-            statusBar.message = "Unealta „" + tool.name + "” vine în Faza " + tool.phase
-        else
-            statusBar.message = "Gata"
+        const ready = modelingTools.includes(id) || navigationTools.includes(id)
+        pendingToolMessage = tool && !ready ? "Unealta „" + tool.name + "” vine în Faza " + tool.phase : ""
+    }
+
+    Document {
+        id: doc
+        activeTool: window.modelingTools.includes(window.activeTool) ? window.activeTool : ""
     }
 
     // Scurtăturile comenzilor, generate din aceeași listă ca și command palette.
@@ -119,15 +139,21 @@ Window {
         sequence: "Ctrl+K"
         onActivated: palette.opened ? palette.close() : palette.open()
     }
-    // Scurtăturile uneltelor de desen (navigarea are scurtăturile în lista de comenzi).
-    Instantiator {
-        model: toolbar.allTools.filter(t => t.key && t.key.length === 1 && !navigationTools.includes(t.id))
-        delegate: Shortcut {
-            required property var modelData
-            sequence: modelData.key
-            enabled: !palette.opened
-            onActivated: window.selectTool(modelData.id)
-        }
+    // Tastele care nu sunt comenzi: Esc (anulează / deselectează), Enter (termină), Backspace (șterge, pe Mac).
+    Shortcut {
+        sequence: "Escape"
+        enabled: !palette.opened
+        onActivated: doc.escape()
+    }
+    Shortcut {
+        sequences: ["Return", "Enter"]
+        enabled: !palette.opened
+        onActivated: doc.enter()
+    }
+    Shortcut {
+        sequence: "Backspace"
+        enabled: !palette.opened
+        onActivated: doc.deleteSelection()
     }
 
     TitleBar {
@@ -205,8 +231,33 @@ Window {
         edgeColor: Theme.edge
         faceFrontColor: Theme.faceFront
         faceBackColor: Theme.faceBack
+        accentColor: Theme.accent
+        previewColor: Theme.textPrimary
+        eraseColor: Theme.danger
+        document: doc
         reducedMotion: Theme.reduceMotion
         navigationTool: window.navigationTools.includes(window.activeTool) ? window.activeTool : ""
+
+        // Dreptunghiul de selecție: linie continuă = window (stânga → dreapta), punctată = crossing.
+        Shape {
+            visible: viewport.selectionRect.width > 0 || viewport.selectionRect.height > 0
+            x: viewport.selectionRect.x
+            y: viewport.selectionRect.y
+            width: viewport.selectionRect.width
+            height: viewport.selectionRect.height
+            ShapePath {
+                strokeColor: Theme.accent
+                strokeWidth: 1
+                fillColor: Theme.accentSubtle
+                strokeStyle: viewport.selectionCrossing ? ShapePath.DashLine : ShapePath.SolidLine
+                dashPattern: [4, 3]
+                startX: 0; startY: 0
+                PathLine { x: viewport.selectionRect.width; y: 0 }
+                PathLine { x: viewport.selectionRect.width; y: viewport.selectionRect.height }
+                PathLine { x: 0; y: viewport.selectionRect.height }
+                PathLine { x: 0; y: 0 }
+            }
+        }
 
         NavigationGizmo {
             anchors.top: parent.top
@@ -245,9 +296,22 @@ Window {
             spacing: Theme.space6
 
             Text {
-                text: "Nimic selectat"
-                color: Theme.textTertiary
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: doc.selectionSummary.length > 0 ? doc.selectionSummary : "Nimic selectat"
+                color: doc.selectionSummary.length > 0 ? Theme.textPrimary : Theme.textTertiary
                 font.pixelSize: Theme.fontSizeMd
+            }
+
+            Section {
+                width: parent.width
+                title: "Model"
+                Text {
+                    text: doc.faceCount + " fețe · " + doc.edgeCount + " muchii"
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeSm
+                    font.family: Theme.fontMono
+                }
             }
 
             Section {
@@ -265,12 +329,6 @@ Window {
                     text: "Grid"
                     checked: viewport.gridVisible
                     onToggled: viewport.gridVisible = checked
-                }
-                Toggle {
-                    width: parent.width
-                    text: "Cutie demo"
-                    checked: viewport.demoVisible
-                    onToggled: viewport.demoVisible = checked
                 }
             }
 
@@ -308,6 +366,9 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         framesPerSecond: viewport.framesPerSecond
+        message: window.pendingToolMessage.length > 0 ? window.pendingToolMessage
+               : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata"
+        selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
     }
 

@@ -1,17 +1,24 @@
 #include "aion/render/Viewport.h"
 
+#include "aion/render/Document.h"
+
 #include "ViewportFrame.h"
 #include "ViewportRenderer.h"
 
 #include <QNativeGestureEvent>
 #include <QPointingDevice>
+#include <QGuiApplication>
+#include <QLineF>
 #include <QQuickWindow>
+#include <QStyleHints>
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
+#include <set>
 
 namespace aion::render {
 
@@ -27,6 +34,11 @@ constexpr int kTransientCursorMs = 450;
 // Cât de recentă trebuie să fie mișcarea ca, la eliberare, orbita să continue prin inerție.
 constexpr qint64 kInertiaWindowNs = 80'000'000;
 constexpr qint64 kInertiaMaxIdleNs = 40'000'000;
+// Clicurile succesive mai apropiate de atât (în pixeli) se numără împreună (dublu, triplu).
+constexpr double kMultiClickDistancePx = 5.0;
+
+constexpr float kEdgeWidth = 1.25f;
+constexpr float kHighlightedEdgeWidth = 2.25f;
 
 // Cutia demo (în mm), afișată până când modelul poate conține geometrie (Faza 3).
 constexpr glm::dvec3 kDemoMin { 0.0, 0.0, 0.0 };
@@ -158,6 +170,109 @@ void Viewport::updateCursor()
 
 Viewport::~Viewport() = default;
 
+void Viewport::setDocument(Document* document)
+{
+    if (document == m_document) {
+        return;
+    }
+    if (m_document) {
+        disconnect(m_document, nullptr, this, nullptr);
+    }
+    m_document = document;
+    if (m_document) {
+        connect(m_document, &Document::changed, this, &QQuickItem::update);
+    }
+    emit documentChanged();
+    update();
+}
+
+tools::PointerEvent Viewport::toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount) const
+{
+    tools::PointerEvent e;
+    e.screen = toVec2(position);
+    e.modifiers.shift = modifiers.testFlag(Qt::ShiftModifier);
+    // Qt pe macOS: Cmd = ControlModifier, Control = MetaModifier.
+    e.modifiers.command = modifiers.testFlag(Qt::ControlModifier);
+    e.modifiers.alt = modifiers.testFlag(Qt::AltModifier);
+    e.clickCount = clickCount;
+    return e;
+}
+
+void Viewport::afterToolEvent()
+{
+    QRectF rect;
+    bool crossing = false;
+    if (m_document && m_document->tool()) {
+        const tools::Overlay overlay = m_document->tool()->overlay();
+        if (overlay.selectionRect) {
+            const auto [a, b] = *overlay.selectionRect;
+            rect = QRectF(QPointF(a.x, a.y), QPointF(b.x, b.y)).normalized();
+            crossing = overlay.crossing;
+        }
+    }
+    if (rect != m_selectionRect || crossing != m_selectionCrossing) {
+        m_selectionRect = rect;
+        m_selectionCrossing = crossing;
+        emit selectionRectChanged();
+    }
+    update();
+}
+
+void Viewport::appendDocument(ViewportFrame& f) const
+{
+    const Document& doc = *m_document;
+    const geom::Mesh& mesh = doc.mesh();
+    const geom::Selection& selection = doc.selection();
+    const view::PickResult hover = doc.tool() ? doc.tool()->hover() : view::PickResult {};
+    const tools::Overlay overlay = doc.tool() ? doc.tool()->overlay() : tools::Overlay {};
+
+    for (const auto& [faceId, tri] : doc.triangles()) {
+        const geom::Face* face = mesh.faces().find(faceId);
+        if (face == nullptr) {
+            continue;
+        }
+        const glm::vec3 normal(face->plane.normal);
+        const float state = selection.contains(faceId) ? 2.0f
+            : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
+                                                                                   : 0.0f;
+        for (std::uint32_t i : tri.indices) {
+            f.triangles.push_back({ glm::vec3(tri.points[i]), normal, state });
+        }
+    }
+
+    const std::set<geom::EdgeId> marked(overlay.markedEdges.begin(), overlay.markedEdges.end());
+    const glm::vec4 edge = toVec4(m_edge);
+    const glm::vec4 accent = toVec4(m_accent);
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        const geom::EdgeId id = mesh.edges().keys()[i];
+        const geom::Edge& e = mesh.edges().values()[i];
+        glm::vec4 color = edge;
+        float width = kEdgeWidth;
+        if (marked.contains(id)) {
+            color = toVec4(m_erase);
+            width = kHighlightedEdgeWidth;
+        } else if (selection.contains(id)) {
+            color = accent;
+            width = kHighlightedEdgeWidth;
+        } else if (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) {
+            color = withAlpha(m_accent, 0.75f);
+            width = kHighlightedEdgeWidth;
+        }
+        f.lines.push_back({ glm::vec3(mesh.position(e.v0)), glm::vec3(mesh.position(e.v1)), color, { width, 0.0f } });
+    }
+
+    const glm::vec4 preview = toVec4(m_preview);
+    for (const tools::OverlayLine& l : overlay.lines) {
+        f.lines.push_back({ glm::vec3(l.a), glm::vec3(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
+    }
+    for (const math::Vec3d& p : overlay.points) {
+        f.points.push_back({ glm::vec3(p), accent, 7.0f });
+    }
+    if (hover.kind == view::PickResult::Kind::Vertex) {
+        f.points.push_back({ glm::vec3(hover.point), accent, 9.0f });
+    }
+}
+
 QQuickRhiItemRenderer* Viewport::createRenderer()
 {
     // Qt preia renderer-ul și îl distruge pe firul de randare.
@@ -233,7 +348,18 @@ void Viewport::startTurntable(double seconds)
 
 void Viewport::sceneBounds(view::Vec3d& min, view::Vec3d& max) const
 {
-    if (m_demoVisible) {
+    if (m_document && !m_document->mesh().vertices().empty()) {
+        min = view::Vec3d(std::numeric_limits<double>::max());
+        max = view::Vec3d(std::numeric_limits<double>::lowest());
+        for (const geom::Vertex& v : m_document->mesh().vertices().values()) {
+            min = glm::min(min, v.position);
+            max = glm::max(max, v.position);
+        }
+        if (m_demoVisible) {
+            min = glm::min(min, kDemoMin);
+            max = glm::max(max, kDemoMax);
+        }
+    } else if (m_demoVisible) {
         min = kDemoMin;
         max = kDemoMax;
     } else {
@@ -276,11 +402,15 @@ ViewportFrame Viewport::frameForRendering() const
         f.lines.push_back({ { 0, 0, 0 }, -dir * axisLength, withAlpha(color, 0.55f), { axisWidth, dash } });
     }
 
+    f.colors.accent = toVec4(m_accent);
+    if (m_document) {
+        appendDocument(f);
+    }
     if (m_demoVisible) {
         appendBox(f.triangles, kDemoMin, kDemoMax);
-        appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), 1.25f);
+        appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
-    f.meshRevision = m_demoVisible ? 1u : 2u;
+    f.meshRevision = (m_document ? m_document->revision() : 0u) * 2u + (m_demoVisible ? 1u : 0u);
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     return f;
@@ -407,6 +537,22 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             drag = Drag::Zoom;
         }
     }
+    if (drag == Drag::None && event->button() == Qt::LeftButton && m_document && m_document->hasTool()) {
+        // Numărăm noi clicurile (dublu, triplu), ca să funcționeze la fel pe toate platformele.
+        const qint64 now = m_frameClock.nsecsElapsed();
+        const qint64 interval = qint64(QGuiApplication::styleHints()->mouseDoubleClickInterval()) * 1'000'000;
+        const bool continues = now - m_lastClickNs <= interval
+            && QLineF(event->position(), m_lastClickPosition).length() <= kMultiClickDistancePx;
+        m_clickCount = continues ? std::min(m_clickCount + 1, 3) : 1;
+        m_lastClickNs = now;
+        m_lastClickPosition = event->position();
+
+        m_toolPressed = true;
+        m_document->pointerDown(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
+        afterToolEvent();
+        event->accept();
+        return;
+    }
     if (drag == Drag::None) {
         event->ignore();
         return;
@@ -435,11 +581,23 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
     } else if (m_drag == Drag::Zoom) {
         m_camera.zoomAbout(std::exp(delta.y() * kDragZoomPerPixel), m_zoomDragAnchor);
         onCameraMoved();
+    } else if (m_toolPressed && m_document) {
+        m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
+        afterToolEvent();
     }
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_toolPressed && event->button() == Qt::LeftButton) {
+        m_toolPressed = false;
+        if (m_document) {
+            m_document->pointerUp(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
+            afterToolEvent();
+        }
+        event->accept();
+        return;
+    }
     if (m_drag == Drag::Orbit) {
         m_motion.setOrbitVelocity(orbitReleaseVelocity());
         requestAnimationFrame();
@@ -460,7 +618,8 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
         event->accept();
         return;
     }
-    event->ignore();
+    // Butonul stâng: clicurile multiple le numărăm în mousePressEvent.
+    event->setAccepted(event->button() == Qt::LeftButton && m_document && m_document->hasTool());
 }
 
 void Viewport::recordOrbitSample(QPointF delta)
@@ -529,7 +688,18 @@ void Viewport::wheelEvent(QWheelEvent* event)
 void Viewport::hoverMoveEvent(QHoverEvent* event)
 {
     m_hoverPosition = event->position();
+    // În timpul navigării cu butonul din mijloc nu actualizăm unealta (evenimentele vin prin mouseMove).
+    if (m_document && m_drag == Drag::None && !m_toolPressed) {
+        m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers()));
+        afterToolEvent();
+    }
     QQuickRhiItem::hoverMoveEvent(event);
+}
+
+void Viewport::hoverLeaveEvent(QHoverEvent* event)
+{
+    QQuickRhiItem::hoverLeaveEvent(event);
+    update();
 }
 
 } // namespace aion::render

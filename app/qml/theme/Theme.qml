@@ -44,6 +44,7 @@ QtObject {
     readonly property color accentHover: dark ? "#60A5FA" : "#1D4ED8"
     readonly property color accentSubtle: dark ? Qt.rgba(0.23, 0.51, 0.96, 0.16) : Qt.rgba(0.15, 0.39, 0.92, 0.10)
     readonly property color accentText: "#FFFFFF"
+    readonly property color danger: dark ? "#F87171" : "#DC2626"
     readonly property color focusRing: dark ? Qt.rgba(0.23, 0.51, 0.96, 0.55) : Qt.rgba(0.15, 0.39, 0.92, 0.45)
 
     readonly property color shadow: dark ? Qt.rgba(0, 0, 0, 0.55) : Qt.rgba(0, 0, 0, 0.14)
