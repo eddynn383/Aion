@@ -23,6 +23,9 @@ struct Plane {
     [[nodiscard]] Vec3d origin() const { return normal * d; }
     [[nodiscard]] Plane flipped() const { return { -normal, -d }; }
 
+    // Egalitate exactă (pentru compararea stărilor la undo), nu geometrică; vezi coincident().
+    bool operator==(const Plane&) const = default;
+
     // Aceeași mulțime de puncte (normala poate avea sens opus).
     [[nodiscard]] bool coincident(const Plane& other) const;
 };

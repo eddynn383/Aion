@@ -2,6 +2,8 @@ find_package(glm CONFIG REQUIRED)
 
 add_library(forma_core STATIC
     src/Version.cpp
+    src/geom/Mesh.cpp
+    src/geom/MeshValidate.cpp
     src/math/Intersect.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
