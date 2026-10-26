@@ -240,6 +240,9 @@ public:
     void selectForContextMenu(const view::Camera& camera, math::Vec2d screen);
     // Cutia selecției în coordonate globale (pentru „Zoom la selecție”); nullopt dacă selecția e goală.
     std::optional<std::pair<math::Vec3d, math::Vec3d>> selectionBounds() const;
+    // Punctul de pe model (fețe, muchii, grupuri și obiecte vizibile) de sub cursor, în coordonate globale.
+    // `camera` e camera globală a viewport-ului. Pentru zoom spre suprafață și orbita în jurul cursorului.
+    std::optional<math::Vec3d> surfacePoint(const view::Camera& camera, math::Vec2d screen) const;
 
     void pointerDown(const view::Camera& camera, const tools::PointerEvent& e);
     void pointerMove(const view::Camera& camera, const tools::PointerEvent& e);

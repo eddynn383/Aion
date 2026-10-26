@@ -7,6 +7,7 @@
 #include <QCoreApplication>
 #include <QKeySequence>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPointer>
 #include <QQuickWindow>
 
@@ -100,6 +101,18 @@ QString AppInfo::shortcutText(const QString& sequence) const
         return {};
     }
     return QKeySequence(sequence).toString(QKeySequence::NativeText);
+}
+
+void AppInfo::simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const
+{
+    if (item == nullptr || item->window() == nullptr) {
+        return;
+    }
+    QQuickWindow* window = item->window();
+    const QPointF scenePos = item->mapToScene(position);
+    QWheelEvent e(scenePos, window->mapToGlobal(scenePos), QPoint(), QPoint(0, angleDelta), Qt::NoButton, Qt::NoModifier,
+        Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(window, &e);
 }
 
 void AppInfo::simulateClick(QQuickItem* item, const QPointF& position) const

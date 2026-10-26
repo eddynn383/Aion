@@ -98,6 +98,62 @@ Popover {
 
         Section {
             width: parent.width
+            title: "Navigare"
+
+            Text {
+                text: "Orbitează în jurul"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeXs
+            }
+            Tabs {
+                width: parent.width
+                model: ["Centrul vederii", "Selecției", "Punctului de sub cursor"]
+                currentIndex: root.viewport ? root.viewport.orbitPivot : 0
+                onCurrentIndexChanged: if (root.viewport) root.viewport.orbitPivot = currentIndex
+            }
+            Toggle {
+                width: parent.width
+                text: "Zoom spre suprafața de sub cursor"
+                checked: root.viewport ? root.viewport.zoomToSurface : true
+                onToggled: if (root.viewport) root.viewport.zoomToSurface = checked
+            }
+            Row {
+                width: parent.width
+                spacing: Theme.space2
+                NumberField {
+                    width: (parent.width - Theme.space2) / 2
+                    label: "Clip start"
+                    unit: "mm"
+                    from: 0
+                    to: 100000
+                    step: 0.1
+                    decimals: 3
+                    value: root.viewport ? root.viewport.clipStart : 0
+                    onValueModified: (v) => { if (root.viewport) root.viewport.clipStart = v }
+                }
+                NumberField {
+                    width: (parent.width - Theme.space2) / 2
+                    label: "Clip end"
+                    unit: "m"
+                    from: 0
+                    to: 1000000
+                    step: 10
+                    value: root.viewport ? root.viewport.clipEnd / 1000 : 0
+                    onValueModified: (v) => { if (root.viewport) root.viewport.clipEnd = v * 1000 }
+                }
+            }
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: "0 = automat (după distanța camerei și mărimea modelului). Setează Clip start mic (de exemplu 0.01 mm) "
+                      + "doar dacă detaliile foarte mici dispar când te apropii."
+                color: Theme.textTertiary
+                font.pixelSize: Theme.fontSizeXs
+            }
+        }
+
+        Section {
+            width: parent.width
             title: "Locație (pentru umbre)"
 
             Slider {

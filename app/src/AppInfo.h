@@ -46,6 +46,8 @@ public:
     Q_INVOKABLE void simulateMove(QQuickItem* item, const QPointF& position) const;
     // Click cu butonul drept (meniul contextual).
     Q_INVOKABLE void simulateRightClick(QQuickItem* item, const QPointF& position) const;
+    // Rotița mouse-ului (pași de 120 = o treaptă; pozitiv = apropiere).
+    Q_INVOKABLE void simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const;
 
     // Fișierele cerute din afară (Finder, Dock, linia de comandă) până să le preia interfața.
     static void queueFileOpen(const QString& path);

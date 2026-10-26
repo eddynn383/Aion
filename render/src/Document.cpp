@@ -6,6 +6,8 @@
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/units/Length.h"
+#include "aion/core/view/ModelPicking.h"
+#include "aion/core/view/Picking.h"
 
 #include <QColor>
 #include <QDateTime>
@@ -1179,6 +1181,27 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
         m_selection = hit;
     }
     afterInteraction(before);
+}
+
+std::optional<math::Vec3d> Document::surfacePoint(const view::Camera& camera, math::Vec2d screen) const
+{
+    std::optional<math::Vec3d> best;
+    double bestDistance = std::numeric_limits<double>::infinity();
+    const auto consider = [&](const math::Vec3d& p) {
+        const double d = glm::dot(p - camera.eye(), camera.forward());
+        if (d > 0.0 && d < bestDistance) {
+            bestDistance = d;
+            best = p;
+        }
+    };
+    const view::PickResult hit = view::pick(m_model.mesh(m_model.root()), camera, screen);
+    if (hit.hit()) {
+        consider(hit.point);
+    }
+    if (const auto instance = view::pickInstance(m_model, m_model.root(), camera, screen)) {
+        consider(instance->point);
+    }
+    return best;
 }
 
 std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() const

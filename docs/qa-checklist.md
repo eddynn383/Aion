@@ -7,6 +7,12 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Gizmo-ul de axe: click pe o axă → vederea standard; ⌘0–6; Zoom Extents (⇧Z)
 - [ ] Command palette (⌘K): căutare, comenzi recente, „Deschide recent: …”
 - [ ] Teme: Sistem / Light / Dark; panourile (⌘\); tooltip-urile lizibile
+## Navigare precisă (ADR 0016)
+- [ ] Preferințe → Navigare → „Selecției”: selectează un obiect departe de centru, orbitează → obiectul rămâne pe loc (punct albastru = pivot)
+- [ ] „Punctului de sub cursor”: orbita pornește din punctul de pe model de sub mouse; pe gol → centrul vederii
+- [ ] Zoom cu rotița spre un detaliu de 1–5 mm: se apropie lin, nu trece prin el, nu se blochează
+- [ ] Foarte aproape de un detaliu mic, restul modelului (zeci de metri) rămâne vizibil
+- [ ] Clip start / Clip end manuale schimbă tăierea; 0 revine la automat
 ## Desen și inferență
 - [ ] Line: snap pe capăt / mijloc / muchie / față / axe; Shift și săgețile blochează; VCB (`4m`, `2500`, `3'6"`)
 - [ ] Camera de 4 × 3 m numai din inferențe și VCB se închide într-o față

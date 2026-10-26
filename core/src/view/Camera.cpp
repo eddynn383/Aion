@@ -17,7 +17,9 @@ constexpr double kHalfPi = glm::half_pi<double>();
 // Raportul far/near ține precizia buffer-ului de adâncime (24 de biți) acceptabilă.
 constexpr double kNearFactor = 0.01;
 constexpr double kFarFactor = 100.0;
-constexpr double kMinNear = 0.1;
+constexpr double kMinNear = 0.001;
+// Raportul maxim far/near când planul îndepărtat cuprinde toată scena.
+constexpr double kMaxDepthRatio = 1.0e6;
 
 // Ancora de zoom pe sol se folosește doar dacă e la cel mult atâtea distanțe-țintă.
 constexpr double kMaxGroundAnchorFactor = 20.0;
@@ -176,17 +178,44 @@ Mat4d Camera::viewMatrix() const
     return v;
 }
 
+void Camera::setSceneBounds(const Vec3d& min, const Vec3d& max)
+{
+    m_sceneBounds = std::pair { min, max };
+}
+
+void Camera::setClipOverride(double nearMm, double farMm)
+{
+    m_clipNear = std::max(nearMm, 0.0);
+    m_clipFar = std::max(farMm, 0.0);
+}
+
 double Camera::worldNear() const
 {
     if (m_projection == Projection::Orthographic) {
-        return -m_pose.distance * kFarFactor;
+        return -worldFar();
     }
-    return std::max(m_pose.distance * kNearFactor, kMinNear);
+    if (m_clipNear > 0.0) {
+        return m_clipNear;
+    }
+    return std::max({ m_pose.distance * kNearFactor, worldFar() / kMaxDepthRatio, kMinNear });
 }
 
 double Camera::worldFar() const
 {
-    return m_pose.distance * kFarFactor;
+    if (m_clipFar > 0.0) {
+        return m_clipFar;
+    }
+    double far = m_pose.distance * kFarFactor;
+    // Colțul cel mai îndepărtat al scenei trebuie să rămână vizibil (altfel, aproape de un detaliu de câțiva mm,
+    // restul modelului ar dispărea).
+    if (m_sceneBounds) {
+        const auto& [lo, hi] = *m_sceneBounds;
+        const Vec3d e = worldEye();
+        const Vec3d corner { std::abs(lo.x - e.x) > std::abs(hi.x - e.x) ? lo.x : hi.x,
+            std::abs(lo.y - e.y) > std::abs(hi.y - e.y) ? lo.y : hi.y, std::abs(lo.z - e.z) > std::abs(hi.z - e.z) ? lo.z : hi.z };
+        far = std::max(far, glm::length(corner - e) * 1.05);
+    }
+    return far;
 }
 
 Mat4d Camera::projectionMatrix() const
@@ -246,10 +275,33 @@ double Camera::worldPerPixelAtTarget() const
 
 void Camera::orbit(double deltaYaw, double deltaPitch)
 {
+    if (!m_orbitPivot) {
+        CameraPose p = m_pose;
+        p.yaw += deltaYaw;
+        p.pitch += deltaPitch;
+        setPose(p);
+        return;
+    }
+    // Rotație rigidă în jurul pivotului: ținta își păstrează coordonatele în baza camerei relativ la pivot.
+    const Vec3d pivot = *m_orbitPivot;
+    const Vec3d v = m_pose.target - pivot;
+    const double a = glm::dot(v, worldRight());
+    const double b = glm::dot(v, worldUp());
+    const double c = glm::dot(v, worldForward());
     CameraPose p = m_pose;
     p.yaw += deltaYaw;
     p.pitch += deltaPitch;
     setPose(p);
+    m_pose.target = pivot + worldRight() * a + worldUp() * b + worldForward() * c;
+}
+
+void Camera::retargetToDepth(const Vec3d& point)
+{
+    const Vec3d e = worldEye();
+    const Vec3d f = worldForward();
+    const double depth = std::clamp(glm::dot(point - e, f), kMinDistance, kMaxDistance);
+    m_pose.target = e + f * depth;
+    m_pose.distance = depth;
 }
 
 void Camera::pan(Vec2d deltaPx)

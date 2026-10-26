@@ -86,6 +86,9 @@ Window {
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
             { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" },
+            { id: "nav.pivotView", title: "Orbitează în jurul centrului vederii", category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "nav.pivotSelection", title: "Orbitează în jurul selecției", category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "nav.pivotCursor", title: "Orbitează în jurul punctului de sub cursor", category: "Vedere", shortcut: "", icon: "orbit" },
             { id: "app.preferences", title: "Preferințe…", category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
             { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" },
             { id: "app.tour", title: "Turul uneltelor (cum se folosește fiecare)", category: "Ajutor", shortcut: "", icon: "info" }
@@ -174,6 +177,9 @@ Window {
             break
         }
         case "ui.theme": Theme.cycleMode(); break
+        case "nav.pivotView": viewport.orbitPivot = 0; toast.show("Orbita: în jurul centrului vederii"); break
+        case "nav.pivotSelection": viewport.orbitPivot = 1; toast.show("Orbita: în jurul selecției"); break
+        case "nav.pivotCursor": viewport.orbitPivot = 2; toast.show("Orbita: în jurul punctului de sub cursor"); break
         case "app.preferences": preferencesDialog.open(); break
         case "app.about": aboutDialog.open(); break
         case "app.tour": toolTour.open(); break
@@ -233,6 +239,10 @@ Window {
                 } else if (action.startsWith("movew:")) {
                     const m = action.slice(6).split(",").map(Number)
                     AppInfo.simulateMove(viewport, viewport.projectToScreen(Qt.vector3d(m[0], m[1], m[2])))
+                } else if (action.startsWith("wheelw:")) {
+                    // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
+                    const wh = action.slice(7).split(",").map(Number)
+                    AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
                 } else if (action.startsWith("moves:")) {
                     // Hover în coordonatele ferestrei (de exemplu pe un buton din toolbar).
                     const ms = action.slice(6).split(",").map(Number)
@@ -389,11 +399,19 @@ Window {
         category: "ui"
         property int themeMode: 0
         property real latitude: 45
+        property int orbitPivot: 0
+        property bool zoomToSurface: true
+        property real clipStart: 0
+        property real clipEnd: 0
     }
     Component.onCompleted: {
         if (AppInfo.themeOverride === 0)
             Theme.mode = preferences.themeMode
         viewport.latitude = preferences.latitude
+        viewport.orbitPivot = preferences.orbitPivot
+        viewport.zoomToSurface = preferences.zoomToSurface
+        viewport.clipStart = preferences.clipStart
+        viewport.clipEnd = preferences.clipEnd
         window.openPendingFiles()
     }
     Connections {
@@ -403,6 +421,12 @@ Window {
     Connections {
         target: viewport
         function onAppearanceChanged() { preferences.latitude = viewport.latitude }
+        function onNavigationSettingsChanged() {
+            preferences.orbitPivot = viewport.orbitPivot
+            preferences.zoomToSurface = viewport.zoomToSurface
+            preferences.clipStart = viewport.clipStart
+            preferences.clipEnd = viewport.clipEnd
+        }
     }
 
     // Fișierele deschise din Finder (dublu-click pe un .aion, „Open With”) sau date în linia de comandă.

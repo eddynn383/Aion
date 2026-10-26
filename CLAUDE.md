@@ -97,6 +97,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `RichTooltip` la hover lung (1,3 s), `ToolTour` (meniul Ajutor / palette). ADR 0013. Acțiuni de script:
   `moves:x,y` (hover în fereastră), `debug.demos` (galeria animațiilor).
 
+- **Navigare precisă** (ADR 0016): orbită în jurul selecției / cursorului, zoom spre suprafață, planuri de tăiere
+  adaptive + Clip start/end în Preferințe. Acțiune de script: `wheelw:x,y,z,trepte`.
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 
