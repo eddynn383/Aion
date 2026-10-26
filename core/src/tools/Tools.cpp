@@ -301,7 +301,11 @@ private:
 
     void restartInference()
     {
-        m_engine.resetLock();
+        if (m_start) {
+            m_engine.restartFrom(*m_start);
+        } else {
+            m_engine.resetLock();
+        }
         m_shiftLock = false;
     }
 
@@ -447,7 +451,7 @@ private:
         m_plane = plane;
         m_origin = p.point;
         m_current = p.point;
-        m_engine.resetLock();
+        m_engine.restartFrom(p.point);
         m_shiftLock = false;
     }
 

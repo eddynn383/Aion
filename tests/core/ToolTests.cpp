@@ -464,7 +464,9 @@ TEST_CASE("Unelte: acoperiș în două ape cu Move pe linia de coamă (săgeata 
     auto move = tools::makeTool("move");
     s.click(*move, { 1000, 500, 1000 }); // fără selecție: mută muchia de sub cursor
     REQUIRE(move->key(s.ctx, { tools::Key::Up, {} }));
-    move->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 500, 1600 })));
+    // Cu axa albastră blocată, cursorul poate fi oriunde: rămâne pe verticală.
+    move->pointerMove(s.ctx, Scene::at(s.screen({ 1500, 900, 1300 })));
+    CHECK(move->overlay().marker->locked);
     REQUIRE(move->applyMeasurement(s.ctx, "800"));
     CHECK(maxCoord(s.mesh, 2) == Approx(1800));
     CHECK(s.mesh.faces().size() == 7);

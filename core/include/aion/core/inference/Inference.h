@@ -114,6 +114,8 @@ public:
     void reset();
     // Uită doar lock-ul și ultima inferență, păstrând punctele de referință (de exemplu după un segment).
     void resetLock();
+    // Ca resetLock(), dar operația continuă din `from`: o săgeată apăsată imediat (fără mișcare) blochează axa prin el.
+    void restartFrom(const Vec3d& from);
 
     [[nodiscard]] const Inference& last() const { return m_last; }
     [[nodiscard]] const std::deque<Vec3d>& references() const { return m_references; }

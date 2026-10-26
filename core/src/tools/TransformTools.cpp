@@ -244,7 +244,7 @@ public:
             m_base = m_inference.point;
             m_current = *m_base;
             m_preview = previewEdges(ctx.mesh, m_target.vertices);
-            m_engine.resetLock();
+            m_engine.restartFrom(*m_base);
             m_dragging = false;
             return;
         }

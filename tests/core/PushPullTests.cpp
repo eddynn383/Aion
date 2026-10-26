@@ -8,6 +8,7 @@
 #include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <functional>
 
 using namespace aion;
 using Catch::Approx;
@@ -249,4 +250,93 @@ TEST_CASE("Unirea fețelor coplanare și dizolvarea vârfurilor", "[core][geom][
     CHECK(mesh.faces().size() == 1);
     // Un colț nu se dizolvă.
     CHECK_FALSE(geom::dissolveVertex(mesh, mesh.findVertexNear({ 0, 0, 0 }, 1e-6)));
+}
+
+TEST_CASE("Faza 5, „gata când”: o căsuță cu acoperiș în două ape, ușă și fereastră, cu undo/redo complet",
+    "[core][geom][pushpull][house]")
+{
+    Mesh mesh;
+    commands::CommandStack stack { mesh };
+    stack.setValidation(true, geom::ValidationLevel::Full);
+    stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+    std::vector<Mesh> states { mesh };
+    const auto step = [&](const std::string& name, const std::function<void(Mesh&)>& fn) {
+        REQUIRE(stack.run(name, fn));
+        states.push_back(mesh);
+    };
+    const auto faceAt = [&](const Vec3d& p) {
+        for (FaceId f : mesh.faces().keys()) {
+            if (geom::faceContainsPoint(mesh, f, p)) {
+                return f;
+            }
+        }
+        FAIL("nicio față în punctul dat");
+        return FaceId {};
+    };
+
+    // Pereții: un bloc de 6 × 4 × 2.7 m.
+    step("Rectangle", [](Mesh& m) {
+        geom::drawPolygon(m, { { 0, 0, 0 }, { 6000, 0, 0 }, { 6000, 4000, 0 }, { 0, 4000, 0 } });
+    });
+    step("Push/Pull", [&](Mesh& m) { geom::pushPull(m, faceAt({ 3000, 2000, 0 }), -2700); });
+
+    // Acoperișul: coama pe mijlocul feței de sus, ridicată cu 1.5 m.
+    step("Line", [](Mesh& m) { geom::drawLine(m, { 0, 2000, 2700 }, { 6000, 2000, 2700 }); });
+    step("Move", [](Mesh& m) {
+        const auto a = m.findVertexNear({ 0, 2000, 2700 }, 1e-6);
+        const auto b = m.findVertexNear({ 6000, 2000, 2700 }, 1e-6);
+        REQUIRE(geom::transformVertices(m, { a, b }, math::Transform::translation({ 0, 0, 1500 })));
+    });
+
+    // Ușa: 1 × 2.1 m pe fața din față (Y = 0), lipită de sol, împinsă 300 mm în casă.
+    step("Rectangle", [](Mesh& m) {
+        geom::drawPolygon(m, { { 1000, 0, 0 }, { 2000, 0, 0 }, { 2000, 0, 2100 }, { 1000, 0, 2100 } });
+    });
+    step("Push/Pull", [&](Mesh& m) { geom::pushPull(m, faceAt({ 1500, 0, 1000 }), -300); });
+
+    // Fereastra: 1.2 × 1 m pe peretele lateral (X = 6000), împinsă prin tot blocul (6 m): un tunel.
+    step("Rectangle", [](Mesh& m) {
+        geom::drawPolygon(m, { { 6000, 1400, 1000 }, { 6000, 2600, 1000 }, { 6000, 2600, 2000 }, { 6000, 1400, 2000 } });
+    });
+    step("Push/Pull", [&](Mesh& m) { geom::pushPull(m, faceAt({ 6000, 2000, 1500 }), -6000); });
+
+    // Fețele cheie există: cele două ape, frontoanele (pentagoane, cu gaura ferestrei), nișa ușii.
+    int slopes = 0;
+    for (FaceId f : mesh.faces().keys()) {
+        const double nz = mesh.face(f).plane.normal.z;
+        slopes += (nz > 0.1 && nz < 0.99) ? 1 : 0;
+    }
+    CHECK(slopes == 2);
+    const FaceId right = faceAt({ 6000, 500, 500 });
+    const FaceId left = faceAt({ 0, 500, 500 });
+    CHECK(mesh.face(right).inner.size() == 1);
+    CHECK(mesh.face(left).inner.size() == 1);
+    CHECK(mesh.face(right).outer.uses.size() == 5);
+    CHECK(geom::faceContainsPoint(mesh, faceAt({ 1500, 300, 1000 }), { 1500, 300, 1000 })); // fundul nișei
+    CHECK_FALSE(std::any_of(mesh.faces().keys().begin(), mesh.faces().keys().end(),
+        [&](FaceId f) { return geom::faceContainsPoint(mesh, f, { 1500, 0, 1000 }); })); // golul ușii
+
+    // Glafurile tunelului ferestrei privesc spre axa lui.
+    int reveals = 0;
+    for (FaceId f : mesh.faces().keys()) {
+        const Vec3d c = geom::faceInteriorPoint(mesh, f);
+        if (c.x > 1 && c.x < 5999 && c.y > 1399 && c.y < 2601 && c.z > 999 && c.z < 2001) {
+            ++reveals;
+            const Vec3d axis { c.x, 2000, 1500 };
+            INFO("glaf în " << c.x << "," << c.y << "," << c.z << " normala " << mesh.face(f).plane.normal.y << ","
+                            << mesh.face(f).plane.normal.z);
+            CHECK(glm::dot(mesh.face(f).plane.normal, axis - c) > 0.0);
+        }
+    }
+    CHECK(reveals == 4);
+
+    // Undo până la capăt și redo până la capăt: fiecare stare intermediară revine identic.
+    for (std::size_t i = states.size() - 1; i > 0; --i) {
+        REQUIRE(stack.undo());
+        CHECK(mesh.sameAs(states[i - 1]));
+    }
+    for (std::size_t i = 1; i < states.size(); ++i) {
+        REQUIRE(stack.redo());
+        CHECK(mesh.sameAs(states[i]));
+    }
 }

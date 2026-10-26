@@ -600,10 +600,12 @@ void Engine::toggleAxisLock(Axis axis)
         unlock();
         return;
     }
-    if (!m_lastFrom) {
+    // Fără punct de pornire (de exemplu imediat după primul click al lui Move), axa trece prin ultimul punct inferat.
+    const std::optional<Vec3d> origin = m_lastFrom ? m_lastFrom : (m_last.valid() ? std::optional(m_last.point) : std::nullopt);
+    if (!origin) {
         return;
     }
-    m_lock = { LockKind::Line, *m_lastFrom, axisDirection(axis), {}, Kind::OnAxis, axis };
+    m_lock = { LockKind::Line, *origin, axisDirection(axis), {}, Kind::OnAxis, axis };
 }
 
 void Engine::toggleReferenceLock()
@@ -629,6 +631,12 @@ void Engine::reset()
     m_references.clear();
     m_referenceEdge.reset();
     m_referenceDirection.reset();
+}
+
+void Engine::restartFrom(const Vec3d& from)
+{
+    resetLock();
+    m_lastFrom = from;
 }
 
 void Engine::resetLock()

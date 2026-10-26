@@ -65,9 +65,14 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   (`movew:` = doar hover, `type:` = text în VCB, `key:enter|escape|left|right|up|down`). Punctele trebuie să fie în viewport.
 - Fazele 3–4 și PR #1 (WebAssembly) unite în `main` pe 2026-10-26.
 
+- **Faza 5** făcută pe `feature/faza-5`: Push/Pull (cu tăieri și găuri), Move/Rotate/Scale (cu copiere și array),
+  Circle/Arc/Polygon (curbe, muchii soft, umbrire netedă), Offset. Designul: `docs/decisions/0006-push-pull-si-transformari.md`.
+  Scale e doar uniform; Follow Me amânat. Atenție în scripturile `AION_STARTUP`: clicurile pe fețe ascunse lovesc altceva,
+  iar după `view.extents` trebuie `wait:1500` (animația camerei).
+
 ## Următorii pași
-1. Utilizatorul testează Fazele 3–4 în aplicație.
-2. Faza 5: Push/Pull și transformări.
+1. Utilizatorul testează Fazele 3–5 în aplicație; merge `feature/faza-5`.
+2. Faza 6: grupuri, componente, tag-uri (PLAN.md).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,
