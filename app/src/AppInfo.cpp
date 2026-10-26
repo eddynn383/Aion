@@ -102,6 +102,23 @@ QString AppInfo::shortcutText(const QString& sequence) const
     return QKeySequence(sequence).toString(QKeySequence::NativeText);
 }
 
+QString AppInfo::platformText(const QString& text) const
+{
+#ifdef Q_OS_MACOS
+    return text;
+#else
+    QString result = text;
+    result.replace(QStringLiteral("Option (⌥)"), QStringLiteral("Alt"))
+        .replace(QStringLiteral("⇧⌘"), QStringLiteral("Ctrl+Shift+"))
+        .replace(QStringLiteral("⌘"), QStringLiteral("Ctrl+"))
+        .replace(QStringLiteral("⌥"), QStringLiteral("Alt"))
+        .replace(QStringLiteral("⇧"), QStringLiteral("Shift"))
+        .replace(QStringLiteral("Option"), QStringLiteral("Alt"))
+        .replace(QStringLiteral("Cmd"), QStringLiteral("Ctrl"));
+    return result;
+#endif
+}
+
 void AppInfo::simulateClick(QQuickItem* item, const QPointF& position) const
 {
     if (item == nullptr || item->window() == nullptr) {

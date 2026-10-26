@@ -107,7 +107,7 @@ Item {
         visible: list.count === 0
         width: parent.width
         wrapMode: Text.Wrap
-        text: "Niciun grup sau obiect. Selectează geometrie și alege „Creează grup” (⌘G) sau „Creează obiect” (⇧⌘G); le găsești și în meniul de click dreapta."
+        text: AppInfo.platformText("Niciun grup sau obiect. Selectează geometrie și alege „Creează grup” (⌘G) sau „Creează obiect” (⇧⌘G); le găsești și în meniul de click dreapta.")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeSm
     }

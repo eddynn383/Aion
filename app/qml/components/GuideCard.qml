@@ -50,7 +50,7 @@ Column {
     Text {
         width: parent.width
         wrapMode: Text.Wrap
-        text: root.guide ? root.guide.summary : ""
+        text: root.guide ? AppInfo.platformText(root.guide.summary) : ""
         color: Theme.textPrimary
         font.pixelSize: Theme.fontSizeSm
         lineHeight: 1.25
@@ -82,7 +82,7 @@ Column {
                 Text {
                     width: parent.width - 24
                     wrapMode: Text.Wrap
-                    text: modelData
+                    text: AppInfo.platformText(modelData)
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeXs
                     lineHeight: 1.2
@@ -95,7 +95,7 @@ Column {
         visible: root.guide !== null && root.guide.tip.length > 0
         width: parent.width
         wrapMode: Text.Wrap
-        text: root.guide ? "Sfat: " + root.guide.tip : ""
+        text: root.guide ? "Sfat: " + AppInfo.platformText(root.guide.tip) : ""
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeXs
         lineHeight: 1.2

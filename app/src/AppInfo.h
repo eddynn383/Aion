@@ -38,6 +38,8 @@ public:
 
     // Textul unei scurtături în forma platformei („Ctrl+K” devine „⌘K” pe macOS).
     Q_INVOKABLE QString shortcutText(const QString& sequence) const;
+    // Un text de ajutor scris cu tastele de pe Mac (⌘, ⌥, ⇧, „Option”, „Cmd”), adaptat platformei curente.
+    Q_INVOKABLE QString platformText(const QString& text) const;
 
     // Trimite un click real (mișcare, apăsare, eliberare) la poziția dată din item.
     // Folosit de scripturile AION_STARTUP pentru verificarea uneltelor prin calea completă de input.

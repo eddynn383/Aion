@@ -471,7 +471,15 @@ void Document::setActiveTool(const QString& id)
 
 QString Document::toolStatus() const
 {
-    return m_tool ? QString::fromStdString(m_tool->status()) : QString();
+    if (!m_tool) {
+        return {};
+    }
+    QString status = QString::fromStdString(m_tool->status());
+#ifndef Q_OS_MACOS
+    // Textele din core folosesc numele tastelor de pe Mac; pe Windows și Linux: Alt și Ctrl.
+    status.replace(QStringLiteral("Option"), QStringLiteral("Alt")).replace(QStringLiteral("Cmd"), QStringLiteral("Ctrl"));
+#endif
+    return status;
 }
 
 QString Document::undoName() const
