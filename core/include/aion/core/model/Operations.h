@@ -39,6 +39,20 @@ void eraseInstance(Model& model, InstanceId instance);
 // Mută, rotește sau scalează instanțele (în coordonatele părintelui).
 void transformInstances(Model& model, const std::set<InstanceId>& instances, const math::Transform& delta);
 
+// Un solid: fiecare muchie a geometriei (cu tot ce conține) e folosită de exact două fețe — un volum închis.
+[[nodiscard]] bool isSolid(const Model& model, DefinitionId definition);
+
+enum class BooleanKind { Union, Subtract, Intersect };
+
+struct BooleanResult {
+    InstanceId instance; // grupul nou (nul dacă operația a eșuat)
+    std::string error;
+};
+
+// Operații booleene pe două grupuri sau obiecte solide din `context` (Manifold): rezultatul e un grup nou,
+// iar cele două dispar. Subtract scade `b` din `a`.
+BooleanResult booleanOperation(Model& model, InstanceId a, InstanceId b, BooleanKind kind);
+
 // Cutia (min, max) a geometriei unei definiții, cu tot ce conține, în coordonatele ei.
 [[nodiscard]] std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition);
 

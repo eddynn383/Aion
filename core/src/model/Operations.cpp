@@ -103,7 +103,7 @@ InstanceId makeGroup(Model& model, DefinitionId context, const geom::Selection& 
             model.setInstance(i, inst);
         }
     }
-    return model.addInstance({ context, definition, {}, {}, {}, false, false });
+    return model.addInstance({ context, definition, {}, {}, {}, false, false, {} });
 }
 
 geom::Selection explode(Model& model, InstanceId id)

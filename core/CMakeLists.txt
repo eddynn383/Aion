@@ -1,12 +1,14 @@
 find_package(glm CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(miniz CONFIG REQUIRED)
+find_package(manifold CONFIG REQUIRED)
 find_path(EARCUT_HPP_INCLUDE_DIRS "mapbox/earcut.hpp" REQUIRED)
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
 
 add_library(aion_core STATIC
     src/Version.cpp
     src/commands/CommandStack.cpp
+    src/geom/IntersectFaces.cpp
     src/geom/Mesh.cpp
     src/geom/MeshBuilder.cpp
     src/geom/MeshValidate.cpp
@@ -21,6 +23,7 @@ add_library(aion_core STATIC
     src/model/Model.cpp
     src/model/Operations.cpp
     src/model/MaterialLibrary.cpp
+    src/model/Boolean.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
     src/text/FuzzyMatch.cpp
@@ -49,7 +52,7 @@ configure_file(src/VersionConfig.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/Ver
 target_include_directories(aion_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 target_link_libraries(aion_core PUBLIC glm::glm)
-target_link_libraries(aion_core PRIVATE nlohmann_json::nlohmann_json miniz::miniz)
+target_link_libraries(aion_core PRIVATE nlohmann_json::nlohmann_json miniz::miniz manifold::manifold)
 target_include_directories(aion_core PRIVATE ${EARCUT_HPP_INCLUDE_DIRS})
 target_include_directories(aion_core SYSTEM PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 

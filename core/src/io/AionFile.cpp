@@ -200,6 +200,33 @@ std::string toJson(const model::Model& model)
             { "metallic", m.metallic },
         });
     }
+    const auto vec = [](const math::Vec3d& v) { return json { v.x, v.y, v.z }; };
+    json guides = json::array();
+    for (std::size_t i : sortedIndices(model.guides())) {
+        const model::Guide& g = model.guides().values()[i];
+        guides.push_back({ { "id", model.guides().keys()[i].value }, { "context", g.context.value },
+            { "point", vec(g.point) }, { "direction", vec(g.direction) } });
+    }
+    json annotations = json::array();
+    for (std::size_t i : sortedIndices(model.annotations())) {
+        const model::Annotation& a = model.annotations().values()[i];
+        annotations.push_back({ { "id", model.annotations().keys()[i].value },
+            { "kind", a.kind == model::Annotation::Kind::Text ? "text" : "dimension" }, { "context", a.context.value },
+            { "a", vec(a.a) }, { "b", vec(a.b) }, { "offset", vec(a.offset) }, { "text", a.text } });
+    }
+    json sections = json::array();
+    for (std::size_t i : sortedIndices(model.sections())) {
+        const model::SectionPlane& s = model.sections().values()[i];
+        sections.push_back({ { "id", model.sections().keys()[i].value }, { "name", s.name }, { "point", vec(s.point) },
+            { "normal", vec(s.normal) }, { "active", s.active } });
+    }
+    json scenes = json::array();
+    for (std::size_t i : sortedIndices(model.scenes())) {
+        const model::Scene& s = model.scenes().values()[i];
+        scenes.push_back({ { "id", model.scenes().keys()[i].value }, { "name", s.name }, { "target", vec(s.target) },
+            { "yaw", s.yaw }, { "pitch", s.pitch }, { "distance", s.distance }, { "orthographic", s.orthographic },
+            { "style", s.style } });
+    }
     const json doc {
         { "format", "aion" },
         { "formatVersion", kFormatVersion },
@@ -210,6 +237,10 @@ std::string toJson(const model::Model& model)
         { "instances", instances },
         { "tags", tags },
         { "materials", materials },
+        { "guides", guides },
+        { "annotations", annotations },
+        { "sections", sections },
+        { "scenes", scenes },
     };
     return doc.dump(1);
 }
@@ -281,6 +312,39 @@ LoadResult fromJson(std::string_view text)
                     c.at(3).get<std::uint8_t>() },
                 mj.value("roughness", 0.8f), mj.value("metallic", 0.0f) };
             changes.materials[model::MaterialId { mj.at("id").get<std::uint64_t>() }].after = std::move(material);
+        }
+        const auto vec = [](const json& v) {
+            return math::Vec3d { v.at(0).get<double>(), v.at(1).get<double>(), v.at(2).get<double>() };
+        };
+        for (const json& g : doc.value("guides", json::array())) {
+            changes.guides[model::GuideId { g.at("id").get<std::uint64_t>() }].after = model::Guide {
+                model::DefinitionId { g.at("context").get<std::uint64_t>() }, vec(g.at("point")), vec(g.at("direction")) };
+        }
+        for (const json& a : doc.value("annotations", json::array())) {
+            model::Annotation annotation;
+            annotation.kind = a.value("kind", std::string()) == "text" ? model::Annotation::Kind::Text
+                                                                      : model::Annotation::Kind::Dimension;
+            annotation.context = model::DefinitionId { a.at("context").get<std::uint64_t>() };
+            annotation.a = vec(a.at("a"));
+            annotation.b = vec(a.at("b"));
+            annotation.offset = vec(a.at("offset"));
+            annotation.text = a.value("text", std::string());
+            changes.annotations[model::AnnotationId { a.at("id").get<std::uint64_t>() }].after = std::move(annotation);
+        }
+        for (const json& s : doc.value("sections", json::array())) {
+            changes.sections[model::SectionId { s.at("id").get<std::uint64_t>() }].after = model::SectionPlane {
+                s.value("name", std::string()), vec(s.at("point")), vec(s.at("normal")), s.value("active", true) };
+        }
+        for (const json& s : doc.value("scenes", json::array())) {
+            model::Scene scene;
+            scene.name = s.value("name", std::string());
+            scene.target = vec(s.at("target"));
+            scene.yaw = s.value("yaw", 0.0);
+            scene.pitch = s.value("pitch", 0.0);
+            scene.distance = s.value("distance", 10000.0);
+            scene.orthographic = s.value("orthographic", false);
+            scene.style = s.value("style", std::string());
+            changes.scenes[model::SceneId { s.at("id").get<std::uint64_t>() }].after = std::move(scene);
         }
         model.apply(changes, geom::ChangeDirection::Forward);
         const geom::ValidationReport report = model.validate(geom::ValidationLevel::Topology);

@@ -10,6 +10,7 @@
     "earcut-hpp",
     "tinygltf",
     "miniz",
+    "manifold",
     "catch2"
   ]
 }

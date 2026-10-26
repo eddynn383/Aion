@@ -813,7 +813,7 @@ Window {
                     to: 12
                     stepSize: 1
                     value: viewport.sunMonth
-                    valueText: ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "nov", "dec"][Math.round(value) - 1]
+                    valueText: Qt.locale("ro_RO").monthName(Math.round(value) - 1, Locale.ShortFormat)
                     onMoved: viewport.sunMonth = Math.round(value)
                 }
             }
