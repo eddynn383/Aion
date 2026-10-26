@@ -12,6 +12,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/matrix.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 
