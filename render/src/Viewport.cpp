@@ -235,6 +235,7 @@ void Viewport::appendDocument(ViewportFrame& f) const
         const float state = selection.contains(faceId) ? 2.0f
             : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
                                                                                    : 0.0f;
+        f.hasSelectedFaces = f.hasSelectedFaces || state > 1.5f;
         for (std::uint32_t i : tri.indices) {
             f.triangles.push_back({ glm::vec3(tri.points[i]), normal, state });
         }
@@ -337,6 +338,12 @@ void Viewport::zoomExtents()
 void Viewport::toggleProjection()
 {
     setOrthographic(!isOrthographic());
+}
+
+QPointF Viewport::projectToScreen(const QVector3D& world) const
+{
+    const auto s = m_camera.project({ world.x(), world.y(), world.z() });
+    return s ? QPointF(s->x, s->y) : QPointF(-1, -1);
 }
 
 void Viewport::startTurntable(double seconds)

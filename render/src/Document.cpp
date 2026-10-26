@@ -79,7 +79,8 @@ QString Document::selectionSummary() const
     if (!m_selection.edges.empty()) {
         parts << plural(m_selection.edges.size(), "muchie", "muchii");
     }
-    return parts.join(QStringLiteral(", ")) + QStringLiteral(" selectate");
+    const std::size_t total = m_selection.faces.size() + m_selection.edges.size();
+    return parts.join(QStringLiteral(", ")) + (total == 1 ? QStringLiteral(" selectată") : QStringLiteral(" selectate"));
 }
 
 template <class Fn>

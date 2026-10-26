@@ -99,6 +99,8 @@ public:
     Q_INVOKABLE void toggleProjection();
     // Rotește camera continuu timp de `seconds` secunde (pentru măsurarea fps-ului).
     Q_INVOKABLE void startTurntable(double seconds);
+    // Poziția pe ecran (în coordonatele item-ului) a unui punct 3D; pentru scripturile de verificare.
+    Q_INVOKABLE QPointF projectToScreen(const QVector3D& world) const;
 
     // Apelat de renderer (pe firul de randare, cu firul GUI blocat).
     ViewportFrame frameForRendering() const;

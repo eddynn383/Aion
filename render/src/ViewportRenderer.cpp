@@ -63,6 +63,18 @@ void copyMatrix(float (&dst)[16], const glm::dmat4& m)
     std::memcpy(dst, glm::value_ptr(f), sizeof(dst));
 }
 
+QRhiVertexInputLayout meshLayout()
+{
+    QRhiVertexInputLayout layout;
+    layout.setBindings({ { sizeof(MeshVertex) } });
+    layout.setAttributes({
+        { 0, 0, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, position) },
+        { 0, 1, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, normal) },
+        { 0, 2, QRhiVertexInputAttribute::Float, offsetof(MeshVertex, state) },
+    });
+    return layout;
+}
+
 // Colțurile unui quad din două triunghiuri.
 constexpr std::array<float, 12> kLineCorners { 0, -1, 1, -1, 1, 1, 0, -1, 1, 1, 0, 1 };
 constexpr std::array<float, 12> kPointCorners { -1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1 };
@@ -72,6 +84,8 @@ constexpr std::array<float, 12> kPointCorners { -1, -1, 1, -1, 1, 1, -1, -1, 1, 
 void ViewportRenderer::initialize(QRhiCommandBuffer* /*cb*/)
 {
     if (m_rhi != rhi()) {
+        releaseMaskTarget();
+        m_maskSampler.reset();
         m_rhi = rhi();
         m_backgroundPipeline.reset();
         m_uniforms.reset();
@@ -93,6 +107,7 @@ void ViewportRenderer::initialize(QRhiCommandBuffer* /*cb*/)
     }
     if (!m_backgroundPipeline) {
         createPipelines();
+        m_outlinePipeline.reset(); // depinde de render pass-ul principal
     }
 }
 
@@ -147,14 +162,8 @@ void ViewportRenderer::createPipelines()
     m_backgroundPipeline = makePipeline(QStringLiteral("fullscreen.vert"), QStringLiteral("background.frag"),
         QRhiVertexInputLayout {}, Depth::None, false);
 
-    QRhiVertexInputLayout meshLayout;
-    meshLayout.setBindings({ { sizeof(MeshVertex) } });
-    meshLayout.setAttributes({
-        { 0, 0, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, position) },
-        { 0, 1, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, normal) },
-        { 0, 2, QRhiVertexInputAttribute::Float, offsetof(MeshVertex, state) },
-    });
-    m_meshPipeline = makePipeline(QStringLiteral("mesh.vert"), QStringLiteral("mesh.frag"), meshLayout, Depth::TestAndWrite, false);
+    m_meshPipeline = makePipeline(
+        QStringLiteral("mesh.vert"), QStringLiteral("mesh.frag"), meshLayout(), Depth::TestAndWrite, false);
 
     m_gridPipeline = makePipeline(QStringLiteral("fullscreen.vert"), QStringLiteral("grid.frag"),
         QRhiVertexInputLayout {}, Depth::Test, true);
@@ -186,6 +195,66 @@ void ViewportRenderer::createPipelines()
     });
     m_pointPipeline
         = makePipeline(QStringLiteral("point.vert"), QStringLiteral("point.frag"), pointLayout, Depth::Test, true);
+}
+
+void ViewportRenderer::releaseMaskTarget()
+{
+    m_outlinePipeline.reset();
+    m_outlineBindings.reset();
+    m_maskPipeline.reset();
+    m_maskTarget.reset();
+    m_maskPass.reset();
+    m_maskDepth.reset();
+    m_maskTexture.reset();
+    m_maskSize = {};
+}
+
+void ViewportRenderer::ensureMaskTarget(QSize size)
+{
+    if (m_maskTarget && size == m_maskSize) {
+        return;
+    }
+    releaseMaskTarget();
+    m_maskSize = size;
+
+    m_maskTexture.reset(m_rhi->newTexture(QRhiTexture::RGBA8, size, 1, QRhiTexture::RenderTarget));
+    m_maskTexture->create();
+    m_maskDepth.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size, 1));
+    m_maskDepth->create();
+
+    QRhiTextureRenderTargetDescription desc { QRhiColorAttachment(m_maskTexture.get()) };
+    desc.setDepthStencilBuffer(m_maskDepth.get());
+    m_maskTarget.reset(m_rhi->newTextureRenderTarget(desc));
+    m_maskPass.reset(m_maskTarget->newCompatibleRenderPassDescriptor());
+    m_maskTarget->setRenderPassDescriptor(m_maskPass.get());
+    m_maskTarget->create();
+
+    m_maskPipeline.reset(m_rhi->newGraphicsPipeline());
+    m_maskPipeline->setShaderStages({
+        { QRhiShaderStage::Vertex, loadShader(QStringLiteral("mesh.vert")) },
+        { QRhiShaderStage::Fragment, loadShader(QStringLiteral("mask.frag")) },
+    });
+    m_maskPipeline->setVertexInputLayout(meshLayout());
+    m_maskPipeline->setShaderResourceBindings(m_bindings.get());
+    m_maskPipeline->setRenderPassDescriptor(m_maskPass.get());
+    m_maskPipeline->setDepthTest(true);
+    m_maskPipeline->setDepthWrite(true);
+    m_maskPipeline->setDepthOp(QRhiGraphicsPipeline::LessOrEqual);
+    m_maskPipeline->create();
+
+    if (!m_maskSampler) {
+        m_maskSampler.reset(m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
+            QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
+        m_maskSampler->create();
+    }
+    m_outlineBindings.reset(m_rhi->newShaderResourceBindings());
+    m_outlineBindings->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_uniforms.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            1, QRhiShaderResourceBinding::FragmentStage, m_maskTexture.get(), m_maskSampler.get()),
+    });
+    m_outlineBindings->create();
 }
 
 void ViewportRenderer::synchronize(QQuickRhiItem* item)
@@ -273,6 +342,40 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
 
     const QSize size = renderTarget()->pixelSize();
+    const bool outline = m_frame.hasSelectedFaces && m_mesh && m_meshVertexCount > 0;
+    if (outline) {
+        ensureMaskTarget(size);
+        cb->beginPass(m_maskTarget.get(), Qt::black, { 1.0f, 0 }, batch);
+        batch = nullptr; // trimis cu prima trecere
+        cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
+        cb->setGraphicsPipeline(m_maskPipeline.get());
+        cb->setShaderResources();
+        const QRhiCommandBuffer::VertexInput input(m_mesh.get(), 0);
+        cb->setVertexInput(0, 1, &input);
+        cb->draw(m_meshVertexCount);
+        cb->endPass();
+
+        if (!m_outlinePipeline) {
+            m_outlinePipeline.reset(m_rhi->newGraphicsPipeline());
+            m_outlinePipeline->setShaderStages({
+                { QRhiShaderStage::Vertex, loadShader(QStringLiteral("fullscreen.vert")) },
+                { QRhiShaderStage::Fragment, loadShader(QStringLiteral("outline.frag")) },
+            });
+            m_outlinePipeline->setVertexInputLayout({});
+            m_outlinePipeline->setShaderResourceBindings(m_outlineBindings.get());
+            m_outlinePipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+            m_outlinePipeline->setSampleCount(m_sampleCount);
+            QRhiGraphicsPipeline::TargetBlend b;
+            b.enable = true;
+            b.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+            b.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+            b.srcAlpha = QRhiGraphicsPipeline::One;
+            b.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+            m_outlinePipeline->setTargetBlends({ b });
+            m_outlinePipeline->create();
+        }
+    }
+
     cb->beginPass(renderTarget(), Qt::black, { 1.0f, 0 }, batch);
     cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
 
@@ -291,6 +394,12 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     if (m_frame.gridVisible) {
         cb->setGraphicsPipeline(m_gridPipeline.get());
         cb->setShaderResources();
+        cb->draw(3);
+    }
+
+    if (outline) {
+        cb->setGraphicsPipeline(m_outlinePipeline.get());
+        cb->setShaderResources(m_outlineBindings.get());
         cb->draw(3);
     }
 

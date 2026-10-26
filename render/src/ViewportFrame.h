@@ -49,6 +49,7 @@ struct ViewportFrame {
     double targetDistance = 1.0;
     bool orthographic = false;
     bool gridVisible = true;
+    bool hasSelectedFaces = false; // activează conturul selecției
     float devicePixelRatio = 1.0f;
 
     ViewportColors colors {};

@@ -4,7 +4,9 @@
 #include "aion/render/GraphicsApi.h"
 #include "platform/Platform.h"
 
+#include <QCoreApplication>
 #include <QKeySequence>
+#include <QMouseEvent>
 #include <QQuickWindow>
 
 AppInfo::AppInfo(QObject* parent)
@@ -65,4 +67,21 @@ QString AppInfo::shortcutText(const QString& sequence) const
         return {};
     }
     return QKeySequence(sequence).toString(QKeySequence::NativeText);
+}
+
+void AppInfo::simulateClick(QQuickItem* item, const QPointF& position) const
+{
+    if (item == nullptr || item->window() == nullptr) {
+        return;
+    }
+    QQuickWindow* window = item->window();
+    const QPointF scenePos = item->mapToScene(position);
+    const QPointF globalPos = window->mapToGlobal(scenePos);
+    const auto send = [&](QEvent::Type type, Qt::MouseButton button, Qt::MouseButtons buttons) {
+        QMouseEvent e(type, scenePos, scenePos, globalPos, button, buttons, Qt::NoModifier);
+        QCoreApplication::sendEvent(window, &e);
+    };
+    send(QEvent::MouseMove, Qt::NoButton, Qt::NoButton);
+    send(QEvent::MouseButtonPress, Qt::LeftButton, Qt::LeftButton);
+    send(QEvent::MouseButtonRelease, Qt::LeftButton, Qt::NoButton);
 }

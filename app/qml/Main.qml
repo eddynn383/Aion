@@ -95,16 +95,32 @@ Window {
         }
     }
 
-    // Comenzile din AION_STARTUP; „palette:text” deschide command palette cu textul dat.
+    // Comenzile din AION_STARTUP, rulate pe rând: „palette:text” deschide command palette,
+    // „wait:ms” așteaptă, „clickw:x,y,z” dă click în punctul 3D dat, „key:escape” apasă Esc.
+    property int startupIndex: 0
     Timer {
+        id: startupTimer
         running: AppInfo.startupActions.length > 0
         interval: 300
         onTriggered: {
-            for (const action of AppInfo.startupActions) {
-                if (action.startsWith("palette:"))
+            const actions = AppInfo.startupActions
+            while (window.startupIndex < actions.length) {
+                const action = actions[window.startupIndex++]
+                if (action.startsWith("wait:")) {
+                    startupTimer.interval = parseInt(action.slice(5))
+                    startupTimer.start()
+                    return
+                }
+                if (action.startsWith("palette:")) {
                     palette.openWithQuery(action.slice(8))
-                else
+                } else if (action.startsWith("clickw:")) {
+                    const c = action.slice(7).split(",").map(Number)
+                    AppInfo.simulateClick(viewport, viewport.projectToScreen(Qt.vector3d(c[0], c[1], c[2])))
+                } else if (action === "key:escape") {
+                    doc.escape()
+                } else {
                     window.runCommand(action)
+                }
             }
         }
     }
@@ -190,7 +206,7 @@ Window {
             width: parent.width
             spacing: Theme.space2
             Text {
-                text: leftTabs.currentIndex === 0 ? "Modelul e gol" : "Niciun tag"
+                text: leftTabs.currentIndex === 0 ? (doc.faceCount + doc.edgeCount > 0 ? "Geometrie liberă" : "Modelul e gol") : "Niciun tag"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeMd
             }
@@ -307,7 +323,8 @@ Window {
                 width: parent.width
                 title: "Model"
                 Text {
-                    text: doc.faceCount + " fețe · " + doc.edgeCount + " muchii"
+                    text: (doc.faceCount === 1 ? "1 față" : doc.faceCount + " fețe") + " · "
+                          + (doc.edgeCount === 1 ? "1 muchie" : doc.edgeCount + " muchii")
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeSm
                     font.family: Theme.fontMono

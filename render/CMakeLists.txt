@@ -48,6 +48,8 @@ qt_add_shaders(aion_render "aion_render_shaders"
         shaders/point.frag
         shaders/mesh.vert
         shaders/mesh.frag
+        shaders/mask.frag
+        shaders/outline.frag
 )
 
 aion_configure_target(aion_render)
