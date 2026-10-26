@@ -49,6 +49,8 @@ jobs:
   windows:
     name: Windows (MSVC, Debug)
     runs-on: windows-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}\..\vcpkg
 
     steps:
       - uses: actions/checkout@v4
@@ -71,11 +73,15 @@ jobs:
           key: vcpkg-win-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-win-
 
-      - name: Configurare
+      # vcpkg-ul preinstalat pe runner e prea vechi pentru baseline-ul din vcpkg.json.
+      - name: Instalează vcpkg
         shell: pwsh
         run: |
-          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
-          cmake --preset win-debug
+          git clone https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
+          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+
+      - name: Configurare
+        run: cmake --preset win-debug
 
       - name: Build
         run: cmake --build --preset win-debug
