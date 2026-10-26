@@ -38,6 +38,7 @@ struct FrameUniforms {
     float lightViewProj[16];
     float shadow[4];
     float style[4];
+    float section[4];
 };
 
 constexpr int kShadowMapSize = 2048;
@@ -369,6 +370,9 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     u.style[1] = m_frame.fog ? 1.0f : 0.0f;
     u.style[2] = static_cast<float>(m_frame.targetDistance * 1.2);
     u.style[3] = static_cast<float>(m_frame.targetDistance * 6.0);
+    if (m_frame.section) {
+        copy4(u.section, glm::normalize(glm::dvec3(*m_frame.section)), (*m_frame.section).w);
+    }
 
     batch->updateDynamicBuffer(m_uniforms.get(), 0, sizeof(u), &u);
 }

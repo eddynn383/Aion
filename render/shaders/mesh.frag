@@ -28,6 +28,7 @@ layout(std140, binding = 0) uniform Frame {
     mat4 lightViewProj; // pentru umbre: spațiul hărții de umbre
     vec4 shadow;       // x = 1 dacă umbrele sunt active, y = bias, z = 1 / mărimea hărții, w = intensitatea umbrei
     vec4 style;        // x = stilul (0 shaded, 1 clay, 2 linii ascunse, 3 wireframe, 4 x-ray), y = ceață, z/w = începutul/sfârșitul ceții
+    vec4 section;      // planul de secțiune activ: xyz = normala, w = d (n·x = d); normală nulă = fără secțiune
 } frame;
 
 layout(binding = 1) uniform sampler2D shadowMap;
@@ -66,6 +67,9 @@ float shadowFactor(vec3 world, vec3 n)
 
 void main()
 {
+    // Secțiunea: ce e de partea normalei planului nu se vede.
+    if (dot(frame.section.xyz, frame.section.xyz) > 0.5 && dot(frame.section.xyz, v_world) - frame.section.w > 0.0)
+        discard;
     vec3 n = normalize(v_normal);
     vec3 toEye = frame.forward.w > 0.5 ? -frame.forward.xyz : normalize(frame.eye.xyz - v_world);
     bool front = dot(n, toEye) >= 0.0;

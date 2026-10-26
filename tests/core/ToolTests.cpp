@@ -740,3 +740,35 @@ TEST_CASE("Unelte: Tape Measure lasă ghidaje (de care se prinde inferența), co
     CHECK(m.sections().values().front().active);
     CHECK(m.sections().values().front().normal.z > 0.99);
 }
+
+TEST_CASE("Unelte: Section Plane pe fața laterală a unei cutii e vertical", "[core][tools][measure]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 750, 600 }, 0, 0, 7000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    stack.run("Box", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 1500, 0 }, { 0, 1500, 0 } });
+        geom::pushPull(mesh, mesh.faces().keys().front(), -1200);
+    });
+    auto section = tools::makeTool("section");
+    // Fețele vizibile din vederea izometrică: cea de sus și două laterale.
+    for (Vec3d p : { Vec3d { 2000, 800, 600 }, Vec3d { 1000, 0, 600 }, Vec3d { 1000, 1500, 600 }, Vec3d { 0, 800, 600 } }) {
+        const auto s = camera.project(p);
+        INFO(p.x << "," << p.y << "," << p.z);
+        section->pointerMove(ctx, { *s, {}, 1 });
+        UNSCOPED_INFO("marcaj: " << section->overlay().marker->label);
+    }
+    const auto s = camera.project({ 1000, 0, 600 });
+    section->pointerMove(ctx, { *s, {}, 1 });
+    section->pointerDown(ctx, { *s, {}, 1 });
+    REQUIRE(m.sections().size() == 1);
+    const auto& sec = m.sections().values().front();
+    INFO("n = " << sec.normal.x << "," << sec.normal.y << "," << sec.normal.z << " p = " << sec.point.x << "," << sec.point.y << "," << sec.point.z);
+    CHECK(std::abs(sec.normal.z) < 1e-6);
+}

@@ -30,6 +30,7 @@ layout(std140, binding = 0) uniform Frame {
     mat4 lightViewProj; // pentru umbre: spațiul hărții de umbre
     vec4 shadow;       // x = 1 dacă umbrele sunt active, y = bias, z = 1 / mărimea hărții, w = intensitatea umbrei
     vec4 style;        // x = stilul (0 shaded, 1 clay, 2 linii ascunse, 3 wireframe, 4 x-ray), y = ceață, z/w = începutul/sfârșitul ceții
+    vec4 section;      // planul de secțiune activ: xyz = normala, w = d (n·x = d); normală nulă = fără secțiune
 } frame;
 
 void main()

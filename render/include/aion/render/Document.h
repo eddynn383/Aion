@@ -76,6 +76,15 @@ class Document : public QObject, private model::ModelObserver {
     // Materialul cu care vopsește Paint Bucket: { source: "default"|"model"|"library", id, index, name, color }.
     Q_PROPERTY(QVariantMap currentMaterial READ currentMaterial NOTIFY materialChanged)
 
+    // --- Faza 9 ---
+    // Scenele: { id, name, style } (poziția camerei o citește QML prin sceneCamera).
+    Q_PROPERTY(QVariantList scenes READ scenes NOTIFY outlineChanged)
+    // Planurile de secțiune: { id, name, active }.
+    Q_PROPERTY(QVariantList sections READ sections NOTIFY outlineChanged)
+    Q_PROPERTY(int guideCount READ guideCount NOTIFY outlineChanged)
+    // Adnotarea al cărei text se editează acum (după unealta Text), 0 = niciuna.
+    Q_PROPERTY(double editingAnnotation READ editingAnnotation WRITE setEditingAnnotation NOTIFY editingAnnotationChanged)
+
     // Ultima eroare de fișier (pentru un mesaj în interfață).
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorChanged)
 
@@ -112,6 +121,11 @@ public:
     QVariantList libraryMaterials() const;
     QVariantList modelMaterials() const;
     QVariantMap currentMaterial() const;
+    QVariantList scenes() const;
+    QVariantList sections() const;
+    int guideCount() const { return static_cast<int>(m_model.guides().size()); }
+    double editingAnnotation() const { return static_cast<double>(m_editingAnnotation.value); }
+    void setEditingAnnotation(double id);
 
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
@@ -172,6 +186,23 @@ public:
     Q_INVOKABLE void setMaterialColor(double materialId, const QColor& color);
     Q_INVOKABLE void removeMaterial(double materialId);
 
+    // --- Faza 9: intersecții, booleene, ghidaje, adnotări, secțiuni, scene ---
+    Q_INVOKABLE void intersectSelection(bool withModel);
+    // "union", "subtract", "intersect" pe cele două obiecte selectate.
+    Q_INVOKABLE void booleanSelection(const QString& kind);
+    Q_INVOKABLE void deleteGuides();
+    Q_INVOKABLE void setAnnotationText(double annotationId, const QString& text);
+    Q_INVOKABLE void removeAnnotation(double annotationId);
+    Q_INVOKABLE void setSectionActive(double sectionId, bool active);
+    Q_INVOKABLE void moveSection(double sectionId, double distance);
+    Q_INVOKABLE void removeSection(double sectionId);
+    // camera: { tx, ty, tz, yaw, pitch, distance, ortho } (Viewport.cameraState()).
+    Q_INVOKABLE void addScene(const QVariantMap& camera, const QString& style);
+    Q_INVOKABLE void updateScene(double sceneId, const QVariantMap& camera, const QString& style);
+    Q_INVOKABLE void renameScene(double sceneId, const QString& name);
+    Q_INVOKABLE void removeScene(double sceneId);
+    Q_INVOKABLE QVariantMap sceneCamera(double sceneId) const;
+
     // --- Meniul contextual (click dreapta) ---
     // Elementele potrivite selecției: { id, name, shortcut, enabled, destructive } sau { separator: true }.
     // `id` e o comandă din Main.qml (runCommand).
@@ -216,6 +247,7 @@ signals:
     void recoveryChanged();
     void errorChanged();
     void materialChanged();
+    void editingAnnotationChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
@@ -259,6 +291,8 @@ private:
     bool m_hasRecovery = false;
     QTimer m_autosaveTimer;
     model::MaterialId m_currentMaterial;
+    model::AnnotationId m_editingAnnotation;
+    std::vector<inference::GuideRef> m_contextGuides;
     int m_libraryMaterial = -1;
 };
 

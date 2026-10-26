@@ -407,13 +407,13 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 9 – Unelte suplimentare
-- [ ] **Tape Measure (T):** măsurare + linii și puncte de construcție (guides)
-- [ ] **Protractor:** linii de construcție la unghi
-- [ ] **Dimensions** și **Text** (adnotări în model)
-- [ ] **Section Plane:** secțiuni prin model
-- [ ] **Intersect Faces:** cu modelul sau cu selecția
-- [ ] Booleene pe solide cu **Manifold**: Union, Subtract, Intersect (numai pentru grupuri și componente „solide”)
-- [ ] **Scenes:** salvarea pozițiilor de cameră, cu tranziții animate
+- [x] **Tape Measure (T):** măsurare + linii și puncte de construcție (guides)
+- [x] **Protractor:** linii de construcție la unghi
+- [x] **Dimensions** și **Text** (adnotări în model)
+- [x] **Section Plane:** secțiuni prin model
+- [x] **Intersect Faces:** cu modelul sau cu selecția
+- [x] Booleene pe solide cu **Manifold**: Union, Subtract, Intersect (numai pentru grupuri și componente „solide”)
+- [x] **Scenes:** salvarea pozițiilor de cameră, cu tranziții animate
 
 ---
 

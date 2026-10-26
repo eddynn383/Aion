@@ -95,7 +95,7 @@ QtObject {
     // Dimensiuni
     readonly property int titleBarHeight: 44
     readonly property int statusBarHeight: 28
-    readonly property int sidePanelWidth: 248
+    readonly property int sidePanelWidth: 272
     readonly property int controlHeight: 32
     readonly property int controlHeightSm: 28
     // Spațiul lăsat butoanelor native ale ferestrei (macOS).

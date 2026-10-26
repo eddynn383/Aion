@@ -3,6 +3,7 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/model/Operations.h"
+#include "aion/core/units/Length.h"
 
 #include "ViewportFrame.h"
 #include "ViewportRenderer.h"
@@ -453,8 +454,49 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         } else if (dim) {
             color.a *= 0.3f;
         }
-        f.lines.push_back({ glm::vec3(toWorld.applyToPoint(mesh.position(e.v0))),
-            glm::vec3(toWorld.applyToPoint(mesh.position(e.v1))), color, { width, 0.0f } });
+        glm::dvec3 p0 = toWorld.applyToPoint(mesh.position(e.v0));
+        glm::dvec3 p1 = toWorld.applyToPoint(mesh.position(e.v1));
+        if (f.section) {
+            // Secțiunea taie muchia: rămâne doar partea din spatele planului.
+            const glm::dvec3 n(*f.section);
+            const double d0 = glm::dot(n, p0) - f.section->w;
+            const double d1 = glm::dot(n, p1) - f.section->w;
+            if (d0 > 0.0 && d1 > 0.0) {
+                continue;
+            }
+            if (d0 > 0.0) {
+                p0 = p0 + (p1 - p0) * (d0 / (d0 - d1));
+            } else if (d1 > 0.0) {
+                p1 = p1 + (p0 - p1) * (d1 / (d1 - d0));
+            }
+        }
+        f.lines.push_back({ glm::vec3(p0), glm::vec3(p1), color, { width, 0.0f } });
+    }
+
+    // Liniile de tăietură ale secțiunii: unde planul trece prin fețe.
+    if (f.section && displayStyle != 3) {
+        const glm::dvec3 n(*f.section);
+        const glm::vec4 cutColor = toVec4(m_edge);
+        for (const auto& [faceId, tri] : doc.triangles(definition)) {
+            for (std::size_t i = 0; i + 2 < tri.indices.size(); i += 3) {
+                std::array<glm::dvec3, 3> p {};
+                std::array<double, 3> d {};
+                for (std::size_t k = 0; k < 3; ++k) {
+                    p[k] = toWorld.applyToPoint(tri.points[tri.indices[i + k]]);
+                    d[k] = glm::dot(n, p[k]) - f.section->w;
+                }
+                std::vector<glm::dvec3> crossing;
+                for (std::size_t k = 0; k < 3; ++k) {
+                    const std::size_t j = (k + 1) % 3;
+                    if ((d[k] > 0.0) != (d[j] > 0.0)) {
+                        crossing.push_back(p[k] + (p[j] - p[k]) * (d[k] / (d[k] - d[j])));
+                    }
+                }
+                if (crossing.size() == 2) {
+                    f.lines.push_back({ glm::vec3(crossing[0]), glm::vec3(crossing[1]), cutColor, { kProfileWidth, 0.0f } });
+                }
+            }
+        }
     }
 
     // Instanțele din definiție.
@@ -573,6 +615,32 @@ void Viewport::updateAnnotations()
             }
         }
     }
+    // Etichetele adnotărilor din model (cote și texte), editabile din QML.
+    if (m_document) {
+        const model::Model& model = m_document->model();
+        for (std::size_t i = 0; i < model.annotations().size(); ++i) {
+            const model::Annotation& a = model.annotations().values()[i];
+            const math::Transform t = definitionToWorld(*m_document, a.context);
+            math::Vec3d anchor = t.applyToPoint(a.a + a.offset);
+            QString text = QString::fromStdString(a.text);
+            if (a.kind == model::Annotation::Kind::Dimension) {
+                anchor = (anchor + t.applyToPoint(a.b + a.offset)) * 0.5;
+                if (text.isEmpty()) {
+                    text = QString::fromStdString(units::formatLength(glm::length(t.applyToPoint(a.b) - t.applyToPoint(a.a))));
+                }
+            }
+            if (const auto p = m_camera.project(anchor)) {
+                list.append(QVariantMap {
+                    { QStringLiteral("kind"), QStringLiteral("note") },
+                    { QStringLiteral("id"), static_cast<double>(model.annotations().keys()[i].value) },
+                    { QStringLiteral("x"), p->x },
+                    { QStringLiteral("y"), p->y },
+                    { QStringLiteral("text"), text },
+                    { QStringLiteral("dimension"), a.kind == model::Annotation::Kind::Dimension },
+                });
+            }
+        }
+    }
     if (list != m_annotations) {
         m_annotations = list;
         emit annotationsChanged();
@@ -647,6 +715,109 @@ void Viewport::zoomExtents()
     view::Vec3d hi;
     sceneBounds(lo, hi);
     m_motion.animateTo(m_camera, m_camera.framing(lo, hi));
+    requestAnimationFrame();
+}
+
+math::Transform Viewport::definitionToWorld(const Document& doc, model::DefinitionId definition) const
+{
+    const model::Model& model = doc.model();
+    // Pe calea editată, transformarea e cea a căii.
+    for (std::size_t i = 0; i < doc.path().size(); ++i) {
+        if (model.instance(doc.path()[i]).definition == definition) {
+            return model::worldTransform(model, { doc.path().begin(), doc.path().begin() + static_cast<std::ptrdiff_t>(i + 1) });
+        }
+    }
+    math::Transform t;
+    model::DefinitionId d = definition;
+    for (int guard = 0; d != model.root() && guard < 64; ++guard) {
+        const auto owners = model.instancesOf(d);
+        if (owners.empty()) {
+            break;
+        }
+        const model::Instance& inst = model.instance(owners.front());
+        t = inst.transform * t;
+        d = inst.parent;
+    }
+    return t;
+}
+
+void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
+{
+    const model::Model& model = doc.model();
+    const double far = std::max(m_camera.pose().distance * 40.0, 100000.0);
+
+    // Ghidajele: linii punctate lungi și puncte.
+    const glm::vec4 guide = toVec4(m_guide);
+    for (const model::Guide& g : model.guides().values()) {
+        const math::Transform t = definitionToWorld(doc, g.context);
+        const glm::dvec3 p = t.applyToPoint(g.point);
+        if (g.isLine()) {
+            const glm::dvec3 dir = glm::normalize(t.applyToVector(g.direction));
+            f.lines.push_back({ glm::vec3(p - dir * far), glm::vec3(p + dir * far), guide, { 1.0f, 6.0f } });
+        } else {
+            f.points.push_back({ glm::vec3(p), guide, 7.0f });
+        }
+    }
+
+    // Adnotările: liniile cotelor și ale textelor (etichetele le desenează QML).
+    const glm::vec4 noteColor = withAlpha(m_preview, 0.75f);
+    for (const model::Annotation& a : model.annotations().values()) {
+        const math::Transform t = definitionToWorld(doc, a.context);
+        const glm::vec3 pa(t.applyToPoint(a.a));
+        const glm::vec3 po(t.applyToPoint(a.a + a.offset));
+        if (a.kind == model::Annotation::Kind::Dimension) {
+            const glm::vec3 pb(t.applyToPoint(a.b));
+            const glm::vec3 pbo(t.applyToPoint(a.b + a.offset));
+            f.lines.push_back({ pa, po, noteColor, { 1.0f, 0.0f } });
+            f.lines.push_back({ pb, pbo, noteColor, { 1.0f, 0.0f } });
+            f.lines.push_back({ po, pbo, noteColor, { 1.25f, 0.0f } });
+            f.points.push_back({ po, noteColor, 5.0f });
+            f.points.push_back({ pbo, noteColor, 5.0f });
+        } else {
+            f.lines.push_back({ pa, po, noteColor, { 1.0f, 0.0f } });
+            f.points.push_back({ pa, noteColor, 6.0f });
+        }
+    }
+
+    // Planurile de secțiune: un dreptunghi în plan, plin pentru cel activ.
+    const glm::dvec3 center = (f.sceneMin + f.sceneMax) * 0.5;
+    const double size = std::max(glm::length(f.sceneMax - f.sceneMin) * 0.6, 1000.0);
+    for (const model::SectionPlane& s : model.sections().values()) {
+        const glm::dvec3 n = glm::normalize(s.normal);
+        const glm::dvec3 c = center - n * glm::dot(center - s.point, n);
+        const glm::dvec3 u = glm::normalize(glm::cross(std::abs(n.z) < 0.9 ? glm::dvec3(0, 0, 1) : glm::dvec3(1, 0, 0), n));
+        const glm::dvec3 v = glm::cross(n, u);
+        const std::array<glm::dvec3, 4> corners { c + (u + v) * size, c + (u - v) * size, c - (u + v) * size,
+            c - (u - v) * size };
+        const glm::vec4 color = s.active ? toVec4(m_sectionColor) : withAlpha(m_sectionColor, 0.35f);
+        for (std::size_t k = 0; k < 4; ++k) {
+            f.topLines.push_back({ glm::vec3(corners[k]), glm::vec3(corners[(k + 1) % 4]), color,
+                { s.active ? 1.5f : 1.0f, s.active ? 0.0f : 5.0f } });
+        }
+    }
+}
+
+QVariantMap Viewport::cameraState() const
+{
+    const view::CameraPose& p = m_camera.pose();
+    return QVariantMap { { QStringLiteral("tx"), p.target.x }, { QStringLiteral("ty"), p.target.y },
+        { QStringLiteral("tz"), p.target.z }, { QStringLiteral("yaw"), p.yaw }, { QStringLiteral("pitch"), p.pitch },
+        { QStringLiteral("distance"), p.distance }, { QStringLiteral("ortho"), isOrthographic() } };
+}
+
+void Viewport::animateToCamera(const QVariantMap& state)
+{
+    if (state.isEmpty()) {
+        return;
+    }
+    view::CameraPose pose;
+    pose.target = { state.value(QStringLiteral("tx")).toDouble(), state.value(QStringLiteral("ty")).toDouble(),
+        state.value(QStringLiteral("tz")).toDouble() };
+    pose.yaw = state.value(QStringLiteral("yaw")).toDouble();
+    pose.pitch = state.value(QStringLiteral("pitch")).toDouble();
+    pose.distance = state.value(QStringLiteral("distance")).toDouble();
+    setOrthographic(state.value(QStringLiteral("ortho")).toBool());
+    m_motion.animateTo(m_camera, pose);
     requestAnimationFrame();
 }
 
@@ -788,7 +959,14 @@ ViewportFrame Viewport::frameForRendering() const
     f.shadows = m_shadows && sunIntensity > 0.0 && f.style != 3;
     sceneBounds(f.sceneMin, f.sceneMax);
     if (m_document) {
+        for (const model::SectionPlane& s : m_document->model().sections().values()) {
+            if (s.active) {
+                const glm::dvec3 n = glm::normalize(s.normal);
+                f.section = glm::dvec4(n, glm::dot(n, s.point));
+            }
+        }
         appendDocument(f);
+        appendModelExtras(f, *m_document);
     }
     if (m_demoVisible) {
         appendBox(f.triangles, kDemoMin, kDemoMax);

@@ -69,6 +69,7 @@ qt_add_qml_module(aion_app
         qml/shell/TagsPanel.qml
         qml/shell/EntityInfo.qml
         qml/shell/MaterialsPanel.qml
+        qml/shell/ScenesPanel.qml
         qml/overlays/CommandPalette.qml
         qml/overlays/ViewportAnnotations.qml
         qml/overlays/MeasurementsBox.qml

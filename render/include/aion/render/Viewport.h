@@ -131,6 +131,9 @@ public:
     Q_INVOKABLE bool saveImage(const QString& path);
     // Previzualizarea pentru fișierul .aion: PNG de cel mult 512 px lățime.
     Q_INVOKABLE QByteArray captureThumbnail();
+    // Poziția camerei pentru scene: { tx, ty, tz, yaw, pitch, distance, ortho }; și tranziția animată spre una.
+    Q_INVOKABLE QVariantMap cameraState() const;
+    Q_INVOKABLE void animateToCamera(const QVariantMap& state);
     // Încadrează selecția documentului (sau tot modelul, dacă nu e nimic selectat).
     Q_INVOKABLE void zoomToSelection();
     Q_INVOKABLE void toggleProjection();
@@ -203,6 +206,9 @@ private:
     view::Vec2d orbitReleaseVelocity() const;
     void sceneBounds(view::Vec3d& min, view::Vec3d& max) const;
     QImage renderImage();
+    // Transformarea (în model) a unei definiții: prin calea editată, dacă e pe ea, altfel prin prima ei instanță.
+    math::Transform definitionToWorld(const Document& doc, model::DefinitionId definition) const;
+    void appendModelExtras(ViewportFrame& f, const Document& doc) const;
 
     view::Camera m_camera;
     view::CameraMotion m_motion;
@@ -253,6 +259,8 @@ private:
     QColor m_erase { 0xEF, 0x44, 0x44 };
     QColor m_inferenceCyan { 0x06, 0xB6, 0xD4 };
     QColor m_inferenceMagenta { 0xD9, 0x46, 0xEF };
+    QColor m_guide { 0x8B, 0x95, 0xA7, 210 };
+    QColor m_sectionColor { 0xF9, 0x73, 0x16 };
     bool m_gridVisible = true;
     QString m_displayStyle = QStringLiteral("shaded");
     bool m_profiles = true;
