@@ -136,7 +136,8 @@ Window {
     }
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
-    readonly property var modelingTools: ["select", "line", "rectangle", "pushpull", "move", "rotate", "scale", "eraser"]
+    readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull",
+                                         "move", "rotate", "scale", "eraser"]
     property string pendingToolMessage: ""
 
     function selectTool(id) {
