@@ -94,6 +94,9 @@ cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset m
 
 Gizmo-ul din colțul viewport-ului: click pe o axă = vederea dinspre ea, click pe centru = Iso.
 
+Toolbar-ul grupează uneltele ca Figma: fiecare grup arată ultima unealtă folosită, iar săgeata de lângă ea
+deschide meniul grupului (de exemplu Move / Rotate / Scale). Navigarea (Orbit, Pan, Zoom) stă separat, în dreapta.
+
 ### Variabile de mediu pentru dezvoltare
 | Variabilă | Efect |
 |---|---|

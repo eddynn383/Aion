@@ -9,6 +9,9 @@ T.Popup {
 
     padding: Theme.space2
     margins: Theme.space2
+    // Templates nu calculează mărimea implicită; fără ea, popover-ul ar avea 0 × 0.
+    implicitWidth: Math.max(implicitBackgroundWidth, implicitContentWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(implicitBackgroundHeight, implicitContentHeight + topPadding + bottomPadding)
 
     enter: Transition {
         ParallelAnimation {

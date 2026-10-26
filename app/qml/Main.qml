@@ -98,8 +98,9 @@ Window {
 
     function selectTool(id) {
         window.activeTool = id
-        if (id !== "select" && !navigationTools.includes(id))
-            statusBar.message = "Unealta „" + id + "” vine în Faza 3"
+        const tool = toolbar.toolInfo(id)
+        if (tool && tool.phase && id !== "select")
+            statusBar.message = "Unealta „" + tool.name + "” vine în Faza " + tool.phase
         else
             statusBar.message = "Gata"
     }
@@ -118,9 +119,9 @@ Window {
         sequence: "Ctrl+K"
         onActivated: palette.opened ? palette.close() : palette.open()
     }
-    // Uneltele de desen (doar vizual, până în Faza 3).
+    // Scurtăturile uneltelor de desen (navigarea are scurtăturile în lista de comenzi).
     Instantiator {
-        model: toolbar.tools.filter(t => t.key && t.key.length === 1 && !navigationTools.includes(t.id))
+        model: toolbar.allTools.filter(t => t.key && t.key.length === 1 && !navigationTools.includes(t.id))
         delegate: Shortcut {
             required property var modelData
             sequence: modelData.key

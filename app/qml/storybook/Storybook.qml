@@ -167,6 +167,26 @@ Rectangle {
 
             Specimen {
                 width: column.width
+                title: "Menu"
+                Button {
+                    id: menuButton
+                    text: "Deschide meniul"
+                    iconName: "chevron-down"
+                    onClicked: demoMenu.open()
+                    Menu {
+                        id: demoMenu
+                        y: menuButton.height + Theme.space1
+                        items: [
+                            { id: "move", icon: "move", name: "Move", shortcut: "M", checked: true },
+                            { id: "rotate", icon: "rotate-cw", name: "Rotate", shortcut: "Q" },
+                            { id: "scale", icon: "scale-3d", name: "Scale", shortcut: "S", enabled: false }
+                        ]
+                    }
+                }
+            }
+
+            Specimen {
+                width: column.width
                 title: "Popover"
                 Button {
                     id: popButton

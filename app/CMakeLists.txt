@@ -49,6 +49,7 @@ qt_add_qml_module(aion_app
         qml/components/IconButton.qml
         qml/components/Input.qml
         qml/components/Kbd.qml
+        qml/components/Menu.qml
         qml/components/NumberField.qml
         qml/components/Panel.qml
         qml/components/Popover.qml
@@ -60,6 +61,7 @@ qt_add_qml_module(aion_app
         qml/shell/NavigationGizmo.qml
         qml/shell/StatusBar.qml
         qml/shell/TitleBar.qml
+        qml/shell/ToolGroupButton.qml
         qml/shell/Toolbar.qml
         qml/overlays/CommandPalette.qml
         qml/storybook/Storybook.qml
