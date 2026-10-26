@@ -2,7 +2,10 @@
 
 #include "ToolHelpers.h"
 
-// Paint Bucket (B): vopsește o față sau un grup cu materialul curent.
+#include <glm/geometric.hpp>
+
+// Paint Bucket (B): vopsește o față sau un grup cu materialul curent. O față văzută din spate primește materialul
+// pe verso (ca în SketchUp).
 // Option: pipetă (ia materialul de sub cursor). Cmd: toate fețele conectate. Shift: toate fețele din context
 // care au același material ca fața atinsă.
 namespace aion::tools {
@@ -20,7 +23,7 @@ public:
             return;
         }
         if (e.modifiers.alt) {
-            sample(ctx, hit);
+            sample(ctx, hit, e.screen);
             return;
         }
         if (!ctx.paintMaterial && ctx.libraryMaterial == nullptr) {
@@ -44,6 +47,8 @@ public:
             if (!mesh.faces().contains(hit.face)) {
                 return;
             }
+            // Partea vizibilă a feței atinse: dacă privim spre normală, vedem versoul.
+            const bool back = glm::dot(mesh.face(hit.face).plane.normal, ctx.camera.rayAt(e.screen).direction) > 0.0;
             std::set<geom::FaceId> faces { hit.face };
             if (e.modifiers.command) {
                 faces = geom::connectedTo(mesh, { {}, { hit.face }, {} }).faces;
@@ -56,7 +61,11 @@ public:
                 }
             }
             for (geom::FaceId f : faces) {
-                mesh.setFaceMaterial(f, material);
+                if (back) {
+                    mesh.setFaceBackMaterial(f, material);
+                } else {
+                    mesh.setFaceMaterial(f, material);
+                }
             }
         });
     }
@@ -79,7 +88,7 @@ public:
     }
 
 private:
-    static void sample(ToolContext& ctx, const view::PickResult& hit)
+    static void sample(ToolContext& ctx, const view::PickResult& hit, math::Vec2d screen)
     {
         if (ctx.requests == nullptr) {
             return;
@@ -87,7 +96,9 @@ private:
         if (hit.kind == view::PickResult::Kind::Instance) {
             ctx.requests->sampledMaterial = ctx.model->instance(hit.instance).material;
         } else if (ctx.mesh.faces().contains(hit.face)) {
-            ctx.requests->sampledMaterial = ctx.mesh.face(hit.face).material;
+            const geom::Face& face = ctx.mesh.face(hit.face);
+            const bool back = glm::dot(face.plane.normal, ctx.camera.rayAt(screen).direction) > 0.0;
+            ctx.requests->sampledMaterial = back && face.backMaterial ? face.backMaterial : face.material;
         }
     }
 

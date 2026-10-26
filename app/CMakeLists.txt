@@ -86,6 +86,7 @@ qt_add_qml_module(aion_app
         qml/overlays/ToolTour.qml
         qml/overlays/QuantitiesDialog.qml
         qml/components/DataTable.qml
+        qml/components/MaterialSwatch.qml
         qml/components/ToolDemo.qml
         qml/components/GuideCard.qml
         qml/components/RichTooltip.qml

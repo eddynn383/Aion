@@ -32,6 +32,7 @@ struct MeshVertex {
     float state = 0.0f; // 0 = normal, 1 = sub cursor, 2 = selectat, 3 = estompat
     glm::vec4 color { 0.0f, 0.0f, 0.0f, -1.0f }; // culoarea materialului (a = opacitate; a < 0 = fără material)
     glm::vec2 material { 0.85f, 0.0f }; // rugozitate, metalic
+    glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f }; // materialul de pe verso (a < 0 = ca fața / culoarea versoului)
 };
 
 struct ViewportColors {

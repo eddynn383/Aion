@@ -6,6 +6,7 @@ layout(location = 1) in vec3 v_world;
 layout(location = 2) in float v_state;
 layout(location = 3) in vec4 v_color;
 layout(location = 4) in vec2 v_material;
+layout(location = 5) in vec4 v_backColor;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -83,8 +84,11 @@ void main()
         return;
     }
 
-    bool hasMaterial = v_color.a >= 0.0 && style != 1;
-    vec3 base = hasMaterial ? v_color.rgb : (front ? frame.faceFront.rgb : frame.faceBack.rgb);
+    // Versoul cu material propriu îl folosește pe acela; altfel, ca până acum (materialul feței sau culoarea versoului).
+    bool backMaterial = !front && v_backColor.a >= 0.0 && style != 1;
+    bool hasMaterial = (backMaterial || v_color.a >= 0.0) && style != 1;
+    vec4 surfaceColor = backMaterial ? v_backColor : v_color;
+    vec3 base = hasMaterial ? surfaceColor.rgb : (front ? frame.faceFront.rgb : frame.faceBack.rgb);
     if (style == 1)
         base = vec3(0.92, 0.91, 0.89); // „clay”: alb mat, fără materiale
     float roughness = hasMaterial ? v_material.x : 0.85;
@@ -120,7 +124,7 @@ void main()
     }
     // Tentă de accent: discretă la hover, mai puternică pentru selecție.
     float tint = v_state > 1.5 ? 0.38 : v_state > 0.5 ? 0.14 : 0.0;
-    float alpha = hasMaterial ? clamp(v_color.a, 0.0, 1.0) : 1.0;
+    float alpha = hasMaterial ? clamp(surfaceColor.a, 0.0, 1.0) : 1.0;
     if (style == 4)
         alpha = 0.42; // x-ray
     fragColor = vec4(mix(lit, frame.accent.rgb, tint), alpha);

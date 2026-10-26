@@ -772,3 +772,31 @@ TEST_CASE("Unelte: Section Plane pe fața laterală a unei cutii e vertical", "[
     INFO("n = " << sec.normal.x << "," << sec.normal.y << "," << sec.normal.z << " p = " << sec.point.x << "," << sec.point.y << "," << sec.point.z);
     CHECK(std::abs(sec.normal.z) < 1e-6);
 }
+
+TEST_CASE("Paint Bucket: o față văzută din spate primește materialul pe verso", "[core][tools][paint]")
+{
+    model::Model m;
+    geom::Mesh& mesh = m.mesh(m.root());
+    geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } });
+    const geom::FaceId face = mesh.faces().keys().front();
+    const model::MaterialId red = m.addMaterial({ "Roșu", { 220, 40, 40, 255 }, 0.8f, 0.0f });
+    commands::CommandStack stack(m);
+    geom::Selection selection;
+    // Camera de sus: fața de pe sol are normala în jos (ca în SketchUp), deci de sus vedem versoul.
+    view::Camera camera;
+    camera.setViewportSize(800, 600);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 1000, 1000, 0 }, 0, 0, 5000 }));
+    tools::ToolContext ctx { mesh, stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    ctx.paintMaterial = red;
+    auto paint = tools::makeTool("paint");
+    const auto s = camera.project({ 1000, 1000, 0 });
+    REQUIRE(s);
+    tools::PointerEvent e;
+    e.screen = *s;
+    paint->pointerDown(ctx, e);
+    const bool up = mesh.face(face).plane.normal.z > 0.0;
+    CHECK(mesh.face(face).material == (up ? red : model::MaterialId {}));
+    CHECK(mesh.face(face).backMaterial == (up ? model::MaterialId {} : red));
+}

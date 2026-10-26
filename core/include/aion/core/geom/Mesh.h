@@ -58,8 +58,10 @@ public:
     EdgeId addEdge(VertexId a, VertexId b);
     // Muchia trebuie să nu mai fie folosită de nicio față.
     void removeEdge(EdgeId id);
-    FaceId addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner = {}, model::MaterialId material = {});
+    FaceId addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner = {}, model::MaterialId material = {},
+        model::MaterialId backMaterial = {});
     void setFaceMaterial(FaceId id, model::MaterialId material);
+    void setFaceBackMaterial(FaceId id, model::MaterialId material);
     void removeFace(FaceId id);
     // Mută un vârf (fără verificări: fețele atinse trebuie apoi aduse la zi, vezi transformVertices).
     void setPosition(VertexId id, const Vec3d& position);

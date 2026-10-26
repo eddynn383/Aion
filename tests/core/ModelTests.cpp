@@ -279,3 +279,36 @@ TEST_CASE("Booleene (Manifold): reuniune, diferență și intersecție a două c
         CHECK_FALSE(r.error.empty());
     });
 }
+
+TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni editabile", "[core][model]")
+{
+    Model m;
+    geom::Mesh& root = m.mesh(m.root());
+    geom::drawPolygon(root, { { 100, 200, 0 }, { 700, 200, 0 }, { 700, 600, 0 }, { 100, 600, 0 } });
+    geom::Selection all;
+    for (geom::FaceId f : root.faces().keys()) {
+        all.faces.insert(f);
+    }
+    const model::InstanceId id = model::makeGroup(m, m.root(), all, false, "Placă");
+
+    model::Placement p = model::placementOf(m, id);
+    CHECK(glm::length(p.position - math::Vec3d { 100, 200, 0 }) < 1e-6);
+    CHECK(p.rotationZ == Catch::Approx(0.0).margin(1e-9));
+    CHECK(glm::length(p.size - math::Vec3d { 600, 400, 0 }) < 1e-6);
+
+    // Mută, rotește 90° și dublează lățimea (prin dimensiune).
+    p.position = { 1000, 1000, 50 };
+    p.rotationZ = 90.0;
+    p.size = { 600, 800, 0 };
+    model::setPlacement(m, id, p);
+    const model::Placement q = model::placementOf(m, id);
+    CHECK(glm::length(q.position - math::Vec3d { 1000, 1000, 50 }) < 1e-6);
+    CHECK(q.rotationZ == Catch::Approx(90.0));
+    CHECK(q.size.x == Catch::Approx(600.0));
+    CHECK(q.size.y == Catch::Approx(800.0));
+    CHECK(q.scale.y == Catch::Approx(2.0));
+    // Colțul opus: rotit spre +Y (X local → Y global), apoi Y local (dublat) → −X global.
+    const auto [lo, hi] = model::bounds(m, m.instance(id).definition);
+    CHECK(glm::length(m.instance(id).transform.applyToPoint({ hi.x, lo.y, lo.z }) - math::Vec3d { 1000, 1600, 50 }) < 1e-6);
+    CHECK(m.validate().ok());
+}

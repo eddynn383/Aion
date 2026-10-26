@@ -262,6 +262,18 @@ Window {
                     // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("material:")) {
+                    // „material:back,3” = materialul 3 din bibliotecă pe versoul selecției.
+                    const mt = action.slice(9).split(",")
+                    doc.assignMaterial({ library: parseInt(mt[1]) }, mt[0])
+                } else if (action.startsWith("placement:")) {
+                    // „placement:dz=600,rotation=30” pe instanța selectată.
+                    const pl = {}
+                    for (const kv of action.slice(10).split(",")) {
+                        const parts = kv.split("=")
+                        pl[parts[0]] = parseFloat(parts[1])
+                    }
+                    doc.setPlacement(pl)
                 } else if (action.startsWith("behavior:")) {
                     // „behavior:rotate,0,90” pe instanța selectată.
                     const bh = action.slice(9).split(",")

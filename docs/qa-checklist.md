@@ -53,6 +53,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Stilurile ca iconițe (wireframe, linii ascunse, clay, materiale, X-Ray); ▾ = Profile, Ceață
 - [ ] Umbre (☀) + ▾ = ora, luna; Secțiuni (apare doar dacă există); Zoom Extents, proiecție, grid
 - [ ] Inspector-ul arată doar selecția (fără selecție: datele modelului)
+## Inspector (selecție)
+- [ ] Grup/obiect: Poziție X/Y/Z, Dimensiuni L/l/h (lacăt = proporții), Rotație, Scară — editabile, cu undo
+- [ ] Material: pastila deschide paleta (model + bibliotecă + „Fără material”)
+- [ ] Fețe: Față / Verso; Paint Bucket pe o față văzută din spate vopsește versoul; Reverse Faces le schimbă
 ## Grafică
 - [ ] Materiale (bibliotecă, în model, pipetă ⌥, ⌘ conectate, ⇧ același material), sticlă transparentă
 - [ ] Stiluri: materiale, clay, linii, wireframe, X-Ray; profile; ceață; umbre (oră, lună)
