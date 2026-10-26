@@ -7,6 +7,8 @@ Rectangle {
     id: root
 
     property string documentName: "Fără titlu"
+    // Documentul are modificări nesalvate: un punct după nume (ca în Figma).
+    property bool modified: false
     property bool leftPanelVisible: true
     property bool rightPanelVisible: true
 
@@ -73,6 +75,14 @@ Rectangle {
             text: root.documentName
             color: Theme.textSecondary
             font.pixelSize: Theme.fontSizeMd
+        }
+        Rectangle {
+            visible: root.modified
+            anchors.verticalCenter: parent.verticalCenter
+            width: 6
+            height: 6
+            radius: 3
+            color: Theme.textTertiary
         }
     }
 

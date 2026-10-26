@@ -82,7 +82,9 @@ bool CommandStack::commit()
         return false;
     }
     m_undo.push_back(std::move(command));
+    m_undoSerials.push_back(m_nextSerial++);
     m_redo.clear();
+    m_redoSerials.clear();
     afterChange();
     return true;
 }
@@ -105,7 +107,9 @@ void CommandStack::push(std::unique_ptr<Command> command)
     assert(!inTransaction());
     command->apply();
     m_undo.push_back(std::move(command));
+    m_undoSerials.push_back(m_nextSerial++);
     m_redo.clear();
+    m_redoSerials.clear();
     afterChange();
 }
 
@@ -129,6 +133,8 @@ bool CommandStack::undo()
     m_undo.pop_back();
     command->revert();
     m_redo.push_back(std::move(command));
+    m_redoSerials.push_back(m_undoSerials.back());
+    m_undoSerials.pop_back();
     afterChange();
     return true;
 }
@@ -143,14 +149,40 @@ bool CommandStack::redo()
     m_redo.pop_back();
     command->apply();
     m_undo.push_back(std::move(command));
+    m_undoSerials.push_back(m_redoSerials.back());
+    m_redoSerials.pop_back();
     afterChange();
     return true;
+}
+
+void CommandStack::markClean()
+{
+    m_cleanSerial = m_undoSerials.empty() ? 0 : m_undoSerials.back();
+    if (m_onChanged) {
+        m_onChanged();
+    }
+}
+
+void CommandStack::markDirty()
+{
+    m_cleanSerial = ~std::uint64_t { 0 };
+    if (m_onChanged) {
+        m_onChanged();
+    }
+}
+
+bool CommandStack::isClean() const
+{
+    return (m_undoSerials.empty() ? 0 : m_undoSerials.back()) == m_cleanSerial;
 }
 
 void CommandStack::clear()
 {
     m_undo.clear();
     m_redo.clear();
+    m_undoSerials.clear();
+    m_redoSerials.clear();
+    m_cleanSerial = 0;
     afterChange();
 }
 

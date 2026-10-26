@@ -112,6 +112,12 @@ public:
     void clear();
     [[nodiscard]] std::size_t undoCount() const { return m_undo.size(); }
 
+    // Starea „salvată”: isClean() e adevărat cât timp istoricul e în punctul marcat (după undo/redo înapoi la el, tot).
+    void markClean();
+    // Documentul are modificări nesalvate chiar fără istoric (de exemplu după o recuperare).
+    void markDirty();
+    [[nodiscard]] bool isClean() const;
+
     // Verificarea modelului după fiecare commit / undo / redo (implicit activă în debug).
     // La eșec se apelează `onInvalid`; implicit se oprește programul (assert).
     void setValidation(bool enabled, geom::ValidationLevel level = geom::ValidationLevel::Topology);
@@ -127,6 +133,11 @@ private:
     model::DefinitionId m_active;
     std::vector<std::unique_ptr<Command>> m_undo;
     std::vector<std::unique_ptr<Command>> m_redo;
+    // Un număr unic pentru fiecare comandă, ca starea salvată să fie recunoscută sigur.
+    std::vector<std::uint64_t> m_undoSerials;
+    std::vector<std::uint64_t> m_redoSerials;
+    std::uint64_t m_nextSerial = 1;
+    std::uint64_t m_cleanSerial = 0; // 0 = istoric gol
     std::optional<std::string> m_transactionName;
     bool m_validate;
     geom::ValidationLevel m_validationLevel = geom::ValidationLevel::Topology;

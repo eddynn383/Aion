@@ -79,9 +79,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `Camera::inContext`, Make Group/Component, Explode, Make Unique, Outliner, Tag-uri, Entity Info, context de editare.
   Designul: `docs/decisions/0008-model-grupuri-componente.md`. Comenzi în palette: categoria „Organizare” (⌘G, ⇧⌘G).
 
+- **Faza 7** pe `feature/faza-7`: `.aion` (ZIP + model.json), OBJ/glTF export și import, autosalvare + recuperare,
+  documente recente, PNG. ADR 0009. Acțiuni de script: `save:`, `open:`, `export:`, `import:`, `png:`, `file.newNow`.
+
 ## Următorii pași
-1. Utilizatorul testează Faza 6 în aplicație; merge `feature/faza-6`.
-2. Faza 7: fișiere (.aion), export OBJ/glTF, import (PLAN.md).
+1. Faza 8: grafică avansată, materiale, stiluri (PLAN.md).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

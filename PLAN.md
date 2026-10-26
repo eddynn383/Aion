@@ -360,16 +360,17 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 7 – Fișiere și export
-- [ ] Format propriu `.aion`: arhivă ZIP cu `model.json` (topologie, entități, tag-uri, materiale), texturi și thumbnail; câmp `formatVersion` pentru migrări
-- [ ] Salvare și deschidere, „documente recente”, marcaj „modificat” în titlul ferestrei
-- [ ] Autosalvare periodică și recuperare după crash
-- [ ] Export **OBJ** (+ MTL) și **glTF/GLB**
-- [ ] Import OBJ (ca grup)
-- [ ] Import **glTF/GLB** (păstrează ierarhia de noduri ca grupuri); calea fără licențe pentru modelele exportate din SketchUp
-- [ ] Export imagine PNG din viewport
-- [ ] Teste: round-trip salvare → încărcare → model identic (`validate()` + comparare)
+- [x] Format propriu `.aion`: arhivă ZIP cu `model.json` (topologie, entități, tag-uri, materiale), texturi și thumbnail; câmp `formatVersion` pentru migrări — materialele și texturile se adaugă în Faza 8
+- [x] Salvare și deschidere, „documente recente”, marcaj „modificat” în titlul ferestrei
+- [x] Autosalvare periodică și recuperare după crash
+- [x] Export **OBJ** (+ MTL) și **glTF/GLB**
+- [x] Import OBJ (ca grup)
+- [x] Import **glTF/GLB** (păstrează ierarhia de noduri ca grupuri); calea fără licențe pentru modelele exportate din SketchUp
+- [x] Export imagine PNG din viewport
+- [x] Teste: round-trip salvare → încărcare → model identic (`validate()` + comparare)
 
 **Gata când:** toate modelele de test trec round-trip-ul, iar exportul glTF se deschide corect într-un viewer extern (de exemplu Blender).
+✓ `tests/core/IoTests.cpp` (round-trip exact, OBJ și GLB dus-întors); deschiderea în Blender rămâne de verificat de utilizator (ADR 0009).
 
 ---
 

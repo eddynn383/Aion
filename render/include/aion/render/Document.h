@@ -10,6 +10,8 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
+#include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
@@ -56,6 +58,18 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(bool canGroup READ canGroup NOTIFY selectionChanged)
     Q_PROPERTY(bool hasInstanceSelected READ hasInstanceSelected NOTIFY selectionChanged)
 
+    // --- Fișiere (Faza 7) ---
+    // Calea fișierului (gol = încă nesalvat), numele afișat și dacă are modificări nesalvate.
+    Q_PROPERTY(QString filePath READ filePath NOTIFY fileChanged)
+    Q_PROPERTY(QString fileName READ fileName NOTIFY fileChanged)
+    Q_PROPERTY(bool modified READ modified NOTIFY historyChanged)
+    Q_PROPERTY(QStringList recentFiles READ recentFiles NOTIFY recentFilesChanged)
+    // O sesiune nesalvată, găsită la pornire (autosalvarea unei rulări care nu s-a închis normal).
+    Q_PROPERTY(bool hasRecovery READ hasRecovery NOTIFY recoveryChanged)
+    Q_PROPERTY(QString recoveryInfo READ recoveryInfo NOTIFY recoveryChanged)
+    // Ultima eroare de fișier (pentru un mesaj în interfață).
+    Q_PROPERTY(QString lastError READ lastError NOTIFY errorChanged)
+
 public:
     explicit Document(QObject* parent = nullptr);
     ~Document() override;
@@ -79,6 +93,13 @@ public:
     QVariantMap entityInfo() const;
     bool canGroup() const { return !m_selection.empty(); }
     bool hasInstanceSelected() const { return !m_selection.instances.empty(); }
+    QString filePath() const { return m_filePath; }
+    QString fileName() const;
+    bool modified() const { return !m_stack.isClean(); }
+    QStringList recentFiles() const;
+    bool hasRecovery() const { return m_hasRecovery; }
+    QString recoveryInfo() const;
+    QString lastError() const { return m_lastError; }
 
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
@@ -115,6 +136,21 @@ public:
     Q_INVOKABLE void removeTag(double tagId);
     // Tag-ul instanțelor selectate (0 = fără tag).
     Q_INVOKABLE void assignTag(double tagId);
+
+    // --- Fișiere ---
+    Q_INVOKABLE void newDocument();
+    Q_INVOKABLE bool openFile(const QString& path);
+    // Salvează (`path` gol = fișierul curent); `thumbnailPng` e imaginea de previzualizare din arhivă.
+    Q_INVOKABLE bool saveFile(const QString& path, const QByteArray& thumbnailPng = {});
+    // Import după extensie (.obj, .gltf, .glb), ca grup în contextul editat.
+    Q_INVOKABLE bool importFile(const QString& path);
+    // Export după extensie: .obj (+ .mtl alături), .gltf, .glb.
+    Q_INVOKABLE bool exportFile(const QString& path);
+    Q_INVOKABLE void recoverAutosave();
+    Q_INVOKABLE void discardAutosave();
+    Q_INVOKABLE void clearRecentFiles();
+    // Calea locală dintr-un URL de fișier (dialogurile QML dau URL-uri).
+    Q_INVOKABLE QString localPath(const QUrl& url) const;
 
     // --- Meniul contextual (click dreapta) ---
     // Elementele potrivite selecției: { id, name, shortcut, enabled, destructive } sau { separator: true }.
@@ -155,6 +191,12 @@ signals:
     void modelChanged();
     void outlineChanged();
     void contextChanged();
+    void fileChanged();
+    void recentFilesChanged();
+    void recoveryChanged();
+    void errorChanged();
+    // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
+    void documentReplaced();
     // Orice schimbare vizibilă în viewport.
     void changed();
 
@@ -173,6 +215,13 @@ private:
     void runOnModel(const std::string& name, Fn&& fn);
     void replayPointer();
     void touch();
+    void replaceModel(const model::Model& model);
+    void setFilePath(const QString& path);
+    void addRecentFile(const QString& path);
+    void setError(const QString& message);
+    void autosave();
+    void removeAutosave();
+    static QString autosavePath();
 
     model::Model m_model;
     commands::CommandStack m_stack { m_model };
@@ -184,6 +233,10 @@ private:
     unsigned m_revision = 1;
     view::Camera m_lastCamera;
     std::optional<tools::PointerEvent> m_lastPointer;
+    QString m_filePath;
+    QString m_lastError;
+    bool m_hasRecovery = false;
+    QTimer m_autosaveTimer;
 };
 
 } // namespace aion::render

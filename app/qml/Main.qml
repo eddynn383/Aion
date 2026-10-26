@@ -2,6 +2,7 @@ import QtQuick
 import Aion
 import Aion.Render
 import QtQuick.Shapes
+import QtQuick.Dialogs
 
 Window {
     id: window
@@ -11,7 +12,7 @@ Window {
     minimumWidth: 960
     minimumHeight: 600
     visible: true
-    title: "Aion"
+    title: doc.fileName + (doc.modified ? " — modificat" : "") + " · Aion"
     color: Theme.bgApp
     // Conținutul continuă sub bara de titlu (macOS: butoanele native rămân, fără fundal propriu).
     flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
@@ -24,6 +25,15 @@ Window {
     // Toate comenzile aplicației; apar în command palette și au scurtături.
     readonly property var commands: {
         const list = [
+            { id: "file.new", title: "Document nou", category: "Fișier", shortcut: "Ctrl+N", icon: "plus" },
+            { id: "file.open", title: "Deschide…", category: "Fișier", shortcut: "Ctrl+O", icon: "search" },
+            { id: "file.save", title: "Salvează", category: "Fișier", shortcut: "Ctrl+S", icon: "check" },
+            { id: "file.saveAs", title: "Salvează ca…", category: "Fișier", shortcut: "Ctrl+Shift+S", icon: "check" },
+            { id: "file.import", title: "Importă (OBJ, glTF, GLB)…", category: "Fișier", shortcut: "", icon: "arrow-down" },
+            { id: "file.exportObj", title: "Exportă OBJ…", category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
             { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
             { id: "view.top",    title: "Vedere de sus",     category: "Vedere", shortcut: "Ctrl+1", icon: "arrow-down" },
             { id: "view.front",  title: "Vedere din față",   category: "Vedere", shortcut: "Ctrl+2", icon: "arrow-up" },
@@ -65,6 +75,12 @@ Window {
         // Toate uneltele din toolbar, cu scurtăturile lor.
         for (const t of toolbar.allTools)
             list.push({ id: "tool." + t.id, title: t.name, category: "Unelte", shortcut: t.key || "", icon: t.icon })
+        // Documentele recente.
+        for (let i = 0; i < doc.recentFiles.length; ++i) {
+            const path = doc.recentFiles[i]
+            list.push({ id: "file.recent:" + i, title: "Deschide recent: " + path.split("/").pop(),
+                        category: "Fișier", shortcut: "", icon: "layers" })
+        }
         if (AppInfo.debugBuild)
             list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
@@ -72,7 +88,21 @@ Window {
     }
 
     function runCommand(id) {
+        if (id.startsWith("file.recent:")) {
+            const path = doc.recentFiles[parseInt(id.slice(12))]
+            window.confirmDiscard(() => doc.openFile(path))
+            return
+        }
         switch (id) {
+        case "file.new": window.confirmDiscard(() => doc.newDocument()); break
+        case "file.open": window.confirmDiscard(() => fileDialog.ask("open")); break
+        case "file.save": window.save(null); break
+        case "file.saveAs": fileDialog.ask("saveAs"); break
+        case "file.import": fileDialog.ask("import"); break
+        case "file.exportObj": fileDialog.ask("exportObj"); break
+        case "file.exportGlb": fileDialog.ask("exportGlb"); break
+        case "file.exportGltf": fileDialog.ask("exportGltf"); break
+        case "file.exportPng": fileDialog.ask("exportPng"); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
         case "view.front": viewport.setStandardView(Viewport.Front); break
@@ -143,6 +173,18 @@ Window {
                 } else if (action.startsWith("clickw:")) {
                     const c = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(viewport, viewport.projectToScreen(Qt.vector3d(c[0], c[1], c[2])))
+                } else if (action.startsWith("save:")) {
+                    doc.saveFile(action.slice(5), viewport.captureThumbnail())
+                } else if (action.startsWith("open:")) {
+                    doc.openFile(action.slice(5))
+                } else if (action.startsWith("export:")) {
+                    doc.exportFile(action.slice(7))
+                } else if (action.startsWith("import:")) {
+                    doc.importFile(action.slice(7))
+                } else if (action.startsWith("png:")) {
+                    viewport.saveImage(action.slice(4))
+                } else if (action === "file.newNow") {
+                    doc.newDocument()
                 } else if (action.startsWith("rclickw:")) {
                     const r = action.slice(8).split(",").map(Number)
                     AppInfo.simulateRightClick(viewport, viewport.projectToScreen(Qt.vector3d(r[0], r[1], r[2])))
@@ -270,12 +312,98 @@ Window {
         }
     }
 
+    // --- Fișiere ---
+
+    // Salvează (în fișierul curent sau, dacă nu are, prin dialog), apoi rulează `then` dacă a reușit.
+    function save(then) {
+        if (doc.filePath.length === 0) {
+            fileDialog.afterSave = then
+            fileDialog.ask("saveAs")
+            return
+        }
+        if (doc.saveFile("", viewport.captureThumbnail()) && then)
+            then()
+    }
+
+    // Înainte de a închide documentul curent: dacă are modificări, întreabă.
+    function confirmDiscard(action) {
+        if (!doc.modified) {
+            action()
+            return
+        }
+        unsavedDialog.action = action
+        unsavedDialog.open()
+    }
+
+    property bool allowClose: false
+    onClosing: (close) => {
+        if (doc.modified && !window.allowClose) {
+            close.accepted = false
+            window.confirmDiscard(() => { window.allowClose = true; window.close() })
+        }
+    }
+
+    FileDialog {
+        id: fileDialog
+
+        property string purpose: ""
+        property var afterSave: null
+
+        function ask(what) {
+            purpose = what
+            const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng"].includes(what)
+            fileMode = save ? FileDialog.SaveFile : FileDialog.OpenFile
+            switch (what) {
+            case "open": title = "Deschide"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
+            case "saveAs": title = "Salvează"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
+            case "import": title = "Importă"; nameFilters = ["Modele 3D (*.obj *.gltf *.glb)"]; defaultSuffix = ""; break
+            case "exportObj": title = "Exportă OBJ"; nameFilters = ["OBJ (*.obj)"]; defaultSuffix = "obj"; break
+            case "exportGlb": title = "Exportă GLB"; nameFilters = ["glTF binar (*.glb)"]; defaultSuffix = "glb"; break
+            case "exportGltf": title = "Exportă glTF"; nameFilters = ["glTF (*.gltf)"]; defaultSuffix = "gltf"; break
+            case "exportPng": title = "Exportă imaginea"; nameFilters = ["PNG (*.png)"]; defaultSuffix = "png"; break
+            }
+            if (save)
+                selectedFile = "file:///" + doc.fileName + "." + defaultSuffix
+            open()
+        }
+
+        onAccepted: {
+            const path = doc.localPath(selectedFile)
+            switch (purpose) {
+            case "open": doc.openFile(path); break
+            case "saveAs":
+                if (doc.saveFile(path, viewport.captureThumbnail()) && afterSave)
+                    afterSave()
+                break
+            case "import": doc.importFile(path); break
+            case "exportObj":
+            case "exportGlb":
+            case "exportGltf":
+                if (doc.exportFile(path)) toast.show("Exportat: " + path.split("/").pop())
+                break
+            case "exportPng":
+                if (viewport.saveImage(path)) toast.show("Imagine salvată: " + path.split("/").pop())
+                else toast.show("Imaginea nu a putut fi salvată.")
+                break
+            }
+            afterSave = null
+        }
+        onRejected: afterSave = null
+    }
+
+    Connections {
+        target: doc
+        function onErrorChanged() { toast.show(doc.lastError) }
+    }
+
     TitleBar {
         id: titleBar
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         z: 2
+        documentName: doc.fileName
+        modified: doc.modified
         leftPanelVisible: window.leftPanelVisible
         rightPanelVisible: window.rightPanelVisible
         onCommandPaletteRequested: palette.open()
@@ -443,6 +571,83 @@ Window {
             }
         }
 
+        // O sesiune nesalvată găsită la pornire.
+        Rectangle {
+            visible: doc.hasRecovery
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.topMargin: Theme.space3
+            width: recoveryRow.implicitWidth + Theme.space3 * 2
+            height: 44
+            radius: Theme.radiusLg
+            color: Theme.bgElevated
+            border.color: Theme.borderStrong
+
+            Row {
+                id: recoveryRow
+                anchors.centerIn: parent
+                spacing: Theme.space3
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "info"
+                    size: Theme.iconSizeSm
+                    color: Theme.accent
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Am găsit o sesiune nesalvată: " + doc.recoveryInfo
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Button {
+                    small: true
+                    variant: "primary"
+                    text: "Recuperează"
+                    onClicked: doc.recoverAutosave()
+                }
+                Button {
+                    small: true
+                    text: "Renunță"
+                    onClicked: doc.discardAutosave()
+                }
+            }
+        }
+
+        // Mesaje scurte (export reușit, erori de fișier).
+        Rectangle {
+            id: toast
+            property string message: ""
+            function show(text) {
+                message = text
+                toastTimer.restart()
+            }
+            visible: opacity > 0
+            opacity: toastTimer.running ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Theme.motionNormal } }
+            anchors.bottom: toolbar.top
+            anchors.bottomMargin: Theme.space3
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(toastText.implicitWidth + Theme.space4 * 2, parent.width - Theme.space6 * 2)
+            height: toastText.implicitHeight + Theme.space2 * 2
+            radius: Theme.radiusMd
+            color: Theme.bgElevated
+            border.color: Theme.borderStrong
+            Text {
+                id: toastText
+                anchors.centerIn: parent
+                width: parent.width - Theme.space4 * 2
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: toast.message
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            Timer {
+                id: toastTimer
+                interval: 4500
+            }
+        }
+
         ContextMenu {
             id: contextMenu
             onTriggered: (id) => window.runCommand(id)
@@ -573,6 +778,61 @@ Window {
         active: AppInfo.storybookOnStart
         sourceComponent: Storybook {
             onCloseRequested: storybookLoader.active = false
+        }
+    }
+
+    // „Salvezi modificările?” înainte de a închide documentul.
+    Popover {
+        id: unsavedDialog
+        property var action: null
+        modal: true
+        anchors.centerIn: parent
+        width: 380
+        padding: Theme.space6
+
+        contentItem: Column {
+            spacing: Theme.space4
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: "Salvezi modificările din „" + doc.fileName + "”?"
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeLg
+                font.weight: Font.DemiBold
+            }
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: "Dacă nu le salvezi, se pierd."
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeMd
+            }
+            Row {
+                anchors.right: parent.right
+                spacing: Theme.space2
+                Button {
+                    text: "Anulează"
+                    onClicked: unsavedDialog.close()
+                }
+                Button {
+                    text: "Nu salva"
+                    onClicked: {
+                        const action = unsavedDialog.action
+                        unsavedDialog.close()
+                        doc.discardAutosave()
+                        if (action) action()
+                    }
+                }
+                Button {
+                    variant: "primary"
+                    text: "Salvează"
+                    onClicked: {
+                        const action = unsavedDialog.action
+                        unsavedDialog.close()
+                        window.save(action)
+                    }
+                }
+            }
         }
     }
 }

@@ -9,6 +9,7 @@
 
 #include <QNativeGestureEvent>
 #include <QPointingDevice>
+#include <QBuffer>
 #include <QGuiApplication>
 #include <QLineF>
 #include <QQuickWindow>
@@ -218,6 +219,10 @@ void Viewport::setDocument(Document* document)
     if (m_document) {
         // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
+        // Un document deschis sau nou: îl încadrăm.
+        connect(m_document, &Document::documentReplaced, this, [this] {
+            zoomExtents();
+        });
     }
     emit documentChanged();
     update();
@@ -564,6 +569,52 @@ void Viewport::zoomExtents()
     sceneBounds(lo, hi);
     m_motion.animateTo(m_camera, m_camera.framing(lo, hi));
     requestAnimationFrame();
+}
+
+QImage Viewport::renderImage()
+{
+    if (window() == nullptr) {
+        return {};
+    }
+    // Elementele QML puse peste viewport (toolbar, gizmo, etichete) nu intră în imagine.
+    QList<QQuickItem*> hidden;
+    for (QQuickItem* child : childItems()) {
+        if (child->isVisible()) {
+            child->setVisible(false);
+            hidden.append(child);
+        }
+    }
+    const QImage frame = window()->grabWindow();
+    for (QQuickItem* child : hidden) {
+        child->setVisible(true);
+    }
+    const qreal dpr = frame.devicePixelRatio() > 0 ? frame.devicePixelRatio() : window()->effectiveDevicePixelRatio();
+    const QRectF scene = mapRectToScene(boundingRect());
+    const QRect pixels(qRound(scene.x() * dpr), qRound(scene.y() * dpr), qRound(scene.width() * dpr),
+        qRound(scene.height() * dpr));
+    return frame.copy(pixels);
+}
+
+bool Viewport::saveImage(const QString& path)
+{
+    const QImage image = renderImage();
+    return !image.isNull() && image.save(path, "PNG");
+}
+
+QByteArray Viewport::captureThumbnail()
+{
+    QImage image = renderImage();
+    if (image.isNull()) {
+        return {};
+    }
+    if (image.width() > 512) {
+        image = image.scaledToWidth(512, Qt::SmoothTransformation);
+    }
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "PNG");
+    return bytes;
 }
 
 void Viewport::zoomToSelection()
