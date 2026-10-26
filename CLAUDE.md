@@ -86,8 +86,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   wireframe, X-Ray), profile, ceață, ACES, umbre de la soare (oră/lună). ADR 0010. Rămân: SSAO, IBL, TAA, texturi/UV.
   Acțiuni de script: `sun:ora`, `style:nume`.
 
+- **Faza 9** pe `feature/faza-9`: ghidaje, Tape Measure, Protractor, Dimension, Text, Section Plane, Intersect Faces,
+  booleene (Manifold), Scene. ADR 0011.
+
 ## Următorii pași
-1. Faza 9: unelte suplimentare (Tape Measure, Dimensions, Section Plane, Intersect, Scenes).
+1. Faza 10: finisare macOS și distribuție (PLAN.md).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

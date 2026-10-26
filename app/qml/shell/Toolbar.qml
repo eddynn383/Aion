@@ -28,6 +28,12 @@ Item {
             { id: "move",   icon: "move",      name: "Move",   key: "M", phase: 5 },
             { id: "rotate", icon: "rotate-cw", name: "Rotate", key: "Q", phase: 5 },
             { id: "scale",  icon: "scale-3d",  name: "Scale",  key: "S", phase: 5 } ] },
+        { id: "measure", tools: [
+            { id: "tape", icon: "ruler", name: "Tape Measure", key: "T", phase: 9 },
+            { id: "protractor", icon: "protractor", name: "Protractor", key: "", phase: 9 },
+            { id: "dimension", icon: "dimension", name: "Dimension", key: "", phase: 9 },
+            { id: "text", icon: "type", name: "Text", key: "", phase: 9 },
+            { id: "section", icon: "section", name: "Section Plane", key: "", phase: 9 } ] },
         { id: "erase", tools: [
             { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 },
             { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 } ] }

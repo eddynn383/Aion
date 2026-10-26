@@ -635,6 +635,14 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.context = activeDefinition();
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
+    ctx.toWorld = contextTransform();
+    m_contextGuides.clear();
+    for (const model::Guide& g : m_model.guides().values()) {
+        if (g.context == activeDefinition()) {
+            m_contextGuides.push_back({ g.point, g.direction });
+        }
+    }
+    ctx.guides = m_contextGuides;
     ctx.libraryMaterial
         = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
     fn(*m_tool, ctx);
@@ -648,6 +656,10 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         m_currentMaterial = *requests.sampledMaterial;
         m_libraryMaterial = -1;
         emit materialChanged();
+    }
+    if (requests.editAnnotation) {
+        m_editingAnnotation = requests.editAnnotation;
+        emit editingAnnotationChanged();
     }
     if (requests.enter && m_model.instances().contains(requests.enter)) {
         enterInstance(static_cast<double>(requests.enter.value));
@@ -1171,6 +1183,9 @@ QVariantList Document::contextMenuItems() const
             separator();
         }
         item(QStringLiteral("edit.selectAll"), QStringLiteral("Selectează tot"), QStringLiteral("Ctrl+A"));
+        if (!m_model.guides().empty()) {
+            item(QStringLiteral("guides.clear"), QStringLiteral("Șterge ghidajele"));
+        }
         if (anyHidden) {
             item(QStringLiteral("org.unhideAll"), QStringLiteral("Arată tot"));
         }
@@ -1207,9 +1222,18 @@ QVariantList Document::contextMenuItems() const
             item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !allLocked);
         }
     }
+    if (!geometry && m_selection.instances.size() == 2) {
+        separator();
+        item(QStringLiteral("solid.union"), QStringLiteral("Reuniune"));
+        item(QStringLiteral("solid.subtract"), QStringLiteral("Scade al doilea din primul"));
+        item(QStringLiteral("solid.intersect"), QStringLiteral("Intersecție (partea comună)"));
+    }
     if (geometry) {
         separator();
         item(QStringLiteral("edit.selectConnected"), QStringLiteral("Selectează ce e conectat"));
+        if (!m_selection.faces.empty()) {
+            item(QStringLiteral("edit.intersectModel"), QStringLiteral("Intersectează cu modelul"));
+        }
         if (!m_selection.faces.empty()) {
             item(QStringLiteral("edit.reverseFaces"), m_selection.faces.size() == 1 ? QStringLiteral("Inversează fața")
                                                                                     : QStringLiteral("Inversează fețele"));
@@ -1377,6 +1401,227 @@ void Document::removeMaterial(double materialId)
     if (m_currentMaterial == id) {
         selectDefaultMaterial();
     }
+}
+
+QVariantList Document::scenes() const
+{
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.scenes().size(); ++i) {
+        const model::Scene& s = m_model.scenes().values()[i];
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.scenes().keys()[i].value) },
+            { QStringLiteral("name"), QString::fromStdString(s.name) },
+            { QStringLiteral("style"), QString::fromStdString(s.style) } });
+    }
+    return out;
+}
+
+QVariantList Document::sections() const
+{
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.sections().size(); ++i) {
+        const model::SectionPlane& s = m_model.sections().values()[i];
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.sections().keys()[i].value) },
+            { QStringLiteral("name"), QString::fromStdString(s.name) }, { QStringLiteral("active"), s.active } });
+    }
+    return out;
+}
+
+void Document::setEditingAnnotation(double id)
+{
+    const model::AnnotationId annotation { static_cast<std::uint64_t>(id) };
+    if (annotation == m_editingAnnotation) {
+        return;
+    }
+    m_editingAnnotation = annotation;
+    emit editingAnnotationChanged();
+}
+
+void Document::intersectSelection(bool withModel)
+{
+    if (m_selection.faces.empty()) {
+        setError(QStringLiteral("Selectează fețele de intersectat."));
+        return;
+    }
+    std::size_t count = 0;
+    runOnModel(withModel ? "Intersectează cu modelul" : "Intersectează selecția", [&](model::Model& model) {
+        count = geom::intersectFaces(model.mesh(activeDefinition()), m_selection.faces, withModel);
+    });
+    if (count == 0) {
+        setError(QStringLiteral("Fețele selectate nu intersectează nimic."));
+    }
+}
+
+void Document::booleanSelection(const QString& kind)
+{
+    if (m_selection.instances.size() != 2 || !m_selection.faces.empty() || !m_selection.edges.empty()) {
+        setError(QStringLiteral("Selectează exact două grupuri sau obiecte."));
+        return;
+    }
+    const model::InstanceId a = *m_selection.instances.begin();
+    const model::InstanceId b = *std::next(m_selection.instances.begin());
+    const model::BooleanKind k = kind == QLatin1String("union") ? model::BooleanKind::Union
+        : kind == QLatin1String("subtract")                    ? model::BooleanKind::Subtract
+                                                               : model::BooleanKind::Intersect;
+    model::BooleanResult result;
+    const char* name = k == model::BooleanKind::Union ? "Reuniune" : k == model::BooleanKind::Subtract ? "Scădere" : "Intersecție";
+    runOnModel(name, [&](model::Model& model) {
+        result = model::booleanOperation(model, a, b, k);
+        m_selection.clear();
+        if (result.instance) {
+            m_selection.instances.insert(result.instance);
+        }
+    });
+    if (!result.instance) {
+        setError(QString::fromStdString(result.error));
+    }
+}
+
+void Document::deleteGuides()
+{
+    if (m_model.guides().empty()) {
+        return;
+    }
+    runOnModel("Șterge ghidajele", [&](model::Model& model) {
+        for (model::GuideId id : std::vector(model.guides().keys())) {
+            model.removeGuide(id);
+        }
+    });
+}
+
+void Document::setAnnotationText(double annotationId, const QString& text)
+{
+    const model::AnnotationId id { static_cast<std::uint64_t>(annotationId) };
+    if (!m_model.annotations().contains(id)) {
+        return;
+    }
+    if (m_model.annotations().at(id).text != text.toStdString()) {
+        runOnModel("Editează textul", [&](model::Model& model) {
+            model::Annotation a = model.annotations().at(id);
+            a.text = text.toStdString();
+            model.setAnnotation(id, a);
+        });
+    }
+    setEditingAnnotation(0);
+}
+
+void Document::removeAnnotation(double annotationId)
+{
+    const model::AnnotationId id { static_cast<std::uint64_t>(annotationId) };
+    if (m_model.annotations().contains(id)) {
+        runOnModel("Șterge adnotarea", [&](model::Model& model) { model.removeAnnotation(id); });
+    }
+}
+
+void Document::setSectionActive(double sectionId, bool active)
+{
+    const model::SectionId id { static_cast<std::uint64_t>(sectionId) };
+    if (!m_model.sections().contains(id)) {
+        return;
+    }
+    runOnModel(active ? "Activează secțiunea" : "Dezactivează secțiunea", [&](model::Model& model) {
+        for (model::SectionId other : std::vector(model.sections().keys())) {
+            model::SectionPlane s = model.sections().at(other);
+            const bool wanted = other == id ? active : false;
+            if (s.active != wanted) {
+                s.active = wanted;
+                model.setSection(other, s);
+            }
+        }
+    });
+}
+
+void Document::moveSection(double sectionId, double distance)
+{
+    const model::SectionId id { static_cast<std::uint64_t>(sectionId) };
+    if (!m_model.sections().contains(id)) {
+        return;
+    }
+    runOnModel("Mută secțiunea", [&](model::Model& model) {
+        model::SectionPlane s = model.sections().at(id);
+        s.point += s.normal * distance;
+        model.setSection(id, s);
+    });
+}
+
+void Document::removeSection(double sectionId)
+{
+    const model::SectionId id { static_cast<std::uint64_t>(sectionId) };
+    if (m_model.sections().contains(id)) {
+        runOnModel("Șterge secțiunea", [&](model::Model& model) { model.removeSection(id); });
+    }
+}
+
+namespace {
+
+model::Scene sceneFrom(const QVariantMap& camera, const QString& style)
+{
+    model::Scene s;
+    s.target = { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
+        camera.value(QStringLiteral("tz")).toDouble() };
+    s.yaw = camera.value(QStringLiteral("yaw")).toDouble();
+    s.pitch = camera.value(QStringLiteral("pitch")).toDouble();
+    s.distance = camera.value(QStringLiteral("distance")).toDouble();
+    s.orthographic = camera.value(QStringLiteral("ortho")).toBool();
+    s.style = style.toStdString();
+    return s;
+}
+
+} // namespace
+
+void Document::addScene(const QVariantMap& camera, const QString& style)
+{
+    runOnModel("Scenă nouă", [&](model::Model& model) {
+        model::Scene s = sceneFrom(camera, style);
+        s.name = "Scena " + std::to_string(model.scenes().size() + 1);
+        model.addScene(s);
+    });
+}
+
+void Document::updateScene(double sceneId, const QVariantMap& camera, const QString& style)
+{
+    const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
+    if (!m_model.scenes().contains(id)) {
+        return;
+    }
+    runOnModel("Actualizează scena", [&](model::Model& model) {
+        model::Scene s = sceneFrom(camera, style);
+        s.name = model.scenes().at(id).name;
+        model.setScene(id, s);
+    });
+}
+
+void Document::renameScene(double sceneId, const QString& name)
+{
+    const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
+    if (!m_model.scenes().contains(id) || name.trimmed().isEmpty()) {
+        return;
+    }
+    runOnModel("Redenumește scena", [&](model::Model& model) {
+        model::Scene s = model.scenes().at(id);
+        s.name = name.trimmed().toStdString();
+        model.setScene(id, s);
+    });
+}
+
+void Document::removeScene(double sceneId)
+{
+    const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
+    if (m_model.scenes().contains(id)) {
+        runOnModel("Șterge scena", [&](model::Model& model) { model.removeScene(id); });
+    }
+}
+
+QVariantMap Document::sceneCamera(double sceneId) const
+{
+    const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
+    if (!m_model.scenes().contains(id)) {
+        return {};
+    }
+    const model::Scene& s = m_model.scenes().at(id);
+    return QVariantMap { { QStringLiteral("tx"), s.target.x }, { QStringLiteral("ty"), s.target.y },
+        { QStringLiteral("tz"), s.target.z }, { QStringLiteral("yaw"), s.yaw }, { QStringLiteral("pitch"), s.pitch },
+        { QStringLiteral("distance"), s.distance }, { QStringLiteral("ortho"), s.orthographic },
+        { QStringLiteral("style"), QString::fromStdString(s.style) } };
 }
 
 void Document::reverseSelectedFaces()

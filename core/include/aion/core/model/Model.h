@@ -47,6 +47,54 @@ struct Material {
     bool operator==(const Material&) const = default;
 };
 
+// O linie sau un punct de construcție (Tape Measure, Protractor), în coordonatele definiției `context`.
+// `direction` nul = punct; altfel linie infinită prin `point`.
+struct Guide {
+    DefinitionId context;
+    math::Vec3d point { 0.0 };
+    math::Vec3d direction { 0.0 };
+
+    [[nodiscard]] bool isLine() const { return direction != math::Vec3d { 0.0 }; }
+    bool operator==(const Guide&) const = default;
+};
+
+// O adnotare: o cotă (distanța dintre `a` și `b`, cu linia de cotă deplasată cu `offset`) sau un text
+// (ancorat în `a`, cu eticheta în `a + offset`). În coordonatele definiției `context`.
+struct Annotation {
+    enum class Kind { Dimension, Text };
+    Kind kind = Kind::Dimension;
+    DefinitionId context;
+    math::Vec3d a { 0.0 };
+    math::Vec3d b { 0.0 };
+    math::Vec3d offset { 0.0 };
+    std::string text; // pentru Text; pentru o cotă, gol = lungimea calculată
+
+    bool operator==(const Annotation&) const = default;
+};
+
+// Un plan de secțiune (în coordonatele modelului): ce e de partea normalei se ascunde când e activ.
+struct SectionPlane {
+    std::string name;
+    math::Vec3d point { 0.0 };
+    math::Vec3d normal { 0.0, 0.0, 1.0 };
+    bool active = true;
+
+    bool operator==(const SectionPlane&) const = default;
+};
+
+// O scenă: o poziție de cameră salvată (și stilul de afișare).
+struct Scene {
+    std::string name;
+    math::Vec3d target { 0.0 };
+    double yaw = 0.0;
+    double pitch = 0.0;
+    double distance = 10000.0;
+    bool orthographic = false;
+    std::string style;
+
+    bool operator==(const Scene&) const = default;
+};
+
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
@@ -76,6 +124,10 @@ struct ChangeSet {
     std::map<InstanceId, geom::EntityChange<Instance>> instances;
     std::map<TagId, geom::EntityChange<Tag>> tags;
     std::map<MaterialId, geom::EntityChange<Material>> materials;
+    std::map<GuideId, geom::EntityChange<Guide>> guides;
+    std::map<AnnotationId, geom::EntityChange<Annotation>> annotations;
+    std::map<SectionId, geom::EntityChange<SectionPlane>> sections;
+    std::map<SceneId, geom::EntityChange<Scene>> scenes;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -109,6 +161,10 @@ public:
     [[nodiscard]] const Tag& tag(TagId id) const { return m_tags.at(id); }
     [[nodiscard]] const geom::SlotMap<MaterialId, Material>& materials() const { return m_materials; }
     [[nodiscard]] const Material& material(MaterialId id) const { return m_materials.at(id); }
+    [[nodiscard]] const geom::SlotMap<GuideId, Guide>& guides() const { return m_guides; }
+    [[nodiscard]] const geom::SlotMap<AnnotationId, Annotation>& annotations() const { return m_annotations; }
+    [[nodiscard]] const geom::SlotMap<SectionId, SectionPlane>& sections() const { return m_sections; }
+    [[nodiscard]] const geom::SlotMap<SceneId, Scene>& scenes() const { return m_scenes; }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -134,6 +190,17 @@ public:
     // Fețele și instanțele care îl folosesc rămân fără material.
     void removeMaterial(MaterialId id);
     void setMaterial(MaterialId id, Material material);
+    GuideId addGuide(Guide guide);
+    void removeGuide(GuideId id);
+    AnnotationId addAnnotation(Annotation annotation);
+    void removeAnnotation(AnnotationId id);
+    void setAnnotation(AnnotationId id, Annotation annotation);
+    SectionId addSection(SectionPlane section);
+    void removeSection(SectionId id);
+    void setSection(SectionId id, SectionPlane section);
+    SceneId addScene(Scene scene);
+    void removeScene(SceneId id);
+    void setScene(SceneId id, Scene scene);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -157,6 +224,12 @@ private:
     void touch(InstanceId id);
     void touch(TagId id);
     void touch(MaterialId id);
+    template <class IdT, class T>
+    IdT addEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, T value);
+    template <class IdT, class T>
+    void removeEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id);
+    template <class IdT, class T>
+    void setEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id, T value);
     void notifyStructure();
 
     DefinitionId m_root;
@@ -164,6 +237,10 @@ private:
     geom::SlotMap<InstanceId, Instance> m_instances;
     geom::SlotMap<TagId, Tag> m_tags;
     geom::SlotMap<MaterialId, Material> m_materials;
+    geom::SlotMap<GuideId, Guide> m_guides;
+    geom::SlotMap<AnnotationId, Annotation> m_annotations;
+    geom::SlotMap<SectionId, SectionPlane> m_sections;
+    geom::SlotMap<SceneId, Scene> m_scenes;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;
     // Geometria (goală) a definițiilor șterse, păstrată ca undo să le refacă fără să refolosească ID-uri.
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_graveyard;

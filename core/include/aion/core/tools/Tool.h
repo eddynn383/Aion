@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -91,6 +92,8 @@ struct Measurement {
 struct ToolRequests {
     model::InstanceId enter;
     bool exit = false;
+    // Text: adnotarea nou creată, al cărei text îl scrie utilizatorul.
+    model::AnnotationId editAnnotation;
     // Paint Bucket: materialul luat cu pipeta (Option) sau materialul nou intrat în model la vopsire.
     std::optional<model::MaterialId> sampledMaterial;
     model::MaterialId addedMaterial;
@@ -116,6 +119,10 @@ struct ToolContext {
     // Paint Bucket: materialul curent (din model), sau unul din bibliotecă care intră în model la prima folosire.
     model::MaterialId paintMaterial;
     const model::Material* libraryMaterial = nullptr;
+    // Ghidajele contextului, pentru inferență.
+    std::span<const inference::GuideRef> guides;
+    // Transformarea contextului editat (local → model), pentru ce se păstrează în coordonatele modelului.
+    math::Transform toWorld;
 };
 
 class Tool {

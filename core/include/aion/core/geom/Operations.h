@@ -107,6 +107,10 @@ private:
     std::unordered_map<std::uint64_t, VertexId> m_grid;
 };
 
+// Intersect Faces: desenează segmentele în care fețele `faces` taie celelalte fețe (`withAll`) sau doar pe ele
+// între ele. Liniile noi împart fețele, ca orice linie desenată. Întoarce numărul de segmente.
+std::size_t intersectFaces(Mesh& mesh, const std::set<FaceId>& faces, bool withAll);
+
 // Regiunea unei fețe (în interior, nu pe margine și nu într-o gaură).
 [[nodiscard]] bool faceContainsPoint(const Mesh& mesh, FaceId face, const Vec3d& point);
 

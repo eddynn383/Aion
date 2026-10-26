@@ -67,6 +67,12 @@ Window {
             { id: "edit.selectConnected", title: "Selectează ce e conectat", category: "Editare", shortcut: "", icon: "square-dashed-mouse-pointer" },
             { id: "edit.reverseFaces", title: "Inversează fețele selectate", category: "Editare", shortcut: "", icon: "rotate-ccw" },
             { id: "view.zoomSelection", title: "Zoom la selecție", category: "Vedere", shortcut: "", icon: "scan" },
+            { id: "edit.intersectModel", title: "Intersectează fețele selectate cu modelul", category: "Editare", shortcut: "", icon: "scan" },
+            { id: "edit.intersectSelection", title: "Intersectează fețele selectate între ele", category: "Editare", shortcut: "", icon: "scan" },
+            { id: "solid.union", title: "Solide: reuniune", category: "Solide", shortcut: "", icon: "box" },
+            { id: "solid.subtract", title: "Solide: scade al doilea din primul", category: "Solide", shortcut: "", icon: "box" },
+            { id: "solid.intersect", title: "Solide: intersecție", category: "Solide", shortcut: "", icon: "box" },
+            { id: "guides.clear", title: "Șterge ghidajele (" + doc.guideCount + ")", category: "Editare", shortcut: "", icon: "trash-2" },
             { id: "style.shaded", title: "Stil: materiale", category: "Stil", shortcut: "", icon: "palette" },
             { id: "style.clay", title: "Stil: clay (alb mat)", category: "Stil", shortcut: "", icon: "palette" },
             { id: "style.hiddenline", title: "Stil: linii ascunse", category: "Stil", shortcut: "", icon: "palette" },
@@ -140,6 +146,12 @@ Window {
         case "edit.selectConnected": doc.selectConnected(); break
         case "edit.reverseFaces": doc.reverseSelectedFaces(); break
         case "view.zoomSelection": viewport.zoomToSelection(); break
+        case "edit.intersectModel": doc.intersectSelection(true); break
+        case "edit.intersectSelection": doc.intersectSelection(false); break
+        case "solid.union": doc.booleanSelection("union"); break
+        case "solid.subtract": doc.booleanSelection("subtract"); break
+        case "solid.intersect": doc.booleanSelection("intersect"); break
+        case "guides.clear": doc.deleteGuides(); break
         case "style.shaded": viewport.displayStyle = "shaded"; break
         case "style.clay": viewport.displayStyle = "clay"; break
         case "style.hiddenline": viewport.displayStyle = "hiddenline"; break
@@ -228,7 +240,8 @@ Window {
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
-                                         "move", "rotate", "scale", "eraser", "paint"]
+                                         "move", "rotate", "scale", "eraser", "paint",
+                                         "tape", "protractor", "dimension", "text", "section"]
     property string pendingToolMessage: ""
 
     function selectTool(id) {
@@ -445,7 +458,7 @@ Window {
         header: Tabs {
             id: leftTabs
             anchors.fill: parent
-            model: ["Outliner", "Tag-uri", "Materiale"]
+            model: ["Outliner", "Tag-uri", "Materiale", "Scene"]
         }
 
         Outliner {
@@ -457,6 +470,12 @@ Window {
             anchors.fill: parent
             visible: leftTabs.currentIndex === 1
             document: doc
+        }
+        ScenesPanel {
+            anchors.fill: parent
+            visible: leftTabs.currentIndex === 3
+            document: doc
+            viewport: viewport
         }
         MaterialsPanel {
             anchors.fill: parent
@@ -531,6 +550,7 @@ Window {
         ViewportAnnotations {
             anchors.fill: parent
             annotations: viewport.annotations
+            document: doc
         }
 
         MeasurementsBox {
@@ -785,6 +805,50 @@ Window {
             }
 
             Section {
+                visible: doc.sections.length > 0
+                width: parent.width
+                title: "Secțiuni"
+
+                Repeater {
+                    model: doc.sections
+                    delegate: Item {
+                        id: sectionRow
+                        required property var modelData
+                        width: parent.width
+                        height: Theme.controlHeight
+                        Toggle {
+                            anchors.left: parent.left
+                            anchors.right: sectionActions.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: sectionRow.modelData.name
+                            checked: sectionRow.modelData.active
+                            onToggled: doc.setSectionActive(sectionRow.modelData.id, checked)
+                        }
+                        Row {
+                            id: sectionActions
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            IconButton {
+                                width: 24; height: 24; iconSize: Theme.iconSizeSm
+                                iconName: "arrow-down"; tooltip: "Mută 100 mm înapoi"
+                                onClicked: doc.moveSection(sectionRow.modelData.id, -100)
+                            }
+                            IconButton {
+                                width: 24; height: 24; iconSize: Theme.iconSizeSm
+                                iconName: "arrow-up"; tooltip: "Mută 100 mm înainte"
+                                onClicked: doc.moveSection(sectionRow.modelData.id, 100)
+                            }
+                            IconButton {
+                                width: 24; height: 24; iconSize: Theme.iconSizeSm
+                                iconName: "trash-2"; tooltip: "Șterge secțiunea"
+                                onClicked: doc.removeSection(sectionRow.modelData.id)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section {
                 width: parent.width
                 title: "Soare și umbre"
 
@@ -813,7 +877,7 @@ Window {
                     to: 12
                     stepSize: 1
                     value: viewport.sunMonth
-                    valueText: ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "nov", "dec"][Math.round(value) - 1]
+                    valueText: Qt.locale("ro_RO").monthName(Math.round(value) - 1, Locale.ShortFormat)
                     onMoved: viewport.sunMonth = Math.round(value)
                 }
             }

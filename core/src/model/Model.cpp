@@ -71,7 +71,8 @@ bool sameMap(const geom::SlotMap<IdT, T>& a, const geom::SlotMap<IdT, T>& b)
 
 bool ChangeSet::empty() const
 {
-    return definitions.empty() && instances.empty() && tags.empty() && materials.empty()
+    return definitions.empty() && instances.empty() && tags.empty() && materials.empty() && guides.empty()
+        && annotations.empty() && sections.empty() && scenes.empty()
         && std::all_of(meshes.begin(), meshes.end(), [](const auto& m) { return m.second.empty(); });
 }
 
@@ -107,6 +108,10 @@ Model& Model::operator=(const Model& other)
     m_instances = other.m_instances;
     m_tags = other.m_tags;
     m_materials = other.m_materials;
+    m_guides = other.m_guides;
+    m_annotations = other.m_annotations;
+    m_sections = other.m_sections;
+    m_scenes = other.m_scenes;
     m_meshes.clear();
     for (const auto& [id, mesh] : other.m_meshes) {
         auto copy = std::make_unique<geom::Mesh>(*mesh);
@@ -237,6 +242,17 @@ void Model::removeDefinition(DefinitionId id)
 {
     assert(id != m_root);
     assert(instancesOf(id).empty() && childrenOf(id).empty());
+    // Ghidajele și adnotările din definiție dispar odată cu ea.
+    for (std::size_t i = m_guides.size(); i-- > 0;) {
+        if (m_guides.values()[i].context == id) {
+            removeGuide(m_guides.keys()[i]);
+        }
+    }
+    for (std::size_t i = m_annotations.size(); i-- > 0;) {
+        if (m_annotations.values()[i].context == id) {
+            removeAnnotation(m_annotations.keys()[i]);
+        }
+    }
     geom::Mesh& mesh = this->mesh(id);
     // Geometria se șterge prin primitive, ca undo să o poată reface.
     for (const geom::FaceId f : std::vector(mesh.faces().keys())) {
@@ -364,6 +380,96 @@ void Model::setMaterial(MaterialId id, Material material)
     notifyStructure();
 }
 
+template <class IdT, class T>
+IdT Model::addEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, T value)
+{
+    const IdT id = map.insert(std::move(value));
+    if (m_recording) {
+        ((*m_recording).*changes)[id];
+    }
+    m_structureDirty = true;
+    notifyStructure();
+    return id;
+}
+
+template <class IdT, class T>
+void Model::removeEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id)
+{
+    if (m_recording) {
+        touchIn((*m_recording).*changes, map, id);
+    }
+    map.erase(id);
+    m_structureDirty = true;
+    notifyStructure();
+}
+
+template <class IdT, class T>
+void Model::setEntity(
+    geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id, T value)
+{
+    if (m_recording) {
+        touchIn((*m_recording).*changes, map, id);
+    }
+    map.at(id) = std::move(value);
+    m_structureDirty = true;
+    notifyStructure();
+}
+
+GuideId Model::addGuide(Guide guide)
+{
+    return addEntity(m_guides, &ChangeSet::guides, std::move(guide));
+}
+
+void Model::removeGuide(GuideId id)
+{
+    removeEntity(m_guides, &ChangeSet::guides, id);
+}
+
+AnnotationId Model::addAnnotation(Annotation annotation)
+{
+    return addEntity(m_annotations, &ChangeSet::annotations, std::move(annotation));
+}
+
+void Model::removeAnnotation(AnnotationId id)
+{
+    removeEntity(m_annotations, &ChangeSet::annotations, id);
+}
+
+void Model::setAnnotation(AnnotationId id, Annotation annotation)
+{
+    setEntity(m_annotations, &ChangeSet::annotations, id, std::move(annotation));
+}
+
+SectionId Model::addSection(SectionPlane section)
+{
+    return addEntity(m_sections, &ChangeSet::sections, std::move(section));
+}
+
+void Model::removeSection(SectionId id)
+{
+    removeEntity(m_sections, &ChangeSet::sections, id);
+}
+
+void Model::setSection(SectionId id, SectionPlane section)
+{
+    setEntity(m_sections, &ChangeSet::sections, id, std::move(section));
+}
+
+SceneId Model::addScene(Scene scene)
+{
+    return addEntity(m_scenes, &ChangeSet::scenes, std::move(scene));
+}
+
+void Model::removeScene(SceneId id)
+{
+    removeEntity(m_scenes, &ChangeSet::scenes, id);
+}
+
+void Model::setScene(SceneId id, Scene scene)
+{
+    setEntity(m_scenes, &ChangeSet::scenes, id, std::move(scene));
+}
+
 void Model::beginRecording()
 {
     assert(!m_recording);
@@ -389,6 +495,10 @@ ChangeSet Model::endRecording()
     finishChanges(changes.instances, m_instances);
     finishChanges(changes.tags, m_tags);
     finishChanges(changes.materials, m_materials);
+    finishChanges(changes.guides, m_guides);
+    finishChanges(changes.annotations, m_annotations);
+    finishChanges(changes.sections, m_sections);
+    finishChanges(changes.scenes, m_scenes);
     // O definiție creată și ștearsă în aceeași operație nu lasă nicio urmă.
     for (DefinitionId id : m_createdWhileRecording) {
         if (!changes.definitions.contains(id) && !m_definitions.contains(id)) {
@@ -422,6 +532,10 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyMeshes();
         applyChanges(changes.instances, m_instances, direction);
         applyChanges(changes.tags, m_tags, direction);
+        applyChanges(changes.guides, m_guides, direction);
+        applyChanges(changes.annotations, m_annotations, direction);
+        applyChanges(changes.sections, m_sections, direction);
+        applyChanges(changes.scenes, m_scenes, direction);
         for (const auto& [id, change] : changes.definitions) {
             if (change.before && !change.after) {
                 m_definitions.erase(id);
@@ -435,6 +549,10 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
                 createMesh(id);
             }
         }
+        applyChanges(changes.guides, m_guides, direction);
+        applyChanges(changes.annotations, m_annotations, direction);
+        applyChanges(changes.sections, m_sections, direction);
+        applyChanges(changes.scenes, m_scenes, direction);
         applyChanges(changes.instances, m_instances, direction);
         applyChanges(changes.tags, m_tags, direction);
         applyMeshes();
@@ -449,7 +567,8 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         }
     }
     if (!changes.definitions.empty() || !changes.instances.empty() || !changes.tags.empty()
-        || !changes.materials.empty()) {
+        || !changes.materials.empty() || !changes.guides.empty() || !changes.annotations.empty()
+        || !changes.sections.empty() || !changes.scenes.empty()) {
         m_structureDirty = true;
         notifyStructure();
     }
@@ -530,6 +649,16 @@ geom::ValidationReport Model::validate(geom::ValidationLevel level) const
             report.errors.push_back("instanță cu un material inexistent");
         }
     }
+    for (const Guide& g : m_guides.values()) {
+        if (!m_definitions.contains(g.context)) {
+            report.errors.push_back("ghidaj într-o definiție inexistentă");
+        }
+    }
+    for (const Annotation& a : m_annotations.values()) {
+        if (!m_definitions.contains(a.context)) {
+            report.errors.push_back("adnotare într-o definiție inexistentă");
+        }
+    }
     // Fără cicluri: urmărim din fiecare definiție definițiile pe care le conține.
     for (std::size_t i = 0; i < m_definitions.size(); ++i) {
         const DefinitionId start = m_definitions.keys()[i];
@@ -563,7 +692,9 @@ bool Model::sameAs(const Model& other) const
 {
     if (m_root != other.m_root || !sameMap(m_definitions, other.m_definitions)
         || !sameMap(m_instances, other.m_instances) || !sameMap(m_tags, other.m_tags)
-        || !sameMap(m_materials, other.m_materials)) {
+        || !sameMap(m_materials, other.m_materials) || !sameMap(m_guides, other.m_guides)
+        || !sameMap(m_annotations, other.m_annotations) || !sameMap(m_sections, other.m_sections)
+        || !sameMap(m_scenes, other.m_scenes)) {
         return false;
     }
     for (const auto& [id, mesh] : m_meshes) {

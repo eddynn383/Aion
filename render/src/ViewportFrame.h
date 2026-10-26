@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include <optional>
 #include <vector>
 
 // Datele pe care Viewport (firul GUI) le predă renderer-ului (firul de randare) la fiecare cadru.
@@ -75,6 +76,8 @@ struct ViewportFrame {
     bool shadows = false;
     glm::dvec3 sceneMin { -5000.0, -5000.0, 0.0 };
     glm::dvec3 sceneMax { 5000.0, 5000.0, 3000.0 };
+    // Planul de secțiune activ (n, d cu n·x = d); geometria de partea normalei se ascunde.
+    std::optional<glm::dvec4> section;
 };
 
 } // namespace aion::render
