@@ -103,6 +103,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Snap la grid**: `Engine::withGridSnap` (doar puncte libere și distanțe pe direcții), `autoGridStep` = regula din
   grid.frag, `ToolContext::gridStep`, Document `snapToGrid`/`gridStep`, pas fix desenat prin `params.z` în grid.frag.
 
+- **Raport de cantități** (ADR 0017): `model/Quantities.h` (general + listă de debitare + CSV), `QuantitiesDialog.qml`,
+  `DataTable.qml`; comanda `file.quantities` (Fișier). Acțiune de script: `debug.cutlist`.
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 
