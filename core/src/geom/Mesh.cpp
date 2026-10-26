@@ -273,6 +273,18 @@ void Mesh::removeFace(FaceId id)
     m_faces.erase(id);
 }
 
+void Mesh::setPosition(VertexId id, const Vec3d& position)
+{
+    touch(id);
+    m_vertices.at(id).position = position;
+}
+
+void Mesh::setFacePlane(FaceId id, const math::Plane& plane)
+{
+    touch(id);
+    m_faces.at(id).plane = plane;
+}
+
 std::pair<EdgeId, EdgeId> Mesh::splitEdge(EdgeId id, VertexId at)
 {
     const Edge original = m_edges.at(id);

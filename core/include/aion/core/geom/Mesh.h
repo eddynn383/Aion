@@ -60,6 +60,10 @@ public:
     void removeEdge(EdgeId id);
     FaceId addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner = {});
     void removeFace(FaceId id);
+    // Mută un vârf (fără verificări: fețele atinse trebuie apoi aduse la zi, vezi transformVertices).
+    void setPosition(VertexId id, const Vec3d& position);
+    // Schimbă planul unei fețe (de exemplu după ce i s-au mutat vârfurile).
+    void setFacePlane(FaceId id, const math::Plane& plane);
     // Înlocuiește muchia cu două muchii prin vârful `at` și actualizează buclele fețelor.
     // Întoarce (muchia dinspre v0, muchia dinspre v1).
     std::pair<EdgeId, EdgeId> splitEdge(EdgeId id, VertexId at);

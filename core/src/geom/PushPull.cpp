@@ -31,25 +31,6 @@ std::vector<FaceId> facesInPlane(const Mesh& mesh, const Plane& plane)
     return out;
 }
 
-// Un punct sigur din interiorul feței: centrul celui mai mare triunghi.
-Vec3d interiorSample(const Mesh& mesh, FaceId face)
-{
-    const FaceTriangles tri = triangulateFace(mesh, face);
-    Vec3d best = tri.points.empty() ? Vec3d { 0.0 } : tri.points.front();
-    double bestArea = -1.0;
-    for (std::size_t i = 0; i + 2 < tri.indices.size(); i += 3) {
-        const Vec3d a = tri.points[tri.indices[i]];
-        const Vec3d b = tri.points[tri.indices[i + 1]];
-        const Vec3d c = tri.points[tri.indices[i + 2]];
-        const double area = glm::length(glm::cross(b - a, c - a));
-        if (area > bestArea) {
-            bestArea = area;
-            best = (a + b + c) / 3.0;
-        }
-    }
-    return best;
-}
-
 bool insidePolygon(const std::vector<Vec3d>& polygon, const Plane& plane, const Vec3d& p)
 {
     const math::PlaneFrame frame(plane);
@@ -312,7 +293,7 @@ PushPullResult pushPull(Mesh& mesh, FaceId faceId, double distance, bool keepOri
 
     // Capacul: dacă ajunge pe material existent (o față opusă), cele două se anulează.
     const Plane capPlane = Plane::fromPointNormal(loops.front().front() + offset, n);
-    const bool capCut = materialAt(mesh, interiorSample(mesh, faceId) + offset, faceId);
+    const bool capCut = materialAt(mesh, faceInteriorPoint(mesh, faceId) + offset, faceId);
     std::vector<std::vector<Vec3d>> capLoops;
     for (const auto& loop : loops) {
         capLoops.push_back(offsetPoints(loop, offset));
@@ -329,7 +310,7 @@ PushPullResult pushPull(Mesh& mesh, FaceId faceId, double distance, bool keepOri
     // Laturile: tăieturile dispar, fețele noi primesc orientarea spre exteriorul solidului.
     for (const Side& side : sides) {
         for (FaceId f : facesInPlane(mesh, side.plane)) {
-            if (!mesh.faces().contains(f) || !insidePolygon(side.points, side.plane, interiorSample(mesh, f))) {
+            if (!mesh.faces().contains(f) || !insidePolygon(side.points, side.plane, faceInteriorPoint(mesh, f))) {
                 continue;
             }
             if (side.cut) {
@@ -342,7 +323,7 @@ PushPullResult pushPull(Mesh& mesh, FaceId faceId, double distance, bool keepOri
 
     // Capacul și eventualele fețe închise de găurile lui.
     for (FaceId f : facesInPlane(mesh, capPlane)) {
-        const Vec3d s = interiorSample(mesh, f);
+        const Vec3d s = faceInteriorPoint(mesh, f);
         if (!insidePolygon(capLoops.front(), capPlane, s)) {
             continue;
         }

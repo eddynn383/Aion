@@ -10,6 +10,7 @@ add_library(aion_core STATIC
     src/geom/PlanarRegions.cpp
     src/geom/PushPull.cpp
     src/geom/Selection.cpp
+    src/geom/Transformations.cpp
     src/geom/Triangulate.cpp
     src/math/Intersect.cpp
     src/math/Plane.cpp

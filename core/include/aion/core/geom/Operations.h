@@ -1,6 +1,10 @@
 #pragma once
 
 #include "aion/core/geom/Mesh.h"
+#include "aion/core/geom/Selection.h"
+#include "aion/core/math/Transform.h"
+
+#include <set>
 
 #include <vector>
 
@@ -50,6 +54,21 @@ struct PushPullResult {
 // - Împinsă în solid, taie materialul; dacă ajunge pe o față opusă, cele două se anulează (gaură).
 // `keepOriginal` (Option/Ctrl în SketchUp) păstrează fața inițială și în al doilea caz.
 PushPullResult pushPull(Mesh& mesh, FaceId face, double distance, bool keepOriginal = false);
+
+// Un punct sigur din interiorul feței (centrul celui mai mare triunghi din triangulare).
+[[nodiscard]] Vec3d faceInteriorPoint(const Mesh& mesh, FaceId face);
+
+// Vârfurile entităților selectate (capetele muchiilor și vârfurile buclelor fețelor).
+[[nodiscard]] std::set<VertexId> verticesOf(const Mesh& mesh, const Selection& selection);
+
+// Move / Rotate / Scale: aplică transformarea pe vârfuri. Geometria conectată se deformează; fețele atinse
+// își recalculează planul, iar cele care nu mai sunt plane se pliază în triunghiuri (ca în SketchUp).
+// Întoarce false, fără nicio modificare, dacă transformarea ar strânge o muchie într-un punct.
+bool transformVertices(Mesh& mesh, const std::set<VertexId>& vertices, const math::Transform& transform);
+
+// Copia transformată a selecției (Option în Move și Rotate), lipită de geometria existentă ca orice desen.
+// Întoarce entitățile copiei.
+Selection copySelection(Mesh& mesh, const Selection& selection, const math::Transform& transform);
 
 // Regiunea unei fețe (în interior, nu pe margine și nu într-o gaură).
 [[nodiscard]] bool faceContainsPoint(const Mesh& mesh, FaceId face, const Vec3d& point);
