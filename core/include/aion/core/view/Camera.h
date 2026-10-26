@@ -1,6 +1,7 @@
 #pragma once
 
 #include "aion/core/math/Ray.h"
+#include "aion/core/math/Transform.h"
 #include "aion/core/math/Vec.h"
 
 #include <optional>
@@ -82,7 +83,28 @@ public:
     // Poziția care încadrează cutia dată, păstrând direcția de privire.
     [[nodiscard]] CameraPose framing(const Vec3d& boundsMin, const Vec3d& boundsMax) const;
 
+    // O copie a camerei pentru un context de editare (grup, componentă) cu transformarea `toWorld`
+    // (local → global): razele, proiecțiile, direcțiile și distanțele ei sunt în coordonatele locale,
+    // așa că uneltele lucrează direct pe geometria contextului. Matricile (view, projection) rămân globale.
+    [[nodiscard]] Camera inContext(const math::Transform& toWorld) const;
+    [[nodiscard]] bool hasContext() const { return m_context.has_value(); }
+
 private:
+    struct Context {
+        math::Transform toWorld;
+        math::Transform toLocal;
+        double scale = 1.0; // factorul de scară (uniform, aproximativ) local → global
+    };
+
+    [[nodiscard]] Vec3d worldForward() const;
+    [[nodiscard]] Vec3d worldRight() const;
+    [[nodiscard]] Vec3d worldUp() const;
+    [[nodiscard]] Vec3d worldEye() const;
+    [[nodiscard]] double worldNear() const;
+    [[nodiscard]] double worldFar() const;
+    [[nodiscard]] Vec3d toLocalVector(const Vec3d& v) const;
+
+    std::optional<Context> m_context;
     CameraPose m_pose;
     Projection m_projection = Projection::Perspective;
     double m_fovY = kDefaultFovY;
