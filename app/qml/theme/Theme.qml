@@ -21,10 +21,42 @@ QtObject {
 
     readonly property string modeLabel: ["Sistem", "Light", "Dark"][mode]
 
+    // Culorile personalizate (Preferințe → Aspect) au prioritate față de cele implicite ale modului curent.
+    readonly property var overrides: {
+        try {
+            const all = JSON.parse(UserPrefs.themeOverrides)
+            return (dark ? all.dark : all.light) || {}
+        } catch (e) {
+            return {}
+        }
+    }
+    function pick(name, darkDefault, lightDefault) {
+        const value = overrides[name]
+        return value !== undefined && value !== "" ? value : (dark ? darkDefault : lightDefault)
+    }
+    // Schimbă (sau, cu "", resetează) o culoare a temei pentru modul curent.
+    function setOverride(name, value) {
+        let all = {}
+        try { all = JSON.parse(UserPrefs.themeOverrides) } catch (e) { all = {} }
+        const key = dark ? "dark" : "light"
+        all[key] = all[key] || {}
+        if (value === "")
+            delete all[key][name]
+        else
+            all[key][name] = String(value)
+        UserPrefs.themeOverrides = JSON.stringify(all)
+    }
+    function resetOverrides() {
+        let all = {}
+        try { all = JSON.parse(UserPrefs.themeOverrides) } catch (e) { all = {} }
+        delete all[dark ? "dark" : "light"]
+        UserPrefs.themeOverrides = JSON.stringify(all)
+    }
+
     // Fundaluri
-    readonly property color bgApp: dark ? "#0A0A0B" : "#FAFAFA"
-    readonly property color bgPanel: dark ? "#141416" : "#FFFFFF"
-    readonly property color bgElevated: dark ? "#1C1C1F" : "#FFFFFF"
+    readonly property color bgApp: pick("bgApp", "#0A0A0B", "#FAFAFA")
+    readonly property color bgPanel: pick("bgPanel", "#141416", "#FFFFFF")
+    readonly property color bgElevated: pick("bgElevated", "#1C1C1F", "#FFFFFF")
     readonly property color bgInput: dark ? Qt.rgba(1, 1, 1, 0.04) : Qt.rgba(0, 0, 0, 0.03)
     readonly property color bgHover: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.05)
     readonly property color bgActive: dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)
@@ -40,24 +72,24 @@ QtObject {
     readonly property color textTertiary: dark ? "#71717A" : "#A1A1AA"
 
     // Accent (singura culoare „vie” din UI)
-    readonly property color accent: dark ? "#3B82F6" : "#2563EB"
-    readonly property color accentHover: dark ? "#60A5FA" : "#1D4ED8"
-    readonly property color accentSubtle: dark ? Qt.rgba(0.23, 0.51, 0.96, 0.16) : Qt.rgba(0.15, 0.39, 0.92, 0.10)
+    readonly property color accent: pick("accent", "#3B82F6", "#2563EB")
+    readonly property color accentHover: dark ? Qt.lighter(accent, 1.25) : Qt.darker(accent, 1.15)
+    readonly property color accentSubtle: Qt.rgba(accent.r, accent.g, accent.b, dark ? 0.16 : 0.10)
     readonly property color accentText: "#FFFFFF"
     readonly property color danger: dark ? "#F87171" : "#DC2626"
-    readonly property color focusRing: dark ? Qt.rgba(0.23, 0.51, 0.96, 0.55) : Qt.rgba(0.15, 0.39, 0.92, 0.45)
+    readonly property color focusRing: Qt.rgba(accent.r, accent.g, accent.b, dark ? 0.55 : 0.45)
 
     readonly property color shadow: dark ? Qt.rgba(0, 0, 0, 0.55) : Qt.rgba(0, 0, 0, 0.14)
 
     // Viewport
-    readonly property color viewportTop: dark ? "#1A1B1F" : "#EEF1F5"
-    readonly property color viewportBottom: dark ? "#0E0F11" : "#D9DEE5"
+    readonly property color viewportTop: pick("viewportTop", "#1A1B1F", "#EEF1F5")
+    readonly property color viewportBottom: pick("viewportBottom", "#0E0F11", "#D9DEE5")
     readonly property color gridMinor: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color gridMajor: dark ? Qt.rgba(1, 1, 1, 0.13) : Qt.rgba(0, 0, 0, 0.15)
-    readonly property color edge: dark ? "#0B0B0D" : "#1F2023" // muchiile fețelor (contrast cu fața)
+    readonly property color edge: pick("edge", "#0B0B0D", "#1F2023") // muchiile fețelor (contrast cu fața)
     readonly property color edgeFree: dark ? "#C9CBD1" : "#1F2023" // liniile fără fețe (contrast cu fundalul)
-    readonly property color faceFront: dark ? "#D9D6D0" : "#ECEAE5"
-    readonly property color faceBack: dark ? "#7D8AA3" : "#9AA6BD"
+    readonly property color faceFront: pick("faceFront", "#D9D6D0", "#ECEAE5")
+    readonly property color faceBack: pick("faceBack", "#7D8AA3", "#9AA6BD")
 
     // Axe
     readonly property color axisX: "#EF4444"

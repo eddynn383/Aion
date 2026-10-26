@@ -36,6 +36,7 @@ private:
 
     QRhi* m_rhi = nullptr;
     int m_sampleCount = 0;
+    int m_shadowMapSize = 2048;
     QVector<quint32> m_passFormat;
 
     std::unique_ptr<QRhiBuffer> m_uniforms;

@@ -81,7 +81,7 @@ qt_add_qml_module(aion_app
         qml/overlays/CommandPalette.qml
         qml/overlays/ViewportAnnotations.qml
         qml/overlays/MeasurementsBox.qml
-        qml/overlays/PreferencesDialog.qml
+        qml/overlays/PreferencesPage.qml
         qml/overlays/AboutDialog.qml
         qml/overlays/ToolTour.qml
         qml/overlays/QuantitiesDialog.qml

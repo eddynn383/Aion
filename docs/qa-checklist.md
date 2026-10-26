@@ -78,6 +78,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Dublu-click pe un `.aion` în Finder deschide Aion (și cu aplicația deja pornită); trage un .aion pe iconița din Dock
 - [ ] `make package` → `dist/Aion-0.1.0.dmg`: montează, trage în Applications, pornește (fără Homebrew în PATH)
 - [ ] Model mare (mii de fețe): navigare fluentă, picking fără întârzieri
+## Pagina de Preferințe (⌘,)
+- [ ] Categorii: General, Unități, Salvare, Aspect, Viewport, Navigare, Grid și snap, Scurtături; Esc / × închide
+- [ ] Salvare: autosalvare oprită → nu mai apare bannerul de recuperare; interval 1–30 min
+- [ ] Aspect: accentul (8 culori) și culorile personalizate (ColorDialog) se aplică imediat, separat pentru light și dark; Resetează
+- [ ] Viewport: MSAA (fără / 2× / 4× / 8×) și calitatea umbrelor schimbă imaginea; „Arată fps”
 ## Ghiduri și tur
 - [ ] Hover ~1,3 s pe o unealtă din toolbar → ghidul animat (titlu, scurtătură, animație, pași, sfat); dispare când pleci
 - [ ] Animațiile arată bine în light și dark; cu „Reduce Motion” (macOS) apare un cadru fix

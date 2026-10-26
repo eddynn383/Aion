@@ -105,9 +105,14 @@ Document::Document(QObject* parent)
     }
 #endif
     m_hasRecovery = QFile::exists(autosavePath());
-    m_autosaveTimer.setInterval(60'000);
-    connect(&m_autosaveTimer, &QTimer::timeout, this, &Document::autosave);
-    m_autosaveTimer.start();
+    {
+        QSettings settings;
+        m_autosaveTimer.setInterval(std::clamp(settings.value(QStringLiteral("files/autosaveMinutes"), 1).toInt(), 1, 60) * 60'000);
+        connect(&m_autosaveTimer, &QTimer::timeout, this, &Document::autosave);
+        if (settings.value(QStringLiteral("files/autosave"), true).toBool()) {
+            m_autosaveTimer.start();
+        }
+    }
 }
 
 Document::~Document()
@@ -117,6 +122,37 @@ Document::~Document()
         removeAutosave();
     }
     m_model.removeObserver(this);
+}
+
+// --- Autosalvare (Preferințe) ---
+
+void Document::setAutosaveEnabled(bool enabled)
+{
+    if (enabled == m_autosaveTimer.isActive()) {
+        return;
+    }
+    if (enabled) {
+        m_autosaveTimer.start();
+    } else {
+        m_autosaveTimer.stop();
+    }
+    QSettings().setValue(QStringLiteral("files/autosave"), enabled);
+    emit autosaveSettingsChanged();
+}
+
+void Document::setAutosaveMinutes(int minutes)
+{
+    minutes = std::clamp(minutes, 1, 60);
+    if (minutes == autosaveMinutes()) {
+        return;
+    }
+    const bool active = m_autosaveTimer.isActive();
+    m_autosaveTimer.setInterval(minutes * 60'000);
+    if (active) {
+        m_autosaveTimer.start();
+    }
+    QSettings().setValue(QStringLiteral("files/autosaveMinutes"), minutes);
+    emit autosaveSettingsChanged();
 }
 
 // --- Preferințe de afișare ---
