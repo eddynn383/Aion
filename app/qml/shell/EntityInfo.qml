@@ -30,32 +30,38 @@ Column {
     }
 
     // Detaliile: eticheta în stânga și valoarea în dreapta; dacă nu încap pe un rând, valoarea trece dedesubt.
+    // Pozițiile sunt calculate direct (nu prin ancore schimbate din mers, care pot rămâne agățate).
     Repeater {
         model: root.info.details || []
         delegate: Item {
             id: detailRow
             required property var modelData
-            readonly property bool stacked: label.implicitWidth + value.implicitWidth + Theme.space3 > width
+            readonly property real gap: Theme.space3
+            readonly property bool stacked: label.implicitWidth + valueMetrics.advanceWidth + gap > width
 
             width: root.width
-            height: stacked ? label.implicitHeight + Theme.space1 + value.implicitHeight : Theme.controlHeightSm
+            height: stacked ? label.implicitHeight + Theme.space1 + value.implicitHeight
+                            : Math.max(Theme.controlHeightSm, label.implicitHeight, value.implicitHeight)
 
+            TextMetrics {
+                id: valueMetrics
+                font: value.font
+                text: detailRow.modelData.value
+            }
             Text {
                 id: label
-                anchors.left: parent.left
-                anchors.top: detailRow.stacked ? parent.top : undefined
-                anchors.verticalCenter: detailRow.stacked ? undefined : parent.verticalCenter
+                x: 0
+                y: detailRow.stacked ? 0 : (detailRow.height - implicitHeight) / 2
                 text: detailRow.modelData.label
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSm
             }
             Text {
                 id: value
-                anchors.right: detailRow.stacked ? undefined : parent.right
-                anchors.left: detailRow.stacked ? parent.left : undefined
-                anchors.bottom: detailRow.stacked ? parent.bottom : undefined
-                anchors.verticalCenter: detailRow.stacked ? undefined : parent.verticalCenter
-                width: detailRow.stacked ? parent.width : implicitWidth
+                width: detailRow.stacked ? detailRow.width : Math.ceil(valueMetrics.advanceWidth) + 1
+                x: detailRow.stacked ? 0 : detailRow.width - width
+                y: detailRow.stacked ? label.implicitHeight + Theme.space1 : (detailRow.height - implicitHeight) / 2
+                horizontalAlignment: detailRow.stacked ? Text.AlignLeft : Text.AlignRight
                 wrapMode: Text.Wrap
                 text: detailRow.modelData.value
                 color: Theme.textPrimary
