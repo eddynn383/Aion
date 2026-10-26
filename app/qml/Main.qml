@@ -836,7 +836,7 @@ Window {
             visible: doc.hasRecovery
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.topMargin: Theme.space3
+            anchors.topMargin: 56 // sub bara de vizualizare din colț
             width: recoveryRow.implicitWidth + Theme.space3 * 2
             height: 44
             radius: Theme.radiusLg
@@ -877,7 +877,7 @@ Window {
         Rectangle {
             visible: viewport.scenesPlaying
             anchors.top: parent.top
-            anchors.topMargin: Theme.space4
+            anchors.topMargin: 56 // sub bara de vizualizare din colț
             anchors.horizontalCenter: parent.horizontalCenter
             width: playerRow.implicitWidth + Theme.space3 * 2
             height: 36
@@ -954,7 +954,17 @@ Window {
             onTriggered: (id) => window.runCommand(id)
         }
 
+        ViewportControls {
+            anchors.top: parent.top
+            anchors.topMargin: Theme.space3
+            anchors.right: gizmo.left
+            anchors.rightMargin: Theme.space1
+            viewport: viewport
+            document: doc
+        }
+
         NavigationGizmo {
+            id: gizmo
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.margins: Theme.space2
@@ -995,7 +1005,9 @@ Window {
                 document: doc
             }
 
+            // Fără selecție, Inspector-ul descrie modelul întreg.
             Section {
+                visible: doc.entityInfo.kind === "none"
                 width: parent.width
                 title: "Model"
                 Text {
@@ -1005,172 +1017,13 @@ Window {
                     font.pixelSize: Theme.fontSizeSm
                     font.family: Theme.fontMono
                 }
-            }
-
-            Section {
-                width: parent.width
-                title: "Stil"
-
-                Flow {
+                Text {
                     width: parent.width
-                    spacing: Theme.space1 + 2
-                    Repeater {
-                        model: [
-                            { id: "shaded", name: "Materiale" }, { id: "clay", name: "Clay" },
-                            { id: "hiddenline", name: "Linii" }, { id: "wireframe", name: "Wireframe" },
-                            { id: "xray", name: "X-Ray" }
-                        ]
-                        delegate: Rectangle {
-                            id: styleChip
-                            required property var modelData
-                            readonly property bool current: viewport.displayStyle === modelData.id
-                            width: styleText.implicitWidth + Theme.space3 * 2
-                            height: 26
-                            radius: 13
-                            color: current ? Theme.accentSubtle : styleArea.containsMouse ? Theme.bgHover : "transparent"
-                            border.color: current ? Theme.accent : Theme.borderStrong
-                            Text {
-                                id: styleText
-                                anchors.centerIn: parent
-                                text: styleChip.modelData.name
-                                color: styleChip.current ? Theme.textPrimary : Theme.textSecondary
-                                font.pixelSize: Theme.fontSizeXs
-                            }
-                            MouseArea {
-                                id: styleArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: viewport.displayStyle = styleChip.modelData.id
-                            }
-                        }
-                    }
-                }
-                Toggle {
-                    width: parent.width
-                    text: "Profile (contururi)"
-                    checked: viewport.profiles
-                    onToggled: viewport.profiles = checked
-                }
-                Toggle {
-                    width: parent.width
-                    text: "Ceață"
-                    checked: viewport.fog
-                    onToggled: viewport.fog = checked
-                }
-            }
-
-            Section {
-                visible: doc.sections.length > 0
-                width: parent.width
-                title: "Secțiuni"
-
-                Repeater {
-                    model: doc.sections
-                    delegate: Item {
-                        id: sectionRow
-                        required property var modelData
-                        width: parent.width
-                        height: Theme.controlHeight
-                        Toggle {
-                            anchors.left: parent.left
-                            anchors.right: sectionActions.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: sectionRow.modelData.name
-                            checked: sectionRow.modelData.active
-                            onToggled: doc.setSectionActive(sectionRow.modelData.id, checked)
-                        }
-                        Row {
-                            id: sectionActions
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            IconButton {
-                                width: 24; height: 24; iconSize: Theme.iconSizeSm
-                                iconName: "arrow-down"; tooltip: "Mută 100 mm înapoi"
-                                onClicked: doc.moveSection(sectionRow.modelData.id, -100)
-                            }
-                            IconButton {
-                                width: 24; height: 24; iconSize: Theme.iconSizeSm
-                                iconName: "arrow-up"; tooltip: "Mută 100 mm înainte"
-                                onClicked: doc.moveSection(sectionRow.modelData.id, 100)
-                            }
-                            IconButton {
-                                width: 24; height: 24; iconSize: Theme.iconSizeSm
-                                iconName: "trash-2"; tooltip: "Șterge secțiunea"
-                                onClicked: doc.removeSection(sectionRow.modelData.id)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section {
-                width: parent.width
-                title: "Soare și umbre"
-
-                Toggle {
-                    width: parent.width
-                    text: "Umbre"
-                    checked: viewport.shadows
-                    onToggled: viewport.shadows = checked
-                }
-                Slider {
-                    visible: viewport.shadows
-                    width: parent.width
-                    label: "Ora"
-                    from: 5
-                    to: 21
-                    stepSize: 0.25
-                    value: viewport.sunHour
-                    valueText: Math.floor(value) + ":" + ("0" + Math.round((value % 1) * 60)).slice(-2)
-                    onMoved: viewport.sunHour = value
-                }
-                Slider {
-                    visible: viewport.shadows
-                    width: parent.width
-                    label: "Luna"
-                    from: 1
-                    to: 12
-                    stepSize: 1
-                    value: viewport.sunMonth
-                    valueText: Qt.locale("ro_RO").monthName(Math.round(value) - 1, Locale.ShortFormat)
-                    onMoved: viewport.sunMonth = Math.round(value)
-                }
-            }
-
-            Section {
-                width: parent.width
-                title: "Vizualizare"
-
-                Tabs {
-                    width: parent.width
-                    model: ["Perspectivă", "Paralelă"]
-                    currentIndex: viewport.orthographic ? 1 : 0
-                    onCurrentIndexChanged: viewport.orthographic = currentIndex === 1
-                }
-                Toggle {
-                    width: parent.width
-                    text: "Grid"
-                    checked: viewport.gridVisible
-                    onToggled: viewport.gridVisible = checked
-                }
-            }
-
-            Section {
-                width: parent.width
-                title: "Cameră"
-
-                NumberField {
-                    width: parent.width
-                    label: "Dist."
-                    unit: "mm"
-                    readOnly: true
-                    value: viewport.cameraDistance
-                }
-                Button {
-                    width: parent.width
-                    text: "Zoom Extents"
-                    iconName: "scan"
-                    onClicked: viewport.zoomExtents()
+                    wrapMode: Text.Wrap
+                    text: "Selectează ceva ca să-i vezi proprietățile. Stilul, umbrele, secțiunile și proiecția sunt "
+                          + "în bara din colțul viewport-ului."
+                    color: Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
                 }
             }
         }

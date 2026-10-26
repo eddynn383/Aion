@@ -89,6 +89,7 @@ qt_add_qml_module(aion_app
         qml/components/RichTooltip.qml
         qml/shell/ToolGuides.js
         qml/shell/AppMenuBar.qml
+        qml/shell/ViewportControls.qml
         qml/storybook/Storybook.qml
         qml/storybook/DemoGallery.qml
 )
