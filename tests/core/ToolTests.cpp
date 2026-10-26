@@ -4,6 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+
 using namespace aion;
 using geom::Mesh;
 using math::Vec2d;
@@ -58,6 +60,14 @@ struct Scene {
     }
 };
 
+// Liniile de previzualizare, fără ghidajele inferenței.
+std::size_t previewLines(const tools::Tool& tool)
+{
+    const auto lines = tool.overlay().lines;
+    return static_cast<std::size_t>(
+        std::count_if(lines.begin(), lines.end(), [](const tools::OverlayLine& l) { return !l.onTop; }));
+}
+
 } // namespace
 
 TEST_CASE("Unelte: dreptunghi, linie, selecție, ștergere, undo (scenariul din Faza 3)", "[core][tools]")
@@ -101,10 +111,10 @@ TEST_CASE("Unelte: linia continuă din ultimul punct și se oprește la închide
     s.click(*line, { 1000, 1000, 0 });
     s.click(*line, { 0, 1000, 0 });
     CHECK(s.mesh.faces().empty());
-    CHECK(line->overlay().lines.size() == 1); // linia „elastică” spre cursor
+    CHECK(previewLines(*line) == 1); // linia „elastică” spre cursor
     s.click(*line, { 0, 0, 0 });
     CHECK(s.mesh.faces().size() == 1);
-    CHECK(line->overlay().lines.empty());
+    CHECK(previewLines(*line) == 0);
     CHECK(s.stack.undoCount() == 4); // câte o comandă pe segment
 }
 
@@ -218,3 +228,79 @@ TEST_CASE("Picking: vârful are prioritate, iar muchiile ascunse nu se aleg", "[
     CHECK_FALSE(empty.hit());
 }
 
+
+TEST_CASE("Unelte: o cameră de 4 × 3 m numai din inferențe și Measurements box (Faza 4)", "[core][tools][inference]")
+{
+    Scene s;
+    auto line = tools::makeTool("line");
+    const auto move = [&](Vec3d world, Vec2d offsetPx = { 0, 0 }) {
+        line->pointerMove(s.ctx, Scene::at(s.screen(world) + offsetPx));
+    };
+    const auto type = [&](std::string_view text) { REQUIRE(line->applyMeasurement(s.ctx, text)); };
+
+    // Primul punct în origine; cursorul doar „aproape” de axe, lungimile tastate.
+    s.click(*line, { 0, 0, 0 });
+    move({ 1300, 0, 0 }, { 0, 6 }); // lângă axa roșie
+    CHECK(line->overlay().marker->label == "On Red Axis");
+    type("4m");
+    move({ 4000, 900, 0 }, { 5, 0 }); // lângă axa verde din (4000, 0)
+    CHECK(line->overlay().marker->label == "On Green Axis");
+    type("3000");
+    move({ 2500, 3000, 0 }, { 0, -5 }); // înapoi pe axa roșie
+    type("4000");
+    // Ultimul segment: cursorul la câțiva pixeli de origine se lipește de capăt și închide fața.
+    move({ 0, 0, 0 }, { 6, -5 });
+    CHECK(line->overlay().marker->label == "Endpoint");
+    line->pointerDown(s.ctx, Scene::at(s.screen({ 0, 0, 0 }) + Vec2d { 6, -5 }));
+
+    REQUIRE(s.mesh.faces().size() == 1);
+    const geom::Face& face = s.mesh.face(s.mesh.faces().keys().front());
+    const auto pts = s.mesh.loopPoints(face.outer);
+    REQUIRE(pts.size() == 4);
+    for (const Vec3d& p : { Vec3d { 0, 0, 0 }, Vec3d { 4000, 0, 0 }, Vec3d { 4000, 3000, 0 }, Vec3d { 0, 3000, 0 } }) {
+        CHECK(std::any_of(pts.begin(), pts.end(), [&](const Vec3d& q) { return glm::length(q - p) < 1e-6; }));
+    }
+}
+
+TEST_CASE("Unelte: lungimea tastată și săgețile", "[core][tools][inference]")
+{
+    Scene s;
+    auto line = tools::makeTool("line");
+    CHECK(line->measurement()->label == "Lungime");
+    CHECK_FALSE(line->applyMeasurement(s.ctx, "1000")); // încă nu există punct de început
+
+    s.click(*line, { 0, 0, 0 });
+    // Săgeata sus blochează pe axa albastră. În perspectivă, de sus, axa verticală prin origine apare
+    // ca o rază din centrul vederii: în sus (spre cameră) înseamnă dinspre centru spre exterior.
+    line->pointerMove(s.ctx, Scene::at(s.screen({ -300, -300, 0 })));
+    REQUIRE(line->key(s.ctx, { tools::Key::Up, {} }));
+    line->pointerMove(s.ctx, Scene::at(s.screen({ -300, -300, 0 })));
+    CHECK(line->overlay().marker->locked);
+    CHECK_FALSE(line->applyMeasurement(s.ctx, "abc"));
+    REQUIRE(line->applyMeasurement(s.ctx, "2.5m"));
+    REQUIRE(s.mesh.edges().size() == 1);
+    const geom::Edge& e = s.mesh.edge(s.mesh.edges().keys().front());
+    const Vec3d top = s.mesh.position(e.v0).z > 1.0 ? s.mesh.position(e.v0) : s.mesh.position(e.v1);
+    CHECK(glm::length(top - Vec3d { 0, 0, 2500 }) < 1e-6);
+    // Linia continuă din capătul nou.
+    CHECK(line->measurement()->value.size() > 0);
+}
+
+TEST_CASE("Unelte: dreptunghi din Measurements box, în sensul cursorului", "[core][tools][inference]")
+{
+    Scene s;
+    auto rect = tools::makeTool("rectangle");
+    s.click(*rect, { 1000, 1000, 0 });
+    rect->pointerMove(s.ctx, Scene::at(s.screen({ 600, 1300, 0 }))); // spre −X, +Y
+    CHECK(rect->overlay().dimensions.size() == 2);
+    REQUIRE(rect->applyMeasurement(s.ctx, "3000,2000"));
+    REQUIRE(s.mesh.faces().size() == 1);
+    Vec3d lo { 1e9 };
+    Vec3d hi { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        lo = glm::min(lo, s.mesh.position(v));
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(glm::length(lo - Vec3d { -2000, 1000, 0 }) < 1e-6);
+    CHECK(glm::length(hi - Vec3d { 1000, 3000, 0 }) < 1e-6);
+}

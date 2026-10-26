@@ -3,6 +3,7 @@
 #include "aion/core/commands/CommandStack.h"
 #include "aion/core/geom/Mesh.h"
 #include "aion/core/geom/Selection.h"
+#include "aion/core/inference/Inference.h"
 #include "aion/core/math/Vec.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/Picking.h"
@@ -32,7 +33,8 @@ struct PointerEvent {
     int clickCount = 1; // 2 = dublu-click, 3 = triplu-click
 };
 
-enum class Key { Escape, Enter, Other };
+// Săgețile blochează inferența pe o axă: → roșie, ← verde, ↑ albastră, ↓ paralel cu muchia de referință.
+enum class Key { Escape, Enter, Left, Right, Up, Down, Other };
 
 struct KeyEvent {
     Key key = Key::Other;
@@ -44,6 +46,23 @@ struct OverlayLine {
     Vec3d a;
     Vec3d b;
     bool dashed = false;
+    inference::Tint tint = inference::Tint::Neutral;
+    bool onTop = false; // ghidajele de inferență se văd și prin fețe
+};
+
+// Punctul inferat de sub cursor, cu tipul lui (culoarea marcajului) și eticheta („Endpoint”).
+struct InferenceMarker {
+    Vec3d point { 0.0 };
+    inference::Kind kind = inference::Kind::None;
+    std::string label;
+    bool locked = false;
+};
+
+// O cotă afișată pe un segment în timpul desenării („2.5 m”).
+struct Dimension {
+    Vec3d a;
+    Vec3d b;
+    std::string text;
 };
 
 struct Overlay {
@@ -54,6 +73,14 @@ struct Overlay {
     bool crossing = false;
     // Muchiile marcate de unealtă (de exemplu cele pe care Eraser le va șterge).
     std::vector<geom::EdgeId> markedEdges;
+    std::optional<InferenceMarker> marker;
+    std::vector<Dimension> dimensions;
+};
+
+// Ce arată Measurements box: eticheta („Lungime”) și valoarea curentă („2.5 m”, gol dacă nu e nimic de măsurat).
+struct Measurement {
+    std::string label;
+    std::string value;
 };
 
 // Tot ce poate folosi o unealtă; aplicația îl construiește și îl ține în viață.
@@ -84,6 +111,11 @@ public:
     [[nodiscard]] virtual view::PickResult hover() const { return {}; }
     // Indicația din status bar („Alege punctul de început”).
     [[nodiscard]] virtual std::string status() const = 0;
+
+    // Measurements box: nullopt dacă unealta nu primește valori tastate.
+    [[nodiscard]] virtual std::optional<Measurement> measurement() const { return std::nullopt; }
+    // Aplică o valoare tastată („2500”, „2.5m”, „3000,2000”). Întoarce false dacă textul nu e valid acum.
+    virtual bool applyMeasurement(ToolContext& /*ctx*/, std::string_view /*text*/) { return false; }
 };
 
 // "select", "line", "rectangle", "eraser"; nullptr pentru o unealtă necunoscută.

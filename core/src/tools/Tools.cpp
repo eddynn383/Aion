@@ -2,9 +2,11 @@
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/tools/Tool.h"
+#include "aion/core/units/Length.h"
 
 #include <glm/geometric.hpp>
 
+#include <array>
 #include <cmath>
 #include <set>
 
@@ -181,6 +183,76 @@ private:
     view::PickResult m_hover;
 };
 
+// --- Inferență (comun pentru Line și Rectangle) -----------------------------------------------
+
+void appendInference(Overlay& o, const inference::Inference& inf)
+{
+    for (const inference::Guide& g : inf.guides) {
+        o.lines.push_back({ g.a, g.b, g.dashed, g.tint, true });
+    }
+    if (inf.valid()) {
+        o.marker = InferenceMarker { inf.point, inf.kind, std::string(inference::label(inf)), inf.locked };
+    }
+}
+
+// Ce se evidențiază sub cursor: muchia sau fața pe care stă punctul inferat (capetele au marcajul lor).
+view::PickResult inferenceHover(const inference::Inference& inf)
+{
+    view::PickResult h;
+    switch (inf.kind) {
+    case inference::Kind::OnEdge:
+    case inference::Kind::Midpoint:
+    case inference::Kind::Intersection:
+        if (inf.edge) {
+            h.kind = view::PickResult::Kind::Edge;
+            h.edge = inf.edge;
+            h.point = inf.point;
+        }
+        break;
+    case inference::Kind::OnFace:
+        h.kind = view::PickResult::Kind::Face;
+        h.face = inf.face;
+        h.point = inf.point;
+        break;
+    default:
+        break;
+    }
+    return h;
+}
+
+// Săgețile: → axa roșie, ← verde, ↑ albastră, ↓ paralel cu muchia de referință.
+bool handleArrow(inference::Engine& engine, Key key)
+{
+    switch (key) {
+    case Key::Right:
+        engine.toggleAxisLock(inference::Axis::X);
+        return true;
+    case Key::Left:
+        engine.toggleAxisLock(inference::Axis::Y);
+        return true;
+    case Key::Up:
+        engine.toggleAxisLock(inference::Axis::Z);
+        return true;
+    case Key::Down:
+        engine.toggleReferenceLock();
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Shift ținut apăsat blochează inferența curentă; eliberat, o deblochează (doar lock-ul pus de el).
+void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock)
+{
+    if (shift && !shiftLock && !engine.locked()) {
+        engine.lockCurrent();
+        shiftLock = engine.locked();
+    } else if (!shift && shiftLock) {
+        engine.unlock();
+        shiftLock = false;
+    }
+}
+
 // --- Line -----------------------------------------------------------------------------------
 
 class LineTool final : public Tool {
@@ -189,42 +261,28 @@ public:
 
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
-        const auto p = surfacePoint(ctx, e.screen);
-        if (!p) {
+        track(ctx, e);
+        if (!m_inference.valid()) {
             return;
         }
         if (!m_start) {
-            m_start = p->point;
-            m_current = p->point;
+            m_start = m_inference.point;
+            m_current = m_inference.point;
+            restartInference();
             return;
         }
-        if (tol::samePoint(*m_start, p->point)) {
-            return;
-        }
-        geom::DrawLineResult result;
-        const Vec3d a = *m_start;
-        const Vec3d b = p->point;
-        ctx.stack.run("Line", [&](geom::Mesh& mesh) { result = geom::drawLine(mesh, a, b); });
-        // Ca în SketchUp: linia continuă din ultimul punct, dar se oprește când a închis o față.
-        if (result.createdFaces.empty()) {
-            m_start = b;
-        } else {
-            m_start.reset();
-        }
+        segmentTo(ctx, m_inference.point);
     }
 
-    void pointerMove(ToolContext& ctx, const PointerEvent& e) override
-    {
-        if (const auto p = surfacePoint(ctx, e.screen)) {
-            m_current = p->point;
-            m_hover = p->pick;
-        }
-    }
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override { track(ctx, e); }
 
     void pointerUp(ToolContext& /*ctx*/, const PointerEvent& /*e*/) override { }
 
     bool key(ToolContext& ctx, const KeyEvent& e) override
     {
+        if (handleArrow(m_engine, e.key)) {
+            return true;
+        }
         if (e.key == Key::Enter) {
             cancel(ctx);
             return true;
@@ -232,7 +290,12 @@ public:
         return Tool::key(ctx, e);
     }
 
-    void cancel(ToolContext& /*ctx*/) override { m_start.reset(); }
+    void cancel(ToolContext& /*ctx*/) override
+    {
+        m_start.reset();
+        m_engine.reset();
+        m_shiftLock = false;
+    }
 
     Overlay overlay() const override
     {
@@ -240,22 +303,81 @@ public:
         if (m_start) {
             o.lines.push_back({ *m_start, m_current, false });
             o.points.push_back(*m_start);
+            const double length = glm::length(m_current - *m_start);
+            if (length > tol::kLength) {
+                o.dimensions.push_back({ *m_start, m_current, units::formatLength(length) });
+            }
         }
-        o.points.push_back(m_current);
+        appendInference(o, m_inference);
         return o;
     }
 
-    view::PickResult hover() const override { return m_hover; }
+    view::PickResult hover() const override { return inferenceHover(m_inference); }
 
     std::string status() const override
     {
-        return m_start ? "Alege următorul punct · Esc sau Enter termină linia" : "Alege punctul de început al liniei";
+        return m_start ? "Alege următorul punct sau tastează lungimea · săgeți/Shift: blochează direcția · Esc termină"
+                       : "Alege punctul de început al liniei";
+    }
+
+    std::optional<Measurement> measurement() const override
+    {
+        return Measurement { "Lungime", m_start ? units::formatLength(glm::length(m_current - *m_start)) : "" };
+    }
+
+    bool applyMeasurement(ToolContext& ctx, std::string_view text) override
+    {
+        const auto length = units::parseLength(text);
+        if (!length || !m_start || std::abs(*length) <= tol::kLength) {
+            return false;
+        }
+        const Vec3d d = m_current - *m_start;
+        if (glm::length(d) <= tol::kLength) {
+            return false;
+        }
+        segmentTo(ctx, *m_start + glm::normalize(d) * *length);
+        return true;
     }
 
 private:
+    void track(ToolContext& ctx, const PointerEvent& e)
+    {
+        updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
+        m_inference = m_engine.infer(ctx.mesh, ctx.camera, e.screen, m_start);
+        if (m_inference.valid()) {
+            m_current = m_inference.point;
+        }
+    }
+
+    void segmentTo(ToolContext& ctx, const Vec3d& b)
+    {
+        if (!m_start || tol::samePoint(*m_start, b)) {
+            return;
+        }
+        geom::DrawLineResult result;
+        const Vec3d a = *m_start;
+        ctx.stack.run("Line", [&](geom::Mesh& mesh) { result = geom::drawLine(mesh, a, b); });
+        // Ca în SketchUp: linia continuă din ultimul punct, dar se oprește când a închis o față.
+        if (result.createdFaces.empty()) {
+            m_start = b;
+        } else {
+            m_start.reset();
+        }
+        m_current = b;
+        restartInference();
+    }
+
+    void restartInference()
+    {
+        m_engine.resetLock();
+        m_shiftLock = false;
+    }
+
     std::optional<Vec3d> m_start;
     Vec3d m_current { 0.0 };
-    view::PickResult m_hover;
+    inference::Engine m_engine;
+    inference::Inference m_inference;
+    bool m_shiftLock = false;
 };
 
 // --- Rectangle ------------------------------------------------------------------------------
@@ -266,37 +388,34 @@ public:
 
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
+        track(ctx, e);
         if (!m_origin) {
-            const auto p = surfacePoint(ctx, e.screen);
-            if (!p) {
-                return;
+            if (m_inference.valid()) {
+                begin(ctx, m_inference);
             }
-            begin(ctx, *p);
             return;
         }
-        update(ctx, e.screen);
-        const auto corners = currentCorners();
-        if (!corners) {
-            return;
-        }
-        const std::vector<Vec3d> pts(corners->begin(), corners->end());
-        ctx.stack.run("Rectangle", [&](geom::Mesh& mesh) { geom::drawPolygon(mesh, pts); });
-        m_origin.reset();
+        create(ctx);
     }
 
-    void pointerMove(ToolContext& ctx, const PointerEvent& e) override
-    {
-        if (m_origin) {
-            update(ctx, e.screen);
-        } else if (const auto p = surfacePoint(ctx, e.screen)) {
-            m_current = p->point;
-            m_hover = p->pick;
-        }
-    }
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override { track(ctx, e); }
 
     void pointerUp(ToolContext& /*ctx*/, const PointerEvent& /*e*/) override { }
 
-    void cancel(ToolContext& /*ctx*/) override { m_origin.reset(); }
+    bool key(ToolContext& ctx, const KeyEvent& e) override
+    {
+        if (handleArrow(m_engine, e.key)) {
+            return true;
+        }
+        return Tool::key(ctx, e);
+    }
+
+    void cancel(ToolContext& /*ctx*/) override
+    {
+        m_origin.reset();
+        m_engine.reset();
+        m_shiftLock = false;
+    }
 
     Overlay overlay() const override
     {
@@ -306,26 +425,85 @@ public:
                 o.lines.push_back({ (*c)[i], (*c)[(i + 1) % 4], false });
             }
             o.lines.push_back({ (*c)[0], (*c)[2], true }); // diagonala, punctată
+            o.dimensions.push_back({ (*c)[0], (*c)[1], units::formatLength(glm::length((*c)[1] - (*c)[0])) });
+            o.dimensions.push_back({ (*c)[1], (*c)[2], units::formatLength(glm::length((*c)[2] - (*c)[1])) });
         }
-        o.points.push_back(m_origin.value_or(m_current));
+        if (m_origin) {
+            o.points.push_back(*m_origin);
+        }
+        appendInference(o, m_inference);
         return o;
     }
 
-    view::PickResult hover() const override { return m_hover; }
+    view::PickResult hover() const override { return inferenceHover(m_inference); }
 
     std::string status() const override
     {
-        return m_origin ? "Alege colțul opus · Esc anulează" : "Alege primul colț (pe sol sau pe o față)";
+        return m_origin ? "Alege colțul opus sau tastează dimensiunile (3000,2000) · Esc anulează"
+                        : "Alege primul colț (pe sol sau pe o față)";
+    }
+
+    std::optional<Measurement> measurement() const override
+    {
+        if (!m_origin) {
+            return Measurement { "Dimensiuni", "" };
+        }
+        const Vec3d d = m_current - *m_origin;
+        return Measurement { "Dimensiuni",
+            units::formatLength(std::abs(glm::dot(d, m_u))) + ", " + units::formatLength(std::abs(glm::dot(d, m_v))) };
+    }
+
+    bool applyMeasurement(ToolContext& ctx, std::string_view text) override
+    {
+        const auto values = units::parseLengths(text, 2);
+        if (!values || !m_origin) {
+            return false;
+        }
+        const Vec3d d = m_current - *m_origin;
+        double du = glm::dot(d, m_u);
+        double dv = glm::dot(d, m_v);
+        // Valoarea tastată dă mărimea; sensul vine din poziția cursorului (sau e pozitiv, dacă nu există încă).
+        const auto apply = [](double current, const std::optional<double>& typed) {
+            if (!typed) {
+                return current;
+            }
+            return current < 0.0 ? -*typed : *typed;
+        };
+        du = apply(du, (*values)[0]);
+        if (values->size() > 1) {
+            dv = apply(dv, (*values)[1]);
+        }
+        if (std::abs(du) <= tol::kLength || std::abs(dv) <= tol::kLength) {
+            return false;
+        }
+        m_current = *m_origin + m_u * du + m_v * dv;
+        create(ctx);
+        return true;
     }
 
 private:
-    void begin(ToolContext& ctx, const SurfacePoint& p)
+    void track(ToolContext& ctx, const PointerEvent& e)
+    {
+        updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
+        // Colțul opus nu folosește direcții din primul colț (ar da un dreptunghi degenerat),
+        // dar folosește capetele, muchiile și alinierea cu punctele de referință, proiectate pe plan.
+        m_inference = m_engine.infer(ctx.mesh, ctx.camera, e.screen, std::nullopt,
+            m_origin ? std::optional(m_plane) : std::nullopt);
+        if (m_inference.valid()) {
+            m_current = m_origin ? m_plane.project(m_inference.point) : m_inference.point;
+        }
+    }
+
+    void begin(ToolContext& ctx, const inference::Inference& p)
     {
         // Pe o față: dreptunghiul stă în planul ei. Altfel: plan orizontal prin punct.
         math::Plane plane = math::Plane::fromPointNormal(p.point, { 0.0, 0.0, 1.0 });
-        if (p.pick.face) {
-            plane = ctx.mesh.face(p.pick.face).plane;
-            plane = math::Plane::fromPointNormal(p.point, plane.normal);
+        const geom::FaceId face = p.kind == inference::Kind::OnFace ? p.face : p.pick.face;
+        if (face && ctx.mesh.faces().contains(face)) {
+            const math::Plane& fp = ctx.mesh.face(face).plane;
+            if (tol::isZero(fp.signedDistance(p.point), 0.01)) {
+                plane = math::Plane::fromPointNormal(p.point, fp.normal);
+            }
         }
         // Laturile se aliniază cu axele globale proiectate pe plan.
         Vec3d u = Vec3d { 1, 0, 0 } - plane.normal * plane.normal.x;
@@ -337,19 +515,21 @@ private:
         m_plane = plane;
         m_origin = p.point;
         m_current = p.point;
+        m_engine.resetLock();
+        m_shiftLock = false;
     }
 
-    void update(ToolContext& ctx, Vec2d screen)
+    void create(ToolContext& ctx)
     {
-        const math::Ray ray = ctx.camera.rayAt(screen);
-        const double denom = glm::dot(m_plane.normal, ray.direction);
-        if (std::abs(denom) < 1e-9) {
+        const auto corners = currentCorners();
+        if (!corners) {
             return;
         }
-        const double t = (m_plane.d - glm::dot(m_plane.normal, ray.origin)) / denom;
-        if (t > 0.0) {
-            m_current = ray.at(t);
-        }
+        const std::vector<Vec3d> pts(corners->begin(), corners->end());
+        ctx.stack.run("Rectangle", [&](geom::Mesh& mesh) { geom::drawPolygon(mesh, pts); });
+        m_origin.reset();
+        m_engine.resetLock();
+        m_shiftLock = false;
     }
 
     std::optional<std::array<Vec3d, 4>> currentCorners() const
@@ -372,7 +552,9 @@ private:
     math::Plane m_plane;
     Vec3d m_u { 1, 0, 0 };
     Vec3d m_v { 0, 1, 0 };
-    view::PickResult m_hover;
+    inference::Engine m_engine;
+    inference::Inference m_inference;
+    bool m_shiftLock = false;
 };
 
 // --- Eraser ---------------------------------------------------------------------------------
