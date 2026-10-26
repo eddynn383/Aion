@@ -75,8 +75,31 @@ file(GLOB AION_ICON_FILES "${PROJECT_SOURCE_DIR}/resources/icons/*.svg")
 qt_add_resources(aion_app "aion_assets"
     PREFIX "/aion"
     BASE "${PROJECT_SOURCE_DIR}/resources"
-    FILES ${AION_FONT_FILES} ${AION_ICON_FILES}
+    FILES ${AION_FONT_FILES} ${AION_ICON_FILES} "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon.svg"
 )
+
+# Iconița aplicației: generată la compilare din SVG-urile din resources/branding (fără imagini binare în repo).
+qt_add_executable(aion_iconrender "${PROJECT_SOURCE_DIR}/tools/iconrender/main.cpp")
+set_target_properties(aion_iconrender PROPERTIES MACOSX_BUNDLE OFF)
+target_link_libraries(aion_iconrender PRIVATE Qt6::Gui Qt6::Svg)
+if(APPLE)
+    set(AION_ICON_BIG "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon.svg")
+    set(AION_ICON_SMALL "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon-small.svg")
+    set(AION_ICON_DIR "${CMAKE_CURRENT_BINARY_DIR}/icon")
+    add_custom_command(
+        OUTPUT "${AION_ICON_DIR}/Aion.icns"
+        COMMAND ${CMAKE_COMMAND} -E rm -rf "${AION_ICON_DIR}/Aion.iconset"
+        COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=offscreen
+                $<TARGET_FILE:aion_iconrender> "${AION_ICON_BIG}" "${AION_ICON_SMALL}" "${AION_ICON_DIR}/Aion.iconset"
+        COMMAND iconutil -c icns -o "${AION_ICON_DIR}/Aion.icns" "${AION_ICON_DIR}/Aion.iconset"
+        DEPENDS aion_iconrender "${AION_ICON_BIG}" "${AION_ICON_SMALL}"
+        COMMENT "Iconița aplicației (Aion.icns)"
+        VERBATIM
+    )
+    target_sources(aion_app PRIVATE "${AION_ICON_DIR}/Aion.icns")
+    set_source_files_properties("${AION_ICON_DIR}/Aion.icns" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(aion_app PROPERTIES MACOSX_BUNDLE_ICON_FILE Aion.icns)
+endif()
 
 target_link_libraries(aion_app PRIVATE
     aion::core

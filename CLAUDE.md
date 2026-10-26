@@ -71,6 +71,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   Scale e doar uniform; Follow Me amânat. Atenție în scripturile `AION_STARTUP`: clicurile pe fețe ascunse lovesc altceva,
   iar după `view.extents` trebuie `wait:1500` (animația camerei).
 
+- **Iconița** (conceptul „Axe”: trei axe RGB dintr-un nod alb, pe fundal închis): SVG-uri în `resources/branding/`
+  (`aion-icon.svg` mare, `aion-icon-small.svg` pentru 16/32 px, `aion-mark.svg` fără fundal). `Aion.icns` se generează la
+  compilare cu `tools/iconrender` (Qt Svg) + `iconutil`; nu se pun imagini binare în repo.
+
 ## Următorii pași
 1. Utilizatorul testează Fazele 3–5 în aplicație; merge `feature/faza-5`.
 2. Faza 6: grupuri, componente, tag-uri (PLAN.md).

@@ -1,0 +1,10 @@
+<!-- Varianta pentru 16 și 32 px: linii mai groase, fără umbră și fără margine, ca să rămână clare. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#16171B"/>
+  <g transform="translate(64 64) scale(8.96)" stroke-linecap="round">
+    <line x1="50" y1="56" x2="50" y2="20" stroke="#3B82F6" stroke-width="11"/>
+    <line x1="50" y1="56" x2="80" y2="73" stroke="#EF4444" stroke-width="11"/>
+    <line x1="50" y1="56" x2="20" y2="73" stroke="#22C55E" stroke-width="11"/>
+    <circle cx="50" cy="56" r="12" fill="#F4F4F5"/>
+  </g>
+</svg>
