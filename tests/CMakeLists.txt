@@ -9,6 +9,7 @@ add_executable(forma_tests
     core/MathTests.cpp
     core/SlotMapTests.cpp
     core/MeshTests.cpp
+    core/CommandStackTests.cpp
 )
 
 target_link_libraries(forma_tests PRIVATE forma::core Catch2::Catch2WithMain)
