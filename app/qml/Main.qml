@@ -67,6 +67,14 @@ Window {
             { id: "edit.selectConnected", title: "Selectează ce e conectat", category: "Editare", shortcut: "", icon: "square-dashed-mouse-pointer" },
             { id: "edit.reverseFaces", title: "Inversează fețele selectate", category: "Editare", shortcut: "", icon: "rotate-ccw" },
             { id: "view.zoomSelection", title: "Zoom la selecție", category: "Vedere", shortcut: "", icon: "scan" },
+            { id: "style.shaded", title: "Stil: materiale", category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.clay", title: "Stil: clay (alb mat)", category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.hiddenline", title: "Stil: linii ascunse", category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.wireframe", title: "Stil: wireframe", category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.xray", title: "Stil: X-Ray", category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.shadows", title: viewport.shadows ? "Ascunde umbrele" : "Arată umbrele", category: "Stil", shortcut: "", icon: "sun-medium" },
+            { id: "style.profiles", title: viewport.profiles ? "Fără profile" : "Profile (contururi)", category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.fog", title: viewport.fog ? "Fără ceață" : "Ceață", category: "Stil", shortcut: "", icon: "palette" },
             { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
@@ -132,6 +140,14 @@ Window {
         case "edit.selectConnected": doc.selectConnected(); break
         case "edit.reverseFaces": doc.reverseSelectedFaces(); break
         case "view.zoomSelection": viewport.zoomToSelection(); break
+        case "style.shaded": viewport.displayStyle = "shaded"; break
+        case "style.clay": viewport.displayStyle = "clay"; break
+        case "style.hiddenline": viewport.displayStyle = "hiddenline"; break
+        case "style.wireframe": viewport.displayStyle = "wireframe"; break
+        case "style.xray": viewport.displayStyle = "xray"; break
+        case "style.shadows": viewport.shadows = !viewport.shadows; break
+        case "style.profiles": viewport.profiles = !viewport.profiles; break
+        case "style.fog": viewport.fog = !viewport.fog; break
         case "ui.leftPanel": window.leftPanelVisible = !window.leftPanelVisible; break
         case "ui.rightPanel": window.rightPanelVisible = !window.rightPanelVisible; break
         case "ui.panels": {
@@ -183,6 +199,10 @@ Window {
                     doc.importFile(action.slice(7))
                 } else if (action.startsWith("png:")) {
                     viewport.saveImage(action.slice(4))
+                } else if (action.startsWith("sun:")) {
+                    viewport.sunHour = parseFloat(action.slice(4))
+                } else if (action.startsWith("style:")) {
+                    viewport.displayStyle = action.slice(6)
                 } else if (action === "file.newNow") {
                     doc.newDocument()
                 } else if (action.startsWith("rclickw:")) {
@@ -208,7 +228,7 @@ Window {
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
-                                         "move", "rotate", "scale", "eraser"]
+                                         "move", "rotate", "scale", "eraser", "paint"]
     property string pendingToolMessage: ""
 
     function selectTool(id) {
@@ -425,7 +445,7 @@ Window {
         header: Tabs {
             id: leftTabs
             anchors.fill: parent
-            model: ["Outliner", "Tag-uri"]
+            model: ["Outliner", "Tag-uri", "Materiale"]
         }
 
         Outliner {
@@ -437,6 +457,12 @@ Window {
             anchors.fill: parent
             visible: leftTabs.currentIndex === 1
             document: doc
+        }
+        MaterialsPanel {
+            anchors.fill: parent
+            visible: leftTabs.currentIndex === 2
+            document: doc
+            onPaintRequested: window.selectTool("paint")
         }
     }
 
@@ -703,6 +729,92 @@ Window {
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeSm
                     font.family: Theme.fontMono
+                }
+            }
+
+            Section {
+                width: parent.width
+                title: "Stil"
+
+                Flow {
+                    width: parent.width
+                    spacing: Theme.space1 + 2
+                    Repeater {
+                        model: [
+                            { id: "shaded", name: "Materiale" }, { id: "clay", name: "Clay" },
+                            { id: "hiddenline", name: "Linii" }, { id: "wireframe", name: "Wireframe" },
+                            { id: "xray", name: "X-Ray" }
+                        ]
+                        delegate: Rectangle {
+                            id: styleChip
+                            required property var modelData
+                            readonly property bool current: viewport.displayStyle === modelData.id
+                            width: styleText.implicitWidth + Theme.space3 * 2
+                            height: 26
+                            radius: 13
+                            color: current ? Theme.accentSubtle : styleArea.containsMouse ? Theme.bgHover : "transparent"
+                            border.color: current ? Theme.accent : Theme.borderStrong
+                            Text {
+                                id: styleText
+                                anchors.centerIn: parent
+                                text: styleChip.modelData.name
+                                color: styleChip.current ? Theme.textPrimary : Theme.textSecondary
+                                font.pixelSize: Theme.fontSizeXs
+                            }
+                            MouseArea {
+                                id: styleArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: viewport.displayStyle = styleChip.modelData.id
+                            }
+                        }
+                    }
+                }
+                Toggle {
+                    width: parent.width
+                    text: "Profile (contururi)"
+                    checked: viewport.profiles
+                    onToggled: viewport.profiles = checked
+                }
+                Toggle {
+                    width: parent.width
+                    text: "Ceață"
+                    checked: viewport.fog
+                    onToggled: viewport.fog = checked
+                }
+            }
+
+            Section {
+                width: parent.width
+                title: "Soare și umbre"
+
+                Toggle {
+                    width: parent.width
+                    text: "Umbre"
+                    checked: viewport.shadows
+                    onToggled: viewport.shadows = checked
+                }
+                Slider {
+                    visible: viewport.shadows
+                    width: parent.width
+                    label: "Ora"
+                    from: 5
+                    to: 21
+                    stepSize: 0.25
+                    value: viewport.sunHour
+                    valueText: Math.floor(value) + ":" + ("0" + Math.round((value % 1) * 60)).slice(-2)
+                    onMoved: viewport.sunHour = value
+                }
+                Slider {
+                    visible: viewport.shadows
+                    width: parent.width
+                    label: "Luna"
+                    from: 1
+                    to: 12
+                    stepSize: 1
+                    value: viewport.sunMonth
+                    valueText: ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "nov", "dec"][Math.round(value) - 1]
+                    onMoved: viewport.sunMonth = Math.round(value)
                 }
             }
 

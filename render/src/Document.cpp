@@ -3,6 +3,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
+#include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/units/Length.h"
 
@@ -571,6 +572,9 @@ QVariantMap Document::entityInfo() const
         if (lo.x <= hi.x) {
             details << detail(QStringLiteral("Dimensiuni"), formatSize(hi - lo));
         }
+        if (inst.material && m_model.materials().contains(inst.material)) {
+            details << detail(QStringLiteral("Material"), QString::fromStdString(m_model.material(inst.material).name));
+        }
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -584,6 +588,13 @@ QVariantMap Document::entityInfo() const
                 const auto& a = t.points[t.indices[i]];
                 area += 0.5 * glm::length(glm::cross(t.points[t.indices[i + 1]] - a, t.points[t.indices[i + 2]] - a));
             }
+        }
+        if (m_selection.faces.size() == 1) {
+            const geom::Face& face = mesh.face(*m_selection.faces.begin());
+            details << detail(QStringLiteral("Material"),
+                face.material && m_model.materials().contains(face.material)
+                    ? QString::fromStdString(m_model.material(face.material).name)
+                    : QStringLiteral("Implicit"));
         }
         info[QStringLiteral("kind")] = QStringLiteral("faces");
         info[QStringLiteral("title")]
@@ -623,7 +634,21 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.model = &m_model;
     ctx.context = activeDefinition();
     ctx.requests = &requests;
+    ctx.paintMaterial = m_currentMaterial;
+    ctx.libraryMaterial
+        = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
     fn(*m_tool, ctx);
+    // Paint Bucket: un material din bibliotecă a intrat în model, sau pipeta a ales unul.
+    if (requests.addedMaterial) {
+        m_currentMaterial = requests.addedMaterial;
+        m_libraryMaterial = -1;
+        emit materialChanged();
+    }
+    if (requests.sampledMaterial) {
+        m_currentMaterial = *requests.sampledMaterial;
+        m_libraryMaterial = -1;
+        emit materialChanged();
+    }
     if (requests.enter && m_model.instances().contains(requests.enter)) {
         enterInstance(static_cast<double>(requests.enter.value));
     } else if (requests.exit) {
@@ -1205,6 +1230,153 @@ QVariantList Document::contextMenuItems() const
     separator();
     item(QStringLiteral("edit.delete"), QStringLiteral("Șterge"), QStringLiteral("Delete"), geometry || !allLocked, true);
     return items;
+}
+
+namespace {
+
+QVariantMap materialEntry(const model::Material& m)
+{
+    return QVariantMap {
+        { QStringLiteral("name"), QString::fromStdString(m.name) },
+        { QStringLiteral("color"), QColor(m.color.r, m.color.g, m.color.b, m.color.a) },
+        { QStringLiteral("roughness"), m.roughness },
+        { QStringLiteral("metallic"), m.metallic },
+    };
+}
+
+} // namespace
+
+QVariantList Document::libraryMaterials() const
+{
+    QVariantList out;
+    const auto library = model::builtinMaterials();
+    for (std::size_t i = 0; i < library.size(); ++i) {
+        QVariantMap entry = materialEntry(library[i]);
+        entry[QStringLiteral("index")] = static_cast<int>(i);
+        out.append(entry);
+    }
+    return out;
+}
+
+QVariantList Document::modelMaterials() const
+{
+    std::map<model::MaterialId, int> counts;
+    for (model::DefinitionId d : m_model.definitions().keys()) {
+        for (const geom::Face& f : m_model.mesh(d).faces().values()) {
+            if (f.material) {
+                ++counts[f.material];
+            }
+        }
+    }
+    for (const model::Instance& inst : m_model.instances().values()) {
+        if (inst.material) {
+            ++counts[inst.material];
+        }
+    }
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.materials().size(); ++i) {
+        const model::MaterialId id = m_model.materials().keys()[i];
+        QVariantMap entry = materialEntry(m_model.materials().values()[i]);
+        entry[QStringLiteral("id")] = static_cast<double>(id.value);
+        entry[QStringLiteral("count")] = counts[id];
+        out.append(entry);
+    }
+    return out;
+}
+
+QVariantMap Document::currentMaterial() const
+{
+    if (m_libraryMaterial >= 0) {
+        QVariantMap entry = materialEntry(model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)]);
+        entry[QStringLiteral("source")] = QStringLiteral("library");
+        entry[QStringLiteral("index")] = m_libraryMaterial;
+        return entry;
+    }
+    if (m_currentMaterial && m_model.materials().contains(m_currentMaterial)) {
+        QVariantMap entry = materialEntry(m_model.material(m_currentMaterial));
+        entry[QStringLiteral("source")] = QStringLiteral("model");
+        entry[QStringLiteral("id")] = static_cast<double>(m_currentMaterial.value);
+        return entry;
+    }
+    return QVariantMap { { QStringLiteral("source"), QStringLiteral("default") },
+        { QStringLiteral("name"), QStringLiteral("Implicit") }, { QStringLiteral("color"), QColor(0, 0, 0, 0) } };
+}
+
+void Document::selectLibraryMaterial(int index)
+{
+    if (index < 0 || index >= static_cast<int>(model::builtinMaterials().size())) {
+        return;
+    }
+    // Dacă modelul are deja un material cu același nume, îl folosim pe acela.
+    const std::string& name = model::builtinMaterials()[static_cast<std::size_t>(index)].name;
+    for (std::size_t i = 0; i < m_model.materials().size(); ++i) {
+        if (m_model.materials().values()[i].name == name) {
+            selectModelMaterial(static_cast<double>(m_model.materials().keys()[i].value));
+            return;
+        }
+    }
+    m_libraryMaterial = index;
+    m_currentMaterial = {};
+    emit materialChanged();
+}
+
+void Document::selectModelMaterial(double materialId)
+{
+    const model::MaterialId id { static_cast<std::uint64_t>(materialId) };
+    if (!m_model.materials().contains(id)) {
+        return;
+    }
+    m_currentMaterial = id;
+    m_libraryMaterial = -1;
+    emit materialChanged();
+}
+
+void Document::selectDefaultMaterial()
+{
+    m_currentMaterial = {};
+    m_libraryMaterial = -1;
+    emit materialChanged();
+}
+
+void Document::renameMaterial(double materialId, const QString& name)
+{
+    const model::MaterialId id { static_cast<std::uint64_t>(materialId) };
+    if (!m_model.materials().contains(id) || name.trimmed().isEmpty()) {
+        return;
+    }
+    runOnModel("Redenumește materialul", [&](model::Model& model) {
+        model::Material m = model.material(id);
+        m.name = name.trimmed().toStdString();
+        model.setMaterial(id, m);
+    });
+    emit materialChanged();
+}
+
+void Document::setMaterialColor(double materialId, const QColor& color)
+{
+    const model::MaterialId id { static_cast<std::uint64_t>(materialId) };
+    if (!m_model.materials().contains(id)) {
+        return;
+    }
+    runOnModel("Culoarea materialului", [&](model::Model& model) {
+        model::Material m = model.material(id);
+        m.color = { static_cast<std::uint8_t>(color.red()), static_cast<std::uint8_t>(color.green()),
+            static_cast<std::uint8_t>(color.blue()), static_cast<std::uint8_t>(color.alpha()) };
+        model.setMaterial(id, m);
+    });
+    emit materialChanged();
+}
+
+void Document::removeMaterial(double materialId)
+{
+    const model::MaterialId id { static_cast<std::uint64_t>(materialId) };
+    if (!m_model.materials().contains(id)) {
+        return;
+    }
+    runOnModel("Șterge materialul", [&](model::Model& model) { model.removeMaterial(id); });
+    if (m_currentMaterial == id) {
+        selectDefaultMaterial();
+    }
 }
 
 void Document::reverseSelectedFaces()

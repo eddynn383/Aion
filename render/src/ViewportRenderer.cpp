@@ -7,6 +7,8 @@
 #include <rhi/qshader.h>
 
 #include <glm/geometric.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/matrix.hpp>
 
@@ -33,7 +35,12 @@ struct FrameUniforms {
     float forward[4];
     float accent[4];
     float params[4];
+    float lightViewProj[16];
+    float shadow[4];
+    float style[4];
 };
+
+constexpr int kShadowMapSize = 2048;
 
 QShader loadShader(const QString& name)
 {
@@ -71,6 +78,8 @@ QRhiVertexInputLayout meshLayout()
         { 0, 0, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, position) },
         { 0, 1, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, normal) },
         { 0, 2, QRhiVertexInputAttribute::Float, offsetof(MeshVertex, state) },
+        { 0, 3, QRhiVertexInputAttribute::Float4, offsetof(MeshVertex, color) },
+        { 0, 4, QRhiVertexInputAttribute::Float2, offsetof(MeshVertex, material) },
     });
     return layout;
 }
@@ -116,10 +125,43 @@ void ViewportRenderer::createStaticResources()
     m_uniforms.reset(m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, sizeof(FrameUniforms)));
     m_uniforms->create();
 
+    // Harta de umbre (există mereu, ca legăturile shaderelor să fie aceleași; se desenează doar cu umbrele active).
+    const QSize shadowSize(kShadowMapSize, kShadowMapSize);
+    m_shadowTexture.reset(m_rhi->newTexture(QRhiTexture::R32F, shadowSize, 1, QRhiTexture::RenderTarget));
+    m_shadowTexture->create();
+    m_shadowDepth.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, shadowSize, 1));
+    m_shadowDepth->create();
+    QRhiTextureRenderTargetDescription shadowDesc { QRhiColorAttachment(m_shadowTexture.get()) };
+    shadowDesc.setDepthStencilBuffer(m_shadowDepth.get());
+    m_shadowTarget.reset(m_rhi->newTextureRenderTarget(shadowDesc));
+    m_shadowPass.reset(m_shadowTarget->newCompatibleRenderPassDescriptor());
+    m_shadowTarget->setRenderPassDescriptor(m_shadowPass.get());
+    m_shadowTarget->create();
+    m_shadowSampler.reset(m_rhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest, QRhiSampler::None,
+        QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
+    m_shadowSampler->create();
+
     m_bindings.reset(m_rhi->newShaderResourceBindings());
-    m_bindings->setBindings({ QRhiShaderResourceBinding::uniformBuffer(0,
-        QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_uniforms.get()) });
+    m_bindings->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_uniforms.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            1, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
+    });
     m_bindings->create();
+
+    m_shadowPipeline.reset(m_rhi->newGraphicsPipeline());
+    m_shadowPipeline->setShaderStages({
+        { QRhiShaderStage::Vertex, loadShader(QStringLiteral("shadow.vert")) },
+        { QRhiShaderStage::Fragment, loadShader(QStringLiteral("shadow.frag")) },
+    });
+    m_shadowPipeline->setVertexInputLayout(meshLayout());
+    m_shadowPipeline->setShaderResourceBindings(m_bindings.get());
+    m_shadowPipeline->setRenderPassDescriptor(m_shadowPass.get());
+    m_shadowPipeline->setDepthTest(true);
+    m_shadowPipeline->setDepthWrite(true);
+    m_shadowPipeline->setDepthOp(QRhiGraphicsPipeline::LessOrEqual);
+    m_shadowPipeline->create();
 
     m_quadCorners.reset(m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(kLineCorners)));
     m_quadCorners->create();
@@ -167,6 +209,10 @@ void ViewportRenderer::createPipelines()
 
     m_gridPipeline = makePipeline(QStringLiteral("fullscreen.vert"), QStringLiteral("grid.frag"),
         QRhiVertexInputLayout {}, Depth::Test, true);
+    m_groundPipeline = makePipeline(QStringLiteral("fullscreen.vert"), QStringLiteral("ground.frag"),
+        QRhiVertexInputLayout {}, Depth::Test, true);
+    m_transparentPipeline
+        = makePipeline(QStringLiteral("mesh.vert"), QStringLiteral("mesh.frag"), meshLayout(), Depth::Test, true);
 
     QRhiVertexInputLayout lineLayout;
     lineLayout.setBindings({
@@ -298,12 +344,31 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     copy4(u.bgBottom, m_frame.colors.backgroundBottom);
     copy4(u.gridMinor, m_frame.colors.gridMinor);
     copy4(u.gridMajor, m_frame.colors.gridMajor);
-    copy4(u.lightDir, glm::normalize(glm::dvec3(-0.4, -0.6, 0.7)), 0.0);
+    copy4(u.lightDir, glm::normalize(m_frame.sunDirection), m_frame.sunIntensity);
     copy4(u.faceFront, m_frame.colors.faceFront);
     copy4(u.faceBack, m_frame.colors.faceBack);
     copy4(u.forward, m_frame.forward, m_frame.orthographic ? 1.0 : 0.0);
     copy4(u.accent, m_frame.colors.accent);
     u.params[0] = m_rhi->isYUpInNDC() ? 1.0f : 0.0f;
+    u.params[1] = m_rhi->isYUpInFramebuffer() ? 1.0f : 0.0f;
+
+    // Umbrele: o proiecție ortografică din direcția soarelui care cuprinde toată scena.
+    const glm::dvec3 center = (m_frame.sceneMin + m_frame.sceneMax) * 0.5;
+    const double radius = std::max(glm::length(m_frame.sceneMax - m_frame.sceneMin) * 0.5, 1000.0);
+    const glm::dvec3 dir = glm::normalize(m_frame.sunDirection);
+    const glm::dvec3 up = std::abs(dir.z) > 0.99 ? glm::dvec3(0, 1, 0) : glm::dvec3(0, 0, 1);
+    const glm::dmat4 lightView = glm::lookAt(center + dir * radius * 2.0, center, up);
+    const glm::dmat4 lightProj = glm::ortho(-radius, radius, -radius, radius, radius * 0.5, radius * 3.5);
+    m_lightViewProj = glm::dmat4(corrF) * lightProj * lightView;
+    copyMatrix(u.lightViewProj, m_lightViewProj);
+    u.shadow[0] = m_frame.shadows ? 1.0f : 0.0f;
+    u.shadow[1] = static_cast<float>(radius * 0.0015);
+    u.shadow[2] = 1.0f / static_cast<float>(kShadowMapSize);
+    u.shadow[3] = static_cast<float>(std::clamp(m_frame.sunIntensity, 0.0, 1.0)) * 0.85f;
+    u.style[0] = static_cast<float>(m_frame.style);
+    u.style[1] = m_frame.fog ? 1.0f : 0.0f;
+    u.style[2] = static_cast<float>(m_frame.targetDistance * 1.2);
+    u.style[3] = static_cast<float>(m_frame.targetDistance * 6.0);
 
     batch->updateDynamicBuffer(m_uniforms.get(), 0, sizeof(u), &u);
 }
@@ -349,22 +414,41 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
     if (m_uploadedMeshRevision != m_frame.meshRevision) {
         m_uploadedMeshRevision = m_frame.meshRevision;
-        m_meshVertexCount = static_cast<quint32>(m_frame.triangles.size());
-        if (m_meshVertexCount > 0) {
-            const auto bytes = static_cast<quint32>(m_meshVertexCount * sizeof(MeshVertex));
-            m_mesh.reset(m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, bytes));
-            m_mesh->create();
-            batch->uploadStaticBuffer(m_mesh.get(), m_frame.triangles.data());
-        } else {
-            m_mesh.reset();
+        const auto upload = [&](std::unique_ptr<QRhiBuffer>& buffer, quint32& count, const std::vector<MeshVertex>& data) {
+            count = static_cast<quint32>(data.size());
+            if (count > 0) {
+                const auto bytes = static_cast<quint32>(count * sizeof(MeshVertex));
+                buffer.reset(m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, bytes));
+                buffer->create();
+                batch->uploadStaticBuffer(buffer.get(), data.data());
+            } else {
+                buffer.reset();
+            }
+        };
+        upload(m_mesh, m_meshVertexCount, m_frame.triangles);
+        upload(m_transparentMesh, m_transparentVertexCount, m_frame.transparent);
+    }
+
+    // Harta de umbre, înaintea celorlalte treceri.
+    if (m_frame.shadows) {
+        cb->beginPass(m_shadowTarget.get(), QColor::fromRgbF(1, 1, 1, 1), { 1.0f, 0 }, batch);
+        batch = nullptr;
+        if (m_mesh && m_meshVertexCount > 0) {
+            cb->setViewport({ 0, 0, float(kShadowMapSize), float(kShadowMapSize) });
+            cb->setGraphicsPipeline(m_shadowPipeline.get());
+            cb->setShaderResources();
+            const QRhiCommandBuffer::VertexInput input(m_mesh.get(), 0);
+            cb->setVertexInput(0, 1, &input);
+            cb->draw(m_meshVertexCount);
         }
+        cb->endPass();
     }
 
     const QSize size = renderTarget()->pixelSize();
     const bool outline = m_frame.hasSelectedFaces && m_mesh && m_meshVertexCount > 0;
     if (outline) {
         ensureMaskTarget(size);
-        cb->beginPass(m_maskTarget.get(), Qt::black, { 1.0f, 0 }, batch);
+        cb->beginPass(m_maskTarget.get(), Qt::black, { 1.0f, 0 }, batch); // batch e null dacă l-a trimis harta de umbre
         batch = nullptr; // trimis cu prima trecere
         cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
         cb->setGraphicsPipeline(m_maskPipeline.get());
@@ -410,6 +494,12 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         cb->draw(m_meshVertexCount);
     }
 
+    if (m_frame.shadows) {
+        cb->setGraphicsPipeline(m_groundPipeline.get());
+        cb->setShaderResources();
+        cb->draw(3);
+    }
+
     if (m_frame.gridVisible) {
         cb->setGraphicsPipeline(m_gridPipeline.get());
         cb->setShaderResources();
@@ -420,6 +510,14 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         cb->setGraphicsPipeline(m_outlinePipeline.get());
         cb->setShaderResources(m_outlineBindings.get());
         cb->draw(3);
+    }
+
+    if (m_transparentMesh && m_transparentVertexCount > 0) {
+        cb->setGraphicsPipeline(m_transparentPipeline.get());
+        cb->setShaderResources();
+        const QRhiCommandBuffer::VertexInput input(m_transparentMesh.get(), 0);
+        cb->setVertexInput(0, 1, &input);
+        cb->draw(m_transparentVertexCount);
     }
 
     if (lineCount > 0) {

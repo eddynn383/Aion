@@ -7,6 +7,7 @@
 #include "aion/core/model/Model.h"
 #include "aion/core/tools/Tool.h"
 
+#include <QColor>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -67,6 +68,14 @@ class Document : public QObject, private model::ModelObserver {
     // O sesiune nesalvată, găsită la pornire (autosalvarea unei rulări care nu s-a închis normal).
     Q_PROPERTY(bool hasRecovery READ hasRecovery NOTIFY recoveryChanged)
     Q_PROPERTY(QString recoveryInfo READ recoveryInfo NOTIFY recoveryChanged)
+    // --- Materiale (Faza 8) ---
+    // Biblioteca inclusă: { index, name, color, roughness, metallic }.
+    Q_PROPERTY(QVariantList libraryMaterials READ libraryMaterials CONSTANT)
+    // Materialele din model: { id, name, color, roughness, metallic, count }.
+    Q_PROPERTY(QVariantList modelMaterials READ modelMaterials NOTIFY outlineChanged)
+    // Materialul cu care vopsește Paint Bucket: { source: "default"|"model"|"library", id, index, name, color }.
+    Q_PROPERTY(QVariantMap currentMaterial READ currentMaterial NOTIFY materialChanged)
+
     // Ultima eroare de fișier (pentru un mesaj în interfață).
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorChanged)
 
@@ -100,6 +109,9 @@ public:
     bool hasRecovery() const { return m_hasRecovery; }
     QString recoveryInfo() const;
     QString lastError() const { return m_lastError; }
+    QVariantList libraryMaterials() const;
+    QVariantList modelMaterials() const;
+    QVariantMap currentMaterial() const;
 
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
@@ -152,6 +164,14 @@ public:
     // Calea locală dintr-un URL de fișier (dialogurile QML dau URL-uri).
     Q_INVOKABLE QString localPath(const QUrl& url) const;
 
+    // --- Materiale ---
+    Q_INVOKABLE void selectLibraryMaterial(int index);
+    Q_INVOKABLE void selectModelMaterial(double materialId);
+    Q_INVOKABLE void selectDefaultMaterial();
+    Q_INVOKABLE void renameMaterial(double materialId, const QString& name);
+    Q_INVOKABLE void setMaterialColor(double materialId, const QColor& color);
+    Q_INVOKABLE void removeMaterial(double materialId);
+
     // --- Meniul contextual (click dreapta) ---
     // Elementele potrivite selecției: { id, name, shortcut, enabled, destructive } sau { separator: true }.
     // `id` e o comandă din Main.qml (runCommand).
@@ -195,6 +215,7 @@ signals:
     void recentFilesChanged();
     void recoveryChanged();
     void errorChanged();
+    void materialChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
@@ -237,6 +258,8 @@ private:
     QString m_lastError;
     bool m_hasRecovery = false;
     QTimer m_autosaveTimer;
+    model::MaterialId m_currentMaterial;
+    int m_libraryMaterial = -1;
 };
 
 } // namespace aion::render

@@ -56,6 +56,17 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(bool gridVisible MEMBER m_gridVisible NOTIFY appearanceChanged)
     Q_PROPERTY(bool demoVisible MEMBER m_demoVisible NOTIFY appearanceChanged)
 
+    // Stilul de afișare: "shaded", "clay", "hiddenline", "wireframe", "xray".
+    Q_PROPERTY(QString displayStyle MEMBER m_displayStyle NOTIFY appearanceChanged)
+    // Muchiile de contur (silueta obiectelor), mai groase.
+    Q_PROPERTY(bool profiles MEMBER m_profiles NOTIFY appearanceChanged)
+    Q_PROPERTY(bool fog MEMBER m_fog NOTIFY appearanceChanged)
+    // Umbrele soarelui, poziționat după oră, lună și latitudine (implicit România, 46° N).
+    Q_PROPERTY(bool shadows MEMBER m_shadows NOTIFY appearanceChanged)
+    Q_PROPERTY(double sunHour MEMBER m_sunHour NOTIFY appearanceChanged)
+    Q_PROPERTY(int sunMonth MEMBER m_sunMonth NOTIFY appearanceChanged)
+    Q_PROPERTY(double latitude MEMBER m_latitude NOTIFY appearanceChanged)
+
     Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY cameraChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
     // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit", "pan" sau "zoom".
@@ -176,6 +187,7 @@ private:
         bool selected = false;
         bool hovered = false;
         bool marked = false;
+        model::MaterialId material; // materialul grupului, pentru fețele fără material
     };
     // Desenează definiția și tot ce conține. `pathIndex`: câte instanțe din calea contextului s-au parcurs
     // (egal cu lungimea căii = contextul editat; -1 = în afara căii).
@@ -242,6 +254,13 @@ private:
     QColor m_inferenceCyan { 0x06, 0xB6, 0xD4 };
     QColor m_inferenceMagenta { 0xD9, 0x46, 0xEF };
     bool m_gridVisible = true;
+    QString m_displayStyle = QStringLiteral("shaded");
+    bool m_profiles = true;
+    bool m_fog = false;
+    bool m_shadows = false;
+    double m_sunHour = 14.0;
+    int m_sunMonth = 6;
+    double m_latitude = 46.0;
     bool m_demoVisible = false;
     bool m_reducedMotion = false;
     QString m_navigationTool;

@@ -51,6 +51,7 @@ qt_add_qml_module(aion_app
         qml/components/Kbd.qml
         qml/components/Menu.qml
         qml/components/ContextMenu.qml
+        qml/components/Slider.qml
         qml/components/NumberField.qml
         qml/components/Panel.qml
         qml/components/Popover.qml
@@ -67,6 +68,7 @@ qt_add_qml_module(aion_app
         qml/shell/Outliner.qml
         qml/shell/TagsPanel.qml
         qml/shell/EntityInfo.qml
+        qml/shell/MaterialsPanel.qml
         qml/overlays/CommandPalette.qml
         qml/overlays/ViewportAnnotations.qml
         qml/overlays/MeasurementsBox.qml

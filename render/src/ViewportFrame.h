@@ -28,7 +28,9 @@ static_assert(sizeof(PointInstance) == 32);
 struct MeshVertex {
     glm::vec3 position;
     glm::vec3 normal;
-    float state = 0.0f; // 0 = normal, 1 = sub cursor, 2 = selectat
+    float state = 0.0f; // 0 = normal, 1 = sub cursor, 2 = selectat, 3 = estompat
+    glm::vec4 color { 0.0f, 0.0f, 0.0f, -1.0f }; // culoarea materialului (a = opacitate; a < 0 = fără material)
+    glm::vec2 material { 0.85f, 0.0f }; // rugozitate, metalic
 };
 
 struct ViewportColors {
@@ -59,8 +61,20 @@ struct ViewportFrame {
     std::vector<LineInstance> topLines;
     std::vector<PointInstance> topPoints;
     std::vector<MeshVertex> triangles;
+    // Fețele transparente (sticlă, x-ray): desenate după cele opace, cu amestec.
+    std::vector<MeshVertex> transparent;
     // Crește când `triangles` se schimbă, ca renderer-ul să reîncarce buffer-ul numai atunci.
     unsigned meshRevision = 0;
+
+    // Stilul de afișare: 0 shaded, 1 clay, 2 linii ascunse, 3 wireframe, 4 x-ray.
+    int style = 0;
+    bool fog = false;
+    // Soarele: direcția spre el (normalizată) și intensitatea; umbrele și cutia scenei (pentru harta de umbre).
+    glm::dvec3 sunDirection { -0.4, -0.6, 0.7 };
+    double sunIntensity = 1.0;
+    bool shadows = false;
+    glm::dvec3 sceneMin { -5000.0, -5000.0, 0.0 };
+    glm::dvec3 sceneMax { 5000.0, 5000.0, 3000.0 };
 };
 
 } // namespace aion::render

@@ -91,6 +91,9 @@ struct Measurement {
 struct ToolRequests {
     model::InstanceId enter;
     bool exit = false;
+    // Paint Bucket: materialul luat cu pipeta (Option) sau materialul nou intrat în model la vopsire.
+    std::optional<model::MaterialId> sampledMaterial;
+    model::MaterialId addedMaterial;
 };
 
 struct ToolContext {
@@ -110,6 +113,9 @@ struct ToolContext {
     model::Model* model = nullptr;
     model::DefinitionId context;
     ToolRequests* requests = nullptr;
+    // Paint Bucket: materialul curent (din model), sau unul din bibliotecă care intră în model la prima folosire.
+    model::MaterialId paintMaterial;
+    const model::Material* libraryMaterial = nullptr;
 };
 
 class Tool {

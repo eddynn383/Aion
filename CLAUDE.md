@@ -82,8 +82,12 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Faza 7** pe `feature/faza-7`: `.aion` (ZIP + model.json), OBJ/glTF export și import, autosalvare + recuperare,
   documente recente, PNG. ADR 0009. Acțiuni de script: `save:`, `open:`, `export:`, `import:`, `png:`, `file.newNow`.
 
+- **Faza 8** (parțial) pe `feature/faza-8`: materiale + Paint Bucket + panou Materiale, stiluri (clay, linii ascunse,
+  wireframe, X-Ray), profile, ceață, ACES, umbre de la soare (oră/lună). ADR 0010. Rămân: SSAO, IBL, TAA, texturi/UV.
+  Acțiuni de script: `sun:ora`, `style:nume`.
+
 ## Următorii pași
-1. Faza 8: grafică avansată, materiale, stiluri (PLAN.md).
+1. Faza 9: unelte suplimentare (Tape Measure, Dimensions, Section Plane, Intersect, Scenes).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

@@ -76,6 +76,13 @@ Model sampleModel()
     inst.name = "Taburet 2";
     m.setInstance(copy, inst);
     m.addTag({ "Ascuns", { 16, 185, 129, 255 }, false });
+    // Materiale: o față a casei și un taburet întreg.
+    const model::MaterialId brick = m.addMaterial({ "Cărămidă", { 168, 82, 58, 255 }, 0.9f, 0.0f });
+    const model::MaterialId glass = m.addMaterial({ "Sticlă", { 170, 205, 225, 90 }, 0.05f, 0.0f });
+    root.setFaceMaterial(faceAt(root, { 0, 1000, 1000 }), brick);
+    inst = m.instance(stool);
+    inst.material = glass;
+    m.setInstance(stool, inst);
     requireValid(m);
     return m;
 }

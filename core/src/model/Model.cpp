@@ -71,7 +71,7 @@ bool sameMap(const geom::SlotMap<IdT, T>& a, const geom::SlotMap<IdT, T>& b)
 
 bool ChangeSet::empty() const
 {
-    return definitions.empty() && instances.empty() && tags.empty()
+    return definitions.empty() && instances.empty() && tags.empty() && materials.empty()
         && std::all_of(meshes.begin(), meshes.end(), [](const auto& m) { return m.second.empty(); });
 }
 
@@ -106,6 +106,7 @@ Model& Model::operator=(const Model& other)
     m_definitions = other.m_definitions;
     m_instances = other.m_instances;
     m_tags = other.m_tags;
+    m_materials = other.m_materials;
     m_meshes.clear();
     for (const auto& [id, mesh] : other.m_meshes) {
         auto copy = std::make_unique<geom::Mesh>(*mesh);
@@ -196,6 +197,14 @@ void Model::touch(InstanceId id)
 {
     if (m_recording) {
         touchIn(m_recording->instances, m_instances, id);
+    }
+    m_structureDirty = true;
+}
+
+void Model::touch(MaterialId id)
+{
+    if (m_recording) {
+        touchIn(m_recording->materials, m_materials, id);
     }
     m_structureDirty = true;
 }
@@ -316,6 +325,45 @@ void Model::setTag(TagId id, Tag tag)
     notifyStructure();
 }
 
+MaterialId Model::addMaterial(Material material)
+{
+    const MaterialId id = m_materials.insert(std::move(material));
+    if (m_recording) {
+        m_recording->materials[id];
+    }
+    m_structureDirty = true;
+    notifyStructure();
+    return id;
+}
+
+void Model::removeMaterial(MaterialId id)
+{
+    for (std::size_t i = 0; i < m_instances.size(); ++i) {
+        if (m_instances.values()[i].material == id) {
+            Instance copy = m_instances.values()[i];
+            copy.material = {};
+            setInstance(m_instances.keys()[i], copy);
+        }
+    }
+    for (auto& [def, mesh] : m_meshes) {
+        for (std::size_t i = 0; i < mesh->faces().size(); ++i) {
+            if (mesh->faces().values()[i].material == id) {
+                mesh->setFaceMaterial(mesh->faces().keys()[i], {});
+            }
+        }
+    }
+    touch(id);
+    m_materials.erase(id);
+    notifyStructure();
+}
+
+void Model::setMaterial(MaterialId id, Material material)
+{
+    touch(id);
+    m_materials.at(id) = std::move(material);
+    notifyStructure();
+}
+
 void Model::beginRecording()
 {
     assert(!m_recording);
@@ -340,6 +388,7 @@ ChangeSet Model::endRecording()
     finishChanges(changes.definitions, m_definitions);
     finishChanges(changes.instances, m_instances);
     finishChanges(changes.tags, m_tags);
+    finishChanges(changes.materials, m_materials);
     // O definiție creată și ștearsă în aceeași operație nu lasă nicio urmă.
     for (DefinitionId id : m_createdWhileRecording) {
         if (!changes.definitions.contains(id) && !m_definitions.contains(id)) {
@@ -369,6 +418,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
                 m_definitions.at(id) = *change.after;
             }
         }
+        applyChanges(changes.materials, m_materials, direction);
         applyMeshes();
         applyChanges(changes.instances, m_instances, direction);
         applyChanges(changes.tags, m_tags, direction);
@@ -388,6 +438,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.instances, m_instances, direction);
         applyChanges(changes.tags, m_tags, direction);
         applyMeshes();
+        applyChanges(changes.materials, m_materials, direction);
         for (const auto& [id, change] : changes.definitions) {
             if (change.before && change.after) {
                 m_definitions.at(id) = *change.before;
@@ -397,7 +448,8 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
             }
         }
     }
-    if (!changes.definitions.empty() || !changes.instances.empty() || !changes.tags.empty()) {
+    if (!changes.definitions.empty() || !changes.instances.empty() || !changes.tags.empty()
+        || !changes.materials.empty()) {
         m_structureDirty = true;
         notifyStructure();
     }
@@ -450,6 +502,12 @@ geom::ValidationReport Model::validate(geom::ValidationLevel level) const
             report.errors.push_back("definiția „" + m_definitions.values()[i].name + "” nu are geometrie");
             continue;
         }
+        for (const geom::Face& f : it->second->faces().values()) {
+            if (f.material && !m_materials.contains(f.material)) {
+                report.errors.push_back("„" + m_definitions.values()[i].name + "”: față cu un material inexistent");
+                break;
+            }
+        }
         for (const std::string& e : it->second->validate(level).errors) {
             report.errors.push_back("„" + m_definitions.values()[i].name + "”: " + e);
         }
@@ -467,6 +525,9 @@ geom::ValidationReport Model::validate(geom::ValidationLevel level) const
         }
         if (inst.tag && !m_tags.contains(inst.tag)) {
             report.errors.push_back("instanță cu un tag inexistent");
+        }
+        if (inst.material && !m_materials.contains(inst.material)) {
+            report.errors.push_back("instanță cu un material inexistent");
         }
     }
     // Fără cicluri: urmărim din fiecare definiție definițiile pe care le conține.
@@ -501,7 +562,8 @@ geom::ValidationReport Model::validate(geom::ValidationLevel level) const
 bool Model::sameAs(const Model& other) const
 {
     if (m_root != other.m_root || !sameMap(m_definitions, other.m_definitions)
-        || !sameMap(m_instances, other.m_instances) || !sameMap(m_tags, other.m_tags)) {
+        || !sameMap(m_instances, other.m_instances) || !sameMap(m_tags, other.m_tags)
+        || !sameMap(m_materials, other.m_materials)) {
         return false;
     }
     for (const auto& [id, mesh] : m_meshes) {

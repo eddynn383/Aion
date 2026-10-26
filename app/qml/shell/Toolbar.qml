@@ -29,7 +29,8 @@ Item {
             { id: "rotate", icon: "rotate-cw", name: "Rotate", key: "Q", phase: 5 },
             { id: "scale",  icon: "scale-3d",  name: "Scale",  key: "S", phase: 5 } ] },
         { id: "erase", tools: [
-            { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 } ] }
+            { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 },
+            { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 } ] }
     ]
     readonly property var navigation: [
         { id: "orbit", icon: "orbit",   name: "Orbit", key: "O" },

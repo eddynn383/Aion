@@ -9,9 +9,11 @@ namespace aion::model {
 struct DefinitionTag;
 struct InstanceTag;
 struct TagTag;
+struct MaterialTag;
 
 using DefinitionId = geom::Id<DefinitionTag>;
 using InstanceId = geom::Id<InstanceTag>;
 using TagId = geom::Id<TagTag>;
+using MaterialId = geom::Id<MaterialTag>;
 
 } // namespace aion::model

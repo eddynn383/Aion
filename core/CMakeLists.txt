@@ -20,6 +20,7 @@ add_library(aion_core STATIC
     src/math/Intersect.cpp
     src/model/Model.cpp
     src/model/Operations.cpp
+    src/model/MaterialLibrary.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
     src/text/FuzzyMatch.cpp
@@ -36,6 +37,7 @@ add_library(aion_core STATIC
     src/tools/ToolHelpers.cpp
     src/tools/TransformTools.cpp
     src/tools/ShapeTools.cpp
+    src/tools/PaintTool.cpp
 )
 add_library(aion::core ALIAS aion_core)
 
