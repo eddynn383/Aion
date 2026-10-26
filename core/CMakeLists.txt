@@ -22,6 +22,7 @@ add_library(aion_core STATIC
     src/view/Camera.cpp
     src/view/CameraMotion.cpp
     src/view/Picking.cpp
+    src/view/ModelPicking.cpp
     src/inference/Inference.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp

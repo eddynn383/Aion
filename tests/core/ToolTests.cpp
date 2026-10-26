@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Operations.h"
 #include "aion/core/tools/Tool.h"
 #include "aion/core/view/Picking.h"
 
@@ -546,4 +547,72 @@ TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin cape
     REQUIRE(a.mesh.findVertexNear({ 0, 0, 0 }, 1e-6));
     REQUIRE(a.mesh.findVertexNear({ 2000, 0, 0 }, 1e-6));
     CHECK(a.mesh.findVertexNear({ 1000, 500, 0 }, 1e-6)); // vârful din mijloc, pe săgeată
+}
+
+TEST_CASE("Unelte pe model: selectarea unei componente, copii legate cu Move+Option, dublu-click intră", "[core][tools][model]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    stack.setValidation(true, geom::ValidationLevel::Full);
+    stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1500, 500, 300 }, 0, 0, 9000 }));
+    tools::ToolRequests requests;
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    ctx.requests = &requests;
+    const auto at = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return *s;
+    };
+
+    // O cutie făcută componentă.
+    stack.run("Box", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 600, 0, 0 }, { 600, 600, 0 }, { 0, 600, 0 } });
+        geom::pushPull(mesh, mesh.faces().keys().front(), -600);
+    });
+    geom::Selection everything;
+    everything.faces.insert(m.mesh(m.root()).faces().keys().begin(), m.mesh(m.root()).faces().keys().end());
+    model::InstanceId box;
+    stack.run("Make Component", [&](model::Model& model) { box = model::makeGroup(model, model.root(), everything, true); });
+    REQUIRE(box);
+
+    // Click pe ea: se selectează instanța întreagă.
+    auto select = tools::makeTool("select");
+    const tools::PointerEvent onTop { at({ 300, 300, 600 }), {}, 1 };
+    select->pointerMove(ctx, onTop);
+    select->pointerDown(ctx, onTop);
+    select->pointerUp(ctx, onTop);
+    REQUIRE(selection.instances.size() == 1);
+    CHECK(*selection.instances.begin() == box);
+
+    // Move + Option, 1000 pe axa roșie: o copie a aceleiași definiții.
+    auto move = tools::makeTool("move");
+    tools::Modifiers option;
+    option.alt = true;
+    const tools::PointerEvent grab { at({ 600, 0, 600 }), option, 1 };
+    move->pointerMove(ctx, grab);
+    move->pointerDown(ctx, grab);
+    move->pointerUp(ctx, grab);
+    move->pointerMove(ctx, { at({ 1300, 0, 600 }), option, 1 });
+    REQUIRE(move->applyMeasurement(ctx, "1000"));
+    const model::DefinitionId def = m.instance(box).definition;
+    REQUIRE(m.instancesOf(def).size() == 2);
+    const model::InstanceId copy = m.instancesOf(def).back();
+    CHECK(glm::length(m.instance(copy).transform.applyToPoint({ 0, 0, 0 }) - Vec3d { 1000, 0, 0 }) < 1e-6);
+
+    // „x3”: încă două copii.
+    REQUIRE(move->applyMeasurement(ctx, "x3"));
+    CHECK(m.instancesOf(def).size() == 4);
+
+    // Dublu-click pe o copie cere intrarea în ea.
+    const tools::PointerEvent onCopy { at({ 1300, 300, 600 }), {}, 2 };
+    select->pointerMove(ctx, onCopy);
+    select->pointerDown(ctx, onCopy);
+    select->pointerUp(ctx, onCopy);
+    CHECK(requests.enter);
 }

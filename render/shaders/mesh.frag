@@ -37,6 +37,11 @@ void main()
     vec3 ambient = mix(vec3(0.55, 0.53, 0.50), vec3(0.80, 0.84, 0.90), hemi) * 0.55;
     float diffuse = max(dot(n, frame.lightDir.xyz), 0.0) * 0.6;
     vec3 lit = base * (ambient + diffuse);
+    // Starea 3: în afara grupului editat, estompat spre fundal.
+    if (v_state > 2.5) {
+        fragColor = vec4(mix(lit, frame.bgBottom.rgb, 0.62), 1.0);
+        return;
+    }
     // Tentă de accent: discretă la hover, mai puternică pentru selecție.
     float tint = v_state > 1.5 ? 0.38 : v_state > 0.5 ? 0.14 : 0.0;
     fragColor = vec4(mix(lit, frame.accent.rgb, tint), 1.0);

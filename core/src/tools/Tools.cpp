@@ -1,4 +1,6 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Operations.h"
+#include "aion/core/view/ModelPicking.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/tools/Tool.h"
@@ -57,7 +59,7 @@ bool deleteSelection(ToolContext& ctx)
     }
     const geom::Selection doomed = ctx.selection;
     ctx.selection.clear();
-    return ctx.stack.run("Delete", [&](geom::Mesh& mesh) {
+    const auto eraseGeometry = [&](geom::Mesh& mesh) {
         for (geom::FaceId f : doomed.faces) {
             if (mesh.faces().contains(f)) {
                 geom::eraseFace(mesh, f);
@@ -66,6 +68,17 @@ bool deleteSelection(ToolContext& ctx)
         for (geom::EdgeId e : doomed.edges) {
             if (mesh.edges().contains(e)) {
                 geom::eraseEdge(mesh, e);
+            }
+        }
+    };
+    if (ctx.model == nullptr) {
+        return ctx.stack.run("Delete", eraseGeometry);
+    }
+    return ctx.stack.run("Delete", [&](model::Model& model) {
+        eraseGeometry(model.mesh(ctx.context));
+        for (model::InstanceId i : doomed.instances) {
+            if (model.instances().contains(i)) {
+                model::eraseInstance(model, i);
             }
         }
     });
@@ -84,7 +97,7 @@ public:
         m_press = e.screen;
         m_current = e.screen;
         m_dragging = false;
-        m_hover = view::pick(ctx.mesh, ctx.camera, e.screen);
+        m_hover = pickWithInstances(ctx, e.screen);
     }
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override
@@ -93,7 +106,7 @@ public:
         if (m_press && glm::length(e.screen - *m_press) > kDragThresholdPx) {
             m_dragging = true;
         }
-        m_hover = m_dragging ? view::PickResult {} : view::pick(ctx.mesh, ctx.camera, e.screen);
+        m_hover = m_dragging ? view::PickResult {} : pickWithInstances(ctx, e.screen);
     }
 
     void pointerUp(ToolContext& ctx, const PointerEvent& e) override
@@ -105,6 +118,10 @@ public:
         if (m_dragging) {
             const bool crossing = e.screen.x < m_press->x;
             picked = view::pickInRectangle(ctx.mesh, ctx.camera, *m_press, e.screen, crossing);
+            if (ctx.model != nullptr) {
+                picked.instances = view::pickInstancesInRectangle(
+                    *ctx.model, ctx.context, ctx.camera, *m_press, e.screen, crossing);
+            }
         } else {
             picked = clickSelection(ctx, e);
         }
@@ -122,7 +139,11 @@ public:
     bool key(ToolContext& ctx, const KeyEvent& e) override
     {
         if (e.key == Key::Escape && !m_dragging) {
-            ctx.selection.clear(); // Esc fără tragere: deselectează tot
+            // Esc deselectează; fără selecție, iese din grupul editat.
+            if (ctx.selection.empty() && ctx.requests != nullptr) {
+                ctx.requests->exit = true;
+            }
+            ctx.selection.clear();
             return true;
         }
         return Tool::key(ctx, e);
@@ -148,9 +169,18 @@ public:
 private:
     static geom::Selection clickSelection(ToolContext& ctx, const PointerEvent& e)
     {
-        // Vârfurile nu se selectează: căutăm muchia sau fața de sub cursor.
-        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, e.screen, { -1.0, 5.0 });
+        // Vârfurile nu se selectează: căutăm muchia, fața sau instanța de sub cursor.
+        const view::PickResult hit = pickWithInstances(ctx, e.screen, { -1.0, 5.0 });
         geom::Selection s;
+        if (hit.kind == view::PickResult::Kind::Instance) {
+            // Dublu-click intră în grup (sau componentă) pentru editare.
+            if (e.clickCount >= 2 && ctx.requests != nullptr) {
+                ctx.requests->enter = hit.instance;
+                return s;
+            }
+            s.instances.insert(hit.instance);
+            return s;
+        }
         if (hit.kind == view::PickResult::Kind::Edge) {
             // O muchie a unei curbe (cerc, arc) selectează toată curba.
             for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
@@ -713,7 +743,7 @@ public:
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override
     {
-        m_hover = view::pick(ctx.mesh, ctx.camera, e.screen, { -1.0, 6.0 });
+        m_hover = pickWithInstances(ctx, e.screen, { -1.0, 6.0 });
         if (m_active) {
             mark(ctx, e.screen);
         }
@@ -727,16 +757,30 @@ public:
         m_active = false;
         const std::set<geom::EdgeId> doomed = std::move(m_marked);
         m_marked.clear();
-        if (doomed.empty()) {
+        if (doomed.empty() && m_markedInstances.empty()) {
             return;
         }
-        ctx.stack.run("Erase", [&](geom::Mesh& mesh) {
+        const std::set<model::InstanceId> instances = std::move(m_markedInstances);
+        m_markedInstances.clear();
+        const auto eraseEdges = [&](geom::Mesh& mesh) {
             for (geom::EdgeId e : doomed) {
                 if (mesh.edges().contains(e)) {
                     geom::eraseEdge(mesh, e);
                 }
             }
-        });
+        };
+        if (ctx.model == nullptr) {
+            ctx.stack.run("Erase", eraseEdges);
+        } else {
+            ctx.stack.run("Erase", [&](model::Model& model) {
+                eraseEdges(model.mesh(ctx.context));
+                for (model::InstanceId i : instances) {
+                    if (model.instances().contains(i)) {
+                        model::eraseInstance(model, i);
+                    }
+                }
+            });
+        }
         ctx.selection.prune(ctx.mesh);
         m_hover = {};
     }
@@ -745,18 +789,22 @@ public:
     {
         m_active = false;
         m_marked.clear();
+        m_markedInstances.clear();
     }
 
     Overlay overlay() const override
     {
         Overlay o;
         o.markedEdges.assign(m_marked.begin(), m_marked.end());
+        o.markedInstances.assign(m_markedInstances.begin(), m_markedInstances.end());
         return o;
     }
 
     view::PickResult hover() const override
     {
-        return m_hover.kind == view::PickResult::Kind::Edge ? m_hover : view::PickResult {};
+        return m_hover.kind == view::PickResult::Kind::Edge || m_hover.kind == view::PickResult::Kind::Instance
+            ? m_hover
+            : view::PickResult {};
     }
 
     std::string status() const override
@@ -767,7 +815,10 @@ public:
 private:
     void mark(ToolContext& ctx, Vec2d screen)
     {
-        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, screen, { -1.0, 6.0 });
+        const view::PickResult hit = pickWithInstances(ctx, screen, { -1.0, 6.0 });
+        if (hit.kind == view::PickResult::Kind::Instance) {
+            m_markedInstances.insert(hit.instance);
+        }
         if (hit.kind == view::PickResult::Kind::Edge) {
             for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
                 m_marked.insert(edge); // o curbă se șterge întreagă
@@ -777,6 +828,7 @@ private:
 
     bool m_active = false;
     std::set<geom::EdgeId> m_marked;
+    std::set<model::InstanceId> m_markedInstances;
     view::PickResult m_hover;
 };
 

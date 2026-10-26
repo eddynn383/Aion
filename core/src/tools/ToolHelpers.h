@@ -19,6 +19,9 @@ bool handleArrow(inference::Engine& engine, Key key);
 // Shift ținut apăsat blochează inferența curentă; eliberat, o deblochează (doar lock-ul pus de el).
 void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock);
 
+// Ce e sub cursor, inclusiv grupurile și componentele din context (cea mai apropiată dintre geometrie și instanțe).
+[[nodiscard]] view::PickResult pickWithInstances(const ToolContext& ctx, Vec2d screen, view::PickOptions options = {});
+
 [[nodiscard]] std::unique_ptr<Tool> makeMoveTool();
 [[nodiscard]] std::unique_ptr<Tool> makeRotateTool();
 [[nodiscard]] std::unique_ptr<Tool> makeScaleTool();

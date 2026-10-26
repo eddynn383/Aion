@@ -32,6 +32,10 @@ DefinitionId makeUnique(Model& model, InstanceId instance);
 // o definiție proprie, ca în SketchUp), mutată cu `delta` (în coordonatele părintelui).
 InstanceId copyInstance(Model& model, InstanceId instance, const math::Transform& delta);
 
+// Șterge o instanță. Definiția unui grup rămas fără instanțe dispare și ea (cu tot ce conține);
+// definițiile componentelor rămân în model (biblioteca „În model”).
+void eraseInstance(Model& model, InstanceId instance);
+
 // Mută, rotește sau scalează instanțele (în coordonatele părintelui).
 void transformInstances(Model& model, const std::set<InstanceId>& instances, const math::Transform& delta);
 

@@ -1,5 +1,9 @@
 #include "ToolHelpers.h"
 
+#include "aion/core/view/ModelPicking.h"
+
+#include <glm/geometric.hpp>
+
 namespace aion::tools {
 
 void appendInference(Overlay& o, const inference::Inference& inf)
@@ -66,6 +70,31 @@ void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock)
         engine.unlock();
         shiftLock = false;
     }
+}
+
+view::PickResult pickWithInstances(const ToolContext& ctx, Vec2d screen, view::PickOptions options)
+{
+    const view::PickResult geometry = view::pick(ctx.mesh, ctx.camera, screen, options);
+    if (ctx.model == nullptr) {
+        return geometry;
+    }
+    const auto hit = view::pickInstance(*ctx.model, ctx.context, ctx.camera, screen);
+    if (!hit) {
+        return geometry;
+    }
+    if (geometry.hit()) {
+        const math::Ray ray = ctx.camera.rayAt(screen);
+        const double t = glm::dot(geometry.point - ray.origin, ray.direction);
+        // Muchiile și vârfurile de pe suprafața unei instanțe rămân alegibile (toleranță ca la picking).
+        if (t <= hit->t + 1.0 + hit->t * 1e-4) {
+            return geometry;
+        }
+    }
+    view::PickResult r;
+    r.kind = view::PickResult::Kind::Instance;
+    r.instance = hit->instance;
+    r.point = hit->point;
+    return r;
 }
 
 } // namespace aion::tools

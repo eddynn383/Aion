@@ -153,6 +153,19 @@ InstanceId copyInstance(Model& model, InstanceId id, const math::Transform& delt
     return model.addInstance(copy);
 }
 
+void eraseInstance(Model& model, InstanceId id)
+{
+    const DefinitionId definition = model.instance(id).definition;
+    model.removeInstance(id);
+    if (!model.definition(definition).group || !model.instancesOf(definition).empty()) {
+        return;
+    }
+    for (InstanceId child : model.childrenOf(definition)) {
+        eraseInstance(model, child);
+    }
+    model.removeDefinition(definition);
+}
+
 void transformInstances(Model& model, const std::set<InstanceId>& instances, const math::Transform& delta)
 {
     for (InstanceId id : instances) {

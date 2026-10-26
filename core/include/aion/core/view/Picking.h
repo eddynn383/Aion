@@ -13,12 +13,13 @@ class Mesh;
 namespace aion::view {
 
 struct PickResult {
-    enum class Kind { None, Vertex, Edge, Face };
+    enum class Kind { None, Vertex, Edge, Face, Instance };
 
     Kind kind = Kind::None;
     geom::VertexId vertex;
     geom::EdgeId edge;
     geom::FaceId face; // fața de sub cursor, dacă există (și când s-a ales o muchie sau un vârf pe ea)
+    model::InstanceId instance; // pentru Kind::Instance: grupul sau componenta de sub cursor
     math::Vec3d point { 0.0 }; // punctul 3D atins
 
     [[nodiscard]] bool hit() const { return kind != Kind::None; }
