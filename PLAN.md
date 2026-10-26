@@ -473,11 +473,11 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
   Formatul `.aion` trece la versiunea 2 (cu migrare automată și test).
 
 ### Faza 13 – Toolbar, obiecte primitive, Materiale
-- [ ] Toolbar: un grup „Desen” (Line, Arc, Rectangle, Circle, Polygon); Eraser singur; Paint Bucket scos din toolbar
+- [x] Toolbar: un grup „Desen” (Line, Arc, Rectangle, Circle, Polygon); Eraser singur; Paint Bucket scos din toolbar
       (îl pornește alegerea unui material)
-- [ ] Grup nou „Obiecte”: Cub, Sferă, Con, Cilindru — click pe sol (sau pe o față), trage pentru mărime, VCB pentru
+- [x] Grup nou „Obiecte”: Cub, Sferă, Con, Cilindru — click pe sol (sau pe o față), trage pentru mărime, VCB pentru
       dimensiuni; rezultatul e direct un obiect (core: generatoare de primitive, cu teste)
-- [ ] Panoul Materiale: click pe un material → unealta Paint Bucket activă, cursor găleată; grila de culori umple
+- [x] Panoul Materiale: click pe un material → unealta Paint Bucket activă, cursor găleată; grila de culori umple
       lățimea panoului
 
 ### Faza 14 – Pagina de Preferințe

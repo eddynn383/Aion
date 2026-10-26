@@ -139,6 +139,7 @@ Window {
             if (doc.scenes.length === 0) toast.show("Adaugă întâi scene (panoul Scene).")
             else fileDialog.ask("exportVideo")
             break
+        case "debug.materials": leftTabs.currentIndex = 2; break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
@@ -302,7 +303,7 @@ Window {
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
                                          "move", "rotate", "scale", "eraser", "paint",
-                                         "tape", "protractor", "dimension", "text", "section"]
+                                         "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
 
     function selectTool(id) {

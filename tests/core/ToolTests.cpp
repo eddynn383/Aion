@@ -800,3 +800,47 @@ TEST_CASE("Paint Bucket: o față văzută din spate primește materialul pe ver
     CHECK(mesh.face(face).material == (up ? red : model::MaterialId {}));
     CHECK(mesh.face(face).backMaterial == (up ? model::MaterialId {} : red));
 }
+
+TEST_CASE("Obiecte primitive: două clicuri creează un obiect nou, selectat, cu mărimea aleasă", "[core][tools][primitives]")
+{
+    model::Model m;
+    commands::CommandStack stack(m);
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 0, 0, 0 }, 0, 0, 6000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    auto cube = tools::makeTool("cube");
+    REQUIRE(cube);
+    const auto click = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        tools::PointerEvent e;
+        e.screen = *s;
+        cube->pointerMove(ctx, e);
+        cube->pointerDown(ctx, e);
+    };
+    click({ 1000, 1000, 0 });
+    click({ 1400, 1000, 0 }); // raza 400 → latura 800
+    REQUIRE(selection.instances.size() == 1);
+    const model::InstanceId id = *selection.instances.begin();
+    const model::Placement p = model::placementOf(m, id);
+    CHECK(p.size.x == Approx(800.0).margin(1.0));
+    CHECK(p.size.z == Approx(800.0).margin(1.0));
+    CHECK(m.mesh(m.root()).faces().empty()); // geometria e în obiect, nu în model
+    CHECK(model::isSolid(m, m.instance(id).definition));
+
+    // VCB: lățime și înălțime.
+    auto cylinder = tools::makeTool("cylinder");
+    const auto s = camera.project({ -1000, -1000, 0 });
+    tools::PointerEvent e;
+    e.screen = *s;
+    cylinder->pointerMove(ctx, e);
+    cylinder->pointerDown(ctx, e);
+    REQUIRE(cylinder->applyMeasurement(ctx, "600,1500"));
+    const model::Placement c = model::placementOf(m, *selection.instances.begin());
+    CHECK(c.size.x == Approx(600.0).margin(1.0));
+    CHECK(c.size.z == Approx(1500.0).margin(1e-6));
+}

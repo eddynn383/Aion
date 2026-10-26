@@ -25,6 +25,8 @@ void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock);
 [[nodiscard]] std::unique_ptr<Tool> makeCircleTool();
 [[nodiscard]] std::unique_ptr<Tool> makePolygonTool();
 [[nodiscard]] std::unique_ptr<Tool> makeArcTool();
+// Cub, cilindru, con, sferă (id-urile „cube”, „cylinder”, „cone”, „sphere”); nullptr pentru alt id.
+[[nodiscard]] std::unique_ptr<Tool> makePrimitiveTool(std::string_view id);
 [[nodiscard]] std::unique_ptr<Tool> makeOffsetTool();
 [[nodiscard]] std::unique_ptr<Tool> makePaintTool();
 [[nodiscard]] std::unique_ptr<Tool> makeTapeMeasureTool();

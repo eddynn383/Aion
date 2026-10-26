@@ -51,7 +51,7 @@ Canvas {
 
         const view = { cx: W * 0.5, cy: H * 0.56, s: H / 6, yaw: 0, zoom: 1, panX: 0, panY: 0 }
         const d = makeDraw(ctx, view, c)
-        const scene = scenes[tool] || scenes.select
+        const scene = scenes[tool] || (["sphere", "cone", "cylinder"].includes(tool) ? scenes.cube : scenes.select)
         scene(d, t, c)
     }
 
@@ -387,6 +387,18 @@ Canvas {
             if (t > 0.68) d.vcb("Laturi", "6s")
             d.dot([0, 0, 0], c.cyan, 3)
             d.cursor(t < 0.28 ? approach(d, t, [0, 0, 0], 0.24) : d.p(r, 0, 0), Math.max(d.clickK(t, 0.28), d.clickK(t, 0.8)))
+        },
+        cube: function(d, t, c) {
+            d.grid()
+            const k = phase(t, 0.3, 0.7)
+            const half = 1.1 * k
+            if (t > 0.28 && half > 0.02) {
+                d.box([-half, -half, 0], [2 * half, 2 * half, 2 * half], { highlight: t > 0.82 })
+                if (t < 0.82) d.label([0, -half - 0.3, 0], Math.round(2 * half * 1000) + " mm")
+            }
+            if (t > 0.72) d.vcb("Latură", "2200")
+            d.dot([0, 0, 0], c.cyan, 3)
+            d.cursor(t < 0.28 ? approach(d, t, [0, 0, 0], 0.24) : d.p(half, 0, 0), Math.max(d.clickK(t, 0.28), d.clickK(t, 0.8)))
         },
         pushpull: function(d, t, c) {
             d.grid()

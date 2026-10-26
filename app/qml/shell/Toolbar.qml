@@ -14,13 +14,19 @@ Item {
         { id: "select", tools: [
             { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 },
             { id: "interact", icon: "hand-pointer", name: "Interact", key: "I", phase: 0 } ] },
-        { id: "lines", tools: [
+        // Desen: primitivele 2D (linii și forme).
+        { id: "draw", tools: [
             { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3 },
-            { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 } ] },
-        { id: "shapes", tools: [
+            { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 },
             { id: "rectangle", icon: "square",   name: "Rectangle", key: "R", phase: 3 },
             { id: "circle",    icon: "circle",   name: "Circle",    key: "C", phase: 5 },
             { id: "polygon",   icon: "pentagon", name: "Polygon",   key: "",  phase: 5 } ] },
+        // Obiecte: volume gata făcute, create direct ca obiecte.
+        { id: "objects", tools: [
+            { id: "cube",     icon: "prim-cube",     name: "Cub",      key: "", phase: 13 },
+            { id: "sphere",   icon: "prim-sphere",   name: "Sferă",    key: "", phase: 13 },
+            { id: "cone",     icon: "prim-cone",     name: "Con",      key: "", phase: 13 },
+            { id: "cylinder", icon: "prim-cylinder", name: "Cilindru", key: "", phase: 13 } ] },
         { id: "modify", tools: [
             { id: "pushpull", icon: "arrow-up-from-line", name: "Push/Pull", key: "P", phase: 5 },
             { id: "offset",   icon: "square-dashed",      name: "Offset",    key: "F", phase: 5 },
@@ -36,15 +42,18 @@ Item {
             { id: "text", icon: "type", name: "Text", key: "", phase: 9 },
             { id: "section", icon: "section", name: "Section Plane", key: "", phase: 9 } ] },
         { id: "erase", tools: [
-            { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 },
-            { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 } ] }
+            { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 } ] }
     ]
     readonly property var navigation: [
         { id: "orbit", icon: "orbit",   name: "Orbit", key: "O" },
         { id: "pan",   icon: "hand",    name: "Pan",   key: "H" },
         { id: "zoom",  icon: "zoom-in", name: "Zoom",  key: "Z" }
     ]
-    readonly property var allTools: groups.reduce((all, g) => all.concat(g.tools), []).concat(navigation)
+    // Unelte fără buton în toolbar (pornesc din alt loc): Paint Bucket — din panoul Materiale sau cu tasta B.
+    readonly property var hiddenTools: [
+        { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 }
+    ]
+    readonly property var allTools: groups.reduce((all, g) => all.concat(g.tools), []).concat(navigation).concat(hiddenTools)
 
     // Ultima unealtă aleasă din fiecare grup (id grup → id unealtă).
     property var groupSelection: ({})

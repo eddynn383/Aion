@@ -211,6 +211,12 @@ void Viewport::setNavigationCursors(const QCursor& orbit, const QCursor& zoom)
     updateCursor();
 }
 
+void Viewport::setPaintCursor(const QCursor& paint)
+{
+    m_paintCursor = paint;
+    updateCursor();
+}
+
 void Viewport::showTransientCursor(const QCursor& cursor)
 {
     m_transientCursor = cursor;
@@ -243,6 +249,8 @@ void Viewport::updateCursor()
         setCursor(m_zoomCursor);
     } else if (m_navigationTool == QLatin1String("interact")) {
         setCursor(Qt::PointingHandCursor);
+    } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("paint")) {
+        setCursor(m_paintCursor);
     } else {
         unsetCursor();
     }
@@ -264,6 +272,7 @@ void Viewport::setDocument(Document* document)
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
         connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
         connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
+        connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
             updateSceneBounds();
