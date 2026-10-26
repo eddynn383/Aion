@@ -2,7 +2,8 @@
 
 Modelator 3D nativ, inspirat de SketchUp, cu UI modern (stil Claude app / Figma / Vercel)
 și grafică mai bună decât SketchUp. Numele: **Aion** (până la 2026-10-26 „Forma”; vezi ADR 0004).
-Nu folosim numele, logo-ul sau formatul `.skp` ale SketchUp.
+Nu folosim numele sau logo-ul SketchUp; formatul nostru e `.aion`. Fișierele `.skp` se pot doar importa,
+prin SDK-ul oficial, într-un modul opțional numai pentru desktop (ADR 0007, Faza 7b).
 - Slogan: „Aion — modelează ce rămâne.” / „Aion — shape what lasts.”
 - În cod: namespace `aion::`, header-e în `include/aion/`, ținte `aion_*`, module QML `Aion` / `Aion.Render`,
   variabile de mediu `AION_*`, fișiere `.aion`.
