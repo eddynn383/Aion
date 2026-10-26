@@ -45,3 +45,44 @@ jobs:
 
       - name: Teste
         run: ctest --preset mac-debug
+
+  wasm-core:
+    name: WebAssembly (core + teste în Node)
+    runs-on: ubuntu-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalează Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Instalează Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: "4.0.10"
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-wasm-${{ hashFiles('vcpkg.json', 'triplets/wasm32-emscripten.cmake') }}
+          restore-keys: vcpkg-wasm-
+
+      - name: Instalează vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Configurare
+        run: cmake --preset wasm-core
+
+      - name: Build
+        run: cmake --build --preset wasm-core
+
+      - name: Teste (Node)
+        run: ctest --preset wasm-core
+
+      - name: Mărimea bibliotecii
+        run: ls -l build/wasm-core/core/libaion_core.a build/wasm-core/tests/aion_tests.*
