@@ -15,6 +15,7 @@ add_executable(aion_tests
     core/ToolTests.cpp
     core/LengthTests.cpp
     core/InferenceTests.cpp
+    core/PushPullTests.cpp
 )
 
 target_link_libraries(aion_tests PRIVATE aion::core Catch2::Catch2WithMain)

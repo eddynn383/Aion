@@ -8,6 +8,7 @@ add_library(aion_core STATIC
     src/geom/MeshValidate.cpp
     src/geom/Operations.cpp
     src/geom/PlanarRegions.cpp
+    src/geom/PushPull.cpp
     src/geom/Selection.cpp
     src/geom/Triangulate.cpp
     src/math/Intersect.cpp
