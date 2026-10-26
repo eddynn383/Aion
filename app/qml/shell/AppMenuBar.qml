@@ -84,7 +84,7 @@ Platform.MenuBar {
         id: fileMenu
         title: "Fișier"
         commandIds: ["file.new", "file.open", "-", "file.save", "file.saveAs", "-", "file.import",
-                     "file.exportObj", "file.exportGlb", "file.exportGltf", "file.exportPng", "-"]
+                     "file.exportObj", "file.exportGlb", "file.exportGltf", "file.exportPng", "-", "file.quantities", "-"]
 
         // Rămâne la sfârșitul meniului: comenzile se inserează înaintea lui.
         Platform.Menu {

@@ -6,6 +6,7 @@
 #include "aion/core/io/Exchange.h"
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
 #include "aion/core/view/ModelPicking.h"
 #include "aion/core/view/Picking.h"
@@ -153,6 +154,102 @@ void Document::setDisplayDecimals(int decimals)
     emit selectionChanged();
     emit toolStatusChanged();
     emit changed();
+}
+
+namespace {
+
+model::CutListOptions cutListOptions(const QVariantMap& options)
+{
+    model::CutListOptions o;
+    o.sheetLength = options.value(QStringLiteral("sheetLength"), o.sheetLength).toDouble();
+    o.sheetWidth = options.value(QStringLiteral("sheetWidth"), o.sheetWidth).toDouble();
+    o.waste = options.value(QStringLiteral("waste"), o.waste).toDouble();
+    o.maxThickness = options.value(QStringLiteral("maxThickness"), o.maxThickness).toDouble();
+    return o;
+}
+
+} // namespace
+
+QVariantMap Document::quantityReport() const
+{
+    const model::QuantityReport r = model::quantityReport(m_model);
+    QVariantList objects;
+    for (const model::ObjectQuantity& o : r.objects) {
+        objects.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromStdString(o.name) },
+            { QStringLiteral("component"), o.component },
+            { QStringLiteral("count"), o.count },
+            { QStringLiteral("area"), o.area / 1e6 },
+            { QStringLiteral("volume"), o.volume / 1e9 },
+            { QStringLiteral("solid"), o.solid },
+            { QStringLiteral("sizeX"), o.size.x },
+            { QStringLiteral("sizeY"), o.size.y },
+            { QStringLiteral("sizeZ"), o.size.z },
+            { QStringLiteral("material"), QString::fromStdString(o.material) },
+            { QStringLiteral("tag"), QString::fromStdString(o.tag) },
+        });
+    }
+    const auto named = [](const std::vector<model::NamedArea>& list) {
+        QVariantList out;
+        for (const model::NamedArea& n : list) {
+            out.append(QVariantMap { { QStringLiteral("name"), QString::fromStdString(n.name) },
+                { QStringLiteral("area"), n.area / 1e6 } });
+        }
+        return out;
+    };
+    return {
+        { QStringLiteral("objects"), objects },
+        { QStringLiteral("materials"), named(r.materials) },
+        { QStringLiteral("tags"), named(r.tags) },
+        { QStringLiteral("totalArea"), r.totalArea / 1e6 },
+        { QStringLiteral("totalVolume"), r.totalVolume / 1e9 },
+        { QStringLiteral("horizontalArea"), r.horizontalArea / 1e6 },
+        { QStringLiteral("faceCount"), static_cast<int>(r.faceCount) },
+        { QStringLiteral("edgeLength"), r.edgeLength / 1000.0 },
+    };
+}
+
+QVariantMap Document::cutList(const QVariantMap& options) const
+{
+    const model::CutList list = model::cutList(m_model, cutListOptions(options));
+    QVariantList parts;
+    for (const model::CutPart& p : list.parts) {
+        parts.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromStdString(p.name) },
+            { QStringLiteral("material"), QString::fromStdString(p.material) },
+            { QStringLiteral("length"), p.length },
+            { QStringLiteral("width"), p.width },
+            { QStringLiteral("thickness"), p.thickness },
+            { QStringLiteral("count"), p.count },
+            { QStringLiteral("panel"), p.panel },
+            { QStringLiteral("flat"), p.flat },
+        });
+    }
+    QVariantList sheets;
+    for (const model::SheetNeed& s : list.sheets) {
+        sheets.append(QVariantMap {
+            { QStringLiteral("material"), QString::fromStdString(s.material) },
+            { QStringLiteral("thickness"), s.thickness },
+            { QStringLiteral("area"), s.partsArea / 1e6 },
+            { QStringLiteral("sheets"), s.sheets },
+        });
+    }
+    return { { QStringLiteral("parts"), parts }, { QStringLiteral("sheets"), sheets },
+        { QStringLiteral("edgeBanding"), list.edgeBanding / 1000.0 } };
+}
+
+bool Document::exportReport(const QString& path, const QString& kind, const QVariantMap& options)
+{
+    const std::string csv = kind == QLatin1String("cutlist")
+        ? model::toCsv(model::cutList(m_model, cutListOptions(options)), cutListOptions(options))
+        : model::toCsv(model::quantityReport(m_model));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)
+        || file.write(csv.data(), static_cast<qint64>(csv.size())) != static_cast<qint64>(csv.size())) {
+        setError(QStringLiteral("Raportul nu s-a putut salva în „%1”.").arg(QFileInfo(path).fileName()));
+        return false;
+    }
+    return true;
 }
 
 QString Document::formatLength(double mm) const

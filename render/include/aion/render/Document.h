@@ -130,6 +130,12 @@ public:
     void setDisplayUnit(int unit);
     int displayDecimals() const;
     void setDisplayDecimals(int decimals);
+    // Raportul de cantități (general) și lista de debitare (mobilier), ca date pentru QML. Lungimi în mm,
+    // arii în m², volume în m³. `options`: sheetLength, sheetWidth (mm), waste (0..1), maxThickness (mm).
+    Q_INVOKABLE QVariantMap quantityReport() const;
+    Q_INVOKABLE QVariantMap cutList(const QVariantMap& options) const;
+    // Scrie raportul („general” sau „cutlist”) ca CSV (separator „;”, virgulă zecimală, pentru Excel în română).
+    Q_INVOKABLE bool exportReport(const QString& path, const QString& kind, const QVariantMap& options);
     // Exemplu de lungime formatată cu setările curente (pentru dialogul de preferințe).
     Q_INVOKABLE QString formatLength(double mm) const;
     QVariantList libraryMaterials() const;

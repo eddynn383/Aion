@@ -34,6 +34,7 @@ Window {
             { id: "file.exportObj", title: "Exportă OBJ…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
             { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
             { id: "view.top",    title: "Vedere de sus",     category: "Vedere", shortcut: "Ctrl+1", icon: "arrow-down" },
@@ -126,6 +127,8 @@ Window {
         case "file.exportGlb": fileDialog.ask("exportGlb"); break
         case "file.exportGltf": fileDialog.ask("exportGltf"); break
         case "file.exportPng": fileDialog.ask("exportPng"); break
+        case "file.quantities": quantitiesDialog.open(); break
+        case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
         case "view.front": viewport.setStandardView(Viewport.Front); break
@@ -470,6 +473,16 @@ Window {
         id: aboutDialog
         parent: window.contentItem
     }
+    QuantitiesDialog {
+        id: quantitiesDialog
+        parent: window.contentItem
+        document: doc
+        onExportRequested: (kind, options) => {
+            fileDialog.reportKind = kind
+            fileDialog.reportOptions = options
+            fileDialog.ask("exportReport")
+        }
+    }
     ToolTour {
         id: toolTour
         parent: window.contentItem
@@ -513,10 +526,12 @@ Window {
 
         property string purpose: ""
         property var afterSave: null
+        property string reportKind: "general"
+        property var reportOptions: ({})
 
         function ask(what) {
             purpose = what
-            const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng"].includes(what)
+            const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng", "exportReport"].includes(what)
             fileMode = save ? FileDialog.SaveFile : FileDialog.OpenFile
             switch (what) {
             case "open": title = "Deschide"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
@@ -526,9 +541,12 @@ Window {
             case "exportGlb": title = "Exportă GLB"; nameFilters = ["glTF binar (*.glb)"]; defaultSuffix = "glb"; break
             case "exportGltf": title = "Exportă glTF"; nameFilters = ["glTF (*.gltf)"]; defaultSuffix = "gltf"; break
             case "exportPng": title = "Exportă imaginea"; nameFilters = ["PNG (*.png)"]; defaultSuffix = "png"; break
+            case "exportReport": title = "Exportă raportul"; nameFilters = ["CSV (*.csv)"]; defaultSuffix = "csv"; break
             }
             if (save)
-                selectedFile = "file:///" + doc.fileName + "." + defaultSuffix
+                selectedFile = "file:///" + doc.fileName
+                    + (what === "exportReport" ? (reportKind === "cutlist" ? " - debitare" : " - cantitati") : "")
+                    + "." + defaultSuffix
             open()
         }
 
@@ -549,6 +567,9 @@ Window {
             case "exportPng":
                 if (viewport.saveImage(path)) toast.show("Imagine salvată: " + path.split("/").pop())
                 else toast.show("Imaginea nu a putut fi salvată.")
+                break
+            case "exportReport":
+                if (doc.exportReport(path, reportKind, reportOptions)) toast.show("Raport salvat: " + path.split("/").pop())
                 break
             }
             afterSave = null

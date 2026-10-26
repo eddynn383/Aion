@@ -34,6 +34,12 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Salvează / Deschide `.aion`, punctul de „modificat” din titlu, întrebarea la închidere
 - [ ] Autosalvare: închide forțat aplicația cu modificări, repornește → bannerul de recuperare
 - [ ] Export OBJ, GLB, glTF, PNG; deschide GLB-ul în Blender; import OBJ / glTF
+## Raport de cantități (Fișier → Raport de cantități)
+- [ ] General: arie totală, volumul solidelor, obiectele cu bucăți (copiile unui obiect adunate), materiale, tag-uri
+- [ ] Ascunde un obiect sau un tag → dispare din raport după „Actualizează”
+- [ ] Mobilier: un corp din panouri grupate separat (laterale, blat, poliță, spate) → dimensiuni L × l × g corecte,
+      și pentru panourile rotite; piesele identice adunate; necesarul de plăci se schimbă cu placa și pierderile
+- [ ] Exportă CSV (ambele variante) și deschide în Excel / Numbers: coloane corecte, diacritice, virgulă zecimală
 ## Grafică
 - [ ] Materiale (bibliotecă, în model, pipetă ⌥, ⌘ conectate, ⇧ același material), sticlă transparentă
 - [ ] Stiluri: materiale, clay, linii, wireframe, X-Ray; profile; ceață; umbre (oră, lună)
