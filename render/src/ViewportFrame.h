@@ -52,6 +52,7 @@ struct ViewportFrame {
     double targetDistance = 1.0;
     bool orthographic = false;
     bool gridVisible = true;
+    double gridStep = 0.0; // pasul fix al grid-ului (Snap la grid), 0 = automat
     bool hasSelectedFaces = false; // activează conturul selecției
     float devicePixelRatio = 1.0f;
 

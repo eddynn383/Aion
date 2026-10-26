@@ -1,6 +1,7 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/inference/Inference.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
 #include "aion/core/model/MaterialLibrary.h"
@@ -701,6 +702,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         }
     }
     ctx.guides = m_contextGuides;
+    if (m_snapToGrid) {
+        ctx.gridStep = m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance);
+    }
     ctx.libraryMaterial
         = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
     fn(*m_tool, ctx);

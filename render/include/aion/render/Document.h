@@ -90,6 +90,9 @@ class Document : public QObject, private model::ModelObserver {
 
     // Preferințe de afișare a lungimilor (păstrate în QSettings): 0 Auto, 1 mm, 2 cm, 3 m, 4 inci, 5 picioare;
     // zecimale: -1 = implicit.
+    // Snap la grid: activ sau nu; pasul în mm (0 = automat, după grid-ul vizibil).
+    Q_PROPERTY(bool snapToGrid MEMBER m_snapToGrid NOTIFY gridSnapChanged)
+    Q_PROPERTY(double gridStep MEMBER m_gridStep NOTIFY gridSnapChanged)
     Q_PROPERTY(int displayUnit READ displayUnit WRITE setDisplayUnit NOTIFY unitsChanged)
     Q_PROPERTY(int displayDecimals READ displayDecimals WRITE setDisplayDecimals NOTIFY unitsChanged)
 
@@ -263,12 +266,16 @@ signals:
     void materialChanged();
     void editingAnnotationChanged();
     void unitsChanged();
+    void gridSnapChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
     void changed();
 
 private:
+    bool m_snapToGrid = false;
+    double m_gridStep = 0.0;
+
     void meshChanged(model::DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary) override;
     void structureChanged(const model::Model& model) override;
     template <class Fn>

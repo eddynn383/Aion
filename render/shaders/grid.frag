@@ -19,7 +19,7 @@ layout(std140, binding = 0) uniform Frame {
     vec4 faceBack;
     vec4 forward;      // xyz = direcția de privire, w = 1 pentru proiecție ortografică
     vec4 accent;       // culoarea selecției
-    vec4 params;       // x = 1 dacă y crește în sus în NDC
+    vec4 params;       // x = 1 dacă y crește în sus în NDC, z = pasul fix al grid-ului (0 = automat)
 } frame;
 
 vec3 unproject(vec2 ndc, float z)
@@ -60,6 +60,11 @@ void main()
     float level = log(dist * 0.02) / log(10.0);
     float base = pow(10.0, floor(level));
     float blend = fract(level);
+    // Pas fix (Snap la grid): liniile mici la pas, cele mari la 10 pași; densitatea le estompează singură.
+    if (frame.params.z > 0.0) {
+        base = frame.params.z;
+        blend = 0.0;
+    }
 
     float minor = gridLines(p.xy, base, 1.0) * (1.0 - blend);
     float major = gridLines(p.xy, base * 10.0, 1.0);

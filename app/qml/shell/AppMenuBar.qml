@@ -115,7 +115,7 @@ Platform.MenuBar {
         bar: root
         title: "Vedere"
         commandIds: ["view.iso", "view.top", "view.front", "view.right", "view.back", "view.left", "view.bottom", "-",
-                     "view.extents", "view.zoomSelection", "view.projection", "view.grid", "-",
+                     "view.extents", "view.zoomSelection", "view.projection", "view.grid", "view.snapGrid", "-",
                      "nav.pivotView", "nav.pivotSelection", "nav.pivotCursor", "-",
                      "ui.leftPanel", "ui.rightPanel", "ui.panels", "ui.theme"]
     }

@@ -235,3 +235,50 @@ TEST_CASE("Inferență: lock pe axă (săgeți) și lock pe inferența curentă 
     shift.unlock();
     CHECK_FALSE(shift.locked());
 }
+
+TEST_CASE("Snap la grid: pasul automat urmează grid-ul vizibil", "[core][inference][grid]")
+{
+    CHECK(inference::autoGridStep(10000) == Approx(100)); // 2% = 200 mm → linii la 100 mm
+    CHECK(inference::autoGridStep(40000) == Approx(1000)); // 800 mm → aproape de 1 m: pasul mare
+    CHECK(inference::autoGridStep(100) == Approx(1)); // 2 mm → 1 mm
+    CHECK(inference::autoGridStep(0.01) == Approx(0.01)); // limita de jos (ca shaderul: distanța minimă 1 mm)
+}
+
+TEST_CASE("Snap la grid: punctele libere cad pe grid, capetele au prioritate", "[core][inference][grid]")
+{
+    Mesh mesh;
+    geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } });
+    const auto camera = topCamera();
+    inference::Engine engine;
+    engine.withGridSnap(250.0);
+
+    // Pe sol, departe de geometrie.
+    auto r = engine.infer(mesh, camera, screen(camera, { 2930, -640, 0 }), std::nullopt);
+    CHECK(r.kind == Kind::Ground);
+    CHECK(r.onGrid);
+    CHECK(near(r.point, { 3000, -750, 0 }));
+    CHECK(inference::label(r) == "On Grid");
+
+    // Pe o față orizontală: în planul ei.
+    r = engine.infer(mesh, camera, screen(camera, { 1180, 830, 0 }), std::nullopt);
+    CHECK(r.kind == Kind::OnFace);
+    CHECK(near(r.point, { 1250, 750, 0 }));
+
+    // Lângă un capăt: capătul câștigă, fără rotunjire.
+    r = engine.infer(mesh, camera, screen(camera, { 2000, 2000, 0 }) + Vec2d { 4, -3 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK_FALSE(r.onGrid);
+
+    // De-a lungul unei axe dintr-un punct de pornire oarecare: distanța e multiplu de pas.
+    const Vec3d from { 2000, 2000, 0 };
+    r = engine.infer(mesh, camera, screen(camera, { 2000 + 1160, 2000, 0 }) + Vec2d { 0, 1 }, from);
+    REQUIRE(r.kind == Kind::OnAxis);
+    CHECK(r.onGrid);
+    CHECK(near(r.point, { 3250, 2000, 0 }, 1e-6));
+
+    // Oprit: punctul rămâne cel de sub cursor.
+    engine.withGridSnap(0.0);
+    r = engine.infer(mesh, camera, screen(camera, { 2930, -640, 0 }), std::nullopt);
+    CHECK_FALSE(r.onGrid);
+    CHECK(near(r.point, { 2930, -640, 0 }, 1e-3));
+}

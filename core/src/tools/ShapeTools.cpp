@@ -213,7 +213,7 @@ private:
 
     void track(ToolContext& ctx, const PointerEvent& e)
     {
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, m_center);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_center);
         if (!m_center) {
             if (m_inference.valid()) {
                 m_hoverNormal = drawingNormal(ctx, m_inference, m_axisLock);
@@ -415,7 +415,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         const std::optional<Vec3d> from = m_phase == Phase::End ? std::optional(m_start) : std::nullopt;
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
         switch (m_phase) {
         case Phase::Start:
             if (m_inference.valid()) {

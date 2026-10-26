@@ -71,6 +71,8 @@ struct Inference {
     Axis axis = Axis::None; // axa direcției, pentru OnAxis
     std::vector<Guide> guides;
     bool locked = false; // rezultatul a fost constrâns de un lock
+    bool onGrid = false; // punctul a fost rotunjit la grid (snap la grid)
+    Vec3d planeNormal { 0.0, 0.0, 1.0 }; // pentru Ground: normala planului de lucru
 
     [[nodiscard]] bool valid() const { return kind != Kind::None; }
     [[nodiscard]] bool isPoint() const
@@ -87,6 +89,9 @@ struct Inference {
 [[nodiscard]] std::optional<Vec3d> pointOnLineUnderCursor(
     const view::Camera& camera, Vec2d screen, const Vec3d& origin, const Vec3d& dir);
 [[nodiscard]] Vec3d axisDirection(Axis axis);
+// Pasul grid-ului vizibil la distanța dată a camerei (aceeași regulă ca shaderul grid.frag): o putere a lui 10,
+// cea mai deasă care încă se vede bine (≈ 2% din distanță).
+[[nodiscard]] double autoGridStep(double cameraDistance);
 
 struct Options {
     double pointRadiusPx = 10.0; // capete și mijloace
@@ -109,6 +114,15 @@ public:
     Engine& withGuides(std::span<const GuideRef> guides)
     {
         m_guides.assign(guides.begin(), guides.end());
+        return *this;
+    }
+
+    // Snap la grid cu pasul dat (mm; 0 = oprit). Se aplică doar punctelor „libere” (pe sol, pe o față
+    // aliniată cu axele) și distanțelor de-a lungul unei direcții (axă, paralel); capetele, mijloacele și
+    // muchiile au prioritate.
+    Engine& withGridSnap(double step)
+    {
+        m_gridStep = step;
         return *this;
     }
 
@@ -152,6 +166,7 @@ private:
         const std::optional<math::Plane>& plane);
     Inference inferLocked(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen, std::optional<Vec3d> from);
     void remember(const geom::Mesh& mesh, const Inference& result);
+    void applyGrid(const geom::Mesh& mesh, Inference& result, const std::optional<Vec3d>& from) const;
 
     Options m_options;
     Inference m_last;
@@ -162,6 +177,7 @@ private:
     std::optional<Vec3d> m_referenceDirection;
     std::optional<math::Plane> m_lastFacePlane;
     std::vector<GuideRef> m_guides;
+    double m_gridStep = 0.0;
 };
 
 } // namespace aion::inference
