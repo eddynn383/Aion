@@ -101,13 +101,13 @@ Popover {
             title: "Navigare"
 
             Text {
-                text: "Orbitează în jurul"
+                text: "Centrul orbitei"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeXs
             }
             Tabs {
                 width: parent.width
-                model: ["Centrul vederii", "Selecției", "Punctului de sub cursor"]
+                model: ["Centrul vederii", "Selecția", "Punctul de sub cursor"]
                 currentIndex: root.viewport ? root.viewport.orbitPivot : 0
                 onCurrentIndexChanged: if (root.viewport) root.viewport.orbitPivot = currentIndex
             }
