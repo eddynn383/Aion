@@ -6,6 +6,8 @@ qt_add_executable(forma_app
     src/bridge/CommandSearch.h
     src/bridge/IconProvider.cpp
     src/bridge/IconProvider.h
+    src/bridge/NavigationCursors.cpp
+    src/bridge/NavigationCursors.h
     src/platform/Platform.h
 )
 

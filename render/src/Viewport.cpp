@@ -21,6 +21,9 @@ namespace {
 constexpr double kOrbitRadiansPerPixel = 0.008;
 // Factorul de zoom pentru o „treaptă” de rotiță (120 de unități).
 constexpr double kWheelZoomStep = 0.85;
+// Zoom prin tragere: factorul e exp(pixeli · k); în sus = apropiere (ca în Blender).
+constexpr double kDragZoomPerPixel = 0.006;
+constexpr int kTransientCursorMs = 450;
 // Cât de recentă trebuie să fie mișcarea ca, la eliberare, orbita să continue prin inerție.
 constexpr qint64 kInertiaWindowNs = 80'000'000;
 constexpr qint64 kInertiaMaxIdleNs = 40'000'000;
@@ -95,6 +98,62 @@ Viewport::Viewport(QQuickItem* parent)
     startTimer(1000);
 
     connect(this, &Viewport::appearanceChanged, this, &QQuickItem::update);
+
+    m_transientCursorTimer.setSingleShot(true);
+    m_transientCursorTimer.setInterval(kTransientCursorMs);
+    connect(&m_transientCursorTimer, &QTimer::timeout, this, &Viewport::updateCursor);
+}
+
+void Viewport::setNavigationTool(const QString& tool)
+{
+    if (tool == m_navigationTool) {
+        return;
+    }
+    m_navigationTool = tool;
+    emit navigationToolChanged();
+    updateCursor();
+}
+
+void Viewport::setNavigationCursors(const QCursor& orbit, const QCursor& zoom)
+{
+    m_orbitCursor = orbit;
+    m_zoomCursor = zoom;
+    updateCursor();
+}
+
+void Viewport::showTransientCursor(const QCursor& cursor)
+{
+    m_transientCursor = cursor;
+    m_transientCursorTimer.start();
+    updateCursor();
+}
+
+void Viewport::updateCursor()
+{
+    switch (m_drag) {
+    case Drag::Orbit:
+        setCursor(m_orbitCursor);
+        return;
+    case Drag::Pan:
+        setCursor(Qt::ClosedHandCursor);
+        return;
+    case Drag::Zoom:
+        setCursor(m_zoomCursor);
+        return;
+    case Drag::None:
+        break;
+    }
+    if (m_transientCursorTimer.isActive()) {
+        setCursor(m_transientCursor);
+    } else if (m_navigationTool == QLatin1String("orbit")) {
+        setCursor(m_orbitCursor);
+    } else if (m_navigationTool == QLatin1String("pan")) {
+        setCursor(Qt::OpenHandCursor);
+    } else if (m_navigationTool == QLatin1String("zoom")) {
+        setCursor(m_zoomCursor);
+    } else {
+        unsetCursor();
+    }
 }
 
 Viewport::~Viewport() = default;
@@ -306,6 +365,7 @@ bool Viewport::event(QEvent* event)
             m_motion.stop();
             m_camera.zoomAbout(factor, m_camera.zoomAnchorAt(toVec2(pos)));
             onCameraMoved();
+            showTransientCursor(m_zoomCursor);
             gesture->accept();
             return true;
         }
@@ -330,18 +390,32 @@ void Viewport::beginDrag(Drag drag, QPointF position)
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
-    const bool shift = event->modifiers().testFlag(Qt::ShiftModifier);
+    const auto mods = event->modifiers();
+    const bool shift = mods.testFlag(Qt::ShiftModifier);
+    // Pe macOS, Qt raportează tasta Control ca MetaModifier (Cmd devine ControlModifier).
+    const bool ctrl = mods.testFlag(Qt::ControlModifier) || mods.testFlag(Qt::MetaModifier);
+
+    Drag drag = Drag::None;
     if (event->button() == Qt::MiddleButton) {
-        beginDrag(shift ? Drag::Pan : Drag::Orbit, event->position());
-    } else if (event->button() == Qt::LeftButton && m_navigationTool == QLatin1String("orbit")) {
-        beginDrag(shift ? Drag::Pan : Drag::Orbit, event->position());
-    } else if (event->button() == Qt::LeftButton && m_navigationTool == QLatin1String("pan")) {
-        beginDrag(Drag::Pan, event->position());
-    } else {
+        drag = ctrl ? Drag::Zoom : shift ? Drag::Pan : Drag::Orbit;
+    } else if (event->button() == Qt::LeftButton) {
+        if (m_navigationTool == QLatin1String("orbit")) {
+            drag = shift ? Drag::Pan : Drag::Orbit;
+        } else if (m_navigationTool == QLatin1String("pan")) {
+            drag = Drag::Pan;
+        } else if (m_navigationTool == QLatin1String("zoom")) {
+            drag = Drag::Zoom;
+        }
+    }
+    if (drag == Drag::None) {
         event->ignore();
         return;
     }
-    setCursor(m_drag == Drag::Pan ? Qt::ClosedHandCursor : Qt::SizeAllCursor);
+    beginDrag(drag, event->position());
+    if (drag == Drag::Zoom) {
+        m_zoomDragAnchor = m_camera.zoomAnchorAt(toVec2(event->position()));
+    }
+    updateCursor();
     event->accept();
 }
 
@@ -358,6 +432,9 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
     } else if (m_drag == Drag::Pan) {
         m_camera.pan(toVec2(delta));
         onCameraMoved();
+    } else if (m_drag == Drag::Zoom) {
+        m_camera.zoomAbout(std::exp(delta.y() * kDragZoomPerPixel), m_zoomDragAnchor);
+        onCameraMoved();
     }
 }
 
@@ -368,7 +445,7 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
         requestAnimationFrame();
     }
     m_drag = Drag::None;
-    unsetCursor();
+    updateCursor();
     event->accept();
 }
 
@@ -424,8 +501,10 @@ void Viewport::wheelEvent(QWheelEvent* event)
         const QPointF d = event->pixelDelta();
         if (mods.testFlag(Qt::ShiftModifier)) {
             m_camera.pan(toVec2(d));
+            showTransientCursor(Qt::ClosedHandCursor);
         } else {
             m_camera.orbit(-d.x() * kOrbitRadiansPerPixel, -d.y() * kOrbitRadiansPerPixel);
+            showTransientCursor(m_orbitCursor);
         }
         onCameraMoved();
         event->accept();
@@ -442,6 +521,7 @@ void Viewport::wheelEvent(QWheelEvent* event)
     }
     const double factor = std::pow(kWheelZoomStep, steps);
     m_motion.zoomSmoothly(factor, m_camera.zoomAnchorAt(toVec2(pos)));
+    showTransientCursor(m_zoomCursor);
     requestAnimationFrame();
     event->accept();
 }

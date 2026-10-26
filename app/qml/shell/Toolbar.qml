@@ -3,7 +3,7 @@ import QtQuick.Effects
 import Forma
 
 // Toolbar plutitor, jos în viewport (ca în Figma).
-// Uneltele de desen devin funcționale în Faza 3; Orbit și Pan funcționează de acum.
+// Uneltele de desen devin funcționale în Faza 3; Orbit, Pan și Zoom funcționează de acum.
 Item {
     id: root
 
@@ -19,7 +19,8 @@ Item {
         { id: "eraser",    icon: "eraser",             name: "Eraser",    key: "E" },
         { id: "-" },
         { id: "orbit",     icon: "orbit",              name: "Orbit",     key: "O" },
-        { id: "pan",       icon: "hand",               name: "Pan",       key: "H" }
+        { id: "pan",       icon: "hand",               name: "Pan",       key: "H" },
+        { id: "zoom",      icon: "zoom-in",            name: "Zoom",      key: "Z" }
     ]
 
     signal toolSelected(string id)

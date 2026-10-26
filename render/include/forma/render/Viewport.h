@@ -4,9 +4,11 @@
 #include "forma/core/view/CameraMotion.h"
 
 #include <QColor>
+#include <QCursor>
 #include <QElapsedTimer>
 #include <QPointF>
 #include <QQuickRhiItem>
+#include <QTimer>
 #include <QVector3D>
 #include <QtQml/qqmlregistration.h>
 
@@ -38,8 +40,8 @@ class Viewport : public QQuickRhiItem {
 
     Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY cameraChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
-    // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit" sau "pan".
-    Q_PROPERTY(QString navigationTool MEMBER m_navigationTool NOTIFY navigationToolChanged)
+    // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit", "pan" sau "zoom".
+    Q_PROPERTY(QString navigationTool READ navigationTool WRITE setNavigationTool NOTIFY navigationToolChanged)
 
     // Baza camerei, pentru gizmo-ul de navigare.
     Q_PROPERTY(QVector3D cameraRight READ cameraRight NOTIFY cameraChanged)
@@ -61,6 +63,12 @@ public:
     void setOrthographic(bool orthographic);
     bool reducedMotion() const { return m_reducedMotion; }
     void setReducedMotion(bool reduced);
+
+    QString navigationTool() const { return m_navigationTool; }
+    void setNavigationTool(const QString& tool);
+
+    // Cursoarele pentru orbit și zoom (desenate de aplicație din iconițe).
+    void setNavigationCursors(const QCursor& orbit, const QCursor& zoom);
 
     QVector3D cameraRight() const;
     QVector3D cameraUp() const;
@@ -98,8 +106,10 @@ protected:
     void hoverMoveEvent(QHoverEvent* event) override;
 
 private:
-    enum class Drag { None, Orbit, Pan };
+    enum class Drag { None, Orbit, Pan, Zoom };
 
+    void updateCursor();
+    void showTransientCursor(const QCursor& cursor);
     void onCameraMoved();
     void requestAnimationFrame();
     void onAfterAnimating();
@@ -123,6 +133,13 @@ private:
     };
     std::deque<OrbitSample> m_orbitSamples;
     QPointF m_hoverPosition;
+    view::Vec3d m_zoomDragAnchor { 0.0, 0.0, 0.0 };
+
+    QCursor m_orbitCursor { Qt::SizeAllCursor };
+    QCursor m_zoomCursor { Qt::SizeVerCursor };
+    // La rotiță și gesturile de trackpad, cursorul acțiunii rămâne vizibil puțin după ultimul eveniment.
+    QTimer m_transientCursorTimer;
+    QCursor m_transientCursor;
 
     QColor m_backgroundTop { 0x1A, 0x1B, 0x1F };
     QColor m_backgroundBottom { 0x0E, 0x0F, 0x11 };

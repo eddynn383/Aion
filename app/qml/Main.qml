@@ -18,6 +18,7 @@ Window {
     property bool leftPanelVisible: true
     property bool rightPanelVisible: true
     property string activeTool: "select"
+    readonly property var navigationTools: ["orbit", "pan", "zoom"]
 
     // Toate comenzile aplicației; apar în command palette și au scurtături.
     readonly property var commands: {
@@ -36,6 +37,7 @@ Window {
             { id: "view.demo",   title: viewport.demoVisible ? "Ascunde cutia demo" : "Arată cutia demo", category: "Vedere", shortcut: "", icon: "box" },
             { id: "tool.orbit",  title: "Orbit",  category: "Unelte", shortcut: "O", icon: "orbit" },
             { id: "tool.pan",    title: "Pan",    category: "Unelte", shortcut: "H", icon: "hand" },
+            { id: "tool.zoom",   title: "Zoom",   category: "Unelte", shortcut: "Z", icon: "zoom-in" },
             { id: "tool.select", title: "Select", category: "Unelte", shortcut: "Space", icon: "mouse-pointer-2" },
             { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
@@ -63,6 +65,7 @@ Window {
         case "view.demo": viewport.demoVisible = !viewport.demoVisible; break
         case "tool.orbit": window.activeTool = "orbit"; break
         case "tool.pan": window.activeTool = "pan"; break
+        case "tool.zoom": window.activeTool = "zoom"; break
         case "tool.select": window.activeTool = "select"; break
         case "ui.leftPanel": window.leftPanelVisible = !window.leftPanelVisible; break
         case "ui.rightPanel": window.rightPanelVisible = !window.rightPanelVisible; break
@@ -95,7 +98,7 @@ Window {
 
     function selectTool(id) {
         window.activeTool = id
-        if (id !== "select" && id !== "orbit" && id !== "pan")
+        if (id !== "select" && !navigationTools.includes(id))
             statusBar.message = "Unealta „" + id + "” vine în Faza 3"
         else
             statusBar.message = "Gata"
@@ -117,7 +120,7 @@ Window {
     }
     // Uneltele de desen (doar vizual, până în Faza 3).
     Instantiator {
-        model: toolbar.tools.filter(t => t.key && t.key.length === 1 && t.id !== "orbit" && t.id !== "pan")
+        model: toolbar.tools.filter(t => t.key && t.key.length === 1 && !navigationTools.includes(t.id))
         delegate: Shortcut {
             required property var modelData
             sequence: modelData.key
@@ -202,7 +205,7 @@ Window {
         faceFrontColor: Theme.faceFront
         faceBackColor: Theme.faceBack
         reducedMotion: Theme.reduceMotion
-        navigationTool: window.activeTool === "orbit" || window.activeTool === "pan" ? window.activeTool : ""
+        navigationTool: window.navigationTools.includes(window.activeTool) ? window.activeTool : ""
 
         NavigationGizmo {
             anchors.top: parent.top

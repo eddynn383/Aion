@@ -29,26 +29,29 @@ QImage IconProvider::requestImage(const QString& id, QSize* size, const QSize& r
         *size = outSize;
     }
 
+    // Opacitatea se aplică separat, ca SVG-ul să primească o culoare simplă #RRGGBB.
+    return renderLucideIcon(name, QColor::fromString(QLatin1Char('#') + colorHex), outSize);
+}
+
+QImage renderLucideIcon(const QString& name, const QColor& color, QSize size, double strokeWidth)
+{
     QFile file(QStringLiteral(":/forma/icons/%1.svg").arg(name));
     if (!file.open(QIODevice::ReadOnly)) {
         qWarning("Iconiță lipsă: %s", qPrintable(name));
         return {};
     }
 
-    // Lucide desenează cu „currentColor”; o înlocuim cu culoarea cerută.
-    // Opacitatea se aplică separat, ca SVG-ul să primească o culoare simplă #RRGGBB.
-    const QColor color = QColor::fromString(QLatin1Char('#') + colorHex);
+    // Lucide desenează cu „currentColor” și linii de 2 unități; le înlocuim pe amândouă.
     QByteArray svg = file.readAll();
     svg.replace("currentColor", color.name(QColor::HexRgb).toLatin1());
-    // Linii puțin mai subțiri decât standardul Lucide (2), pentru aspectul discret al UI-ului.
-    svg.replace("stroke-width=\"2\"", "stroke-width=\"1.75\"");
+    svg.replace("stroke-width=\"2\"", QByteArray("stroke-width=\"") + QByteArray::number(strokeWidth) + '"');
 
     QSvgRenderer renderer(svg);
-    QImage image(outSize, QImage::Format_ARGB32_Premultiplied);
+    QImage image(size, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setOpacity(color.alphaF());
-    renderer.render(&painter, QRectF(QPointF(0, 0), QSizeF(outSize)));
+    renderer.render(&painter, QRectF(QPointF(0, 0), QSizeF(size)));
     return image;
 }

@@ -71,7 +71,7 @@ cmake --preset mac-debug && cmake --build --preset mac-debug && ctest --preset m
 |---|---|---|
 | Orbit | buton din mijloc (sau unealta Orbit, `O`) | două degete |
 | Pan | Shift + buton din mijloc (sau unealta Pan, `H`) | Shift + două degete |
-| Zoom spre cursor | rotița | pinch (sau ⌘ + două degete) |
+| Zoom spre cursor | rotița, Ctrl + buton din mijloc (sau unealta Zoom, `Z`: tragi în sus/jos) | pinch (sau ⌘ + două degete) |
 | Centrează pe punct | dublu-click cu butonul din mijloc | — |
 | Zoom Extents | `⇧Z` | dublu-tap cu două degete |
 

@@ -1,5 +1,7 @@
 #include "bridge/IconProvider.h"
+#include "bridge/NavigationCursors.h"
 #include "forma/render/GraphicsApi.h"
+#include "platform/Platform.h"
 
 #include <QDirIterator>
 #include <QFont>
@@ -70,6 +72,14 @@ int main(int argc, char* argv[])
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(EXIT_FAILURE); }, Qt::QueuedConnection);
     engine.loadFromModule("Forma", "Main");
+
+    if (!engine.rootObjects().isEmpty()) {
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
+        // Trebuie să corespundă cu Theme.titleBarHeight.
+        constexpr int kTitleBarHeight = 44;
+        platform::integrateTitleBar(window, kTitleBarHeight);
+        installNavigationCursors(window);
+    }
 
     scheduleScreenshotIfRequested(engine);
 
