@@ -256,9 +256,9 @@ void Mesh::detachFace(FaceId id, const Face& face)
     });
 }
 
-FaceId Mesh::addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner)
+FaceId Mesh::addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner, model::MaterialId material)
 {
-    const FaceId id = m_faces.insert(Face { plane, std::move(outer), std::move(inner) });
+    const FaceId id = m_faces.insert(Face { plane, std::move(outer), std::move(inner), material });
     if (m_recording) {
         m_recording->faces[id];
     }
@@ -298,6 +298,15 @@ std::uint32_t Mesh::newCurveId() const
         highest = std::max(highest, e.curve);
     }
     return highest + 1;
+}
+
+void Mesh::setFaceMaterial(FaceId id, model::MaterialId material)
+{
+    if (m_faces.at(id).material == material) {
+        return;
+    }
+    touch(id);
+    m_faces.at(id).material = material;
 }
 
 void Mesh::setFacePlane(FaceId id, const math::Plane& plane)

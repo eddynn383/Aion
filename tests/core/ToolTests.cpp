@@ -616,3 +616,57 @@ TEST_CASE("Unelte pe model: selectarea unei componente, copii legate cu Move+Opt
     select->pointerUp(ctx, onCopy);
     CHECK(requests.enter);
 }
+
+TEST_CASE("Unelte: Paint Bucket vopsește, cu Cmd tot ce e conectat, cu Option ia materialul", "[core][tools][paint]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    stack.setValidation(true, geom::ValidationLevel::Full);
+    stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 300, 300, 300 }, 0, 0, 6000 }));
+    tools::ToolRequests requests;
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    ctx.requests = &requests;
+    stack.run("Box", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 600, 0, 0 }, { 600, 600, 0 }, { 0, 600, 0 } });
+        geom::pushPull(mesh, mesh.faces().keys().front(), -600);
+    });
+    const auto at = [&](Vec3d p) { return *camera.project(p); };
+    const model::Material wood { "Lemn", { 176, 132, 86, 255 }, 0.7f, 0.0f };
+    ctx.libraryMaterial = &wood;
+
+    auto paint = tools::makeTool("paint");
+    paint->pointerDown(ctx, { at({ 300, 300, 600 }), {}, 1 });
+    REQUIRE(requests.addedMaterial);
+    CHECK(m.materials().size() == 1);
+    int painted = 0;
+    for (const geom::Face& f : m.mesh(m.root()).faces().values()) {
+        painted += f.material == requests.addedMaterial ? 1 : 0;
+    }
+    CHECK(painted == 1);
+
+    // Cu materialul din model, Cmd vopsește toată cutia.
+    ctx.libraryMaterial = nullptr;
+    ctx.paintMaterial = requests.addedMaterial;
+    tools::Modifiers cmd;
+    cmd.command = true;
+    paint->pointerDown(ctx, { at({ 600, 300, 300 }), cmd, 1 });
+    painted = 0;
+    for (const geom::Face& f : m.mesh(m.root()).faces().values()) {
+        painted += f.material == requests.addedMaterial ? 1 : 0;
+    }
+    CHECK(painted == 6);
+
+    // Pipeta.
+    tools::Modifiers option;
+    option.alt = true;
+    requests = {};
+    paint->pointerDown(ctx, { at({ 300, 300, 600 }), option, 1 });
+    REQUIRE(requests.sampledMaterial);
+    CHECK(*requests.sampledMaterial == ctx.paintMaterial);
+}

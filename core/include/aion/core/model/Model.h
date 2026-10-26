@@ -37,6 +37,16 @@ struct Tag {
     bool operator==(const Tag&) const = default;
 };
 
+// Un material: culoare (cu opacitate), rugozitate și caracter metalic (PBR simplificat).
+struct Material {
+    std::string name;
+    Color color { 200, 200, 200, 255 };
+    float roughness = 0.8f;
+    float metallic = 0.0f;
+
+    bool operator==(const Material&) const = default;
+};
+
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
@@ -54,6 +64,8 @@ struct Instance {
     TagId tag; // nul = fără tag
     bool hidden = false;
     bool locked = false;
+    // Materialul cu care se văd fețele fără material din interior (ca „vopsirea” unui grup în SketchUp).
+    MaterialId material;
 
     bool operator==(const Instance&) const = default;
 };
@@ -63,6 +75,7 @@ struct ChangeSet {
     std::map<DefinitionId, geom::EntityChange<Definition>> definitions;
     std::map<InstanceId, geom::EntityChange<Instance>> instances;
     std::map<TagId, geom::EntityChange<Tag>> tags;
+    std::map<MaterialId, geom::EntityChange<Material>> materials;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -94,6 +107,8 @@ public:
     [[nodiscard]] const Definition& definition(DefinitionId id) const { return m_definitions.at(id); }
     [[nodiscard]] const Instance& instance(InstanceId id) const { return m_instances.at(id); }
     [[nodiscard]] const Tag& tag(TagId id) const { return m_tags.at(id); }
+    [[nodiscard]] const geom::SlotMap<MaterialId, Material>& materials() const { return m_materials; }
+    [[nodiscard]] const Material& material(MaterialId id) const { return m_materials.at(id); }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -115,6 +130,10 @@ public:
     // Instanțele cu acest tag rămân fără tag.
     void removeTag(TagId id);
     void setTag(TagId id, Tag tag);
+    MaterialId addMaterial(Material material);
+    // Fețele și instanțele care îl folosesc rămân fără material.
+    void removeMaterial(MaterialId id);
+    void setMaterial(MaterialId id, Material material);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -137,12 +156,14 @@ private:
     void touch(DefinitionId id);
     void touch(InstanceId id);
     void touch(TagId id);
+    void touch(MaterialId id);
     void notifyStructure();
 
     DefinitionId m_root;
     geom::SlotMap<DefinitionId, Definition> m_definitions;
     geom::SlotMap<InstanceId, Instance> m_instances;
     geom::SlotMap<TagId, Tag> m_tags;
+    geom::SlotMap<MaterialId, Material> m_materials;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;
     // Geometria (goală) a definițiilor șterse, păstrată ca undo să le refacă fără să refolosească ID-uri.
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_graveyard;

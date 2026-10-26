@@ -3,6 +3,7 @@
 #include "aion/core/geom/Id.h"
 #include "aion/core/math/Plane.h"
 #include "aion/core/math/Vec.h"
+#include "aion/core/model/Ids.h"
 
 #include <cstdint>
 #include <vector>
@@ -56,6 +57,7 @@ struct Face {
     math::Plane plane;
     Loop outer;
     std::vector<Loop> inner;
+    model::MaterialId material; // nul = materialul implicit (sau al grupului din care face parte)
 
     bool operator==(const Face&) const = default;
 };

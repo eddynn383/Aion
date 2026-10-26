@@ -62,6 +62,7 @@ json meshToJson(const geom::Mesh& mesh)
         }
         faces.push_back({
             { "id", mesh.faces().keys()[i].value },
+            { "material", f.material.value },
             { "plane", { f.plane.normal.x, f.plane.normal.y, f.plane.normal.z, f.plane.d } },
             { "outer", loopToJson(f.outer) },
             { "inner", inner },
@@ -103,6 +104,7 @@ geom::ChangeSet meshFromJson(const json& j)
         geom::Face face;
         face.plane = { { p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>() }, p.at(3).get<double>() };
         face.outer = loopFromJson(f.at("outer"));
+        face.material = model::MaterialId { f.value("material", std::uint64_t { 0 }) };
         for (const json& h : f.at("inner")) {
             face.inner.push_back(loopFromJson(h));
         }
@@ -174,6 +176,7 @@ std::string toJson(const model::Model& model)
             { "tag", inst.tag.value },
             { "hidden", inst.hidden },
             { "locked", inst.locked },
+            { "material", inst.material.value },
         });
     }
     json tags = json::array();
@@ -186,6 +189,17 @@ std::string toJson(const model::Model& model)
             { "visible", t.visible },
         });
     }
+    json materials = json::array();
+    for (std::size_t i : sortedIndices(model.materials())) {
+        const model::Material& m = model.materials().values()[i];
+        materials.push_back({
+            { "id", model.materials().keys()[i].value },
+            { "name", m.name },
+            { "color", colorToJson(m.color) },
+            { "roughness", m.roughness },
+            { "metallic", m.metallic },
+        });
+    }
     const json doc {
         { "format", "aion" },
         { "formatVersion", kFormatVersion },
@@ -195,6 +209,7 @@ std::string toJson(const model::Model& model)
         { "definitions", definitions },
         { "instances", instances },
         { "tags", tags },
+        { "materials", materials },
     };
     return doc.dump(1);
 }
@@ -248,6 +263,7 @@ LoadResult fromJson(std::string_view text)
             inst.tag = model::TagId { i.value("tag", std::uint64_t { 0 }) };
             inst.hidden = i.value("hidden", false);
             inst.locked = i.value("locked", false);
+            inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
             changes.instances[model::InstanceId { i.at("id").get<std::uint64_t>() }].after = std::move(inst);
         }
         for (const json& t : doc.at("tags")) {
@@ -257,6 +273,14 @@ LoadResult fromJson(std::string_view text)
                     c.at(3).get<std::uint8_t>() },
                 t.value("visible", true) };
             changes.tags[model::TagId { t.at("id").get<std::uint64_t>() }].after = std::move(tag);
+        }
+        for (const json& mj : doc.value("materials", json::array())) {
+            const json& c = mj.at("color");
+            model::Material material { mj.at("name").get<std::string>(),
+                { c.at(0).get<std::uint8_t>(), c.at(1).get<std::uint8_t>(), c.at(2).get<std::uint8_t>(),
+                    c.at(3).get<std::uint8_t>() },
+                mj.value("roughness", 0.8f), mj.value("metallic", 0.0f) };
+            changes.materials[model::MaterialId { mj.at("id").get<std::uint64_t>() }].after = std::move(material);
         }
         model.apply(changes, geom::ChangeDirection::Forward);
         const geom::ValidationReport report = model.validate(geom::ValidationLevel::Topology);
