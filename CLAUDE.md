@@ -111,6 +111,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `model/Interaction`, `view::interactiveInstanceAt`, unealta `interact` (în viewport, ca navigarea).
   Acțiuni de script: `scene.add`, `exportvideo:cale.mp4`, `behavior:rotate,0,90`.
 
+- **Bara de vizualizare** (`shell/ViewportControls.qml`, lângă gizmo, ca în Blender): stilurile ca iconițe
+  (`resources/icons/style-*.svg`), umbre, secțiuni, proiecție, grid. Inspector-ul e doar pentru selecție.
+  Rulările cu `AION_SCREENSHOT` / `AION_STARTUP` au profilul lor („Aion Test”): nu ating setările utilizatorului.
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 

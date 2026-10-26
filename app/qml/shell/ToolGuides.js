@@ -107,7 +107,7 @@ const guides = {
     section: {
         title: "Section Plane",
         summary: "Taie modelul cu un plan, ca să vezi interiorul (planuri, secțiuni).",
-        steps: ["Click pe o față: planul se așază paralel cu ea", "Mută planul din Inspector → Secțiuni",
+        steps: ["Click pe o față: planul se așază paralel cu ea", "Mută planul din bara viewport-ului (iconița Secțiuni)",
                 "Activează sau dezactivează tăietura oricând"],
         tip: ""
     },

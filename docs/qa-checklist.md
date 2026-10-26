@@ -49,6 +49,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Unealta Interact (I): click pe ușă → se deschide animat; încă un click → se închide; ⌘Z anulează
 - [ ] Ușă într-un dulap grupat: click pe ușă mișcă ușa, nu dulapul; copiile unui obiect au același comportament
 - [ ] Salvează și redeschide: ușile rămân deschise / închise, comportamentul rămâne
+## Bara de vizualizare (colțul viewport-ului, lângă gizmo)
+- [ ] Stilurile ca iconițe (wireframe, linii ascunse, clay, materiale, X-Ray); ▾ = Profile, Ceață
+- [ ] Umbre (☀) + ▾ = ora, luna; Secțiuni (apare doar dacă există); Zoom Extents, proiecție, grid
+- [ ] Inspector-ul arată doar selecția (fără selecție: datele modelului)
 ## Grafică
 - [ ] Materiale (bibliotecă, în model, pipetă ⌥, ⌘ conectate, ⇧ același material), sticlă transparentă
 - [ ] Stiluri: materiale, clay, linii, wireframe, X-Ray; profile; ceață; umbre (oră, lună)
