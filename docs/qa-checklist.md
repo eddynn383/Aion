@@ -40,6 +40,14 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Mobilier: un corp din panouri grupate separat (laterale, blat, poliță, spate) → dimensiuni L × l × g corecte,
       și pentru panourile rotite; piesele identice adunate; necesarul de plăci se schimbă cu placa și pierderile
 - [ ] Exportă CSV (ambele variante) și deschide în Excel / Numbers: coloane corecte, diacritice, virgulă zecimală
+## Animații și interacțiuni (ADR 0018)
+- [ ] Scene → Redă: camera trece lin prin scene (tranziție, pauză, buclă); fiecare scenă își aplică stilul; click în viewport oprește
+- [ ] Bara de redare (sus, în viewport) arată scena curentă; × oprește
+- [ ] Scene → Exportă video…: progres în panou, Anulează; MP4-ul se deschide în QuickTime, are durata și fps-ul ales
+- [ ] Entity Info → Interacțiune: Balama (stânga / dreapta / sus / jos, unghi, durată) și Glisare (6 direcții, distanță)
+- [ ] Unealta Interact (I): click pe ușă → se deschide animat; încă un click → se închide; ⌘Z anulează
+- [ ] Ușă într-un dulap grupat: click pe ușă mișcă ușa, nu dulapul; copiile unui obiect au același comportament
+- [ ] Salvează și redeschide: ușile rămân deschise / închise, comportamentul rămâne
 ## Grafică
 - [ ] Materiale (bibliotecă, în model, pipetă ⌥, ⌘ conectate, ⇧ același material), sticlă transparentă
 - [ ] Stiluri: materiale, clay, linii, wireframe, X-Ray; profile; ceață; umbre (oră, lună)

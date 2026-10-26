@@ -23,4 +23,9 @@ struct InstanceHit {
 [[nodiscard]] std::set<model::InstanceId> pickInstancesInRectangle(const model::Model& model,
     model::DefinitionId context, const Camera& camera, Vec2d corner0, Vec2d corner1, bool crossing);
 
+// Instanța interactivă de sub cursor (unealta Interact): cea mai adâncă din ierarhie care are un comportament.
+// `camera` e camera globală.
+[[nodiscard]] std::optional<model::InstanceId> interactiveInstanceAt(
+    const model::Model& model, const Camera& camera, Vec2d screen);
+
 } // namespace aion::view

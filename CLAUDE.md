@@ -106,6 +106,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Raport de cantități** (ADR 0017): `model/Quantities.h` (general + listă de debitare + CSV), `QuantitiesDialog.qml`,
   `DataTable.qml`; comanda `file.quantities` (Fișier). Acțiune de script: `debug.cutlist`.
 
+- **Animații și interacțiuni** (ADR 0018): `view/SceneAnimation`, `Viewport::playScenes/exportScenes`,
+  `AppInfo.encodeVideo` (`platform/VideoMac.mm`, AVFoundation; ffmpeg ca rezervă); `model::Behavior` pe instanțe,
+  `model/Interaction`, `view::interactiveInstanceAt`, unealta `interact` (în viewport, ca navigarea).
+  Acțiuni de script: `scene.add`, `exportvideo:cale.mp4`, `behavior:rotate,0,90`.
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 

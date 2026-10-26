@@ -115,4 +115,22 @@ std::set<model::InstanceId> pickInstancesInRectangle(const model::Model& model, 
     return out;
 }
 
+std::optional<model::InstanceId> interactiveInstanceAt(
+    const model::Model& model, const Camera& camera, Vec2d screen)
+{
+    std::optional<model::InstanceId> found;
+    model::DefinitionId context = model.root();
+    Camera local = camera;
+    // Coborâm prin ierarhie: dulap → ușă → mâner; ultima instanță cu comportament câștigă.
+    while (const auto hit = pickInstance(model, context, local, screen)) {
+        const model::Instance& inst = model.instance(hit->instance);
+        if (inst.behavior.kind != model::Behavior::Kind::None) {
+            found = hit->instance;
+        }
+        local = local.inContext(inst.transform);
+        context = inst.definition;
+    }
+    return found;
+}
+
 } // namespace aion::view

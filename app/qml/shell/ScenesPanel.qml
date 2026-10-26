@@ -205,8 +205,8 @@ Item {
         Tabs {
             width: parent.width
             model: ["24 fps", "30 fps", "60 fps"]
-            currentIndex: [24, 30, 60].indexOf(root.fps)
-            onCurrentIndexChanged: root.fps = [24, 30, 60][currentIndex]
+            currentIndex: root.fps === 24 ? 0 : root.fps === 60 ? 2 : 1
+            onCurrentIndexChanged: root.fps = currentIndex === 0 ? 24 : currentIndex === 2 ? 60 : 30
         }
     }
 

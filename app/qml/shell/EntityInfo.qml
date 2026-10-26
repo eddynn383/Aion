@@ -128,6 +128,117 @@ Column {
         }
     }
 
+    // Interacțiunea (unealta Interact): ușă pe balama sau sertar care glisează.
+    Column {
+        id: behaviorBox
+        visible: root.isInstance
+        width: parent.width
+        spacing: Theme.space2
+
+        readonly property var behavior: root.isInstance && root.info.behavior ? root.info.behavior : ({ kind: "none" })
+        readonly property int kindIndex: behavior.kind === "rotate" ? 1 : behavior.kind === "slide" ? 2 : 0
+        // Rotate: Stânga, Dreapta, Sus, Jos → ancorele 0, 1, 4, 5. Slide: Față, Spate, Stânga, Dreapta, Sus, Jos → 2, 3, 0, 1, 4, 5.
+        readonly property var rotateAnchors: [0, 1, 4, 5]
+        readonly property var slideAnchors: [2, 3, 0, 1, 4, 5]
+
+        function apply(changes) {
+            const b = Object.assign({ kind: behavior.kind, anchor: behavior.anchor ?? 0, amount: behavior.amount ?? 90,
+                                      duration: behavior.duration ?? 0.6 }, changes)
+            root.document.setBehavior(b)
+        }
+
+        Text {
+            text: "Interacțiune"
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeSm
+        }
+        Tabs {
+            width: parent.width
+            model: ["Niciuna", "Balama", "Glisare"]
+            currentIndex: behaviorBox.kindIndex
+            onCurrentIndexChanged: {
+                if (currentIndex === behaviorBox.kindIndex)
+                    return
+                if (currentIndex === 0) behaviorBox.apply({ kind: "none" })
+                else if (currentIndex === 1) behaviorBox.apply({ kind: "rotate", anchor: 0, amount: 90 })
+                else behaviorBox.apply({ kind: "slide", anchor: 2, amount: 400 })
+            }
+        }
+        Tabs {
+            visible: behaviorBox.kindIndex === 1
+            width: parent.width
+            model: ["Stânga", "Dreapta", "Sus", "Jos"]
+            currentIndex: Math.max(0, behaviorBox.rotateAnchors.indexOf(behaviorBox.behavior.anchor ?? 0))
+            onCurrentIndexChanged: if (behaviorBox.kindIndex === 1 && behaviorBox.rotateAnchors[currentIndex] !== behaviorBox.behavior.anchor)
+                behaviorBox.apply({ anchor: behaviorBox.rotateAnchors[currentIndex] })
+        }
+        Flow {
+            visible: behaviorBox.kindIndex === 2
+            width: parent.width
+            spacing: Theme.space1
+            Repeater {
+                model: ["Față", "Spate", "Stânga", "Dreapta", "Sus", "Jos"]
+                delegate: Rectangle {
+                    id: dirChip
+                    required property string modelData
+                    required property int index
+                    readonly property bool current: behaviorBox.slideAnchors[index] === behaviorBox.behavior.anchor
+                    width: dirText.implicitWidth + Theme.space3 * 2
+                    height: 24
+                    radius: 12
+                    color: current ? Theme.accentSubtle : dirArea.containsMouse ? Theme.bgHover : "transparent"
+                    border.color: current ? Theme.accent : Theme.borderStrong
+                    Text {
+                        id: dirText
+                        anchors.centerIn: parent
+                        text: dirChip.modelData
+                        color: dirChip.current ? Theme.textPrimary : Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeXs
+                    }
+                    MouseArea {
+                        id: dirArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: behaviorBox.apply({ anchor: behaviorBox.slideAnchors[dirChip.index] })
+                    }
+                }
+            }
+        }
+        Row {
+            visible: behaviorBox.kindIndex !== 0
+            width: parent.width
+            spacing: Theme.space2
+            NumberField {
+                width: (parent.width - Theme.space2) * 0.55
+                label: behaviorBox.kindIndex === 1 ? "Unghi" : "Distanță"
+                unit: behaviorBox.kindIndex === 1 ? "°" : "mm"
+                from: -100000
+                to: 100000
+                value: behaviorBox.behavior.amount ?? 0
+                onValueModified: (v) => behaviorBox.apply({ amount: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space2) * 0.45
+                label: "Durată"
+                unit: "s"
+                from: 0
+                to: 10
+                step: 0.1
+                decimals: 1
+                value: behaviorBox.behavior.duration ?? 0.6
+                onValueModified: (v) => behaviorBox.apply({ duration: v })
+            }
+        }
+        Text {
+            visible: behaviorBox.kindIndex !== 0
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Cu unealta Interact (mâna din toolbar), un click pe obiect îl deschide sau îl închide. Unghi negativ = sens invers."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
     Toggle {
         visible: root.isInstance
         width: parent.width

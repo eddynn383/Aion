@@ -241,6 +241,8 @@ void Viewport::updateCursor()
         setCursor(Qt::OpenHandCursor);
     } else if (m_navigationTool == QLatin1String("zoom")) {
         setCursor(m_zoomCursor);
+    } else if (m_navigationTool == QLatin1String("interact")) {
+        setCursor(Qt::PointingHandCursor);
     } else {
         unsetCursor();
     }
@@ -511,7 +513,8 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             continue;
         }
         const model::Instance& inst = model.instance(child);
-        const math::Transform childToWorld = toWorld * inst.transform;
+        // O ușă în mișcare (unealta Interact) se desenează cu transformarea animată.
+        const math::Transform childToWorld = toWorld * doc.displayTransform(child).value_or(inst.transform);
         if (ancestor && path[static_cast<std::size_t>(pathIndex)] == child) {
             DrawStyle inside;
             inside.material = inst.material ? inst.material : style.material;
@@ -1176,7 +1179,8 @@ ViewportFrame Viewport::frameForRendering() const
         appendBox(f.triangles, kDemoMin, kDemoMax);
         appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
-    f.meshRevision = (m_document ? m_document->revision() : 0u) * 2u + (m_demoVisible ? 1u : 0u);
+    f.meshRevision = ((m_document ? m_document->revision() + m_document->interactionRevision() * 7919u : 0u)) * 2u
+        + (m_demoVisible ? 1u : 0u);
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     // Pivotul orbitei, cât timp se orbitează în jurul lui.
@@ -1218,13 +1222,14 @@ void Viewport::onAfterAnimating()
     if (m_sceneAnimation && !m_exporting) {
         advanceSceneAnimation(dt);
     }
+    const bool interacting = m_document && m_document->advanceInteractions(dt);
     if (m_turntableSecondsLeft > 0.0) {
         constexpr double kTurntableRadiansPerSecond = 0.8;
         m_camera.orbit(kTurntableRadiansPerSecond * dt, 0.0);
         m_turntableSecondsLeft -= dt;
         onCameraMoved();
     }
-    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting)) {
+    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting) || interacting) {
         update();
     } else {
         m_ticking = false;
@@ -1318,6 +1323,12 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             drag = Drag::Pan;
         } else if (m_navigationTool == QLatin1String("zoom")) {
             drag = Drag::Zoom;
+        } else if (m_navigationTool == QLatin1String("interact")) {
+            if (m_document && m_document->interactAt(m_camera, toVec2(event->position()))) {
+                requestAnimationFrame();
+            }
+            event->accept();
+            return;
         }
     }
     if (drag == Drag::None && event->button() == Qt::LeftButton && m_document && m_document->hasTool()) {

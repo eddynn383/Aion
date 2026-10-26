@@ -5,6 +5,7 @@
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
 #include "aion/core/model/MaterialLibrary.h"
+#include "aion/core/model/Interaction.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
@@ -731,6 +732,17 @@ QVariantMap Document::entityInfo() const
         if (inst.material && m_model.materials().contains(inst.material)) {
             details << detail(QStringLiteral("Material"), QString::fromStdString(m_model.material(inst.material).name));
         }
+        const model::Behavior& b = inst.behavior;
+        info[QStringLiteral("behavior")] = QVariantMap {
+            { QStringLiteral("kind"),
+                b.kind == model::Behavior::Kind::Rotate ? QStringLiteral("rotate")
+                    : b.kind == model::Behavior::Kind::Slide ? QStringLiteral("slide")
+                                                             : QStringLiteral("none") },
+            { QStringLiteral("anchor"), static_cast<int>(b.anchor) },
+            { QStringLiteral("amount"), b.amount },
+            { QStringLiteral("duration"), b.duration },
+            { QStringLiteral("open"), b.open },
+        };
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -1282,6 +1294,84 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
         m_selection = hit;
     }
     afterInteraction(before);
+}
+
+bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
+{
+    const auto hit = view::interactiveInstanceAt(m_model, camera, screen);
+    if (!hit) {
+        return false;
+    }
+    for (const InteractionAnimation& a : m_interactions) {
+        if (a.instance == *hit) {
+            return true; // deja în mișcare
+        }
+    }
+    const model::Behavior& b = m_model.instance(*hit).behavior;
+    m_interactions.push_back({ *hit, 0.0, std::max(b.duration, 0.0), !b.open });
+    return true;
+}
+
+bool Document::advanceInteractions(double dt)
+{
+    if (m_interactions.empty()) {
+        return false;
+    }
+    ++m_interactionRevision;
+    std::vector<model::InstanceId> finished;
+    for (InteractionAnimation& a : m_interactions) {
+        a.elapsed += dt;
+        if (a.elapsed >= a.duration) {
+            finished.push_back(a.instance);
+        }
+    }
+    std::erase_if(m_interactions, [](const InteractionAnimation& a) { return a.elapsed >= a.duration; });
+    // La sfârșit, starea nouă intră în model (cu undo), ca o singură operație.
+    for (model::InstanceId id : finished) {
+        if (m_model.instances().contains(id)) {
+            const bool opening = !m_model.instance(id).behavior.open;
+            runOnModel(opening ? "Deschide" : "Închide", [id](model::Model& model) { model::toggleBehavior(model, id); });
+        }
+    }
+    emit changed();
+    return !m_interactions.empty();
+}
+
+std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
+{
+    for (const InteractionAnimation& a : m_interactions) {
+        if (a.instance == instance && m_model.instances().contains(instance)) {
+            const double k = a.duration > 0.0 ? std::clamp(a.elapsed / a.duration, 0.0, 1.0) : 1.0;
+            const double eased = k * k * (3.0 - 2.0 * k);
+            return model::transformAtOpenness(m_model, instance, a.opening ? eased : 1.0 - eased);
+        }
+    }
+    return std::nullopt;
+}
+
+void Document::setBehavior(const QVariantMap& behavior)
+{
+    if (m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    const QString kind = behavior.value(QStringLiteral("kind")).toString();
+    runOnModel("Comportament", [&](model::Model& model) {
+        // Întâi închidem (transformarea „închisă” e referința pentru orice comportament nou).
+        if (model.instance(id).behavior.open) {
+            model::toggleBehavior(model, id);
+        }
+        model::Instance inst = model.instance(id);
+        inst.behavior.kind = kind == QLatin1String("rotate") ? model::Behavior::Kind::Rotate
+            : kind == QLatin1String("slide")                ? model::Behavior::Kind::Slide
+                                                            : model::Behavior::Kind::None;
+        inst.behavior.anchor
+            = static_cast<model::Behavior::Anchor>(std::clamp(behavior.value(QStringLiteral("anchor")).toInt(), 0, 5));
+        inst.behavior.amount = behavior.value(QStringLiteral("amount"), inst.behavior.amount).toDouble();
+        inst.behavior.duration = std::clamp(behavior.value(QStringLiteral("duration"), 0.6).toDouble(), 0.0, 10.0);
+        inst.behavior.open = false;
+        model.setInstance(id, inst);
+    });
 }
 
 std::optional<math::Vec3d> Document::surfacePoint(const view::Camera& camera, math::Vec2d screen) const

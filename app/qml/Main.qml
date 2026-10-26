@@ -21,7 +21,8 @@ Window {
     property bool leftPanelVisible: true
     property bool rightPanelVisible: true
     property string activeTool: "select"
-    readonly property var navigationTools: ["orbit", "pan", "zoom"]
+    // Uneltele tratate de viewport (nu de Document): navigarea și Interact.
+    readonly property var navigationTools: ["orbit", "pan", "zoom", "interact"]
 
     // Toate comenzile aplicației; apar în command palette și au scurtături.
     readonly property var commands: {
@@ -260,6 +261,10 @@ Window {
                     // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("behavior:")) {
+                    // „behavior:rotate,0,90” pe instanța selectată.
+                    const bh = action.slice(9).split(",")
+                    doc.setBehavior({ kind: bh[0], anchor: parseInt(bh[1]), amount: parseFloat(bh[2]), duration: 0.6 })
                 } else if (action.startsWith("exportvideo:")) {
                     window.exportVideo(action.slice(12))
                 } else if (action.startsWith("moves:")) {
