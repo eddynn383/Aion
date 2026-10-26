@@ -43,6 +43,8 @@ private:
     std::unique_ptr<QRhiBuffer> m_quadCorners; // 6 vârfuri pentru linii
     std::unique_ptr<QRhiBuffer> m_pointCorners; // 6 vârfuri pentru puncte
     bool m_cornersUploaded = false;
+    bool m_shadowsSupported = true;
+    bool shadowsActive() const { return m_frame.shadows && m_shadowsSupported; }
     std::unique_ptr<QRhiBuffer> m_lineInstances;
     std::unique_ptr<QRhiBuffer> m_pointInstances;
     std::unique_ptr<QRhiBuffer> m_mesh;

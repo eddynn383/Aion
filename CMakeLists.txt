@@ -14,11 +14,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(AionOptions)
 
-if(EMSCRIPTEN AND AION_BUILD_APP)
-    message(STATUS "Emscripten: compilăm doar core și testele (aplicația Qt pentru web vine în Faza 12)")
-    set(AION_BUILD_APP OFF)
-endif()
-
 # Core-ul nu depinde de Qt: se poate compila singur (teste, WebAssembly).
 add_subdirectory(core)
 

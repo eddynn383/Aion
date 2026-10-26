@@ -7,7 +7,9 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#if QT_CONFIG(process)
 #include <QProcess>
+#endif
 #include <QStandardPaths>
 #include <QKeySequence>
 #include <QMouseEvent>
@@ -107,6 +109,23 @@ QString AppInfo::shortcutText(const QString& sequence) const
     return QKeySequence(sequence).toString(QKeySequence::NativeText);
 }
 
+QString AppInfo::platformText(const QString& text) const
+{
+#ifdef Q_OS_MACOS
+    return text;
+#else
+    QString result = text;
+    result.replace(QStringLiteral("Option (⌥)"), QStringLiteral("Alt"))
+        .replace(QStringLiteral("⇧⌘"), QStringLiteral("Ctrl+Shift+"))
+        .replace(QStringLiteral("⌘"), QStringLiteral("Ctrl+"))
+        .replace(QStringLiteral("⌥"), QStringLiteral("Alt"))
+        .replace(QStringLiteral("⇧"), QStringLiteral("Shift"))
+        .replace(QStringLiteral("Option"), QStringLiteral("Alt"))
+        .replace(QStringLiteral("Cmd"), QStringLiteral("Ctrl"));
+    return result;
+#endif
+}
+
 QString AppInfo::encodeVideo(const QString& directory, int fps, const QString& output) const
 {
     QDir dir(directory);
@@ -127,11 +146,15 @@ QString AppInfo::encodeVideo(const QString& directory, int fps, const QString& o
                 { QDir::homePath() + QStringLiteral("/homebrew/bin"), QStringLiteral("/opt/homebrew/bin"),
                     QStringLiteral("/usr/local/bin") });
         }
+#if !QT_CONFIG(process)
+        ffmpeg.clear(); // în browser nu se pot porni procese
+#endif
         if (ffmpeg.isEmpty()) {
             return error.isEmpty() ? QStringLiteral("Niciun encoder video (instalează ffmpeg); cadrele au rămas în ")
                     + directory
                                    : error;
         }
+#if QT_CONFIG(process)
         const int code = QProcess::execute(ffmpeg,
             { QStringLiteral("-y"), QStringLiteral("-loglevel"), QStringLiteral("error"), QStringLiteral("-framerate"),
                 QString::number(fps), QStringLiteral("-i"), dir.filePath(QStringLiteral("frame_%05d.png")),
@@ -141,6 +164,7 @@ QString AppInfo::encodeVideo(const QString& directory, int fps, const QString& o
         if (!ok) {
             return QStringLiteral("ffmpeg a eșuat (cod %1); cadrele au rămas în %2").arg(code).arg(directory);
         }
+#endif
     }
     dir.removeRecursively();
     return {};

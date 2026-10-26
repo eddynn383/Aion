@@ -7,6 +7,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <numbers>

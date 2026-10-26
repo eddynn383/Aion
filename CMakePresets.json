@@ -48,6 +48,41 @@
       }
     },
     {
+      "name": "win-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "win-debug",
+      "displayName": "Windows Debug (MSVC, Ninja; din „Developer PowerShell for VS”)",
+      "inherits": "win-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "win-release",
+      "displayName": "Windows Release (MSVC, Ninja)",
+      "inherits": "win-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "core-debug",
       "displayName": "Doar core + teste, fără Qt (orice platformă)",
       "inherits": "base",
@@ -68,6 +103,20 @@
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
       }
+    },
+    {
+      "name": "wasm-app",
+      "displayName": "Aplicația completă pentru web (Qt for WebAssembly; QT_ROOT_DIR = Qt wasm, QT_HOST_PATH = Qt desktop)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AION_BUILD_TESTS": "OFF",
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten-qt",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{QT_ROOT_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
+        "QT_HOST_PATH": "$env{QT_HOST_PATH}",
+        "AION_WASM_JS_EXCEPTIONS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -80,12 +129,24 @@
       "configurePreset": "mac-release"
     },
     {
+      "name": "win-debug",
+      "configurePreset": "win-debug"
+    },
+    {
+      "name": "win-release",
+      "configurePreset": "win-release"
+    },
+    {
       "name": "core-debug",
       "configurePreset": "core-debug"
     },
     {
       "name": "wasm-core",
       "configurePreset": "wasm-core"
+    },
+    {
+      "name": "wasm-app",
+      "configurePreset": "wasm-app"
     }
   ],
   "testPresets": [
@@ -105,6 +166,16 @@
       "name": "mac-release",
       "inherits": "test-base",
       "configurePreset": "mac-release"
+    },
+    {
+      "name": "win-debug",
+      "inherits": "test-base",
+      "configurePreset": "win-debug"
+    },
+    {
+      "name": "win-release",
+      "inherits": "test-base",
+      "configurePreset": "win-release"
     },
     {
       "name": "core-debug",

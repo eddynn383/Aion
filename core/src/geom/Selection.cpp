@@ -2,6 +2,7 @@
 
 #include "aion/core/geom/Mesh.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace aion::geom {

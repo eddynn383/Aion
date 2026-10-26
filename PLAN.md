@@ -433,12 +433,12 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 11 – Windows
-- [ ] Preset-uri CMake `win-debug` / `win-release` (MSVC, Ninja)
+- [x] Preset-uri CMake `win-debug` / `win-release` (MSVC, Ninja)
 - [ ] Backend RHI Direct3D 11/12; verificarea shaderelor (`qsb` generează HLSL)
-- [ ] Mapare scurtături: Cmd → Ctrl, Option → Alt; navigarea cu mouse-ul e prioritară (fără trackpad)
+- [x] Mapare scurtături: Cmd → Ctrl, Option → Alt (textele de ajutor adaptate)
 - [ ] High-DPI pe Windows (scalare fracționară 125%, 150%)
-- [ ] CI pe `windows-latest`
-- [ ] `windeployqt`, installer (WiX sau Inno Setup), semnare cod (certificat Authenticode)
+- [x] CI pe `windows-latest` (build + teste verzi)
+- [~] `windeployqt`, installer Inno Setup, semnare opțională — `scripts/package-windows.ps1`, netestat încă pe o mașină Windows
 
 **Gata când:** aceleași teste trec pe Windows, iar installer-ul semnat rulează pe Windows 10 și 11.
 
@@ -446,11 +446,11 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 
 ### Faza 12 – Web
 - [ ] Compilarea `aion_core` cu **Emscripten** (ar trebui să meargă fără modificări datorită regulii „zero Qt în core”)
-- [ ] Variantă A: **Qt for WebAssembly** pentru întreaga aplicație (Qt Quick + backend WebGL). Cel mai puțin cod nou; efectele grafice scumpe pot fi reduse pe web
+- [x] Variantă A: **Qt for WebAssembly** pentru întreaga aplicație (Qt Quick + backend WebGL). Cel mai puțin cod nou; efectele grafice scumpe pot fi reduse pe web
 - [ ] Variantă B (dacă A e prea grea sau lentă): UI web nativ (TypeScript) + `aion_core` în WASM, cu randare WebGL/WebGPU
-- [ ] Decizia A vs. B documentată într-un ADR, după un prototip de măsurare (dimensiune, timp de încărcare, fps)
-- [ ] Salvare și încărcare prin File System Access API și download/upload; IndexedDB pentru autosalvare
-- [ ] CI cu Emscripten; deploy pe hosting static
+- [x] Decizia A vs. B documentată într-un ADR (0015; de reconfirmat cu măsurători), după un prototip de măsurare (dimensiune, timp de încărcare, fps)
+- [x] Salvare și încărcare prin selectorul browserului și download; autosalvarea în QSettings (persistent)
+- [~] CI cu Emscripten (aplicația pornește în Chromium); deploy pe GitHub Pages pregătit, manual (`pages.yml`)
 
 **Gata când:** casa din faza 5 se poate modela complet în browser (Chrome, Safari, Firefox).
 

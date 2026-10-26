@@ -35,6 +35,16 @@ namespace aion::render {
 
 namespace {
 
+// Căile vin din Qt ca UTF-16; pe Windows, std::string ar fi interpretat în codepage-ul local (diacriticele s-ar pierde).
+std::filesystem::path toPath(const QString& path)
+{
+    return std::filesystem::path(path.toStdU16String());
+}
+
+// Copia de recuperare, pe web (unde fișierele nu persistă).
+const QString kRecoveryDataKey = QStringLiteral("recovery/data");
+
+
 QString plural(std::size_t n, const char* one, const char* many)
 {
     return n == 1 ? QStringLiteral("1 %1").arg(QString::fromUtf8(one))
@@ -99,6 +109,16 @@ Document::Document(QObject* parent)
     setActiveTool(QStringLiteral("select"));
 
     // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate.
+#ifdef Q_OS_WASM
+    // În browser, fișierele sunt doar în memorie: copia de recuperare stă în QSettings (IndexedDB / localStorage).
+    {
+        const QByteArray data = QSettings().value(kRecoveryDataKey).toByteArray();
+        QFile file(autosavePath());
+        if (!data.isEmpty() && !file.exists() && file.open(QIODevice::WriteOnly)) {
+            file.write(data);
+        }
+    }
+#endif
     m_hasRecovery = QFile::exists(autosavePath());
     m_autosaveTimer.setInterval(60'000);
     connect(&m_autosaveTimer, &QTimer::timeout, this, &Document::autosave);
@@ -370,7 +390,7 @@ void Document::newDocument()
 
 bool Document::openFile(const QString& path)
 {
-    const io::LoadResult result = io::loadFile(std::filesystem::path(path.toStdString()));
+    const io::LoadResult result = io::loadFile(toPath(path));
     if (!result.model) {
         setError(QStringLiteral("„%1” nu a putut fi deschis. %2")
                      .arg(QFileInfo(path).fileName(), QString::fromStdString(result.error)));
@@ -392,7 +412,7 @@ bool Document::saveFile(const QString& path, const QByteArray& thumbnailPng)
     }
     std::string error;
     const auto* bytes = reinterpret_cast<const std::uint8_t*>(thumbnailPng.constData());
-    if (!io::saveFile(std::filesystem::path(target.toStdString()), m_model,
+    if (!io::saveFile(toPath(target), m_model,
             std::span(bytes, static_cast<std::size_t>(thumbnailPng.size())), &error)) {
         setError(QStringLiteral("„%1” nu a putut fi salvat. %2")
                      .arg(QFileInfo(target).fileName(), QString::fromStdString(error)));
@@ -433,7 +453,7 @@ bool Document::importFile(const QString& path)
         });
     } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
         run([&](model::Model& model) {
-            return io::importGltf(model, activeDefinition(), std::filesystem::path(path.toStdString()));
+            return io::importGltf(model, activeDefinition(), toPath(path));
         });
     } else {
         setError(QStringLiteral("Formatul „.%1” nu se poate importa (OBJ, glTF, GLB).").arg(ext));
@@ -465,7 +485,7 @@ bool Document::exportFile(const QString& path)
                 && mtl.write(mtlText.data(), qint64(mtlText.size())) == qint64(mtlText.size());
         }
     } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
-        ok = io::exportGltf(m_model, std::filesystem::path(path.toStdString()), ext == QLatin1String("glb"), {}, &error);
+        ok = io::exportGltf(m_model, toPath(path), ext == QLatin1String("glb"), {}, &error);
     } else {
         setError(QStringLiteral("Formatul „.%1” nu se poate exporta (OBJ, glTF, GLB).").arg(ext));
         return false;
@@ -481,10 +501,16 @@ void Document::autosave()
     if (!modified()) {
         return;
     }
-    if (io::saveFile(std::filesystem::path(autosavePath().toStdString()), m_model)) {
+    if (io::saveFile(toPath(autosavePath()), m_model)) {
         QSettings settings;
         settings.setValue(kRecoverySourceKey, m_filePath);
         settings.setValue(kRecoveryTimeKey, QDateTime::currentDateTime());
+#ifdef Q_OS_WASM
+        QFile file(autosavePath());
+        if (file.open(QIODevice::ReadOnly)) {
+            settings.setValue(kRecoveryDataKey, file.readAll());
+        }
+#endif
     }
 }
 
@@ -494,6 +520,7 @@ void Document::removeAutosave()
     QSettings settings;
     settings.remove(kRecoverySourceKey);
     settings.remove(kRecoveryTimeKey);
+    settings.remove(kRecoveryDataKey);
     if (m_hasRecovery) {
         m_hasRecovery = false;
         emit recoveryChanged();
@@ -503,7 +530,7 @@ void Document::removeAutosave()
 void Document::recoverAutosave()
 {
     const QString source = QSettings().value(kRecoverySourceKey).toString();
-    const io::LoadResult result = io::loadFile(std::filesystem::path(autosavePath().toStdString()));
+    const io::LoadResult result = io::loadFile(toPath(autosavePath()));
     if (!result.model) {
         setError(QStringLiteral("Sesiunea nu a putut fi recuperată. %1").arg(QString::fromStdString(result.error)));
         discardAutosave();
@@ -586,7 +613,15 @@ void Document::setActiveTool(const QString& id)
 
 QString Document::toolStatus() const
 {
-    return m_tool ? QString::fromStdString(m_tool->status()) : QString();
+    if (!m_tool) {
+        return {};
+    }
+    QString status = QString::fromStdString(m_tool->status());
+#ifndef Q_OS_MACOS
+    // Textele din core folosesc numele tastelor de pe Mac; pe Windows și Linux: Alt și Ctrl.
+    status.replace(QStringLiteral("Option"), QStringLiteral("Alt")).replace(QStringLiteral("Cmd"), QStringLiteral("Ctrl"));
+#endif
+    return status;
 }
 
 QString Document::undoName() const

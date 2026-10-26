@@ -34,5 +34,11 @@ if(EMSCRIPTEN)
     target_link_options(aion_tests PRIVATE -sNODERAWFS=1)
 endif()
 
-# Testele sunt descoperite la rularea ctest, nu la build, ca un test blocat să nu blocheze build-ul.
-catch_discover_tests(aion_tests DISCOVERY_MODE PRE_TEST)
+if(WIN32)
+    # Pe Windows, numele testelor (cu diacritice) ajung la Catch2 prin codepage-ul consolei și nu se mai potrivesc
+    # ca filtre; rulăm toate testele într-un singur proces.
+    add_test(NAME aion_tests COMMAND aion_tests)
+else()
+    # Testele sunt descoperite la rularea ctest, nu la build, ca un test blocat să nu blocheze build-ul.
+    catch_discover_tests(aion_tests DISCOVERY_MODE PRE_TEST)
+endif()

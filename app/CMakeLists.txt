@@ -8,6 +8,8 @@ qt_add_executable(aion_app
     src/bridge/IconProvider.h
     src/bridge/NavigationCursors.cpp
     src/bridge/NavigationCursors.h
+    src/bridge/WebFiles.cpp
+    src/bridge/WebFiles.h
     src/platform/Platform.h
     src/platform/Video.h
 )
@@ -104,9 +106,12 @@ qt_add_resources(aion_app "aion_assets"
 )
 
 # Iconița aplicației: generată la compilare din SVG-urile din resources/branding (fără imagini binare în repo).
-qt_add_executable(aion_iconrender "${PROJECT_SOURCE_DIR}/tools/iconrender/main.cpp")
-set_target_properties(aion_iconrender PROPERTIES MACOSX_BUNDLE OFF)
-target_link_libraries(aion_iconrender PRIVATE Qt6::Gui Qt6::Svg)
+# (Pe web nu e nevoie: iconița paginii e SVG-ul, iar unealta n-ar putea rula la build.)
+if(NOT EMSCRIPTEN)
+    qt_add_executable(aion_iconrender "${PROJECT_SOURCE_DIR}/tools/iconrender/main.cpp")
+    set_target_properties(aion_iconrender PROPERTIES MACOSX_BUNDLE OFF)
+    target_link_libraries(aion_iconrender PRIVATE Qt6::Gui Qt6::Svg)
+endif()
 if(APPLE)
     set(AION_ICON_BIG "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon.svg")
     set(AION_ICON_SMALL "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon-small.svg")
@@ -136,6 +141,29 @@ if(APPLE)
             VERBATIM
         )
     endif()
+endif()
+
+if(WIN32)
+    # Iconița din Explorer și din bara de activități: un .ico generat din aceleași SVG-uri, legat printr-un .rc.
+    set(AION_ICON_DIR "${CMAKE_CURRENT_BINARY_DIR}/icon")
+    add_custom_command(
+        OUTPUT "${AION_ICON_DIR}/Aion.ico"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${AION_ICON_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=offscreen
+                $<TARGET_FILE:aion_iconrender> "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon.svg"
+                "${PROJECT_SOURCE_DIR}/resources/branding/aion-icon-small.svg" "${AION_ICON_DIR}/Aion.ico"
+        DEPENDS aion_iconrender
+        COMMENT "Iconița aplicației (Aion.ico)"
+        VERBATIM
+    )
+    file(WRITE "${AION_ICON_DIR}/Aion.rc" "IDI_ICON1 ICON \"Aion.ico\"\n")
+    target_sources(aion_app PRIVATE "${AION_ICON_DIR}/Aion.rc" "${AION_ICON_DIR}/Aion.ico")
+endif()
+
+if(EMSCRIPTEN)
+    # QFileDialog::getOpenFileContent / saveFileContent (selectorul și download-ul browserului).
+    find_package(Qt6 REQUIRED COMPONENTS Widgets)
+    target_link_libraries(aion_app PRIVATE Qt6::Widgets)
 endif()
 
 target_link_libraries(aion_app PRIVATE

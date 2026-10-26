@@ -4,6 +4,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 namespace aion::math {

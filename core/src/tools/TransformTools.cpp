@@ -8,6 +8,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>

@@ -16,7 +16,8 @@ Window {
     title: doc.fileName + (doc.modified ? " — modificat" : "") + " · Aion"
     color: Theme.bgApp
     // Conținutul continuă sub bara de titlu (macOS: butoanele native rămân, fără fundal propriu).
-    flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+    // Pe Windows și Linux rămâne bara de titlu a sistemului (TitleBar-ul nostru stă sub ea).
+    flags: Qt.platform.os === "osx" ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
 
     property bool leftPanelVisible: true
     property bool rightPanelVisible: true
@@ -514,6 +515,11 @@ Window {
 
     // Salvează (în fișierul curent sau, dacă nu are, prin dialog), apoi rulează `then` dacă a reușit.
     function save(then) {
+        if (WebFiles.available) {
+            if (window.webSave("aion") && then)
+                then()
+            return
+        }
         if (doc.filePath.length === 0) {
             fileDialog.afterSave = then
             fileDialog.ask("saveAs")
@@ -550,6 +556,29 @@ Window {
         property var reportOptions: ({})
 
         function ask(what) {
+            // În browser: selectorul de fișiere al browserului și download-uri.
+            if (WebFiles.available) {
+                switch (what) {
+                case "open": WebFiles.pick("open", "Modele Aion (*.aion)"); break
+                case "import": WebFiles.pick("import", "Modele 3D (*.obj *.gltf *.glb)"); break
+                case "saveAs":
+                    if (window.webSave("aion") && afterSave) afterSave()
+                    afterSave = null
+                    break
+                case "exportObj": window.webSave("obj"); break
+                case "exportGlb": window.webSave("glb"); break
+                case "exportGltf": window.webSave("gltf"); break
+                case "exportPng": window.webSave("png"); break
+                case "exportReport": {
+                    const name = doc.fileName + (reportKind === "cutlist" ? " - debitare" : " - cantitati") + ".csv"
+                    const path = WebFiles.temporaryPath(name)
+                    if (doc.exportReport(path, reportKind, reportOptions)) WebFiles.download(path, name)
+                    break
+                }
+                case "exportVideo": toast.show("Exportul video nu e disponibil în browser (folosește aplicația desktop)."); break
+                }
+                return
+            }
             purpose = what
             const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng", "exportReport", "exportVideo"].includes(what)
             fileMode = save ? FileDialog.SaveFile : FileDialog.OpenFile
@@ -602,6 +631,34 @@ Window {
     Connections {
         target: doc
         function onErrorChanged() { toast.show(doc.lastError) }
+    }
+
+    // Web: salvează în memorie, apoi descarcă (kind: aion, obj, glb, gltf, png).
+    function webSave(kind) {
+        const name = doc.fileName + "." + kind
+        const path = WebFiles.temporaryPath(name)
+        let ok = false
+        if (kind === "aion")
+            ok = doc.saveFile(path, viewport.captureThumbnail())
+        else if (kind === "png")
+            ok = viewport.saveImage(path)
+        else
+            ok = doc.exportFile(path)
+        if (ok) {
+            WebFiles.download(path, name)
+            if (kind === "obj")
+                WebFiles.download(path.replace(/\.obj$/, ".mtl"), doc.fileName + ".mtl")
+        }
+        return ok
+    }
+    Connections {
+        target: WebFiles
+        function onFilePicked(purpose, path) {
+            if (purpose === "open")
+                window.confirmDiscard(() => doc.openFile(path))
+            else
+                doc.importFile(path)
+        }
     }
 
     // Animația scenelor → cadre PNG (viewport) → video MP4 (AppInfo.encodeVideo).

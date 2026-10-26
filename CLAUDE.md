@@ -115,6 +115,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   (`resources/icons/style-*.svg`), umbre, secțiuni, proiecție, grid. Inspector-ul e doar pentru selecție.
   Rulările cu `AION_SCREENSHOT` / `AION_STARTUP` au profilul lor („Aion Test”): nu ating setările utilizatorului.
 
+- **Faza 11** (Windows): CI verde pe MSVC (ADR 0014); installerul Inno Setup e scris, dar netestat pe o mașină reală.
+- **Faza 12** (Web, ADR 0015): preset `wasm-app` (Qt 6.10 wasm + Emscripten 4.0.7, excepții JS, triplet
+  `wasm32-emscripten-qt`); CI produce artefactul `aion-web`, care pornește în Chromium (verificat cu Playwright).
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 

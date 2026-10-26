@@ -4,6 +4,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <map>
 
 namespace aion::geom {

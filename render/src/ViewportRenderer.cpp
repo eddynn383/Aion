@@ -12,6 +12,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/matrix.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 
@@ -127,8 +128,12 @@ void ViewportRenderer::createStaticResources()
     m_uniforms->create();
 
     // Harta de umbre (există mereu, ca legăturile shaderelor să fie aceleași; se desenează doar cu umbrele active).
-    const QSize shadowSize(kShadowMapSize, kShadowMapSize);
-    m_shadowTexture.reset(m_rhi->newTexture(QRhiTexture::R32F, shadowSize, 1, QRhiTexture::RenderTarget));
+    // Pe WebGL 2 fără EXT_color_buffer_float nu se poate randa în R32F: umbrele se dezactivează (textura rămâne,
+    // mică, doar pentru legăturile shaderelor).
+    m_shadowsSupported = m_rhi->isTextureFormatSupported(QRhiTexture::R32F);
+    const QSize shadowSize = m_shadowsSupported ? QSize(kShadowMapSize, kShadowMapSize) : QSize(4, 4);
+    m_shadowTexture.reset(m_rhi->newTexture(m_shadowsSupported ? QRhiTexture::R32F : QRhiTexture::RGBA8, shadowSize, 1,
+        QRhiTexture::RenderTarget));
     m_shadowTexture->create();
     m_shadowDepth.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, shadowSize, 1));
     m_shadowDepth->create();
@@ -363,7 +368,7 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     const glm::dmat4 lightProj = glm::ortho(-radius, radius, -radius, radius, radius * 0.5, radius * 3.5);
     m_lightViewProj = glm::dmat4(corrF) * lightProj * lightView;
     copyMatrix(u.lightViewProj, m_lightViewProj);
-    u.shadow[0] = m_frame.shadows ? 1.0f : 0.0f;
+    u.shadow[0] = shadowsActive() ? 1.0f : 0.0f;
     u.shadow[1] = static_cast<float>(radius * 0.0015);
     u.shadow[2] = 1.0f / static_cast<float>(kShadowMapSize);
     u.shadow[3] = static_cast<float>(std::clamp(m_frame.sunIntensity, 0.0, 1.0)) * 0.85f;
@@ -435,7 +440,7 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
 
     // Harta de umbre, înaintea celorlalte treceri.
-    if (m_frame.shadows) {
+    if (shadowsActive()) {
         cb->beginPass(m_shadowTarget.get(), QColor::fromRgbF(1, 1, 1, 1), { 1.0f, 0 }, batch);
         batch = nullptr;
         if (m_mesh && m_meshVertexCount > 0) {
@@ -499,7 +504,7 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         cb->draw(m_meshVertexCount);
     }
 
-    if (m_frame.shadows) {
+    if (shadowsActive()) {
         cb->setGraphicsPipeline(m_groundPipeline.get());
         cb->setShaderResources();
         cb->draw(3);

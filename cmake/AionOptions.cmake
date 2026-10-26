@@ -2,6 +2,8 @@ option(AION_BUILD_APP "Compilează aplicația Qt (render + app)" ON)
 option(AION_BUILD_TESTS "Compilează testele" ON)
 option(AION_ENABLE_SANITIZERS "Activează AddressSanitizer și UndefinedBehaviorSanitizer" OFF)
 option(AION_WARNINGS_AS_ERRORS "Tratează warning-urile ca erori" OFF)
+# WebAssembly: excepțiile JavaScript (ca Qt for WebAssembly precompilat) în loc de cele native.
+option(AION_WASM_JS_EXCEPTIONS "Emscripten: -fexceptions în loc de -fwasm-exceptions (aplicația web cu Qt)" OFF)
 
 # Pe unele combinații compilator + sistem, runtime-ul ASan se blochează încă de la pornire
 # (de exemplu Apple clang 17 pe macOS 26: deadlock în AsanInitInternal). Verificăm o dată,
@@ -43,7 +45,9 @@ endif()
 # Setări comune pentru toate țintele noastre (nu și pentru dependențe).
 function(aion_configure_target target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8 /Zc:__cplusplus)
+        # getenv, fopen etc. sunt „nesigure” pentru MSVC; le folosim corect, fără variantele _s nestandard.
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
         if(AION_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE /WX)
         endif()
@@ -63,7 +67,11 @@ function(aion_configure_target target)
     endif()
 
     # WebAssembly: excepții native (ca dependențele din tripletul nostru) și memorie care poate crește.
-    if(EMSCRIPTEN)
+    if(EMSCRIPTEN AND AION_WASM_JS_EXCEPTIONS)
+        # Aplicația web: Qt își pune singur opțiunile de memorie și de rulare.
+        target_compile_options(${target} PRIVATE -fexceptions)
+        target_link_options(${target} PRIVATE -fexceptions)
+    elseif(EMSCRIPTEN)
         target_compile_options(${target} PRIVATE -fwasm-exceptions)
         target_link_options(${target} PRIVATE -fwasm-exceptions -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=4MB
             -sEXIT_RUNTIME=1)
