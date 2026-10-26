@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/units/Length.h"
@@ -602,7 +603,205 @@ private:
     std::optional<std::vector<Vec3d>> m_preview;
 };
 
+
+// --- Obiecte primitive: cub, cilindru, con, sferă ---------------------------------------------
+// Click: centrul bazei (pe sol sau pe o față, în planul ei); mișcarea alege mărimea; al doilea click creează un obiect
+// nou (definiție proprie, ca să nu taie geometria pe care stă). VCB: „1000” (lățime/diametru) sau „1000,500” (și
+// înălțimea).
+
+class PrimitiveTool final : public Tool {
+public:
+    PrimitiveTool(std::string_view id, geom::Primitive kind, std::string name)
+        : m_id(id)
+        , m_kind(kind)
+        , m_name(std::move(name))
+    {
+    }
+
+    std::string_view id() const override { return m_id; }
+
+    void pointerDown(ToolContext& ctx, const PointerEvent& e) override
+    {
+        track(ctx, e);
+        if (!m_center) {
+            if (m_inference.valid()) {
+                m_center = m_inference.point;
+                m_normal = m_hoverNormal;
+                m_radius = Vec3d { 0.0 };
+            }
+            return;
+        }
+        commit(ctx, 2.0 * glm::length(m_radius), std::nullopt);
+    }
+
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override { track(ctx, e); }
+    void pointerUp(ToolContext& /*ctx*/, const PointerEvent& /*e*/) override { }
+
+    void cancel(ToolContext& /*ctx*/) override
+    {
+        m_center.reset();
+        m_engine.reset();
+    }
+
+    Overlay overlay() const override
+    {
+        Overlay o;
+        if (m_center) {
+            o.points.push_back(*m_center);
+            const double width = 2.0 * glm::length(m_radius);
+            if (width > tol::kLength) {
+                const auto [u, v] = axes();
+                const double h = width;
+                // Conturul bazei și al capacului (sau ecuatorul, la sferă), plus muchiile verticale ale cubului.
+                const auto outline = [&](double z, double scale) {
+                    std::vector<Vec3d> pts;
+                    const int n = m_kind == geom::Primitive::Box ? 4 : 32;
+                    for (int k = 0; k < n; ++k) {
+                        const double a = m_kind == geom::Primitive::Box ? std::numbers::pi / 4 + k * std::numbers::pi / 2
+                                                                        : 2.0 * std::numbers::pi * k / n;
+                        const double rr = width / 2 * scale * (m_kind == geom::Primitive::Box ? std::sqrt(2.0) : 1.0);
+                        pts.push_back(*m_center + (u * std::cos(a) + v * std::sin(a)) * rr + m_normal * z);
+                    }
+                    appendPolyline(o, pts, true);
+                    return pts;
+                };
+                const auto base = outline(0.0, 1.0);
+                if (m_kind == geom::Primitive::Sphere) {
+                    outline(h / 2, 1.0);
+                } else if (m_kind != geom::Primitive::Cone) {
+                    const auto top = outline(h, 1.0);
+                    if (m_kind == geom::Primitive::Box) {
+                        for (std::size_t i = 0; i < base.size(); ++i) {
+                            o.lines.push_back({ base[i], top[i], false });
+                        }
+                    }
+                }
+                if (m_kind == geom::Primitive::Cone) {
+                    o.lines.push_back({ base.front(), *m_center + m_normal * h, false });
+                    o.lines.push_back({ base[base.size() / 2], *m_center + m_normal * h, false });
+                }
+                o.dimensions.push_back({ *m_center - u * (width / 2), *m_center + u * (width / 2), units::formatLength(width) });
+            }
+        }
+        appendInference(o, m_inference);
+        return o;
+    }
+
+    view::PickResult hover() const override { return inferenceHover(m_inference); }
+
+    std::string status() const override
+    {
+        if (m_center) {
+            return "Alege mărimea sau tastează-o (1000, sau 1000,500 cu înălțimea) · Esc anulează";
+        }
+        return "Alege centrul bazei " + m_name + " (pe o față: în planul ei)";
+    }
+
+    std::optional<Measurement> measurement() const override
+    {
+        const bool round = m_kind != geom::Primitive::Box;
+        return Measurement { round ? "Diametru" : "Latură",
+            m_center ? units::formatLength(2.0 * glm::length(m_radius)) : "" };
+    }
+
+    bool applyMeasurement(ToolContext& ctx, std::string_view text) override
+    {
+        const auto values = units::parseLengths(text, 2);
+        if (!values || values->empty() || !m_center) {
+            return false;
+        }
+        const double width = (*values)[0].value_or(2.0 * glm::length(m_radius));
+        if (width <= tol::kLength) {
+            return false;
+        }
+        std::optional<double> height;
+        if (values->size() > 1 && (*values)[1] && *(*values)[1] > tol::kLength) {
+            height = *(*values)[1];
+        }
+        commit(ctx, width, height);
+        return true;
+    }
+
+private:
+    [[nodiscard]] std::pair<Vec3d, Vec3d> axes() const
+    {
+        const Vec3d u = glm::length(m_radius) > tol::kLength ? glm::normalize(m_radius) : anyPerpendicular(m_normal);
+        return { u, glm::cross(m_normal, u) };
+    }
+
+    void track(ToolContext& ctx, const PointerEvent& e)
+    {
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_center);
+        if (!m_center) {
+            if (m_inference.valid()) {
+                m_hoverNormal = drawingNormal(ctx, m_inference, std::nullopt);
+            }
+            return;
+        }
+        if (const auto p = pointOnPlane(ctx, e.screen, m_inference, *m_center, m_normal)) {
+            m_radius = *p - *m_center;
+        }
+    }
+
+    void commit(ToolContext& ctx, double width, std::optional<double> height)
+    {
+        if (!m_center || width <= tol::kLength || ctx.model == nullptr) {
+            m_center.reset();
+            return;
+        }
+        const auto [u, v] = axes();
+        // Local: baza centrată în origine, în sus pe Z → global: centrul ales, normala planului.
+        glm::dmat4 m(1.0);
+        m[0] = glm::dvec4(u, 0.0);
+        m[1] = glm::dvec4(v, 0.0);
+        m[2] = glm::dvec4(m_normal, 0.0);
+        m[3] = glm::dvec4(*m_center, 1.0);
+        const Vec3d size { width, width, height.value_or(width) };
+        const geom::Primitive kind = m_kind;
+        const std::string name = m_name;
+        model::InstanceId created;
+        ctx.stack.run(name, [&](model::Model& model) {
+            const model::DefinitionId def = model.addDefinition({ name, true });
+            geom::buildPrimitive(model.mesh(def), kind, size, 24);
+            created = model.addInstance({ ctx.context, def, math::Transform(m), name, {}, false, false, {}, {} });
+        });
+        if (created) {
+            ctx.selection.clear();
+            ctx.selection.instances.insert(created);
+        }
+        m_center.reset();
+        m_engine.resetLock();
+    }
+
+    std::string_view m_id;
+    geom::Primitive m_kind;
+    std::string m_name;
+    std::optional<Vec3d> m_center;
+    Vec3d m_normal { 0, 0, 1 };
+    Vec3d m_hoverNormal { 0, 0, 1 };
+    Vec3d m_radius { 0.0 };
+    inference::Engine m_engine;
+    inference::Inference m_inference;
+};
+
 } // namespace
+
+std::unique_ptr<Tool> makePrimitiveTool(std::string_view id)
+{
+    if (id == "cube") {
+        return std::make_unique<PrimitiveTool>("cube", geom::Primitive::Box, "Cub");
+    }
+    if (id == "cylinder") {
+        return std::make_unique<PrimitiveTool>("cylinder", geom::Primitive::Cylinder, "Cilindru");
+    }
+    if (id == "cone") {
+        return std::make_unique<PrimitiveTool>("cone", geom::Primitive::Cone, "Con");
+    }
+    if (id == "sphere") {
+        return std::make_unique<PrimitiveTool>("sphere", geom::Primitive::Sphere, "Sferă");
+    }
+    return nullptr;
+}
 
 std::unique_ptr<Tool> makeCircleTool()
 {

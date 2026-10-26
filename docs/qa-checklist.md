@@ -25,6 +25,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Push/Pull: cutie, extindere, micșorare, fereastră prin perete, nișă, dublu-click repetă, Option păstrează fața
 - [ ] Move / Rotate / Scale cu VCB; Option copiază; `x3` și `/3`; acoperiș în două ape (Move pe coamă, ↑)
 - [ ] Offset, Eraser (curbe întregi), Select (click, dublu, triplu, dreptunghi window/crossing)
+## Toolbar și obiecte (Faza 13)
+- [ ] Toolbar: Select/Interact, Desen (Line, Arc, Rectangle, Circle, Polygon), Obiecte (Cub, Sferă, Con, Cilindru), Push/Pull…, Eraser singur
+- [ ] Cub / Sferă / Con / Cilindru: click centru, click mărime; VCB „1000” sau „1000,500”; pe o față: în planul ei; rezultatul e un obiect selectat
+- [ ] Materiale: click pe un material → Paint Bucket activ, cursor găleată; grila umple lățimea panoului; tasta B pornește Paint Bucket
 ## Organizare
 - [ ] Creează grup (⌘G) / obiect (⇧⌘G); dublu-click intră, Esc iese; restul se estompează
 - [ ] Copii ale unui obiect se modifică împreună; Fă unic; Desface

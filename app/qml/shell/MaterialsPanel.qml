@@ -10,6 +10,10 @@ Item {
     signal paintRequested()
 
     readonly property string query: search.text.trim().toLowerCase()
+    // Grila umple lățimea: câte coloane încap (minimum 56 px), iar celulele se lățesc egal.
+    readonly property real gridSpacing: Theme.space2
+    readonly property int columns: Math.max(3, Math.floor((width + gridSpacing) / (56 + gridSpacing)))
+    readonly property real cellWidth: Math.floor((width - gridSpacing * (columns - 1)) / columns)
     function matches(m) { return root.query.length === 0 || m.name.toLowerCase().indexOf(root.query) >= 0 }
 
     component Swatch: Item {
@@ -18,15 +22,15 @@ Item {
         property bool current: false
         signal clicked()
         signal doubleClicked()
-        width: 56
-        height: 74
+        width: root.cellWidth
+        height: ball.height + 26
 
         Rectangle {
             id: ball
             anchors.horizontalCenter: parent.horizontalCenter
-            width: 48
-            height: 48
-            radius: 24
+            width: Math.min(64, swatch.width - 8)
+            height: width
+            radius: width / 2
             color: swatch.material.color.a === 0 ? Theme.bgHover : swatch.material.color
             border.color: swatch.current ? Theme.accent : Theme.borderStrong
             border.width: swatch.current ? 2 : 1
@@ -119,7 +123,7 @@ Item {
             }
             Flow {
                 width: parent.width
-                spacing: Theme.space2
+                spacing: root.gridSpacing
                 Swatch {
                     material: ({ name: "Implicit", color: Qt.rgba(0, 0, 0, 0), metallic: 0 })
                     current: root.document.currentMaterial.source === "default"
@@ -154,7 +158,7 @@ Item {
             }
             Flow {
                 width: parent.width
-                spacing: Theme.space2
+                spacing: root.gridSpacing
                 Repeater {
                     model: root.document.libraryMaterials.filter(m => root.matches(m))
                     delegate: Swatch {

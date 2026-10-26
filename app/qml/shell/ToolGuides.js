@@ -43,6 +43,33 @@ const guides = {
         steps: ["Click pentru centru", "Mișcă mouse-ul pentru rază și dă click", "Tastează numărul de laturi urmat de s (8s)"],
         tip: "Muchiile poligonului rămân separate, spre deosebire de cerc"
     },
+    cube: {
+        title: "Cub",
+        summary: "Creează direct un obiect cub (cu fețele lui), gata de mutat, rotit sau redimensionat.",
+        steps: ["Click pentru centrul bazei (pe o față: în planul ei)", "Mișcă mouse-ul pentru mărime și dă click",
+                "Sau tastează latura (1000) ori latura și înălțimea (1000,500)"],
+        tip: "Dimensiunile se pot schimba apoi din Inspector"
+    },
+    sphere: {
+        title: "Sferă",
+        summary: "Creează un obiect sferă, cu suprafața netedă, așezat pe planul ales.",
+        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru diametru și dă click", "Sau tastează diametrul"],
+        tip: ""
+    },
+    cone: {
+        title: "Con",
+        summary: "Creează un obiect con, cu baza pe planul ales.",
+        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru diametru și dă click",
+                "Sau tastează diametrul și înălțimea (600,1200)"],
+        tip: ""
+    },
+    cylinder: {
+        title: "Cilindru",
+        summary: "Creează un obiect cilindru, cu baza pe planul ales.",
+        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru diametru și dă click",
+                "Sau tastează diametrul și înălțimea (600,1500)"],
+        tip: ""
+    },
     pushpull: {
         title: "Push/Pull",
         summary: "Trage o față în sus sau în jos și transformă formele plane în volume.",
@@ -156,5 +183,5 @@ function guide(id) {
 }
 
 // Ordinea din turul aplicației.
-const tourOrder = ["select", "line", "rectangle", "pushpull", "move", "rotate", "scale", "offset", "arc", "circle",
+const tourOrder = ["select", "line", "rectangle", "cube", "pushpull", "move", "rotate", "scale", "offset", "arc", "circle",
                    "polygon", "eraser", "paint", "tape", "protractor", "dimension", "text", "section", "interact", "orbit", "pan", "zoom"]

@@ -912,7 +912,7 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "eraser") {
         return std::make_unique<EraserTool>();
     }
-    return nullptr;
+    return makePrimitiveTool(id);
 }
 
 } // namespace aion::tools
