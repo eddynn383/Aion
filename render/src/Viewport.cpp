@@ -42,6 +42,8 @@ constexpr double kMultiClickDistancePx = 5.0;
 
 constexpr float kEdgeWidth = 1.25f;
 constexpr float kHighlightedEdgeWidth = 2.25f;
+// Profilele: muchiile de contur ale obiectelor (silueta), mai groase.
+constexpr float kProfileWidth = 2.6f;
 
 // Cutia demo (în mm), afișată până când modelul poate conține geometrie (Faza 3).
 constexpr glm::dvec3 kDemoMin { 0.0, 0.0, 0.0 };
@@ -132,6 +134,43 @@ glm::dvec3 smoothNormal(const geom::Mesh& mesh, geom::FaceId face, geom::VertexI
         sum += mesh.face(f).plane.normal;
     }
     return glm::length(sum) > 1e-12 ? glm::normalize(sum) : mesh.face(face).plane.normal;
+}
+
+int styleIndex(const QString& style)
+{
+    if (style == QLatin1String("clay")) {
+        return 1;
+    }
+    if (style == QLatin1String("hiddenline")) {
+        return 2;
+    }
+    if (style == QLatin1String("wireframe")) {
+        return 3;
+    }
+    if (style == QLatin1String("xray")) {
+        return 4;
+    }
+    return 0;
+}
+
+// Poziția soarelui (model simplu): declinația după lună, unghiul orar după oră. Nordul e +Y, estul +X.
+// Întoarce direcția spre soare și intensitatea (0 noaptea, crește lin la răsărit).
+std::pair<glm::dvec3, double> sunPosition(double hour, int month, double latitudeDeg)
+{
+    constexpr double kDeg = 3.14159265358979323846 / 180.0;
+    const double day = (month - 1) * 30.4 + 15.0;
+    const double declination = 23.44 * kDeg * std::sin(2.0 * 3.14159265358979323846 * (284.0 + day) / 365.0);
+    const double hourAngle = 15.0 * kDeg * (hour - 12.0);
+    const double lat = latitudeDeg * kDeg;
+    const double sinElevation
+        = std::sin(lat) * std::sin(declination) + std::cos(lat) * std::cos(declination) * std::cos(hourAngle);
+    const double elevation = std::asin(std::clamp(sinElevation, -1.0, 1.0));
+    const double azimuth = std::atan2(-std::sin(hourAngle),
+        std::tan(declination) * std::cos(lat) - std::sin(lat) * std::cos(hourAngle)); // de la nord, spre est
+    const double e = std::max(elevation, 3.0 * kDeg); // sub orizont, lumina rămâne joasă (dar fără umbre lungi absurde)
+    const glm::dvec3 dir { std::sin(azimuth) * std::cos(e), std::cos(azimuth) * std::cos(e), std::sin(e) };
+    const double intensity = std::clamp((elevation / kDeg + 2.0) / 12.0, 0.0, 1.0);
+    return { glm::normalize(dir), intensity };
 }
 
 } // namespace
@@ -336,13 +375,29 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         }
         return dim ? 3.0f : style.selected || style.marked ? 2.0f : style.hovered ? 1.0f : 0.0f;
     };
+    const int displayStyle = styleIndex(m_displayStyle);
     for (const auto& [faceId, tri] : doc.triangles(definition)) {
+        if (displayStyle == 3) {
+            break; // wireframe: fără fețe
+        }
         const geom::Face* face = mesh.faces().find(faceId);
         if (face == nullptr) {
             continue;
         }
         const float state = stateOf(faceId);
         f.hasSelectedFaces = f.hasSelectedFaces || (state > 1.5f && state < 2.5f);
+        // Materialul feței, sau al grupului care o conține.
+        const model::MaterialId materialId = face->material ? face->material : style.material;
+        const model::Material* material = materialId ? model.materials().find(materialId) : nullptr;
+        glm::vec4 color { 0.0f, 0.0f, 0.0f, -1.0f };
+        glm::vec2 surface { 0.85f, 0.0f };
+        if (material != nullptr) {
+            color = { material->color.r / 255.0f, material->color.g / 255.0f, material->color.b / 255.0f,
+                material->color.a / 255.0f };
+            surface = { material->roughness, material->metallic };
+        }
+        const bool transparent = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
+        std::vector<MeshVertex>& target = transparent ? f.transparent : f.triangles;
         // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
         std::vector<geom::VertexId> ids = mesh.loopVertices(face->outer);
         for (const geom::Loop& h : face->inner) {
@@ -351,8 +406,8 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         }
         for (std::uint32_t i : tri.indices) {
             const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
-            f.triangles.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
-                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state });
+            target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
+                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface });
         }
     }
 
@@ -369,6 +424,22 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             = active ? (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) : style.hovered;
         if (e.soft && !(isMarked || (active && (isSelected || isHovered)))) {
             continue; // muchiile soft (laturile unui cilindru) nu se desenează
+        }
+        // Profil: muchia de margine a unei suprafețe sau cea dintre o față văzută din față și una din spate.
+        if (m_profiles && displayStyle != 3 && !e.faces.empty()) {
+            bool profile = e.faces.size() == 1;
+            if (e.faces.size() == 2) {
+                const math::Vec3d mid = toWorld.applyToPoint((mesh.position(e.v0) + mesh.position(e.v1)) * 0.5);
+                const math::Vec3d toEye
+                    = isOrthographic() ? -m_camera.forward() : glm::normalize(m_camera.eye() - mid);
+                const auto facing = [&](geom::FaceId fid) {
+                    return glm::dot(toWorld.applyToNormal(mesh.face(fid).plane.normal), toEye) > 0.0;
+                };
+                profile = facing(e.faces[0]) != facing(e.faces[1]);
+            }
+            if (profile) {
+                width = kProfileWidth;
+            }
         }
         if (isMarked) {
             color = toVec4(m_erase);
@@ -395,7 +466,9 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         const model::Instance& inst = model.instance(child);
         const math::Transform childToWorld = toWorld * inst.transform;
         if (ancestor && path[static_cast<std::size_t>(pathIndex)] == child) {
-            appendDefinition(f, doc, inst.definition, childToWorld, pathIndex + 1, {}, hover, overlay);
+            DrawStyle inside;
+            inside.material = inst.material ? inst.material : style.material;
+            appendDefinition(f, doc, inst.definition, childToWorld, pathIndex + 1, inside, hover, overlay);
             continue;
         }
         DrawStyle childStyle = style;
@@ -403,6 +476,9 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             childStyle.selected = selection.contains(child);
             childStyle.hovered = hover.kind == view::PickResult::Kind::Instance && hover.instance == child;
             childStyle.marked = markedInstances.contains(child);
+        }
+        if (inst.material) {
+            childStyle.material = inst.material;
         }
         childStyle.dim = dim;
         appendDefinition(f, doc, inst.definition, childToWorld, -1, childStyle, hover, overlay);
@@ -701,6 +777,13 @@ ViewportFrame Viewport::frameForRendering() const
     }
 
     f.colors.accent = toVec4(m_accent);
+    f.style = styleIndex(m_displayStyle);
+    f.fog = m_fog;
+    const auto [sunDir, sunIntensity] = sunPosition(m_sunHour, m_sunMonth, m_latitude);
+    f.sunDirection = m_shadows ? sunDir : glm::normalize(glm::dvec3(-0.4, -0.6, 0.7));
+    f.sunIntensity = m_shadows ? sunIntensity : 1.0;
+    f.shadows = m_shadows && sunIntensity > 0.0 && f.style != 3;
+    sceneBounds(f.sceneMin, f.sceneMax);
     if (m_document) {
         appendDocument(f);
     }

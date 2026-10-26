@@ -388,18 +388,18 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 8 – Grafică avansată, materiale și stiluri
-- [ ] Pipeline de randare cu pași separați (`render/passes`): adâncime + normale → SSAO/GTAO → iluminare → outline → TAA → tonemapping
-- [ ] Randare în spațiu liniar, HDR intern, **tonemapping ACES**, ieșire sRGB corectă (și Display P3 pe Mac)
+- [~] Pipeline de randare cu pași separați (`render/passes`): adâncime + normale → SSAO/GTAO → iluminare → outline → TAA → tonemapping — deocamdată: umbre → fețe → sol → grid → contur → transparente → linii
+- [~] Randare în spațiu liniar, HDR intern, **tonemapping ACES**, ieșire sRGB corectă (și Display P3 pe Mac) — fără Display P3
 - [ ] **Iluminare din mediu (IBL)** din HDRI, cu câteva medii incluse (studio, exterior, înnorat)
-- [ ] **Umbre moi**: cascaded shadow maps + PCF/PCSS, soarele poziționat după locație, dată și oră
+- [~] **Umbre moi**: cascaded shadow maps + PCF/PCSS, soarele poziționat după locație, dată și oră — o singură hartă + PCF; soarele după oră, lună și latitudine
 - [ ] **SSAO / GTAO** cu filtrare care păstrează muchiile
 - [ ] **TAA** când camera stă pe loc; calitate adaptivă în timpul navigării
-- [ ] Materiale **PBR** (albedo, roughness, metallic, normal map), cu bibliotecă de materiale incluse
-- [ ] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe
-- [ ] **Paint Bucket (B):** aplicare pe față; Option = eyedropper
+- [~] Materiale **PBR** (albedo, roughness, metallic, normal map), cu bibliotecă de materiale incluse — fără normal map și texturi
+- [~] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe — fără drag & drop
+- [x] **Paint Bucket (B):** aplicare pe față; Option = eyedropper
 - [ ] Coordonate UV pentru texturi pe fețe (proiecție planară), poziționarea texturii
-- [ ] Stiluri de afișare: Wireframe, Hidden Line, Shaded, Shaded with Textures, X-Ray, plus un stil **„Clay”** (alb mat cu AO, pentru prezentări)
-- [ ] Profiluri (muchii exterioare îngroșate), ceață atmosferică
+- [x] Stiluri de afișare: Wireframe, Hidden Line, Shaded, Shaded with Textures, X-Ray, plus un stil **„Clay”** (alb mat cu AO, pentru prezentări) — „with Textures” vine cu texturile
+- [x] Profiluri (muchii exterioare îngroșate), ceață atmosferică
 - [ ] Preset-uri de calitate în Preferințe: *Performanță*, *Echilibrat*, *Calitate*
 
 **Gata când:** casa din faza 5, texturată, arată vizibil mai bine decât același model în SketchUp (comparație de capturi), cu 60 fps în timpul navigării pe un MacBook Air M1.
