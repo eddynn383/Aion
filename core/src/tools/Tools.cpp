@@ -558,6 +558,211 @@ private:
     bool m_shiftLock = false;
 };
 
+// --- Push/Pull ------------------------------------------------------------------------------
+
+class PushPullTool final : public Tool {
+public:
+    std::string_view id() const override { return "pushpull"; }
+
+    void pointerDown(ToolContext& ctx, const PointerEvent& e) override
+    {
+        m_buttonDown = true;
+        m_press = e.screen;
+        // Dublu-click: repetă ultima distanță pe fața de sub cursor.
+        if (e.clickCount >= 2 && m_lastDistance) {
+            const geom::FaceId face = m_face ? m_face : faceUnder(ctx, e.screen);
+            if (face && std::abs(m_distance) <= tol::kLength) {
+                m_face = face;
+                m_distance = *m_lastDistance;
+                commit(ctx);
+                return;
+            }
+        }
+        if (m_face) {
+            commit(ctx); // click – mișcare – click
+            return;
+        }
+        const geom::FaceId face = faceUnder(ctx, e.screen);
+        if (!face) {
+            return;
+        }
+        const geom::Face& f = ctx.mesh.face(face);
+        const math::Ray ray = ctx.camera.rayAt(e.screen);
+        const auto t = math::intersectRayPlane(ray, f.plane).value_or(0.0);
+        m_face = face;
+        m_normal = f.plane.normal;
+        m_origin = t > 0.0 ? ray.at(t) : f.plane.project(ray.origin);
+        m_loops = { ctx.mesh.loopPoints(f.outer) };
+        for (const geom::Loop& h : f.inner) {
+            m_loops.push_back(ctx.mesh.loopPoints(h));
+        }
+        m_distance = 0.0;
+        m_keep = e.modifiers.alt;
+        m_dragging = false;
+        m_engine.reset();
+    }
+
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override
+    {
+        if (!m_face) {
+            m_hover = faceUnder(ctx, e.screen);
+            return;
+        }
+        m_keep = e.modifiers.alt;
+        if (m_buttonDown && glm::length(e.screen - m_press) > kDragThresholdPx) {
+            m_dragging = true;
+        }
+        track(ctx, e.screen);
+    }
+
+    void pointerUp(ToolContext& ctx, const PointerEvent& /*e*/) override
+    {
+        m_buttonDown = false;
+        if (m_face && m_dragging) {
+            commit(ctx); // tras cu butonul apăsat
+        }
+    }
+
+    void cancel(ToolContext& /*ctx*/) override
+    {
+        m_face = {};
+        m_distance = 0.0;
+        m_dragging = false;
+        m_inference = {};
+    }
+
+    Overlay overlay() const override
+    {
+        Overlay o;
+        if (!m_face) {
+            return o;
+        }
+        // Previzualizarea prismei: capacul și muchiile laterale.
+        const Vec3d offset = m_normal * m_distance;
+        if (std::abs(m_distance) > tol::kLength) {
+            for (const auto& loop : m_loops) {
+                for (std::size_t i = 0; i < loop.size(); ++i) {
+                    const Vec3d a = loop[i];
+                    const Vec3d b = loop[(i + 1) % loop.size()];
+                    o.lines.push_back({ a + offset, b + offset, false });
+                    o.lines.push_back({ a, a + offset, false });
+                }
+            }
+            o.dimensions.push_back({ m_origin, m_origin + offset, units::formatLength(std::abs(m_distance)) });
+        }
+        o.lines.push_back({ m_origin, m_origin + offset, true });
+        appendInference(o, m_inference);
+        if (!o.marker) {
+            o.marker = InferenceMarker { m_origin + offset, inference::Kind::Ground, inference::Tint::Neutral, "", false };
+        }
+        return o;
+    }
+
+    view::PickResult hover() const override
+    {
+        view::PickResult h;
+        const geom::FaceId face = m_face ? m_face : m_hover;
+        if (face) {
+            h.kind = view::PickResult::Kind::Face;
+            h.face = face;
+        }
+        return h;
+    }
+
+    std::string status() const override
+    {
+        if (m_face) {
+            return "Mută pentru adâncime, click sau eliberează pentru a termina · tastează distanța · "
+                   "Option: păstrează fața · Esc anulează";
+        }
+        return m_lastDistance ? "Alege fața de extrudat · dublu-click repetă ultima distanță"
+                              : "Alege fața de extrudat";
+    }
+
+    std::optional<Measurement> measurement() const override
+    {
+        return Measurement { "Distanță", m_face ? units::formatLength(std::abs(m_distance)) : "" };
+    }
+
+    bool applyMeasurement(ToolContext& ctx, std::string_view text) override
+    {
+        const auto value = units::parseLength(text);
+        if (!value || !m_face || std::abs(*value) <= tol::kLength) {
+            return false;
+        }
+        // Valoarea dă mărimea; sensul e cel în care a fost trasă fața (sau al normalei).
+        m_distance = m_distance < 0.0 ? -*value : *value;
+        commit(ctx);
+        return true;
+    }
+
+private:
+    static geom::FaceId faceUnder(const ToolContext& ctx, Vec2d screen)
+    {
+        return view::pick(ctx.mesh, ctx.camera, screen, { -1.0, -1.0 }).face;
+    }
+
+    void track(ToolContext& ctx, Vec2d screen)
+    {
+        // Adâncimea se poate lua dintr-un punct al geometriei (capăt, mijloc, muchie) sau de pe o față
+        // paralelă; altfel e punctul de pe normală cel mai apropiat de cursor.
+        inference::Inference inf = m_engine.infer(ctx.mesh, ctx.camera, screen, std::nullopt);
+        const double depth = glm::dot(inf.point - m_origin, m_normal);
+        const bool fromPoint = (inf.kind == inference::Kind::Endpoint || inf.kind == inference::Kind::Midpoint
+                                   || inf.kind == inference::Kind::OnEdge)
+            && std::abs(depth) > tol::kLength; // punctele din planul feței nu dau o adâncime
+
+        const bool fromFace = inf.kind == inference::Kind::OnFace && inf.face != m_face
+            && ctx.mesh.faces().contains(inf.face)
+            && tol::parallel(ctx.mesh.face(inf.face).plane.normal, m_normal, 1e-6)
+            && std::abs(depth) > tol::kLength;
+        if (fromPoint || fromFace) {
+            m_distance = depth;
+            const Vec3d onAxis = m_origin + m_normal * m_distance;
+            if (!tol::samePoint(onAxis, inf.point)) {
+                inf.guides.push_back({ inf.point, onAxis, inference::Tint::Neutral, true });
+            }
+            m_inference = inf;
+            return;
+        }
+        m_inference = {};
+        if (const auto p = inference::pointOnLineUnderCursor(ctx.camera, screen, m_origin, m_normal)) {
+            m_distance = glm::dot(*p - m_origin, m_normal);
+        }
+    }
+
+    void commit(ToolContext& ctx)
+    {
+        if (m_face && ctx.mesh.faces().contains(m_face) && std::abs(m_distance) > tol::kLength) {
+            const geom::FaceId face = m_face;
+            const double distance = m_distance;
+            const bool keep = m_keep;
+            ctx.stack.run("Push/Pull", [&](geom::Mesh& mesh) { geom::pushPull(mesh, face, distance, keep); });
+            m_lastDistance = distance;
+            ctx.selection.prune(ctx.mesh);
+        }
+        m_face = {};
+        m_distance = 0.0;
+        m_dragging = false;
+        m_inference = {};
+        m_hover = {};
+    }
+
+    geom::FaceId m_face;
+    geom::FaceId m_hover;
+    Vec3d m_origin { 0.0 };
+    Vec3d m_normal { 0.0, 0.0, 1.0 };
+    std::vector<std::vector<Vec3d>> m_loops;
+    double m_distance = 0.0;
+    std::optional<double> m_lastDistance;
+    bool m_keep = false;
+    bool m_buttonDown = false;
+    bool m_dragging = false;
+    Vec2d m_press { 0.0 };
+    inference::Engine m_engine;
+    inference::Inference m_inference;
+};
+
 // --- Eraser ---------------------------------------------------------------------------------
 
 class EraserTool final : public Tool {
@@ -650,6 +855,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     }
     if (id == "rectangle") {
         return std::make_unique<RectangleTool>();
+    }
+    if (id == "pushpull") {
+        return std::make_unique<PushPullTool>();
     }
     if (id == "eraser") {
         return std::make_unique<EraserTool>();

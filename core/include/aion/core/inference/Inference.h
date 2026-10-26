@@ -73,6 +73,10 @@ struct Inference {
 // Eticheta afișată lângă cursor: „Endpoint”, „On Red Axis”, „Parallel to Edge”; gol pentru Ground.
 [[nodiscard]] std::string_view label(const Inference& inference);
 [[nodiscard]] Tint axisTint(Axis axis);
+// Punctul de pe dreapta (origin, dir unitar) a cărui proiecție e cea mai apropiată de cursor; pe ecran, nu în 3D:
+// în perspectivă cele două diferă, iar utilizatorul vede ecranul.
+[[nodiscard]] std::optional<Vec3d> pointOnLineUnderCursor(
+    const view::Camera& camera, Vec2d screen, const Vec3d& origin, const Vec3d& dir);
 [[nodiscard]] Vec3d axisDirection(Axis axis);
 
 struct Options {

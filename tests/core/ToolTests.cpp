@@ -304,3 +304,54 @@ TEST_CASE("Unelte: dreptunghi din Measurements box, în sensul cursorului", "[co
     CHECK(glm::length(lo - Vec3d { -2000, 1000, 0 }) < 1e-6);
     CHECK(glm::length(hi - Vec3d { 1000, 3000, 0 }) < 1e-6);
 }
+
+TEST_CASE("Unelte: Push/Pull prin tragere, prin VCB și dublu-click", "[core][tools][pushpull]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 1000, 500 }, 0, 0, 9000 }));
+    auto rect = tools::makeTool("rectangle");
+    auto pp = tools::makeTool("pushpull");
+    s.click(*rect, { 0, 0, 0 });
+    s.click(*rect, { 2000, 1000, 0 });
+    REQUIRE(s.mesh.faces().size() == 1);
+
+    // Click pe față, mișcare în sus, apoi tastăm înălțimea.
+    s.click(*pp, { 1000, 500, 0 });
+    pp->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 500, 800 })));
+    CHECK(pp->measurement()->value == "800 mm");
+    REQUIRE(pp->applyMeasurement(s.ctx, "1.2m"));
+    CHECK(s.mesh.faces().size() == 6);
+    Vec3d hi { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(std::abs(hi.z - 1200) < 1e-6);
+    CHECK(s.stack.undoName() == "Push/Pull");
+
+    // Tragere pe fața de sus până la capătul unei muchii aflate mai sus (inferență pe adâncime).
+    geom::drawLine(s.mesh, { 3000, 0, 0 }, { 3000, 0, 2000 });
+    const tools::PointerEvent down { s.screen({ 1000, 500, 1200 }), {}, 1 };
+    pp->pointerDown(s.ctx, down);
+    pp->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 500, 1600 })));
+    pp->pointerMove(s.ctx, Scene::at(s.screen({ 3000, 0, 2000 }) + Vec2d { 3, -2 }));
+    CHECK(pp->overlay().marker->label == "Endpoint");
+    pp->pointerUp(s.ctx, Scene::at(s.screen({ 3000, 0, 2000 })));
+    hi = Vec3d { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(std::abs(hi.z - 2000) < 1e-6);
+
+    // Dublu-click pe fața de sus repetă ultima distanță (+800).
+    const Vec2d top = s.screen({ 1000, 500, 2000 });
+    pp->pointerMove(s.ctx, Scene::at(top));
+    pp->pointerDown(s.ctx, { top, {}, 1 });
+    pp->pointerUp(s.ctx, Scene::at(top));
+    pp->pointerDown(s.ctx, { top, {}, 2 });
+    pp->pointerUp(s.ctx, Scene::at(top));
+    hi = Vec3d { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(std::abs(hi.z - 2800) < 1e-6);
+}
