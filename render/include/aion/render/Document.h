@@ -309,6 +309,10 @@ private:
     void afterInteraction(const geom::Selection& before);
     // După undo/redo sau ștergeri: calea și selecția nu trebuie să indice entități dispărute.
     void repairContext();
+    // Varianta sigură în mijlocul unei notificări de la model (fără să anuleze unealta).
+    void dropStaleReferences();
+    std::size_t validPathLength() const;
+    bool m_contextLost = false;
     void setPath(std::vector<model::InstanceId> path);
     void retriangulate(model::DefinitionId definition);
     // Rulează o comandă pe model și aduce la zi selecția și contextul.

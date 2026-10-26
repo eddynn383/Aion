@@ -27,6 +27,7 @@
 #include <filesystem>
 #include <functional>
 #include <span>
+#include <utility>
 #include <limits>
 #include <set>
 
@@ -528,14 +529,34 @@ void Document::touch()
     emit changed();
 }
 
+std::size_t Document::validPathLength() const
+{
+    // În mijlocul unui undo, calea poate indica pentru scurt timp instanțe dispărute (până la repairContext()).
+    std::size_t valid = 0;
+    model::DefinitionId parent = m_model.root();
+    for (; valid < m_path.size(); ++valid) {
+        const model::Instance* inst = m_model.instances().find(m_path[valid]);
+        if (inst == nullptr || inst->parent != parent) {
+            break;
+        }
+        parent = inst->definition;
+    }
+    return valid;
+}
+
 model::DefinitionId Document::activeDefinition() const
 {
-    return m_path.empty() ? m_model.root() : m_model.instance(m_path.back()).definition;
+    const std::size_t valid = validPathLength();
+    return valid == 0 ? m_model.root() : m_model.instance(m_path[valid - 1]).definition;
 }
 
 math::Transform Document::contextTransform() const
 {
-    return model::worldTransform(m_model, m_path);
+    const std::size_t valid = validPathLength();
+    if (valid == m_path.size()) {
+        return model::worldTransform(m_model, m_path);
+    }
+    return model::worldTransform(m_model, { m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid) });
 }
 
 const std::unordered_map<geom::FaceId, geom::FaceTriangles>& Document::triangles(model::DefinitionId definition) const
@@ -586,7 +607,8 @@ QString Document::selectionSummary() const
     QStringList parts;
     std::size_t groups = 0;
     for (model::InstanceId id : m_selection.instances) {
-        groups += m_model.definition(m_model.instance(id).definition).group ? 1 : 0;
+        const model::Instance* inst = m_model.instances().find(id);
+        groups += inst != nullptr && m_model.definition(inst->definition).group ? 1 : 0;
     }
     if (groups > 0) {
         parts << plural(groups, "grup", "grupuri");
@@ -711,7 +733,8 @@ QVariantMap Document::entityInfo() const
     }
     const geom::Mesh& mesh = m_model.mesh(activeDefinition());
     QVariantList details;
-    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()) {
+    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()
+        && m_model.instances().contains(*m_selection.instances.begin())) {
         const model::InstanceId id = *m_selection.instances.begin();
         const model::Instance& inst = m_model.instance(id);
         const model::Definition& def = m_model.definition(inst.definition);
@@ -853,6 +876,11 @@ void Document::afterInteraction(const geom::Selection& before)
 
 void Document::repairContext()
 {
+    if (std::exchange(m_contextLost, false) && m_tool) {
+        const view::Camera camera;
+        tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        m_tool->cancel(ctx);
+    }
     // Calea se oprește la prima instanță care nu mai există sau nu mai e în definiția de deasupra.
     std::size_t valid = 0;
     model::DefinitionId parent = m_model.root();
@@ -865,6 +893,27 @@ void Document::repairContext()
     }
     if (valid < m_path.size()) {
         setPath({ m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid) });
+    }
+    m_selection.prune(m_model.mesh(activeDefinition()));
+    const model::DefinitionId active = activeDefinition();
+    std::erase_if(m_selection.instances, [&](model::InstanceId id) {
+        const model::Instance* inst = m_model.instances().find(id);
+        return inst == nullptr || inst->parent != active;
+    });
+}
+
+void Document::dropStaleReferences()
+{
+    const std::size_t valid = validPathLength();
+    if (valid < m_path.size()) {
+        // Contextul editat a dispărut: ieșim din el fără să atingem unealta (poate fi chiar ea în lucru);
+        // repairContext() o anulează după operație.
+        m_path.resize(valid);
+        m_stack.setActiveDefinition(activeDefinition());
+        m_selection.clear();
+        m_contextLost = true;
+        emit contextChanged();
+        return;
     }
     m_selection.prune(m_model.mesh(activeDefinition()));
     const model::DefinitionId active = activeDefinition();
@@ -1413,6 +1462,9 @@ std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() c
         add(mesh.position(v));
     }
     for (model::InstanceId id : m_selection.instances) {
+        if (!m_model.instances().contains(id)) {
+            continue;
+        }
         const model::Instance& inst = m_model.instance(id);
         const auto [blo, bhi] = model::bounds(m_model, inst.definition);
         if (blo.x > bhi.x) {
@@ -1967,6 +2019,9 @@ void Document::structureChanged(const model::Model& model)
         }
     }
     std::erase_if(m_triangles, [&](const auto& entry) { return !model.definitions().contains(entry.first); });
+    // Înainte ca interfața să citească selecția (selectionSummary, Entity Info): după un undo, instanțele selectate
+    // sau cele din calea contextului pot să nu mai existe.
+    dropStaleReferences();
     emit outlineChanged();
     emit selectionChanged(); // Entity Info (de exemplu un tag schimbat prin undo)
     emit modelChanged();
