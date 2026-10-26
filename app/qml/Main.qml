@@ -179,6 +179,7 @@ Window {
         case "app.tour": toolTour.open(); break
         case "debug.storybook": storybookLoader.active = true; break
         case "debug.demos": demoGalleryLoader.active = true; break
+        case "debug.menus": if (menuBarInstantiator.object) menuBarInstantiator.object.dump(); break
         case "debug.benchmark": viewport.startTurntable(4); break
         default:
             if (id.startsWith("tool."))
@@ -363,15 +364,19 @@ Window {
 
     // Pe macOS, scurtăturile ⌘… sunt ale meniului nativ (altfel ar rula de două ori).
     readonly property bool nativeMenu: Qt.platform.os === "osx"
+    readonly property var appWindow: window
 
     function openPalette() {
         palette.open()
     }
 
     Instantiator {
+        id: menuBarInstantiator
         model: window.nativeMenu ? 1 : 0
+        // MenuBar are propria proprietate `window`, care ar umbri id-ul ferestrei; de aceea appWindow.
         delegate: AppMenuBar {
-            host: window
+            host: appWindow
+            window: appWindow
             document: doc
             onAboutRequested: aboutDialog.open()
             onPreferencesRequested: preferencesDialog.open()
