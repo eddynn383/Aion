@@ -362,6 +362,55 @@ DrawLineResult drawPolygon(Mesh& mesh, const std::vector<Vec3d>& points)
     return total;
 }
 
+DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth)
+{
+    DrawLineResult total;
+    if (points.size() < 2) {
+        return total;
+    }
+    const std::uint32_t curve = mesh.newCurveId();
+    const std::size_t count = closed ? points.size() : points.size() - 1;
+    for (std::size_t i = 0; i < count; ++i) {
+        DrawLineResult r = drawLine(mesh, points[i], points[(i + 1) % points.size()]);
+        total.createdFaces.insert(total.createdFaces.end(), r.createdFaces.begin(), r.createdFaces.end());
+        total.removedFaces.insert(total.removedFaces.end(), r.removedFaces.begin(), r.removedFaces.end());
+    }
+    std::erase_if(total.createdFaces, [&](FaceId f) { return !mesh.faces().contains(f); });
+    // Muchiile de pe segmente (unele s-au putut împărți la desen) primesc curba.
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        const EdgeId id = mesh.edges().keys()[i];
+        const Edge& e = mesh.edges().values()[i];
+        const Vec3d a = mesh.position(e.v0);
+        const Vec3d b = mesh.position(e.v1);
+        for (std::size_t k = 0; k < count; ++k) {
+            const Segment segment { points[k], points[(k + 1) % points.size()] };
+            if (math::projectOnSegment(a, segment).distance <= kTol && math::projectOnSegment(b, segment).distance <= kTol) {
+                total.edges.push_back(id);
+                break;
+            }
+        }
+    }
+    for (EdgeId e : total.edges) {
+        mesh.setEdgeStyle(e, false, curve, smooth);
+    }
+    return total;
+}
+
+std::vector<EdgeId> curveEdges(const Mesh& mesh, EdgeId edge)
+{
+    const std::uint32_t curve = mesh.edge(edge).curve;
+    if (curve == 0) {
+        return { edge };
+    }
+    std::vector<EdgeId> out;
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        if (mesh.edges().values()[i].curve == curve) {
+            out.push_back(mesh.edges().keys()[i]);
+        }
+    }
+    return out;
+}
+
 void eraseFace(Mesh& mesh, FaceId face)
 {
     mesh.removeFace(face);

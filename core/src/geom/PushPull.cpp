@@ -63,6 +63,44 @@ std::vector<Vec3d> offsetPoints(const std::vector<Vec3d>& points, const Vec3d& o
     return out;
 }
 
+EdgeId edgeBetween(const Mesh& mesh, const Vec3d& a, const Vec3d& b)
+{
+    const VertexId va = mesh.findVertexNear(a, kTol);
+    const VertexId vb = mesh.findVertexNear(b, kTol);
+    return va && vb && va != vb ? mesh.findEdge(va, vb) : EdgeId {};
+}
+
+void applyStyles(Mesh& mesh, const std::vector<std::vector<Vec3d>>& loops,
+    const std::vector<std::vector<Edge>>& styles, const Vec3d& offset)
+{
+    std::map<std::uint32_t, std::uint32_t> curves; // curba sursă → curba capacului
+    std::uint32_t next = mesh.newCurveId();
+    for (std::size_t l = 0; l < loops.size(); ++l) {
+        const auto& pts = loops[l];
+        const std::size_t n = pts.size();
+        for (std::size_t i = 0; i < n; ++i) {
+            const Edge& style = styles[l][i];
+            const Edge& previous = styles[l][(i + n - 1) % n];
+            if (const EdgeId cap = edgeBetween(mesh, pts[i] + offset, pts[(i + 1) % n] + offset)) {
+                std::uint32_t curve = 0;
+                if (style.curve != 0) {
+                    const auto [it, inserted] = curves.try_emplace(style.curve, next);
+                    next += inserted ? 1 : 0;
+                    curve = it->second;
+                }
+                mesh.setEdgeStyle(cap, style.soft, curve, style.smoothCurve);
+            }
+            const bool smooth = style.curve != 0 && style.curve == previous.curve && style.smoothCurve;
+            if (smooth) {
+                if (const EdgeId lateral = edgeBetween(mesh, pts[i], pts[i] + offset)) {
+                    const Edge& e = mesh.edge(lateral);
+                    mesh.setEdgeStyle(lateral, true, e.curve, e.smoothCurve);
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 FaceId orientFace(Mesh& mesh, FaceId id, const Vec3d& wanted)
@@ -206,6 +244,7 @@ bool dissolveVertex(Mesh& mesh, VertexId v)
         planned.push_back(std::move(p));
     }
 
+    const Edge style = mesh.edge(e1);
     for (FaceId f : faces1) {
         mesh.removeFace(f);
     }
@@ -213,6 +252,7 @@ bool dissolveVertex(Mesh& mesh, VertexId v)
     mesh.removeEdge(e2);
     mesh.removeVertex(v);
     const EdgeId merged = mesh.addEdge(u, w);
+    mesh.setEdgeStyle(merged, style.soft, style.curve, style.smoothCurve);
     const auto build = [&](const std::vector<std::pair<EdgeUse, VertexId>>& uses) {
         Loop loop;
         for (const auto& [use, start] : uses) {
@@ -244,6 +284,23 @@ PushPullResult pushPull(Mesh& mesh, FaceId faceId, double distance, bool keepOri
     std::vector<std::vector<Vec3d>> loops { mesh.loopPoints(face.outer) };
     for (const Loop& h : face.inner) {
         loops.push_back(mesh.loopPoints(h));
+    }
+    // Stilul muchiilor fiecărei bucle (muchia i merge de la punctul i la i + 1): capacul îl moștenește,
+    // iar laturile dintre două segmente ale aceleiași curbe netede devin soft (un cilindru e neted).
+    std::vector<std::vector<Edge>> loopStyles;
+    for (const Loop* loop : { &face.outer }) {
+        std::vector<Edge> styles;
+        for (const EdgeUse& u : loop->uses) {
+            styles.push_back(mesh.edge(u.edge));
+        }
+        loopStyles.push_back(std::move(styles));
+    }
+    for (const Loop& h : face.inner) {
+        std::vector<Edge> styles;
+        for (const EdgeUse& u : h.uses) {
+            styles.push_back(mesh.edge(u.edge));
+        }
+        loopStyles.push_back(std::move(styles));
     }
 
     // Fața e „liberă” dacă nicio muchie a ei nu are alte fețe.
@@ -399,6 +456,8 @@ PushPullResult pushPull(Mesh& mesh, FaceId faceId, double distance, bool keepOri
             dissolveVertex(mesh, v);
         }
     }
+
+    applyStyles(mesh, loops, loopStyles, offset);
 
     for (FaceId f : mesh.faces().keys()) {
         if (!facesBefore.contains(f)) {

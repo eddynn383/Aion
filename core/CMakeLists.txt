@@ -24,6 +24,7 @@ add_library(aion_core STATIC
     src/tools/Tools.cpp
     src/tools/ToolHelpers.cpp
     src/tools/TransformTools.cpp
+    src/tools/ShapeTools.cpp
 )
 add_library(aion::core ALIAS aion_core)
 

@@ -26,6 +26,13 @@ DrawLineResult drawLine(Mesh& mesh, const Vec3d& a, const Vec3d& b);
 // Desenează o polilinie închisă (de exemplu conturul unui dreptunghi).
 DrawLineResult drawPolygon(Mesh& mesh, const std::vector<Vec3d>& points);
 
+// Desenează o curbă (cerc, arc, poligon) din segmente: toate muchiile primesc același identificator de curbă,
+// ca să se selecteze și să se șteargă împreună. `smooth`: cerc sau arc (extrudat, are laturile soft).
+DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth);
+
+// Muchiile curbei din care face parte muchia (doar ea, dacă nu e pe o curbă).
+[[nodiscard]] std::vector<EdgeId> curveEdges(const Mesh& mesh, EdgeId edge);
+
 // Șterge o muchie, fețele care o folosesc și vârfurile rămase fără muchii.
 void eraseEdge(Mesh& mesh, EdgeId edge);
 

@@ -149,10 +149,13 @@ private:
     static geom::Selection clickSelection(ToolContext& ctx, const PointerEvent& e)
     {
         // Vârfurile nu se selectează: căutăm muchia sau fața de sub cursor.
-        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, e.screen, { 0.0, 5.0 });
+        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, e.screen, { -1.0, 5.0 });
         geom::Selection s;
         if (hit.kind == view::PickResult::Kind::Edge) {
-            s = e.clickCount >= 2 ? geom::edgeWithFaces(ctx.mesh, hit.edge) : geom::Selection { { hit.edge }, {} };
+            // O muchie a unei curbe (cerc, arc) selectează toată curba.
+            for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
+                s.add(e.clickCount >= 2 ? geom::edgeWithFaces(ctx.mesh, edge) : geom::Selection { { edge }, {} });
+            }
         } else if (hit.kind == view::PickResult::Kind::Face) {
             s = e.clickCount >= 2 ? geom::faceWithEdges(ctx.mesh, hit.face) : geom::Selection { {}, { hit.face } };
         }
@@ -706,7 +709,7 @@ public:
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override
     {
-        m_hover = view::pick(ctx.mesh, ctx.camera, e.screen, { 0.0, 6.0 });
+        m_hover = view::pick(ctx.mesh, ctx.camera, e.screen, { -1.0, 6.0 });
         if (m_active) {
             mark(ctx, e.screen);
         }
@@ -760,9 +763,11 @@ public:
 private:
     void mark(ToolContext& ctx, Vec2d screen)
     {
-        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, screen, { 0.0, 6.0 });
+        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, screen, { -1.0, 6.0 });
         if (hit.kind == view::PickResult::Kind::Edge) {
-            m_marked.insert(hit.edge);
+            for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
+                m_marked.insert(edge); // o curbă se șterge întreagă
+            }
         }
     }
 
@@ -795,6 +800,15 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     }
     if (id == "scale") {
         return makeScaleTool();
+    }
+    if (id == "circle") {
+        return makeCircleTool();
+    }
+    if (id == "polygon") {
+        return makePolygonTool();
+    }
+    if (id == "arc") {
+        return makeArcTool();
     }
     if (id == "eraser") {
         return std::make_unique<EraserTool>();

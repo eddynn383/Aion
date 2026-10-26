@@ -279,6 +279,27 @@ void Mesh::setPosition(VertexId id, const Vec3d& position)
     m_vertices.at(id).position = position;
 }
 
+void Mesh::setEdgeStyle(EdgeId id, bool soft, std::uint32_t curve, bool smoothCurve)
+{
+    Edge& e = m_edges.at(id);
+    if (e.soft == soft && e.curve == curve && e.smoothCurve == smoothCurve) {
+        return;
+    }
+    touch(id);
+    e.soft = soft;
+    e.curve = curve;
+    e.smoothCurve = smoothCurve;
+}
+
+std::uint32_t Mesh::newCurveId() const
+{
+    std::uint32_t highest = 0;
+    for (const Edge& e : m_edges.values()) {
+        highest = std::max(highest, e.curve);
+    }
+    return highest + 1;
+}
+
 void Mesh::setFacePlane(FaceId id, const math::Plane& plane)
 {
     touch(id);
@@ -305,6 +326,13 @@ std::pair<EdgeId, EdgeId> Mesh::splitEdge(EdgeId id, VertexId at)
 
     const EdgeId first = addEdge(original.v0, at);
     const EdgeId second = addEdge(at, original.v1);
+    // Bucățile păstrează stilul muchiei (soft, curba).
+    for (EdgeId piece : { first, second }) {
+        Edge& e = m_edges.at(piece);
+        e.soft = original.soft;
+        e.curve = original.curve;
+        e.smoothCurve = original.smoothCurve;
+    }
 
     for (FaceId f : original.faces) {
         Face& face = m_faces.at(f);

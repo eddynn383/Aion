@@ -119,7 +119,8 @@ public:
     virtual bool applyMeasurement(ToolContext& /*ctx*/, std::string_view /*text*/) { return false; }
 };
 
-// "select", "line", "rectangle", "pushpull", "eraser"; nullptr pentru o unealtă necunoscută.
+// "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "move", "rotate", "scale", "eraser";
+// nullptr pentru o unealtă necunoscută.
 [[nodiscard]] std::unique_ptr<Tool> makeTool(std::string_view id);
 
 // Punctul 3D de sub cursor: pe geometrie dacă există, altfel pe planul solului (Z = 0).

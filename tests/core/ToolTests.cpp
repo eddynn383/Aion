@@ -470,3 +470,78 @@ TEST_CASE("Unelte: acoperiș în două ape cu Move pe linia de coamă (săgeata 
     CHECK(s.mesh.faces().size() == 7);
     REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
 }
+
+TEST_CASE("Unelte: cerc, cilindru neted, selecția și ștergerea curbei", "[core][tools][curves]")
+{
+    Scene s;
+    auto circle = tools::makeTool("circle");
+    s.click(*circle, { 1000, 1000, 0 });
+    circle->pointerMove(s.ctx, Scene::at(s.screen({ 1400, 1000, 0 })));
+    REQUIRE(circle->applyMeasurement(s.ctx, "500"));
+    REQUIRE(s.mesh.faces().size() == 1);
+    CHECK(s.mesh.edges().size() == 24);
+    const std::uint32_t curve = s.mesh.edges().values().front().curve;
+    CHECK(curve != 0);
+    for (const geom::Edge& e : s.mesh.edges().values()) {
+        CHECK(e.curve == curve);
+        CHECK(std::abs(glm::length(s.mesh.position(e.v0) - Vec3d { 1000, 1000, 0 }) - 500) < 1e-6);
+    }
+
+    // Un click pe o muchie selectează tot cercul.
+    auto select = tools::makeTool("select");
+    s.click(*select, { 1500, 1000, 0 });
+    CHECK(s.selection.edges.size() == 24);
+    s.selection.clear();
+
+    // Extrudat: un cilindru cu laturile soft și capacul tot o curbă.
+    geom::pushPull(s.mesh, s.mesh.faces().keys().front(), -800);
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
+    CHECK(s.mesh.faces().size() == 26);
+    int soft = 0;
+    int capCurve = 0;
+    for (const geom::Edge& e : s.mesh.edges().values()) {
+        soft += e.soft ? 1 : 0;
+        const double z0 = s.mesh.position(e.v0).z;
+        const double z1 = s.mesh.position(e.v1).z;
+        if (z0 > 799 && z1 > 799) {
+            capCurve += (e.curve != 0 && e.curve != curve) ? 1 : 0;
+        }
+    }
+    CHECK(soft == 24);
+    CHECK(capCurve == 24);
+
+    // Guma pe o muchie a cercului de jos: dispare toată curba (și fețele ei).
+    auto eraser = tools::makeTool("eraser");
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 1000, 400 }, 0, 0, 8000 }));
+    const Vec2d onBottom = s.screen({ 1000, 500, 0 });
+    s.drag(*eraser, onBottom, onBottom + Vec2d { 1, 0 });
+    CHECK(std::none_of(s.mesh.edges().values().begin(), s.mesh.edges().values().end(),
+        [&](const geom::Edge& e) { return e.curve == curve; }));
+}
+
+TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin capete și săgeată", "[core][tools][curves]")
+{
+    Scene s;
+    auto polygon = tools::makeTool("polygon");
+    s.click(*polygon, { 1000, 1000, 0 });
+    polygon->pointerMove(s.ctx, Scene::at(s.screen({ 1400, 1000, 0 })));
+    REQUIRE(polygon->applyMeasurement(s.ctx, "8s"));
+    REQUIRE(polygon->applyMeasurement(s.ctx, "400"));
+    REQUIRE(s.mesh.faces().size() == 1);
+    CHECK(s.mesh.edges().size() == 8);
+    geom::pushPull(s.mesh, s.mesh.faces().keys().front(), -500);
+    CHECK(std::none_of(s.mesh.edges().values().begin(), s.mesh.edges().values().end(),
+        [](const geom::Edge& e) { return e.soft; }));
+
+    Scene a;
+    auto arc = tools::makeTool("arc");
+    a.click(*arc, { 0, 0, 0 });
+    a.click(*arc, { 2000, 0, 0 });
+    arc->pointerMove(a.ctx, Scene::at(a.screen({ 1000, 300, 0 })));
+    REQUIRE(arc->applyMeasurement(a.ctx, "500"));
+    CHECK(a.mesh.edges().size() == 12);
+    CHECK(a.mesh.faces().empty());
+    REQUIRE(a.mesh.findVertexNear({ 0, 0, 0 }, 1e-6));
+    REQUIRE(a.mesh.findVertexNear({ 2000, 0, 0 }, 1e-6));
+    CHECK(a.mesh.findVertexNear({ 1000, 500, 0 }, 1e-6)); // vârful din mijloc, pe săgeată
+}

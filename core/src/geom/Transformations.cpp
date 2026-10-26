@@ -191,16 +191,29 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
         faces.push_back({ transform.applyToPoint(faceInteriorPoint(mesh, f)),
             glm::normalize(transform.applyToNormal(face->plane.normal)) });
     }
-    std::vector<std::pair<Vec3d, Vec3d>> segments;
+    struct Segment {
+        Vec3d a;
+        Vec3d b;
+        Edge style;
+    };
+    std::vector<Segment> segments;
+    std::map<std::uint32_t, std::uint32_t> curves; // curba sursă → curba copiei
+    std::uint32_t nextCurve = mesh.newCurveId();
     for (EdgeId e : edges) {
         if (const Edge* edge = mesh.edges().find(e)) {
-            segments.emplace_back(
-                transform.applyToPoint(mesh.position(edge->v0)), transform.applyToPoint(mesh.position(edge->v1)));
+            Edge style = *edge;
+            if (style.curve != 0) {
+                const auto [it, inserted] = curves.try_emplace(style.curve, nextCurve);
+                nextCurve += inserted ? 1 : 0;
+                style.curve = it->second;
+            }
+            segments.push_back(
+                { transform.applyToPoint(mesh.position(edge->v0)), transform.applyToPoint(mesh.position(edge->v1)), style });
         }
     }
 
-    for (const auto& [a, b] : segments) {
-        drawLine(mesh, a, b);
+    for (const Segment& s : segments) {
+        drawLine(mesh, s.a, s.b);
     }
     // Muchiile copiei: cele aflate pe segmentele desenate (unele s-au putut împărți între timp).
     Selection out;
@@ -208,10 +221,11 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
         const Edge& e = mesh.edges().values()[i];
         const Vec3d p0 = mesh.position(e.v0);
         const Vec3d p1 = mesh.position(e.v1);
-        for (const auto& [a, b] : segments) {
-            if (math::projectOnSegment(p0, { a, b }).distance <= kTol
-                && math::projectOnSegment(p1, { a, b }).distance <= kTol) {
+        for (const Segment& s : segments) {
+            if (math::projectOnSegment(p0, { s.a, s.b }).distance <= kTol
+                && math::projectOnSegment(p1, { s.a, s.b }).distance <= kTol) {
                 out.edges.insert(mesh.edges().keys()[i]);
+                mesh.setEdgeStyle(mesh.edges().keys()[i], s.style.soft, s.style.curve, s.style.smoothCurve);
                 break;
             }
         }

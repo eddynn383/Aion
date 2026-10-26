@@ -22,5 +22,8 @@ void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock);
 [[nodiscard]] std::unique_ptr<Tool> makeMoveTool();
 [[nodiscard]] std::unique_ptr<Tool> makeRotateTool();
 [[nodiscard]] std::unique_ptr<Tool> makeScaleTool();
+[[nodiscard]] std::unique_ptr<Tool> makeCircleTool();
+[[nodiscard]] std::unique_ptr<Tool> makePolygonTool();
+[[nodiscard]] std::unique_ptr<Tool> makeArcTool();
 
 } // namespace aion::tools
