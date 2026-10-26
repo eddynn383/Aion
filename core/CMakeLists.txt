@@ -1,10 +1,14 @@
 find_package(glm CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(miniz CONFIG REQUIRED)
 find_path(EARCUT_HPP_INCLUDE_DIRS "mapbox/earcut.hpp" REQUIRED)
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
 
 add_library(aion_core STATIC
     src/Version.cpp
     src/commands/CommandStack.cpp
     src/geom/Mesh.cpp
+    src/geom/MeshBuilder.cpp
     src/geom/MeshValidate.cpp
     src/geom/Offset.cpp
     src/geom/Operations.cpp
@@ -24,6 +28,9 @@ add_library(aion_core STATIC
     src/view/Picking.cpp
     src/view/ModelPicking.cpp
     src/inference/Inference.cpp
+    src/io/AionFile.cpp
+    src/io/Gltf.cpp
+    src/io/Obj.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp
     src/tools/ToolHelpers.cpp
@@ -40,6 +47,8 @@ configure_file(src/VersionConfig.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/Ver
 target_include_directories(aion_core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 target_link_libraries(aion_core PUBLIC glm::glm)
+target_link_libraries(aion_core PRIVATE nlohmann_json::nlohmann_json miniz::miniz)
 target_include_directories(aion_core PRIVATE ${EARCUT_HPP_INCLUDE_DIRS})
+target_include_directories(aion_core SYSTEM PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
 aion_configure_target(aion_core)

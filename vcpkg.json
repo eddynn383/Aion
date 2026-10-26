@@ -9,6 +9,7 @@
     "nlohmann-json",
     "earcut-hpp",
     "tinygltf",
+    "miniz",
     "catch2"
   ]
 }
