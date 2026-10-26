@@ -1,7 +1,7 @@
 import QtQuick
 import Aion
 
-// Outliner: arborele grupurilor și componentelor. Click selectează (intrând, la nevoie, în grupul care conține
+// Outliner: arborele grupurilor și obiectelor. Click selectează (intrând, la nevoie, în grupul care conține
 // obiectul), dublu-click pe nume redenumește, ochiul ascunde sau arată.
 Item {
     id: root
@@ -107,7 +107,7 @@ Item {
         visible: list.count === 0
         width: parent.width
         wrapMode: Text.Wrap
-        text: "Niciun grup sau componentă. Selectează geometrie și alege „Make Group” (⌘G) sau „Make Component” (⇧⌘G)."
+        text: "Niciun grup sau obiect. Selectează geometrie și alege „Creează grup” (⌘G) sau „Creează obiect” (⇧⌘G); le găsești și în meniul de click dreapta."
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeSm
     }

@@ -566,6 +566,17 @@ void Viewport::zoomExtents()
     requestAnimationFrame();
 }
 
+void Viewport::zoomToSelection()
+{
+    const auto bounds = m_document ? m_document->selectionBounds() : std::nullopt;
+    if (!bounds) {
+        zoomExtents();
+        return;
+    }
+    m_motion.animateTo(m_camera, m_camera.framing(bounds->first, bounds->second));
+    requestAnimationFrame();
+}
+
 void Viewport::toggleProjection()
 {
     setOrthographic(!isOrthographic());
@@ -764,6 +775,12 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     // Pe macOS, Qt raportează tasta Control ca MetaModifier (Cmd devine ControlModifier).
     const bool ctrl = mods.testFlag(Qt::ControlModifier) || mods.testFlag(Qt::MetaModifier);
 
+    if (event->button() == Qt::RightButton) {
+        m_rightPress = event->position();
+        event->accept();
+        return;
+    }
+
     Drag drag = Drag::None;
     if (event->button() == Qt::MiddleButton) {
         drag = ctrl ? Drag::Zoom : shift ? Drag::Pan : Drag::Orbit;
@@ -828,6 +845,16 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::RightButton) {
+        if (m_rightPress && QLineF(*m_rightPress, event->position()).length() <= kMultiClickDistancePx && m_document) {
+            m_document->selectForContextMenu(m_camera, toVec2(event->position()));
+            afterToolEvent();
+            emit contextMenuRequested(event->position());
+        }
+        m_rightPress.reset();
+        event->accept();
+        return;
+    }
     if (m_toolPressed && event->button() == Qt::LeftButton) {
         m_toolPressed = false;
         if (m_document) {

@@ -44,6 +44,13 @@ Faza 6 aduce grupurile, componentele și tag-urile. Până acum documentul era o
   folosite și de fețe rămase în context rămân și acolo. Explode lipește geometria transformată de părinte.
 - Instanțele blocate nu se mută, nu se șterg și nu se editează.
 
+### Numele din interfață
+- În interfață, componentele se numesc **obiecte** („Creează obiect”, „Obiect 1”), ca Aion să nu preia termenii
+  SketchUp; în cod rămân „definiție” și „instanță”. La fel: „Desface” (Explode), „Fă unic” (Make Unique).
+- Meniul de click dreapta (`Document::contextMenuItems`) arată numai comenzile potrivite selecției: geometrie,
+  un grup sau obiect, mai multe obiecte sau nimic (în context: ieșirea din grup). Click dreapta pe ceva neselectat
+  îl selectează întâi (ca în Figma).
+
 ## Consecințe
 - Inferența vede doar geometria contextului activ (nu și pe cea din alte grupuri): de rafinat.
 - Originea unei definiții noi e originea contextului (transformare identitate), nu colțul obiectului.

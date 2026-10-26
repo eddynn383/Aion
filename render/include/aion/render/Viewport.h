@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <deque>
+#include <optional>
 
 namespace aion::render {
 
@@ -113,6 +114,8 @@ public:
 
     Q_INVOKABLE void setStandardView(aion::render::Viewport::StandardView view);
     Q_INVOKABLE void zoomExtents();
+    // Încadrează selecția documentului (sau tot modelul, dacă nu e nimic selectat).
+    Q_INVOKABLE void zoomToSelection();
     Q_INVOKABLE void toggleProjection();
     // Rotește camera continuu timp de `seconds` secunde (pentru măsurarea fps-ului).
     Q_INVOKABLE void startTurntable(double seconds);
@@ -130,6 +133,8 @@ signals:
     void framesPerSecondChanged();
     void documentChanged();
     void selectionRectChanged();
+    // Click dreapta (fără tragere): ce era sub cursor a devenit selecția; QML deschide meniul contextual.
+    void contextMenuRequested(QPointF position);
     void annotationsChanged();
     void pointerPositionChanged();
 
@@ -197,6 +202,7 @@ private:
     QPointF m_hoverPosition;
     QPointer<Document> m_document;
     bool m_toolPressed = false;
+    std::optional<QPointF> m_rightPress;
     int m_clickCount = 0;
     qint64 m_lastClickNs = 0;
     QPointF m_lastClickPosition;

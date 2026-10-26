@@ -51,6 +51,28 @@ std::optional<SurfacePoint> surfacePoint(const ToolContext& ctx, Vec2d screen)
     return std::nullopt;
 }
 
+geom::Selection selectionAt(const ToolContext& ctx, Vec2d screen)
+{
+    const view::PickResult hit = pickWithInstances(ctx, screen, { -1.0, 5.0 });
+    geom::Selection s;
+    switch (hit.kind) {
+    case view::PickResult::Kind::Instance:
+        s.instances.insert(hit.instance);
+        break;
+    case view::PickResult::Kind::Edge:
+        for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
+            s.edges.insert(edge);
+        }
+        break;
+    case view::PickResult::Kind::Face:
+        s.faces.insert(hit.face);
+        break;
+    default:
+        break;
+    }
+    return s;
+}
+
 bool deleteSelection(ToolContext& ctx)
 {
     ctx.selection.prune(ctx.mesh);

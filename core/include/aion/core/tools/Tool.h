@@ -150,6 +150,12 @@ struct SurfacePoint {
 };
 [[nodiscard]] std::optional<SurfacePoint> surfacePoint(const ToolContext& ctx, Vec2d screen);
 
+// Ce e sub cursor, inclusiv grupurile și obiectele din context (cea mai apropiată dintre geometrie și instanțe).
+[[nodiscard]] view::PickResult pickWithInstances(const ToolContext& ctx, Vec2d screen, view::PickOptions options = {});
+
+// Ce selectează un click (Select): o muchie (cu toată curba ei), o față sau o instanță.
+[[nodiscard]] geom::Selection selectionAt(const ToolContext& ctx, Vec2d screen);
+
 // Șterge selecția: fețele selectate, apoi muchiile selectate (cu fețele lor). O singură comandă.
 bool deleteSelection(ToolContext& ctx);
 

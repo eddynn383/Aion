@@ -27,7 +27,7 @@ std::string defaultName(const Model& model, bool component)
     for (const Definition& d : model.definitions().values()) {
         count += d.group ? 0 : 1;
     }
-    return "Componentă " + std::to_string(count); // rădăcina nu e grup, deci prima componentă e „Componentă 1”
+    return "Obiect " + std::to_string(count); // rădăcina nu e grup, deci primul obiect e „Obiect 1”
 }
 
 // O copie independentă a definiției (geometrie și instanțele din ea).

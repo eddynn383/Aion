@@ -1,5 +1,6 @@
 #include "aion/render/Document.h"
 
+#include "aion/core/geom/Operations.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/units/Length.h"
 
@@ -7,7 +8,9 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <set>
 
 namespace aion::render {
@@ -35,6 +38,21 @@ const model::Color kTagPalette[] = {
     { 0x3B, 0x82, 0xF6, 255 }, { 0xF5, 0x9E, 0x0B, 255 }, { 0x10, 0xB9, 0x81, 255 }, { 0xEC, 0x48, 0x99, 255 },
     { 0x8B, 0x5C, 0xF6, 255 }, { 0x14, 0xB8, 0xA6, 255 }, { 0xEF, 0x44, 0x44, 255 }, { 0x84, 0xCC, 0x16, 255 },
 };
+
+// „1.2 × 0.6 × 2.4 m” sau „155.4 × 155.4 × 186.3 mm”: o singură unitate, după cea mai mare dimensiune.
+QString formatSize(const math::Vec3d& size)
+{
+    const bool meters = std::max({ size.x, size.y, size.z }) >= 1000.0;
+    const auto number = [&](double mm) {
+        QString s = QString::number(meters ? mm / 1000.0 : mm, 'f', meters ? 3 : 1);
+        while (s.contains(QLatin1Char('.')) && (s.endsWith(QLatin1Char('0')) || s.endsWith(QLatin1Char('.')))) {
+            s.chop(1);
+        }
+        return s;
+    };
+    return number(size.x) + QStringLiteral(" × ") + number(size.y) + QStringLiteral(" × ") + number(size.z)
+        + (meters ? QStringLiteral(" m") : QStringLiteral(" mm"));
+}
 
 QString formatArea(double mm2)
 {
@@ -123,8 +141,15 @@ QString Document::selectionSummary() const
         return {};
     }
     QStringList parts;
-    if (!m_selection.instances.empty()) {
-        parts << plural(m_selection.instances.size(), "obiect", "obiecte");
+    std::size_t groups = 0;
+    for (model::InstanceId id : m_selection.instances) {
+        groups += m_model.definition(m_model.instance(id).definition).group ? 1 : 0;
+    }
+    if (groups > 0) {
+        parts << plural(groups, "grup", "grupuri");
+    }
+    if (m_selection.instances.size() > groups) {
+        parts << plural(m_selection.instances.size() - groups, "obiect", "obiecte");
     }
     if (!m_selection.faces.empty()) {
         parts << plural(m_selection.faces.size(), "față", "fețe");
@@ -248,20 +273,18 @@ QVariantMap Document::entityInfo() const
         const model::Instance& inst = m_model.instance(id);
         const model::Definition& def = m_model.definition(inst.definition);
         info[QStringLiteral("kind")] = QStringLiteral("instance");
-        info[QStringLiteral("title")] = def.group ? QStringLiteral("Grup") : QStringLiteral("Componentă");
+        info[QStringLiteral("title")] = def.group ? QStringLiteral("Grup") : QStringLiteral("Obiect");
         info[QStringLiteral("instanceId")] = static_cast<double>(id.value);
         info[QStringLiteral("name")] = QString::fromStdString(def.group ? inst.name : def.name);
         info[QStringLiteral("tagId")] = static_cast<double>(inst.tag.value);
         info[QStringLiteral("locked")] = inst.locked;
+        info[QStringLiteral("copies")] = static_cast<int>(m_model.instancesOf(inst.definition).size());
         if (!def.group) {
-            details << detail(QStringLiteral("Copii în model"), QString::number(m_model.instancesOf(inst.definition).size()));
+            details << detail(QStringLiteral("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
         }
         const auto [lo, hi] = model::bounds(m_model, inst.definition);
         if (lo.x <= hi.x) {
-            const math::Vec3d size = hi - lo;
-            details << detail(QStringLiteral("Dimensiuni"),
-                QString::fromStdString(units::formatLength(size.x) + " × " + units::formatLength(size.y) + " × "
-                    + units::formatLength(size.z)));
+            details << detail(QStringLiteral("Dimensiuni"), formatSize(hi - lo));
         }
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
@@ -499,6 +522,8 @@ void Document::runOnModel(const std::string& name, Fn&& fn)
     const geom::Selection before = m_selection;
     m_stack.run(name, [&](model::Model& model) { fn(model); });
     afterInteraction(before);
+    // Entity Info arată și proprietăți ale obiectelor (tag, nume, blocare), nu doar ce e selectat.
+    emit selectionChanged();
     emit outlineChanged();
 }
 
@@ -507,7 +532,7 @@ void Document::makeGroup()
     if (m_selection.empty()) {
         return;
     }
-    runOnModel("Make Group", [&](model::Model& model) {
+    runOnModel("Creează grup", [&](model::Model& model) {
         const model::InstanceId id = model::makeGroup(model, activeDefinition(), m_selection, false);
         m_selection.clear();
         m_selection.instances.insert(id);
@@ -519,7 +544,7 @@ void Document::makeComponent(const QString& name)
     if (m_selection.empty()) {
         return;
     }
-    runOnModel("Make Component", [&](model::Model& model) {
+    runOnModel("Creează obiect", [&](model::Model& model) {
         const model::InstanceId id
             = model::makeGroup(model, activeDefinition(), m_selection, true, name.trimmed().toStdString());
         m_selection.clear();
@@ -532,7 +557,7 @@ void Document::explodeSelection()
     if (m_selection.instances.empty()) {
         return;
     }
-    runOnModel("Explode", [&](model::Model& model) {
+    runOnModel("Desface", [&](model::Model& model) {
         geom::Selection result;
         for (model::InstanceId id : std::set(m_selection.instances)) {
             if (model.instances().contains(id) && !model.instance(id).locked) {
@@ -545,7 +570,7 @@ void Document::explodeSelection()
 
 void Document::makeUniqueSelection()
 {
-    runOnModel("Make Unique", [&](model::Model& model) {
+    runOnModel("Fă unic", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
             model::makeUnique(model, id);
         }
@@ -557,7 +582,7 @@ void Document::hideSelection()
     if (m_selection.instances.empty()) {
         return;
     }
-    runOnModel("Hide", [&](model::Model& model) {
+    runOnModel("Ascunde", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
             model::Instance inst = model.instance(id);
             inst.hidden = true;
@@ -569,7 +594,7 @@ void Document::hideSelection()
 
 void Document::unhideAll()
 {
-    runOnModel("Unhide All", [&](model::Model& model) {
+    runOnModel("Arată tot", [&](model::Model& model) {
         for (model::InstanceId id : std::vector(model.instances().keys())) {
             if (model.instance(id).hidden) {
                 model::Instance inst = model.instance(id);
@@ -582,7 +607,7 @@ void Document::unhideAll()
 
 void Document::setSelectionLocked(bool locked)
 {
-    runOnModel(locked ? "Lock" : "Unlock", [&](model::Model& model) {
+    runOnModel(locked ? "Blochează" : "Deblochează", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
             model::Instance inst = model.instance(id);
             inst.locked = locked;
@@ -670,7 +695,7 @@ void Document::renameInstance(double instanceId, const QString& name)
     if (!m_model.instances().contains(id)) {
         return;
     }
-    runOnModel("Rename", [&](model::Model& model) {
+    runOnModel("Redenumește", [&](model::Model& model) {
         model::Instance inst = model.instance(id);
         const model::Definition& def = model.definition(inst.definition);
         if (def.group) {
@@ -691,7 +716,7 @@ void Document::setInstanceHidden(double instanceId, bool hidden)
     if (!m_model.instances().contains(id)) {
         return;
     }
-    runOnModel(hidden ? "Hide" : "Unhide", [&](model::Model& model) {
+    runOnModel(hidden ? "Ascunde" : "Arată", [&](model::Model& model) {
         model::Instance inst = model.instance(id);
         inst.hidden = hidden;
         model.setInstance(id, inst);
@@ -700,7 +725,7 @@ void Document::setInstanceHidden(double instanceId, bool hidden)
 
 void Document::addTag(const QString& name)
 {
-    runOnModel("Add Tag", [&](model::Model& model) {
+    runOnModel("Tag nou", [&](model::Model& model) {
         const model::Color color = kTagPalette[model.tags().size() % std::size(kTagPalette)];
         model.addTag({ name.trimmed().toStdString(), color, true });
     });
@@ -712,7 +737,7 @@ void Document::renameTag(double tagId, const QString& name)
     if (!m_model.tags().contains(id) || name.trimmed().isEmpty()) {
         return;
     }
-    runOnModel("Rename Tag", [&](model::Model& model) {
+    runOnModel("Redenumește tag-ul", [&](model::Model& model) {
         model::Tag tag = model.tag(id);
         tag.name = name.trimmed().toStdString();
         model.setTag(id, tag);
@@ -725,7 +750,7 @@ void Document::setTagVisible(double tagId, bool visible)
     if (!m_model.tags().contains(id)) {
         return;
     }
-    runOnModel(visible ? "Show Tag" : "Hide Tag", [&](model::Model& model) {
+    runOnModel(visible ? "Arată tag-ul" : "Ascunde tag-ul", [&](model::Model& model) {
         model::Tag tag = model.tag(id);
         tag.visible = visible;
         model.setTag(id, tag);
@@ -738,7 +763,7 @@ void Document::removeTag(double tagId)
     if (!m_model.tags().contains(id)) {
         return;
     }
-    runOnModel("Delete Tag", [&](model::Model& model) { model.removeTag(id); });
+    runOnModel("Șterge tag-ul", [&](model::Model& model) { model.removeTag(id); });
 }
 
 void Document::assignTag(double tagId)
@@ -747,13 +772,181 @@ void Document::assignTag(double tagId)
     if (m_selection.instances.empty() || (id && !m_model.tags().contains(id))) {
         return;
     }
-    runOnModel("Tag", [&](model::Model& model) {
+    runOnModel("Schimbă tag-ul", [&](model::Model& model) {
         for (model::InstanceId i : m_selection.instances) {
             model::Instance inst = model.instance(i);
             inst.tag = id;
             model.setInstance(i, inst);
         }
     });
+}
+
+void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d screen)
+{
+    if (m_tool && m_toolId != QLatin1String("select")) {
+        return; // în timpul unei operații (desen, mutare) meniul lucrează pe selecția existentă
+    }
+    const geom::Selection before = m_selection;
+    const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
+    tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, local };
+    ctx.model = &m_model;
+    ctx.context = activeDefinition();
+    const geom::Selection hit = tools::selectionAt(ctx, screen);
+    const bool alreadySelected = !hit.empty()
+        && std::all_of(hit.faces.begin(), hit.faces.end(), [&](geom::FaceId f) { return m_selection.contains(f); })
+        && std::all_of(hit.edges.begin(), hit.edges.end(), [&](geom::EdgeId e) { return m_selection.contains(e); })
+        && std::all_of(hit.instances.begin(), hit.instances.end(),
+            [&](model::InstanceId i) { return m_selection.contains(i); });
+    if (!alreadySelected) {
+        m_selection = hit;
+    }
+    afterInteraction(before);
+}
+
+std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() const
+{
+    if (m_selection.empty()) {
+        return std::nullopt;
+    }
+    const math::Transform ctx = contextTransform();
+    math::Vec3d lo { std::numeric_limits<double>::infinity() };
+    math::Vec3d hi { -std::numeric_limits<double>::infinity() };
+    const auto add = [&](const math::Vec3d& local) {
+        const math::Vec3d p = ctx.applyToPoint(local);
+        lo = glm::min(lo, p);
+        hi = glm::max(hi, p);
+    };
+    const geom::Mesh& mesh = m_model.mesh(activeDefinition());
+    for (geom::VertexId v : geom::verticesOf(mesh, m_selection)) {
+        add(mesh.position(v));
+    }
+    for (model::InstanceId id : m_selection.instances) {
+        const model::Instance& inst = m_model.instance(id);
+        const auto [blo, bhi] = model::bounds(m_model, inst.definition);
+        if (blo.x > bhi.x) {
+            continue;
+        }
+        for (int k = 0; k < 8; ++k) {
+            add(inst.transform.applyToPoint({ (k & 1) ? bhi.x : blo.x, (k & 2) ? bhi.y : blo.y, (k & 4) ? bhi.z : blo.z }));
+        }
+    }
+    if (lo.x > hi.x) {
+        return std::nullopt;
+    }
+    return std::pair { lo, hi };
+}
+
+QVariantList Document::contextMenuItems() const
+{
+    QVariantList items;
+    const auto item = [&](const QString& id, const QString& name, const QString& shortcut = {}, bool enabled = true,
+                          bool destructive = false) {
+        items.append(QVariantMap { { QStringLiteral("id"), id }, { QStringLiteral("name"), name },
+            { QStringLiteral("shortcut"), shortcut }, { QStringLiteral("enabled"), enabled },
+            { QStringLiteral("destructive"), destructive } });
+    };
+    const auto separator = [&] {
+        if (!items.isEmpty() && !items.last().toMap().value(QStringLiteral("separator")).toBool()) {
+            items.append(QVariantMap { { QStringLiteral("separator"), true } });
+        }
+    };
+    const bool anyHidden = std::any_of(m_model.instances().values().begin(), m_model.instances().values().end(),
+        [](const model::Instance& i) { return i.hidden; });
+
+    if (m_selection.empty()) {
+        if (!m_path.empty()) {
+            const bool group = m_model.definition(activeDefinition()).group;
+            item(QStringLiteral("org.exit"), group ? QStringLiteral("Ieși din grup") : QStringLiteral("Ieși din obiect"),
+                QStringLiteral("Escape"));
+            separator();
+        }
+        item(QStringLiteral("edit.selectAll"), QStringLiteral("Selectează tot"), QStringLiteral("Ctrl+A"));
+        if (anyHidden) {
+            item(QStringLiteral("org.unhideAll"), QStringLiteral("Arată tot"));
+        }
+        separator();
+        item(QStringLiteral("view.extents"), QStringLiteral("Zoom Extents"), QStringLiteral("Shift+Z"));
+        return items;
+    }
+
+    const bool geometry = !m_selection.faces.empty() || !m_selection.edges.empty();
+    const bool instances = !m_selection.instances.empty();
+    bool allLocked = instances;
+    bool anyLocked = false;
+    for (model::InstanceId id : m_selection.instances) {
+        allLocked = allLocked && m_model.instance(id).locked;
+        anyLocked = anyLocked || m_model.instance(id).locked;
+    }
+
+    if (!geometry && m_selection.instances.size() == 1) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        const model::Instance& inst = m_model.instance(id);
+        const bool group = m_model.definition(inst.definition).group;
+        item(QStringLiteral("org.enter"), group ? QStringLiteral("Editează grupul") : QStringLiteral("Editează obiectul"),
+            {}, !inst.locked);
+        separator();
+        item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !inst.locked);
+        if (!group && m_model.instancesOf(inst.definition).size() > 1) {
+            item(QStringLiteral("org.makeUnique"), QStringLiteral("Fă unic"));
+        }
+        item(QStringLiteral("org.makeGroup"), QStringLiteral("Creează grup"), QStringLiteral("Ctrl+G"));
+    } else {
+        item(QStringLiteral("org.makeGroup"), QStringLiteral("Creează grup"), QStringLiteral("Ctrl+G"));
+        item(QStringLiteral("org.makeComponent"), QStringLiteral("Creează obiect"), QStringLiteral("Ctrl+Shift+G"));
+        if (instances) {
+            item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !allLocked);
+        }
+    }
+    if (geometry) {
+        separator();
+        item(QStringLiteral("edit.selectConnected"), QStringLiteral("Selectează ce e conectat"));
+        if (!m_selection.faces.empty()) {
+            item(QStringLiteral("edit.reverseFaces"), m_selection.faces.size() == 1 ? QStringLiteral("Inversează fața")
+                                                                                    : QStringLiteral("Inversează fețele"));
+        }
+    }
+    if (instances) {
+        separator();
+        item(QStringLiteral("org.hide"), QStringLiteral("Ascunde"));
+        if (anyLocked) {
+            item(QStringLiteral("org.unlock"), QStringLiteral("Deblochează"));
+        }
+        if (!allLocked) {
+            item(QStringLiteral("org.lock"), QStringLiteral("Blochează"));
+        }
+    }
+    separator();
+    item(QStringLiteral("view.zoomSelection"), QStringLiteral("Zoom la selecție"));
+    separator();
+    item(QStringLiteral("edit.delete"), QStringLiteral("Șterge"), QStringLiteral("Delete"), geometry || !allLocked, true);
+    return items;
+}
+
+void Document::reverseSelectedFaces()
+{
+    if (m_selection.faces.empty()) {
+        return;
+    }
+    runOnModel(m_selection.faces.size() == 1 ? "Inversează fața" : "Inversează fețele", [&](model::Model& model) {
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        std::set<geom::FaceId> flipped;
+        for (geom::FaceId f : m_selection.faces) {
+            if (mesh.faces().contains(f)) {
+                flipped.insert(geom::orientFace(mesh, f, -mesh.face(f).plane.normal));
+            }
+        }
+        m_selection.faces = flipped;
+    });
+}
+
+void Document::selectConnected()
+{
+    const geom::Selection before = m_selection;
+    const geom::Selection seed { m_selection.edges, m_selection.faces, {} };
+    geom::Selection connected = geom::connectedTo(m_model.mesh(activeDefinition()), seed);
+    connected.instances = m_selection.instances;
+    m_selection = connected;
+    afterInteraction(before);
 }
 
 void Document::retriangulate(model::DefinitionId definition)
@@ -803,6 +996,7 @@ void Document::structureChanged(const model::Model& model)
     }
     std::erase_if(m_triangles, [&](const auto& entry) { return !model.definitions().contains(entry.first); });
     emit outlineChanged();
+    emit selectionChanged(); // Entity Info (de exemplu un tag schimbat prin undo)
     emit modelChanged();
     touch();
 }

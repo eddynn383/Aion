@@ -24,29 +24,40 @@ Column {
     Input {
         visible: root.isInstance
         width: parent.width
-        placeholderText: root.info.title === "Grup" ? "Numele grupului" : "Numele componentei"
+        placeholderText: root.info.title === "Grup" ? "Numele grupului" : "Numele obiectului"
         text: root.isInstance ? root.info.name : ""
         onEditingFinished: if (root.isInstance && text !== root.info.name) root.document.renameInstance(root.info.instanceId, text)
     }
 
+    // Detaliile: eticheta în stânga și valoarea în dreapta; dacă nu încap pe un rând, valoarea trece dedesubt.
     Repeater {
         model: root.info.details || []
         delegate: Item {
+            id: detailRow
             required property var modelData
+            readonly property bool stacked: label.implicitWidth + value.implicitWidth + Theme.space3 > width
+
             width: root.width
-            height: Theme.controlHeightSm
+            height: stacked ? label.implicitHeight + Theme.space1 + value.implicitHeight : Theme.controlHeightSm
 
             Text {
+                id: label
                 anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: parent.modelData.label
+                anchors.top: detailRow.stacked ? parent.top : undefined
+                anchors.verticalCenter: detailRow.stacked ? undefined : parent.verticalCenter
+                text: detailRow.modelData.label
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSm
             }
             Text {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: parent.modelData.value
+                id: value
+                anchors.right: detailRow.stacked ? undefined : parent.right
+                anchors.left: detailRow.stacked ? parent.left : undefined
+                anchors.bottom: detailRow.stacked ? parent.bottom : undefined
+                anchors.verticalCenter: detailRow.stacked ? undefined : parent.verticalCenter
+                width: detailRow.stacked ? parent.width : implicitWidth
+                wrapMode: Text.Wrap
+                text: detailRow.modelData.value
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeSm
                 font.family: Theme.fontMono
@@ -132,13 +143,13 @@ Column {
         }
         Button {
             small: true
-            text: "Explode"
+            text: "Desface"
             onClicked: root.document.explodeSelection()
         }
         Button {
             small: true
-            text: "Make Unique"
-            visible: root.isInstance && root.info.title === "Componentă"
+            text: "Fă unic"
+            visible: root.isInstance && root.info.title === "Obiect" && root.info.copies > 1
             onClicked: root.document.makeUniqueSelection()
         }
     }

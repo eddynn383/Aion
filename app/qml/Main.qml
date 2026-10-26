@@ -44,16 +44,19 @@ Window {
             { id: "edit.selectAll", title: "Selectează tot", category: "Editare", shortcut: "Ctrl+A",
               icon: "square-dashed-mouse-pointer" },
             { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
-            { id: "org.makeGroup", title: "Make Group", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
-            { id: "org.makeComponent", title: "Make Component", category: "Organizare", shortcut: "Ctrl+Shift+G", icon: "component" },
-            { id: "org.explode", title: "Explode", category: "Organizare", shortcut: "", icon: "box" },
-            { id: "org.makeUnique", title: "Make Unique", category: "Organizare", shortcut: "", icon: "component" },
-            { id: "org.enter", title: "Editează grupul selectat", category: "Organizare", shortcut: "", icon: "box" },
-            { id: "org.exit", title: "Ieși din grupul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
+            { id: "org.makeGroup", title: "Creează grup", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
+            { id: "org.makeComponent", title: "Creează obiect", category: "Organizare", shortcut: "Ctrl+Shift+G", icon: "component" },
+            { id: "org.explode", title: "Desface (grup sau obiect)", category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
+            { id: "org.enter", title: "Editează grupul sau obiectul selectat", category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.exit", title: "Ieși din grupul sau obiectul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
             { id: "org.hide", title: "Ascunde selecția", category: "Organizare", shortcut: "", icon: "eye-off" },
             { id: "org.unhideAll", title: "Arată tot", category: "Organizare", shortcut: "", icon: "eye" },
             { id: "org.lock", title: "Blochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
             { id: "org.unlock", title: "Deblochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
+            { id: "edit.selectConnected", title: "Selectează ce e conectat", category: "Editare", shortcut: "", icon: "square-dashed-mouse-pointer" },
+            { id: "edit.reverseFaces", title: "Inversează fețele selectate", category: "Editare", shortcut: "", icon: "rotate-ccw" },
+            { id: "view.zoomSelection", title: "Zoom la selecție", category: "Vedere", shortcut: "", icon: "scan" },
             { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
@@ -96,6 +99,9 @@ Window {
         case "org.unhideAll": doc.unhideAll(); break
         case "org.lock": doc.setSelectionLocked(true); break
         case "org.unlock": doc.setSelectionLocked(false); break
+        case "edit.selectConnected": doc.selectConnected(); break
+        case "edit.reverseFaces": doc.reverseSelectedFaces(); break
+        case "view.zoomSelection": viewport.zoomToSelection(); break
         case "ui.leftPanel": window.leftPanelVisible = !window.leftPanelVisible; break
         case "ui.rightPanel": window.rightPanelVisible = !window.rightPanelVisible; break
         case "ui.panels": {
@@ -137,6 +143,9 @@ Window {
                 } else if (action.startsWith("clickw:")) {
                     const c = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(viewport, viewport.projectToScreen(Qt.vector3d(c[0], c[1], c[2])))
+                } else if (action.startsWith("rclickw:")) {
+                    const r = action.slice(8).split(",").map(Number)
+                    AppInfo.simulateRightClick(viewport, viewport.projectToScreen(Qt.vector3d(r[0], r[1], r[2])))
                 } else if (action.startsWith("movew:")) {
                     const m = action.slice(6).split(",").map(Number)
                     AppInfo.simulateMove(viewport, viewport.projectToScreen(Qt.vector3d(m[0], m[1], m[2])))
@@ -337,6 +346,10 @@ Window {
         document: doc
         focus: true
         Keys.onPressed: (event) => window.vcbKey(event)
+        onContextMenuRequested: (position) => {
+            contextMenu.items = doc.contextMenuItems()
+            contextMenu.openAt(position.x, position.y)
+        }
         reducedMotion: Theme.reduceMotion
         navigationTool: window.navigationTools.includes(window.activeTool) ? window.activeTool : ""
 
@@ -428,6 +441,11 @@ Window {
                     onClicked: doc.exitContext()
                 }
             }
+        }
+
+        ContextMenu {
+            id: contextMenu
+            onTriggered: (id) => window.runCommand(id)
         }
 
         NavigationGizmo {

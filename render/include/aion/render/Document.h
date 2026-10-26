@@ -116,6 +116,13 @@ public:
     // Tag-ul instanțelor selectate (0 = fără tag).
     Q_INVOKABLE void assignTag(double tagId);
 
+    // --- Meniul contextual (click dreapta) ---
+    // Elementele potrivite selecției: { id, name, shortcut, enabled, destructive } sau { separator: true }.
+    // `id` e o comandă din Main.qml (runCommand).
+    Q_INVOKABLE QVariantList contextMenuItems() const;
+    Q_INVOKABLE void reverseSelectedFaces();
+    Q_INVOKABLE void selectConnected();
+
     // --- Pentru Viewport ---
     const model::Model& model() const { return m_model; }
     model::DefinitionId activeDefinition() const;
@@ -130,6 +137,11 @@ public:
     const std::unordered_map<geom::FaceId, geom::FaceTriangles>& triangles(model::DefinitionId definition) const;
     // Crește la orice schimbare care trebuie redesenată (model, selecție, hover, overlay).
     unsigned revision() const { return m_revision; }
+
+    // Click dreapta: ce e sub cursor devine selecția, dacă nu era deja selectat (ca în Figma).
+    void selectForContextMenu(const view::Camera& camera, math::Vec2d screen);
+    // Cutia selecției în coordonate globale (pentru „Zoom la selecție”); nullopt dacă selecția e goală.
+    std::optional<std::pair<math::Vec3d, math::Vec3d>> selectionBounds() const;
 
     void pointerDown(const view::Camera& camera, const tools::PointerEvent& e);
     void pointerMove(const view::Camera& camera, const tools::PointerEvent& e);
