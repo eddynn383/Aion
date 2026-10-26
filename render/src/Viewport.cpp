@@ -1144,6 +1144,7 @@ ViewportFrame Viewport::frameForRendering() const
     f.targetDistance = m_camera.pose().distance;
     f.orthographic = isOrthographic();
     f.gridVisible = m_gridVisible;
+    f.shadowMapSize = std::clamp(m_shadowMapSize, 512, 8192);
     if (m_document && m_document->property("snapToGrid").toBool()) {
         f.gridStep = m_document->property("gridStep").toDouble();
     }

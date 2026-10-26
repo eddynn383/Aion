@@ -93,6 +93,9 @@ class Document : public QObject, private model::ModelObserver {
     // Snap la grid: activ sau nu; pasul în mm (0 = automat, după grid-ul vizibil).
     Q_PROPERTY(bool snapToGrid MEMBER m_snapToGrid NOTIFY gridSnapChanged)
     Q_PROPERTY(double gridStep MEMBER m_gridStep NOTIFY gridSnapChanged)
+    // Autosalvarea (Preferințe → Salvare), păstrată în QSettings.
+    Q_PROPERTY(bool autosaveEnabled READ autosaveEnabled WRITE setAutosaveEnabled NOTIFY autosaveSettingsChanged)
+    Q_PROPERTY(int autosaveMinutes READ autosaveMinutes WRITE setAutosaveMinutes NOTIFY autosaveSettingsChanged)
     Q_PROPERTY(int displayUnit READ displayUnit WRITE setDisplayUnit NOTIFY unitsChanged)
     Q_PROPERTY(int displayDecimals READ displayDecimals WRITE setDisplayDecimals NOTIFY unitsChanged)
 
@@ -126,6 +129,10 @@ public:
     bool hasRecovery() const { return m_hasRecovery; }
     QString recoveryInfo() const;
     QString lastError() const { return m_lastError; }
+    bool autosaveEnabled() const { return m_autosaveTimer.isActive(); }
+    void setAutosaveEnabled(bool enabled);
+    int autosaveMinutes() const { return m_autosaveTimer.interval() / 60'000; }
+    void setAutosaveMinutes(int minutes);
     int displayUnit() const;
     void setDisplayUnit(int unit);
     int displayDecimals() const;
@@ -289,6 +296,7 @@ signals:
     void editingAnnotationChanged();
     void unitsChanged();
     void gridSnapChanged();
+    void autosaveSettingsChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.

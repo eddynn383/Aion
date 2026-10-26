@@ -54,6 +54,7 @@ struct ViewportFrame {
     bool orthographic = false;
     bool gridVisible = true;
     double gridStep = 0.0; // pasul fix al grid-ului (Snap la grid), 0 = automat
+    int shadowMapSize = 2048; // calitatea umbrelor (1024, 2048, 4096)
     bool hasSelectedFaces = false; // activează conturul selecției
     float devicePixelRatio = 1.0f;
 

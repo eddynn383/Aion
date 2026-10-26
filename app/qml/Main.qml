@@ -200,7 +200,7 @@ Window {
         case "nav.pivotView": viewport.orbitPivot = 0; toast.show("Orbita: în jurul centrului vederii"); break
         case "nav.pivotSelection": viewport.orbitPivot = 1; toast.show("Orbita: în jurul selecției"); break
         case "nav.pivotCursor": viewport.orbitPivot = 2; toast.show("Orbita: în jurul punctului de sub cursor"); break
-        case "app.preferences": preferencesDialog.open(); break
+        case "app.preferences": preferencesPage.active = true; break
         case "app.about": aboutDialog.open(); break
         case "app.tour": toolTour.open(); break
         case "debug.storybook": storybookLoader.active = true; break
@@ -263,6 +263,13 @@ Window {
                     // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("themecolor:")) {
+                    // „themecolor:accent=#EC4899” (gol după „=” resetează).
+                    const tc = action.slice(11).split("=")
+                    Theme.setOverride(tc[0], tc[1] || "")
+                } else if (action.startsWith("prefs:")) {
+                    preferencesPage.active = true
+                    preferencesPage.item.category = parseInt(action.slice(6))
                 } else if (action.startsWith("material:")) {
                     // „material:back,3” = materialul 3 din bibliotecă pe versoul selecției.
                     const mt = action.slice(9).split(",")
@@ -427,7 +434,7 @@ Window {
             window: appWindow
             document: doc
             onAboutRequested: aboutDialog.open()
-            onPreferencesRequested: preferencesDialog.open()
+            onPreferencesRequested: preferencesPage.active = true
         }
     }
 
@@ -497,11 +504,18 @@ Window {
         function onFileOpenRequested() { window.openPendingFiles() }
     }
 
-    PreferencesDialog {
-        id: preferencesDialog
-        parent: window.contentItem
-        document: doc
-        viewport: viewport
+    // Preferințele: o pagină peste toată fereastra.
+    Loader {
+        id: preferencesPage
+        anchors.fill: parent
+        z: 150
+        active: false
+        sourceComponent: PreferencesPage {
+            document: doc
+            viewport: viewport
+            commands: window.commands
+            onCloseRequested: preferencesPage.active = false
+        }
     }
     AboutDialog {
         id: aboutDialog
@@ -1111,7 +1125,7 @@ Window {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        framesPerSecond: viewport.framesPerSecond
+        framesPerSecond: UserPrefs.showFps ? viewport.framesPerSecond : 0
         message: window.pendingToolMessage.length > 0 ? window.pendingToolMessage
                : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata"
         selectionText: doc.selectionSummary

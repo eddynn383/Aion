@@ -70,6 +70,9 @@ class Viewport : public QQuickRhiItem {
 
     // Navigare (Preferințe): centrul orbitei 0 = centrul vederii, 1 = selecția, 2 = punctul de sub cursor;
     // zoom spre suprafața de sub cursor („auto depth”); planurile de tăiere manuale, în mm (0 = automat).
+    // Calitatea imaginii (Preferințe → Viewport): eșantioane MSAA (1, 2, 4, 8) și mărimea hărții de umbre.
+    Q_PROPERTY(int antialiasing READ sampleCount WRITE setSampleCount NOTIFY sampleCountChanged)
+    Q_PROPERTY(int shadowQuality MEMBER m_shadowMapSize NOTIFY appearanceChanged)
     Q_PROPERTY(int orbitPivot READ orbitPivot WRITE setOrbitPivot NOTIFY navigationSettingsChanged)
     Q_PROPERTY(bool zoomToSurface MEMBER m_zoomToSurface NOTIFY navigationSettingsChanged)
     Q_PROPERTY(double clipStart READ clipStart WRITE setClipStart NOTIFY navigationSettingsChanged)
@@ -236,6 +239,7 @@ private:
     QString m_exportDirectory;
     QTimer* m_exportTimer = nullptr;
 
+    int m_shadowMapSize = 2048;
     int m_orbitPivotMode = 0;
     bool m_trackpadOrbiting = false;
     bool m_zoomToSurface = true;

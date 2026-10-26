@@ -481,13 +481,13 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
       lățimea panoului
 
 ### Faza 14 – Pagina de Preferințe
-- [ ] Pagină întreagă (nu popover), cu categorii în stânga: General, Unități, Salvare, Aspect, Viewport, Navigare,
+- [x] Pagină întreagă (nu popover), cu categorii în stânga: General, Unități, Salvare, Aspect, Viewport, Navigare,
       Grid și snap, Ghiduri, Scurtături
-- [ ] Unități (unitate, precizie, format), autosalvare (pornit/oprit, interval 1–30 min, câte copii de rezervă)
-- [ ] Temă: Sistem / Light / Dark + temă personalizată (accent, fundaluri, panouri, viewport, grid, muchii, fețe),
+- [x] Unități (unitate, precizie, format), autosalvare (pornit/oprit, interval 1–30 min, câte copii de rezervă)
+- [x] Temă: Sistem / Light / Dark + temă personalizată (accent, fundaluri, panouri, viewport, grid, muchii, fețe),
       salvată și resetabilă; tokenii din `Theme.qml` devin suprascriibili
-- [ ] Viewport: anti-aliasing (MSAA), calitatea umbrelor, limită de fps / economisire baterie, afișarea fps
-- [ ] Scurtături: lista completă (personalizarea vine mai târziu)
+- [x] Viewport: anti-aliasing (MSAA), calitatea umbrelor, limită de fps / economisire baterie, afișarea fps
+- [x] Scurtături: lista completă (personalizarea vine mai târziu)
 
 ### Faza 15 – Panoul din stânga: acordeon; Outliner unit cu Tag-urile
 - [ ] Secțiuni acordeon (Outliner, Materiale, Scene), redimensionabile, starea păstrată

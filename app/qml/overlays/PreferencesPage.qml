@@ -1,0 +1,540 @@
+import QtQuick
+import QtQuick.Dialogs
+import Aion
+
+// Preferințele (⌘,), pe toată fereastra: categoriile în stânga, setările în dreapta. Totul se aplică imediat și se
+// păstrează între sesiuni (unitățile și autosalvarea prin Document, restul prin Settings / UserPrefs).
+Rectangle {
+    id: root
+
+    property var document
+    property var viewport
+    property var commands: []
+    property int category: 0
+
+    signal closeRequested()
+
+    color: Theme.bgApp
+
+    readonly property var categories: [
+        { name: "General", icon: "settings" },
+        { name: "Unități", icon: "ruler" },
+        { name: "Salvare", icon: "check" },
+        { name: "Aspect", icon: "palette" },
+        { name: "Viewport", icon: "monitor" },
+        { name: "Navigare", icon: "orbit" },
+        { name: "Grid și snap", icon: "grid-3x3" },
+        { name: "Scurtături", icon: "search" }
+    ]
+
+    Keys.onEscapePressed: root.closeRequested()
+    Component.onCompleted: forceActiveFocus()
+
+    // Blochează clicurile spre ce e dedesubt.
+    MouseArea { anchors.fill: parent }
+
+    // --- Bara de sus ---
+    Item {
+        id: header
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: Theme.titleBarHeight
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.trafficLightsInset + Theme.space4
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Preferințe"
+            color: Theme.textPrimary
+            font.pixelSize: Theme.fontSizeLg
+            font.weight: Font.DemiBold
+        }
+        IconButton {
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.space3
+            anchors.verticalCenter: parent.verticalCenter
+            iconName: "x"
+            tooltip: "Închide (Esc)"
+            onClicked: root.closeRequested()
+        }
+        Separator { anchors.bottom: parent.bottom; width: parent.width }
+    }
+
+    // --- Categoriile ---
+    Column {
+        id: nav
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.margins: Theme.space4
+        width: 200
+        spacing: 2
+        Repeater {
+            model: root.categories
+            delegate: Rectangle {
+                id: navItem
+                required property var modelData
+                required property int index
+                readonly property bool current: root.category === index
+                width: nav.width
+                height: Theme.controlHeight
+                radius: Theme.radiusMd
+                color: current ? Theme.accentSubtle : navArea.containsMouse ? Theme.bgHover : "transparent"
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.space3
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.space2
+                    Icon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: navItem.modelData.icon
+                        size: Theme.iconSizeSm
+                        color: navItem.current ? Theme.accent : Theme.textSecondary
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: navItem.modelData.name
+                        color: navItem.current ? Theme.textPrimary : Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeMd
+                    }
+                }
+                MouseArea {
+                    id: navArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: root.category = navItem.index
+                }
+            }
+        }
+    }
+    Separator {
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        x: nav.x + nav.width + Theme.space4
+        width: 1
+    }
+
+    // --- Setările categoriei ---
+    Flickable {
+        id: content
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: nav.right
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.space8
+        contentHeight: page.height + Theme.space8 * 2
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        Column {
+            id: page
+            y: Theme.space8
+            width: Math.min(620, content.width - Theme.space8)
+            spacing: Theme.space6
+
+            Text {
+                text: root.categories[root.category].name
+                color: Theme.textPrimary
+                font.pixelSize: 22
+                font.weight: Font.DemiBold
+            }
+
+            // General
+            Column {
+                visible: root.category === 0
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Ghiduri"
+                    Toggle {
+                        width: parent.width
+                        text: "Ghiduri animate la hover lung pe unelte"
+                        checked: UserPrefs.hoverGuides
+                        onToggled: UserPrefs.hoverGuides = checked
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Documente recente"
+                    Row {
+                        spacing: Theme.space3
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.document ? root.document.recentFiles.length + " în listă" : ""
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeSm
+                        }
+                        Button {
+                            text: "Golește lista"
+                            enabled: root.document ? root.document.recentFiles.length > 0 : false
+                            onClicked: root.document.clearRecentFiles()
+                        }
+                    }
+                }
+            }
+
+            // Unități
+            Column {
+                visible: root.category === 1
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Unitatea lungimilor"
+                    Tabs {
+                        width: parent.width
+                        model: ["Auto", "mm", "cm", "m", "inci", "picioare"]
+                        currentIndex: root.document ? root.document.displayUnit : 0
+                        onCurrentIndexChanged: if (root.document) root.document.displayUnit = currentIndex
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "Auto: milimetri sub 1 m, metri peste. Valorile tastate fără unitate se citesc în unitatea aleasă."
+                        color: Theme.textTertiary
+                        font.pixelSize: Theme.fontSizeXs
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Precizie"
+                    Tabs {
+                        width: parent.width
+                        model: ["Implicit", "0", "0.0", "0.00", "0.000"]
+                        currentIndex: root.document ? root.document.displayDecimals + 1 : 0
+                        onCurrentIndexChanged: if (root.document) root.document.displayDecimals = currentIndex - 1
+                    }
+                    Text {
+                        text: root.document
+                              ? (root.document.displayUnit, root.document.displayDecimals,
+                                 "Exemplu: " + root.document.formatLength(2537.25) + "  ·  " + root.document.formatLength(612))
+                              : ""
+                        color: Theme.textSecondary
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeSm
+                    }
+                }
+            }
+
+            // Salvare
+            Column {
+                visible: root.category === 2
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Autosalvare"
+                    Toggle {
+                        width: parent.width
+                        text: "Salvează automat o copie de recuperare"
+                        checked: root.document ? root.document.autosaveEnabled : false
+                        onToggled: root.document.autosaveEnabled = checked
+                    }
+                    Slider {
+                        visible: root.document ? root.document.autosaveEnabled : false
+                        width: parent.width
+                        label: "La fiecare"
+                        from: 1
+                        to: 30
+                        stepSize: 1
+                        value: root.document ? root.document.autosaveMinutes : 1
+                        valueText: Math.round(value) + (Math.round(value) === 1 ? " minut" : " minute")
+                        onMoved: root.document.autosaveMinutes = Math.round(value)
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "Copia se face doar când documentul are modificări nesalvate și se oferă la repornire dacă "
+                              + "aplicația s-a închis neașteptat. Fișierul tău nu e suprascris."
+                        color: Theme.textTertiary
+                        font.pixelSize: Theme.fontSizeXs
+                    }
+                }
+            }
+
+            // Aspect
+            Column {
+                visible: root.category === 3
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Temă"
+                    Tabs {
+                        width: parent.width
+                        model: ["Sistem", "Light", "Dark"]
+                        currentIndex: Theme.mode
+                        onCurrentIndexChanged: Theme.mode = currentIndex
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Culoarea de accent"
+                    Row {
+                        spacing: Theme.space2
+                        Repeater {
+                            model: ["#3B82F6", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B", "#10B981", "#14B8A6", "#64748B"]
+                            delegate: Rectangle {
+                                required property string modelData
+                                width: 28
+                                height: 28
+                                radius: 14
+                                color: modelData
+                                border.color: Qt.colorEqual(Theme.accent, modelData) ? Theme.textPrimary : "transparent"
+                                border.width: 2
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: Theme.setOverride("accent", parent.modelData)
+                                }
+                            }
+                        }
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Culori personalizate (" + (Theme.dark ? "dark" : "light") + ")"
+                    Repeater {
+                        model: [
+                            { key: "accent", name: "Accent" },
+                            { key: "bgApp", name: "Fundalul aplicației" },
+                            { key: "bgPanel", name: "Panouri" },
+                            { key: "bgElevated", name: "Ferestre plutitoare" },
+                            { key: "viewportTop", name: "Viewport — sus" },
+                            { key: "viewportBottom", name: "Viewport — jos" },
+                            { key: "faceFront", name: "Fețele (față)" },
+                            { key: "faceBack", name: "Fețele (verso)" },
+                            { key: "edge", name: "Muchiile" }
+                        ]
+                        delegate: Item {
+                            id: colorRow
+                            required property var modelData
+                            readonly property bool custom: Theme.overrides[modelData.key] !== undefined
+                            width: parent.width
+                            height: Theme.controlHeight
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: colorRow.modelData.name
+                                color: Theme.textSecondary
+                                font.pixelSize: Theme.fontSizeSm
+                            }
+                            Row {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: Theme.space2
+                                IconButton {
+                                    visible: colorRow.custom
+                                    width: 24; height: 24; iconSize: Theme.iconSizeSm
+                                    iconName: "rotate-ccw"
+                                    tooltip: "Revino la culoarea implicită"
+                                    onClicked: Theme.setOverride(colorRow.modelData.key, "")
+                                }
+                                Rectangle {
+                                    width: 44
+                                    height: 24
+                                    radius: Theme.radiusSm
+                                    color: Theme[colorRow.modelData.key]
+                                    border.color: Theme.borderStrong
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            colorDialog.key = colorRow.modelData.key
+                                            colorDialog.selectedColor = Theme[colorRow.modelData.key]
+                                            colorDialog.open()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Button {
+                        text: "Resetează tema " + (Theme.dark ? "dark" : "light")
+                        iconName: "rotate-ccw"
+                        onClicked: Theme.resetOverrides()
+                    }
+                }
+            }
+
+            // Viewport
+            Column {
+                visible: root.category === 4
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Anti-aliasing (MSAA)"
+                    Tabs {
+                        width: parent.width
+                        model: ["Fără", "2×", "4×", "8×"]
+                        currentIndex: root.viewport ? [1, 2, 4, 8].indexOf(root.viewport.antialiasing) : 2
+                        onCurrentIndexChanged: if (root.viewport && currentIndex >= 0) root.viewport.antialiasing = [1, 2, 4, 8][currentIndex]
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Calitatea umbrelor"
+                    Tabs {
+                        width: parent.width
+                        model: ["Scăzută", "Medie", "Înaltă"]
+                        currentIndex: root.viewport ? Math.max(0, [1024, 2048, 4096].indexOf(root.viewport.shadowQuality)) : 1
+                        onCurrentIndexChanged: if (root.viewport) root.viewport.shadowQuality = [1024, 2048, 4096][currentIndex]
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Informații"
+                    Toggle {
+                        width: parent.width
+                        text: "Arată fps în bara de jos"
+                        checked: UserPrefs.showFps
+                        onToggled: UserPrefs.showFps = checked
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Locație (pentru umbre)"
+                    Slider {
+                        width: parent.width
+                        label: "Latitudine"
+                        from: -66
+                        to: 66
+                        stepSize: 0.5
+                        value: root.viewport ? root.viewport.latitude : 45
+                        valueText: Math.abs(value).toFixed(1) + "° " + (value >= 0 ? "N" : "S")
+                        onMoved: if (root.viewport) root.viewport.latitude = value
+                    }
+                }
+            }
+
+            // Navigare
+            Column {
+                visible: root.category === 5
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Centrul orbitei"
+                    Tabs {
+                        width: parent.width
+                        model: ["Centrul vederii", "Selecția", "Punctul de sub cursor"]
+                        currentIndex: root.viewport ? root.viewport.orbitPivot : 0
+                        onCurrentIndexChanged: if (root.viewport) root.viewport.orbitPivot = currentIndex
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Zoom"
+                    Toggle {
+                        width: parent.width
+                        text: "Zoom spre suprafața de sub cursor"
+                        checked: root.viewport ? root.viewport.zoomToSurface : true
+                        onToggled: if (root.viewport) root.viewport.zoomToSurface = checked
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Planuri de tăiere"
+                    Row {
+                        width: parent.width
+                        spacing: Theme.space2
+                        NumberField {
+                            width: (parent.width - Theme.space2) / 2
+                            label: "Clip start"
+                            unit: "mm"
+                            from: 0
+                            to: 100000
+                            step: 0.1
+                            decimals: 3
+                            value: root.viewport ? root.viewport.clipStart : 0
+                            onValueModified: (v) => { if (root.viewport) root.viewport.clipStart = v }
+                        }
+                        NumberField {
+                            width: (parent.width - Theme.space2) / 2
+                            label: "Clip end"
+                            unit: "m"
+                            from: 0
+                            to: 1000000
+                            step: 10
+                            value: root.viewport ? root.viewport.clipEnd / 1000 : 0
+                            onValueModified: (v) => { if (root.viewport) root.viewport.clipEnd = v * 1000 }
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "0 = automat (după distanța camerei și mărimea modelului)."
+                        color: Theme.textTertiary
+                        font.pixelSize: Theme.fontSizeXs
+                    }
+                }
+            }
+
+            // Grid și snap
+            Column {
+                visible: root.category === 6
+                width: parent.width
+                spacing: Theme.space4
+                Section {
+                    width: parent.width
+                    title: "Grid"
+                    Toggle {
+                        width: parent.width
+                        text: "Arată grid-ul"
+                        checked: root.viewport ? root.viewport.gridVisible : false
+                        onToggled: root.viewport.gridVisible = checked
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Snap la grid (⌥G)"
+                    Toggle {
+                        width: parent.width
+                        text: "Punctele libere cad pe grid"
+                        checked: root.document ? root.document.snapToGrid : false
+                        onToggled: if (root.document) root.document.snapToGrid = checked
+                    }
+                    Tabs {
+                        width: parent.width
+                        readonly property var steps: [0, 1, 5, 10, 50, 100, 500, 1000]
+                        model: ["Auto", "1 mm", "5 mm", "1 cm", "5 cm", "10 cm", "50 cm", "1 m"]
+                        currentIndex: root.document ? Math.max(0, steps.indexOf(root.document.gridStep)) : 0
+                        onCurrentIndexChanged: if (root.document) root.document.gridStep = steps[currentIndex]
+                    }
+                }
+            }
+
+            // Scurtături
+            Column {
+                visible: root.category === 7
+                width: parent.width
+                spacing: 2
+                Repeater {
+                    model: root.commands.filter(c => c.shortcut && c.shortcut.length > 0)
+                    delegate: Item {
+                        required property var modelData
+                        width: parent.width
+                        height: Theme.controlHeightSm
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData.title
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeSm
+                        }
+                        Kbd {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            sequence: modelData.shortcut
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ColorDialog {
+        id: colorDialog
+        property string key: ""
+        title: "Alege culoarea"
+        onAccepted: Theme.setOverride(key, selectedColor.toString())
+    }
+}

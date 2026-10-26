@@ -9,4 +9,8 @@ Settings {
 
     // Ghidurile animate la hover lung pe unelte.
     property bool hoverGuides: true
+    // fps-ul în bara de jos.
+    property bool showFps: true
+    // Tema personalizată: culorile schimbate, separat pentru dark și light (JSON: {"dark": {"accent": "#…"}, …}).
+    property string themeOverrides: "{}"
 }

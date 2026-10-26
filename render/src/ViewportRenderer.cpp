@@ -42,7 +42,6 @@ struct FrameUniforms {
     float section[4];
 };
 
-constexpr int kShadowMapSize = 2048;
 
 QShader loadShader(const QString& name)
 {
@@ -132,7 +131,7 @@ void ViewportRenderer::createStaticResources()
     // Pe WebGL 2 fără EXT_color_buffer_float nu se poate randa în R32F: umbrele se dezactivează (textura rămâne,
     // mică, doar pentru legăturile shaderelor).
     m_shadowsSupported = m_rhi->isTextureFormatSupported(QRhiTexture::R32F);
-    const QSize shadowSize = m_shadowsSupported ? QSize(kShadowMapSize, kShadowMapSize) : QSize(4, 4);
+    const QSize shadowSize = m_shadowsSupported ? QSize(m_shadowMapSize, m_shadowMapSize) : QSize(4, 4);
     m_shadowTexture.reset(m_rhi->newTexture(m_shadowsSupported ? QRhiTexture::R32F : QRhiTexture::RGBA8, shadowSize, 1,
         QRhiTexture::RenderTarget));
     m_shadowTexture->create();
@@ -371,7 +370,7 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     copyMatrix(u.lightViewProj, m_lightViewProj);
     u.shadow[0] = shadowsActive() ? 1.0f : 0.0f;
     u.shadow[1] = static_cast<float>(radius * 0.0015);
-    u.shadow[2] = 1.0f / static_cast<float>(kShadowMapSize);
+    u.shadow[2] = 1.0f / static_cast<float>(m_shadowMapSize);
     u.shadow[3] = static_cast<float>(std::clamp(m_frame.sunIntensity, 0.0, 1.0)) * 0.85f;
     u.style[0] = static_cast<float>(m_frame.style);
     u.style[1] = m_frame.fog ? 1.0f : 0.0f;
@@ -386,6 +385,15 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
 
 void ViewportRenderer::render(QRhiCommandBuffer* cb)
 {
+    // Calitatea umbrelor (Preferințe): o hartă de altă mărime cere resursele refăcute.
+    if (m_frame.shadowMapSize > 0 && m_frame.shadowMapSize != m_shadowMapSize) {
+        m_shadowMapSize = m_frame.shadowMapSize;
+        createStaticResources();
+        createPipelines();
+        m_outlinePipeline.reset();
+        m_cornersUploaded = false;
+        m_uploadedMeshRevision = ~0u;
+    }
     QRhiResourceUpdateBatch* batch = m_rhi->nextResourceUpdateBatch();
 
     if (!m_cornersUploaded) {
@@ -445,7 +453,7 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         cb->beginPass(m_shadowTarget.get(), QColor::fromRgbF(1, 1, 1, 1), { 1.0f, 0 }, batch);
         batch = nullptr;
         if (m_mesh && m_meshVertexCount > 0) {
-            cb->setViewport({ 0, 0, float(kShadowMapSize), float(kShadowMapSize) });
+            cb->setViewport({ 0, 0, float(m_shadowMapSize), float(m_shadowMapSize) });
             cb->setGraphicsPipeline(m_shadowPipeline.get());
             cb->setShaderResources();
             const QRhiCommandBuffer::VertexInput input(m_mesh.get(), 0);
