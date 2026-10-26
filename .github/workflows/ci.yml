@@ -84,8 +84,9 @@ jobs:
       - name: Configurare
         run: cmake --preset win-debug
 
+      # -k 0: toate erorile MSVC dintr-o rulare, nu doar prima.
       - name: Build
-        run: cmake --build --preset win-debug
+        run: cmake --build --preset win-debug -- -k 0
 
       - name: Teste
         run: ctest --preset win-debug
