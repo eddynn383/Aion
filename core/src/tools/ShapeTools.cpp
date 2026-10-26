@@ -8,6 +8,7 @@
 #include <glm/geometric.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 // Uneltele de curbe: Circle, Polygon, Arc. Curbele sunt aproximate cu segmente; toate muchiile unei curbe
@@ -456,6 +457,150 @@ private:
     inference::Inference m_inference;
 };
 
+// --- Offset ---------------------------------------------------------------------------------
+
+// Offset (F): click pe o față, apoi distanța față de contur (spre interior sau spre exterior).
+class OffsetTool final : public Tool {
+public:
+    std::string_view id() const override { return "offset"; }
+
+    void pointerDown(ToolContext& ctx, const PointerEvent& e) override
+    {
+        if (!m_face) {
+            const geom::FaceId face = faceAt(ctx, e.screen);
+            if (face) {
+                m_face = face;
+                m_distance = 0.0;
+                track(ctx, e.screen);
+            }
+            return;
+        }
+        track(ctx, e.screen);
+        commit(ctx);
+    }
+
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override
+    {
+        if (m_face) {
+            track(ctx, e.screen);
+        } else {
+            m_hover = faceAt(ctx, e.screen);
+        }
+    }
+
+    void pointerUp(ToolContext& /*ctx*/, const PointerEvent& /*e*/) override { }
+
+    void cancel(ToolContext& /*ctx*/) override
+    {
+        m_face = {};
+        m_preview.reset();
+    }
+
+    Overlay overlay() const override
+    {
+        Overlay o;
+        if (m_preview) {
+            appendPolyline(o, *m_preview, true);
+        }
+        return o;
+    }
+
+    view::PickResult hover() const override
+    {
+        view::PickResult h;
+        const geom::FaceId face = m_face ? m_face : m_hover;
+        if (face) {
+            h.kind = view::PickResult::Kind::Face;
+            h.face = face;
+        }
+        return h;
+    }
+
+    std::string status() const override
+    {
+        return m_face ? "Mută spre interior sau exterior și dă click, sau tastează distanța · Esc anulează"
+                      : "Alege fața al cărei contur îl deplasezi";
+    }
+
+    std::optional<Measurement> measurement() const override
+    {
+        return Measurement { "Distanță", m_face ? units::formatLength(std::abs(m_distance)) : "" };
+    }
+
+    bool applyMeasurement(ToolContext& ctx, std::string_view text) override
+    {
+        const auto value = units::parseLength(text);
+        if (!value || !m_face || std::abs(*value) <= tol::kLength) {
+            return false;
+        }
+        m_distance = m_distance < 0.0 ? -*value : *value;
+        return commit(ctx);
+    }
+
+private:
+    // Fața selectată (dacă e una singură) sau cea de sub cursor.
+    static geom::FaceId faceAt(const ToolContext& ctx, Vec2d screen)
+    {
+        if (ctx.selection.faces.size() == 1) {
+            return *ctx.selection.faces.begin();
+        }
+        return view::pick(ctx.mesh, ctx.camera, screen, { -1.0, -1.0 }).face;
+    }
+
+    void track(ToolContext& ctx, Vec2d screen)
+    {
+        if (!ctx.mesh.faces().contains(m_face)) {
+            m_face = {};
+            return;
+        }
+        const geom::Face& face = ctx.mesh.face(m_face);
+        const math::Ray ray = ctx.camera.rayAt(screen);
+        auto t = math::intersectRayPlane(ray, face.plane);
+        if (!t) {
+            t = math::intersectRayPlane(ray, face.plane.flipped());
+        }
+        if (!t) {
+            return;
+        }
+        const Vec3d p = ray.at(*t);
+        // Distanța cu semn până la contur: pozitivă în interior.
+        const std::vector<Vec3d> outline = ctx.mesh.loopPoints(face.outer);
+        double best = std::numeric_limits<double>::infinity();
+        for (std::size_t i = 0; i < outline.size(); ++i) {
+            best = std::min(best, math::projectOnSegment(p, { outline[i], outline[(i + 1) % outline.size()] }).distance);
+        }
+        const math::PlaneFrame frame(face.plane);
+        std::vector<math::Vec2d> poly;
+        for (const Vec3d& q : outline) {
+            poly.push_back(frame.toLocal(q));
+        }
+        const bool inside = math::locatePoint(frame.toLocal(p), poly, tol::kLength) == math::PointLocation::Inside;
+        m_distance = inside ? best : -best;
+        m_preview = geom::offsetOutline(ctx.mesh, m_face, m_distance);
+    }
+
+    bool commit(ToolContext& ctx)
+    {
+        bool done = false;
+        if (m_face && std::abs(m_distance) > tol::kLength) {
+            const geom::FaceId face = m_face;
+            const double distance = m_distance;
+            if (geom::offsetOutline(ctx.mesh, face, distance)) {
+                ctx.stack.run("Offset", [&](geom::Mesh& mesh) { done = geom::offsetFace(mesh, face, distance); });
+                ctx.selection.prune(ctx.mesh);
+            }
+        }
+        m_face = {};
+        m_preview.reset();
+        return done;
+    }
+
+    geom::FaceId m_face;
+    geom::FaceId m_hover;
+    double m_distance = 0.0;
+    std::optional<std::vector<Vec3d>> m_preview;
+};
+
 } // namespace
 
 std::unique_ptr<Tool> makeCircleTool()
@@ -466,6 +611,11 @@ std::unique_ptr<Tool> makeCircleTool()
 std::unique_ptr<Tool> makePolygonTool()
 {
     return std::make_unique<RadialTool>("polygon", 6, false);
+}
+
+std::unique_ptr<Tool> makeOffsetTool()
+{
+    return std::make_unique<OffsetTool>();
 }
 
 std::unique_ptr<Tool> makeArcTool()

@@ -119,7 +119,7 @@ public:
     virtual bool applyMeasurement(ToolContext& /*ctx*/, std::string_view /*text*/) { return false; }
 };
 
-// "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "move", "rotate", "scale", "eraser";
+// "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale", "eraser";
 // nullptr pentru o unealtă necunoscută.
 [[nodiscard]] std::unique_ptr<Tool> makeTool(std::string_view id);
 

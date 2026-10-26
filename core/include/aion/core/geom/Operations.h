@@ -77,6 +77,14 @@ bool transformVertices(Mesh& mesh, const std::set<VertexId>& vertices, const mat
 // Întoarce entitățile copiei.
 Selection copySelection(Mesh& mesh, const Selection& selection, const math::Transform& transform);
 
+// Conturul exterior al feței deplasat cu `distance` (pozitiv = spre interior), în planul feței.
+// nullopt dacă rezultatul s-ar autointersecta, s-ar întoarce pe dos sau ar atinge o gaură.
+[[nodiscard]] std::optional<std::vector<Vec3d>> offsetOutline(const Mesh& mesh, FaceId face, double distance);
+
+// Offset (F): desenează conturul deplasat (care împarte fața sau adaugă un inel în jurul ei).
+// Muchiile noi moștenesc curbele conturului. Întoarce false dacă offset-ul nu se poate face.
+bool offsetFace(Mesh& mesh, FaceId face, double distance);
+
 // Regiunea unei fețe (în interior, nu pe margine și nu într-o gaură).
 [[nodiscard]] bool faceContainsPoint(const Mesh& mesh, FaceId face, const Vec3d& point);
 

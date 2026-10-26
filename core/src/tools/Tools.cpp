@@ -807,6 +807,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "polygon") {
         return makePolygonTool();
     }
+    if (id == "offset") {
+        return makeOffsetTool();
+    }
     if (id == "arc") {
         return makeArcTool();
     }

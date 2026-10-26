@@ -6,6 +6,7 @@ add_library(aion_core STATIC
     src/commands/CommandStack.cpp
     src/geom/Mesh.cpp
     src/geom/MeshValidate.cpp
+    src/geom/Offset.cpp
     src/geom/Operations.cpp
     src/geom/PlanarRegions.cpp
     src/geom/PushPull.cpp
