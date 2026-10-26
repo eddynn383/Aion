@@ -90,6 +90,9 @@ class Document : public QObject, private model::ModelObserver {
 
     // Preferințe de afișare a lungimilor (păstrate în QSettings): 0 Auto, 1 mm, 2 cm, 3 m, 4 inci, 5 picioare;
     // zecimale: -1 = implicit.
+    // Snap la grid: activ sau nu; pasul în mm (0 = automat, după grid-ul vizibil).
+    Q_PROPERTY(bool snapToGrid MEMBER m_snapToGrid NOTIFY gridSnapChanged)
+    Q_PROPERTY(double gridStep MEMBER m_gridStep NOTIFY gridSnapChanged)
     Q_PROPERTY(int displayUnit READ displayUnit WRITE setDisplayUnit NOTIFY unitsChanged)
     Q_PROPERTY(int displayDecimals READ displayDecimals WRITE setDisplayDecimals NOTIFY unitsChanged)
 
@@ -127,6 +130,12 @@ public:
     void setDisplayUnit(int unit);
     int displayDecimals() const;
     void setDisplayDecimals(int decimals);
+    // Raportul de cantități (general) și lista de debitare (mobilier), ca date pentru QML. Lungimi în mm,
+    // arii în m², volume în m³. `options`: sheetLength, sheetWidth (mm), waste (0..1), maxThickness (mm).
+    Q_INVOKABLE QVariantMap quantityReport() const;
+    Q_INVOKABLE QVariantMap cutList(const QVariantMap& options) const;
+    // Scrie raportul („general” sau „cutlist”) ca CSV (separator „;”, virgulă zecimală, pentru Excel în română).
+    Q_INVOKABLE bool exportReport(const QString& path, const QString& kind, const QVariantMap& options);
     // Exemplu de lungime formatată cu setările curente (pentru dialogul de preferințe).
     Q_INVOKABLE QString formatLength(double mm) const;
     QVariantList libraryMaterials() const;
@@ -240,6 +249,20 @@ public:
     void selectForContextMenu(const view::Camera& camera, math::Vec2d screen);
     // Cutia selecției în coordonate globale (pentru „Zoom la selecție”); nullopt dacă selecția e goală.
     std::optional<std::pair<math::Vec3d, math::Vec3d>> selectionBounds() const;
+    // --- Interacțiuni (unealta Interact) ---
+    // Click: comută instanța interactivă de sub cursor, cu animație. Întoarce false dacă nu e nimic interactiv.
+    bool interactAt(const view::Camera& camera, math::Vec2d screen);
+    // Avansează animațiile; întoarce true cât timp mai există una (viewport-ul cere cadre).
+    bool advanceInteractions(double dt);
+    // Transformarea de afișat pentru o instanță în mișcare (altfel nullopt: cea din model).
+    std::optional<math::Transform> displayTransform(model::InstanceId instance) const;
+    unsigned interactionRevision() const { return m_interactionRevision; }
+    // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
+    Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
+
+    // Punctul de pe model (fețe, muchii, grupuri și obiecte vizibile) de sub cursor, în coordonate globale.
+    // `camera` e camera globală a viewport-ului. Pentru zoom spre suprafață și orbita în jurul cursorului.
+    std::optional<math::Vec3d> surfacePoint(const view::Camera& camera, math::Vec2d screen) const;
 
     void pointerDown(const view::Camera& camera, const tools::PointerEvent& e);
     void pointerMove(const view::Camera& camera, const tools::PointerEvent& e);
@@ -260,12 +283,25 @@ signals:
     void materialChanged();
     void editingAnnotationChanged();
     void unitsChanged();
+    void gridSnapChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
     void changed();
 
 private:
+    struct InteractionAnimation {
+        model::InstanceId instance;
+        double elapsed = 0.0;
+        double duration = 0.6;
+        bool opening = true;
+    };
+    std::vector<InteractionAnimation> m_interactions;
+    unsigned m_interactionRevision = 0;
+
+    bool m_snapToGrid = false;
+    double m_gridStep = 0.0;
+
     void meshChanged(model::DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary) override;
     void structureChanged(const model::Model& model) override;
     template <class Fn>
@@ -273,6 +309,10 @@ private:
     void afterInteraction(const geom::Selection& before);
     // După undo/redo sau ștergeri: calea și selecția nu trebuie să indice entități dispărute.
     void repairContext();
+    // Varianta sigură în mijlocul unei notificări de la model (fără să anuleze unealta).
+    void dropStaleReferences();
+    std::size_t validPathLength() const;
+    bool m_contextLost = false;
     void setPath(std::vector<model::InstanceId> path);
     void retriangulate(model::DefinitionId definition);
     // Rulează o comandă pe model și aduce la zi selecția și contextul.

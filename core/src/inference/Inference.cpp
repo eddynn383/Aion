@@ -169,8 +169,9 @@ std::string_view label(const Inference& inference)
 {
     switch (inference.kind) {
     case Kind::None:
-    case Kind::Ground:
         return {};
+    case Kind::Ground:
+        return inference.onGrid ? "On Grid" : std::string_view {};
     case Kind::OnFace:
         return "On Face";
     case Kind::OnEdge:
@@ -207,6 +208,72 @@ std::string_view label(const Inference& inference)
     return {};
 }
 
+double autoGridStep(double cameraDistance)
+{
+    const double level = std::log10(std::max(cameraDistance, 1.0) * 0.02);
+    const double base = std::pow(10.0, std::floor(level));
+    // Liniile pasului mic se estompează pe măsură ce camera se depărtează (grid.frag); de la jumătate,
+    // pasul vizibil e cel mare.
+    return level - std::floor(level) < 0.5 ? base : base * 10.0;
+}
+
+namespace {
+
+double roundTo(double value, double step)
+{
+    return std::round(value / step) * step;
+}
+
+// Rotunjește coordonatele punctului care stau în planul dat (planul trebuie să fie perpendicular pe o axă).
+std::optional<Vec3d> snapInPlane(const Vec3d& point, const Vec3d& normal, double step)
+{
+    int axis = -1;
+    for (int i = 0; i < 3; ++i) {
+        if (std::abs(std::abs(normal[i]) - 1.0) < 1e-9) {
+            axis = i;
+        }
+    }
+    if (axis < 0) {
+        return std::nullopt; // față înclinată: nicio rotunjire nu rămâne în plan
+    }
+    Vec3d snapped = point;
+    for (int i = 0; i < 3; ++i) {
+        if (i != axis) {
+            snapped[i] = roundTo(point[i], step);
+        }
+    }
+    return snapped;
+}
+
+} // namespace
+
+void Engine::applyGrid(const geom::Mesh& mesh, Inference& result, const std::optional<Vec3d>& from) const
+{
+    if (m_gridStep <= 0.0) {
+        return;
+    }
+    // O distanță de-a lungul unei direcții (axă, paralel, perpendicular, lock pe o linie): multiplu de pas.
+    if (from && result.direction && (result.kind == Kind::OnAxis || result.kind == Kind::Parallel
+                                        || result.kind == Kind::Perpendicular || result.kind == Kind::Ground)) {
+        const double distance = glm::dot(result.point - *from, *result.direction);
+        result.point = *from + *result.direction * roundTo(distance, m_gridStep);
+        result.onGrid = true;
+        return;
+    }
+    std::optional<Vec3d> normal;
+    if (result.kind == Kind::Ground) {
+        normal = result.planeNormal;
+    } else if (result.kind == Kind::OnFace && result.face && mesh.faces().contains(result.face)) {
+        normal = mesh.face(result.face).plane.normal;
+    }
+    if (normal) {
+        if (const auto snapped = snapInPlane(result.point, *normal, m_gridStep)) {
+            result.point = *snapped;
+            result.onGrid = true;
+        }
+    }
+}
+
 Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen, std::optional<Vec3d> from,
     std::optional<math::Plane> plane)
 {
@@ -216,6 +283,7 @@ Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2
     }
     m_lastFrom = from;
     Inference result = locked() ? inferLocked(mesh, camera, screen, from) : inferFree(mesh, camera, screen, from, plane);
+    applyGrid(mesh, result, from);
     remember(mesh, result);
     m_last = result;
     return result;
@@ -567,6 +635,7 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
     if (free) {
         out.kind = Kind::Ground;
         out.point = *free;
+        out.planeNormal = freePlane.normal;
     }
     return out;
 }

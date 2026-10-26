@@ -8,6 +8,22 @@ Item {
 
     property var document
     property var viewport
+    // Setările animației (păstrate în Main.qml).
+    property real transition: 2
+    property real delay: 1
+    property bool loop: true
+    property int fps: 30
+
+    signal exportVideoRequested()
+
+    function sceneStates() {
+        return root.document.scenes.map(s => root.document.sceneCamera(s.id))
+    }
+    function play() {
+        if (root.document.scenes.length === 0)
+            return
+        root.viewport.playScenes(root.sceneStates(), root.transition, root.delay, root.loop)
+    }
 
     Button {
         id: addButton
@@ -23,7 +39,8 @@ Item {
         anchors.topMargin: Theme.space3
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.bottom: animation.top
+        anchors.bottomMargin: Theme.space3
         clip: true
         spacing: 1
         model: root.document ? root.document.scenes : []
@@ -106,6 +123,90 @@ Item {
                     onClicked: root.document.removeScene(row.modelData.id)
                 }
             }
+        }
+    }
+
+    // Animația: redă scenele pe rând (ca în SketchUp) sau le exportă ca video.
+    Column {
+        id: animation
+        visible: list.count > 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: visible ? implicitHeight : 0
+        spacing: Theme.space2
+
+        Separator { width: parent.width }
+        Text {
+            text: "ANIMAȚIE"
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+            font.weight: Font.DemiBold
+            font.letterSpacing: 0.6
+        }
+        Row {
+            width: parent.width
+            spacing: Theme.space2
+            Button {
+                width: (parent.width - Theme.space2) / 2
+                variant: "primary"
+                text: root.viewport && root.viewport.scenesPlaying ? "Oprește" : "Redă"
+                iconName: root.viewport && root.viewport.scenesPlaying ? "x" : "play"
+                enabled: root.viewport && !root.viewport.exporting
+                onClicked: root.viewport.scenesPlaying ? root.viewport.stopScenes() : root.play()
+            }
+            Button {
+                width: (parent.width - Theme.space2) / 2
+                text: root.viewport && root.viewport.exporting ? "Anulează" : "Exportă video…"
+                iconName: root.viewport && root.viewport.exporting ? "x" : "arrow-up"
+                onClicked: root.viewport.exporting ? root.viewport.cancelExport() : root.exportVideoRequested()
+            }
+        }
+        // Progresul exportului.
+        Rectangle {
+            visible: root.viewport && root.viewport.exporting
+            width: parent.width
+            height: 4
+            radius: 2
+            color: Theme.bgHover
+            Rectangle {
+                width: parent.width * (root.viewport ? root.viewport.exportProgress : 0)
+                height: parent.height
+                radius: 2
+                color: Theme.accent
+            }
+        }
+        Slider {
+            width: parent.width
+            label: "Tranziție"
+            from: 0
+            to: 10
+            stepSize: 0.5
+            value: root.transition
+            valueText: value.toFixed(1) + " s"
+            onMoved: root.transition = value
+        }
+        Slider {
+            width: parent.width
+            label: "Pauză pe scenă"
+            from: 0
+            to: 10
+            stepSize: 0.5
+            value: root.delay
+            valueText: value.toFixed(1) + " s"
+            onMoved: root.delay = value
+        }
+        Toggle {
+            width: parent.width
+            text: "În buclă"
+            checked: root.loop
+            onToggled: root.loop = checked
+        }
+        Tabs {
+            width: parent.width
+            model: ["24 fps", "30 fps", "60 fps"]
+            currentIndex: root.fps === 24 ? 0 : root.fps === 60 ? 2 : 1
+            onCurrentIndexChanged: root.fps = currentIndex === 0 ? 24 : currentIndex === 2 ? 60 : 30
         }
     }
 

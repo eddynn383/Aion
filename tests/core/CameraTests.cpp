@@ -1,6 +1,7 @@
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/CameraMotion.h"
+#include "aion/core/view/SceneAnimation.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
@@ -262,4 +263,89 @@ TEST_CASE("Camera: în contextul unui grup, razele și proiecțiile sunt în coo
     const aion::math::Vec3d along = ray.direction * glm::dot(toP, ray.direction);
     CHECK(glm::length(toP - along) < 1e-6);
     CHECK(local.worldPerPixelAtTarget() * 2.0 == Catch::Approx(world.worldPerPixelAtTarget()));
+}
+
+TEST_CASE("Orbit în jurul unui pivot îl ține pe loc pe ecran", "[core][view][camera]")
+{
+    Camera c = makeCamera();
+    const Vec3d pivot { 2500.0, 1200.0, 300.0 };
+    const auto before = c.project(pivot);
+    REQUIRE(before);
+    c.setOrbitPivot(pivot);
+    c.orbit(0.6, -0.3);
+    c.orbit(-0.2, 0.15);
+    const auto after = c.project(pivot);
+    REQUIRE(after);
+    CHECK(sameScreen(*before, *after));
+    // Distanța de la cameră la pivot nu se schimbă (rotație rigidă).
+    Camera reference = makeCamera();
+    CHECK(glm::length(c.eye() - pivot) == Catch::Approx(glm::length(reference.eye() - pivot)).epsilon(1e-9));
+
+    // Fără pivot: orbita clasică, în jurul țintei.
+    c.setOrbitPivot(std::nullopt);
+    const Vec3d target = c.pose().target;
+    c.orbit(0.3, 0.1);
+    CHECK(samePoint(c.pose().target, target, 1e-9));
+}
+
+TEST_CASE("Reîncadrarea la adâncimea unui punct nu mișcă imaginea", "[core][view][camera]")
+{
+    Camera c = makeCamera();
+    const Vec3d point { 1300.0, -350.0, 150.0 };
+    const auto before = c.project(point);
+    const Vec3d eye = c.eye();
+    c.retargetToDepth(point);
+    CHECK(samePoint(c.eye(), eye, 1e-6));
+    const auto after = c.project(point);
+    REQUIRE(before);
+    REQUIRE(after);
+    CHECK(sameScreen(*before, *after));
+    CHECK(c.pose().distance == Catch::Approx(glm::dot(point - eye, c.forward())));
+}
+
+TEST_CASE("Aproape de un detaliu mic, planurile de tăiere păstrează și detaliul, și restul scenei", "[core][view][camera]")
+{
+    Camera c = makeCamera();
+    c.setSceneBounds({ -20000.0, -20000.0, 0.0 }, { 20000.0, 20000.0, 5000.0 });
+    // Detaliu de 2 mm, privit de la 5 mm.
+    CameraPose pose = c.pose();
+    pose.target = { 100.0, 100.0, 0.0 };
+    pose.distance = 5.0;
+    c.setPose(pose);
+    CHECK(c.nearPlane() < 1.0);
+    const double farthest = glm::length(Vec3d { -20000.0, -20000.0, 5000.0 } - c.eye());
+    CHECK(c.farPlane() >= farthest);
+    CHECK(c.farPlane() / c.nearPlane() <= 1.0e6 * 1.0001);
+
+    // Valorile manuale (Preferințe) au prioritate.
+    c.setClipOverride(0.5, 300000.0);
+    CHECK(c.nearPlane() == Catch::Approx(0.5));
+    CHECK(c.farPlane() == Catch::Approx(300000.0));
+}
+
+TEST_CASE("Animația scenelor: pauze, tranziții, buclă", "[core][view][animation]")
+{
+    const CameraPose a { { 0, 0, 0 }, 0.0, -0.3, 5000.0 };
+    const CameraPose b { { 1000, 0, 0 }, 1.0, -0.5, 8000.0 };
+    const CameraPose c { { 0, 2000, 0 }, 2.0, -0.2, 3000.0 };
+
+    const SceneAnimation once({ a, b, c }, 2.0, 1.0, false);
+    CHECK(once.duration() == Catch::Approx(3 * 1.0 + 2 * 2.0));
+    CHECK(samePoint(once.poseAt(0.5).target, a.target));
+    CHECK(once.sceneAt(0.5) == 0);
+    // La jumătatea tranziției a → b: ease-in-out simetric, deci exact la mijloc pentru țintă.
+    CHECK(samePoint(once.poseAt(2.0).target, { 500, 0, 0 }, 1e-6));
+    CHECK(once.sceneAt(2.0) == 1);
+    CHECK(samePoint(once.poseAt(3.5).target, b.target));
+    CHECK(samePoint(once.poseAt(once.duration()).target, c.target));
+    CHECK(samePoint(once.poseAt(100.0).target, c.target));
+
+    const SceneAnimation loop({ a, b, c }, 2.0, 1.0, true);
+    CHECK(loop.duration() == Catch::Approx(3 * 1.0 + 3 * 2.0));
+    CHECK(samePoint(loop.poseAt(loop.duration() - 0.001).target, a.target, 1.0));
+    CHECK(samePoint(loop.poseAt(loop.duration()).target, a.target));
+
+    const SceneAnimation single({ a }, 2.0, 1.0, true);
+    CHECK(single.duration() == Catch::Approx(1.0));
+    CHECK(samePoint(single.poseAt(0.4).target, a.target));
 }

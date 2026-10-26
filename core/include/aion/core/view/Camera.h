@@ -5,6 +5,7 @@
 #include "aion/core/math/Vec.h"
 
 #include <optional>
+#include <utility>
 
 // Camera de navigare: orbitează în jurul unei ținte, cu axa Z în sus (ca în SketchUp).
 // Unitățile sunt mm; coordonatele de ecran sunt în pixeli logici, cu originea în colțul
@@ -34,7 +35,7 @@ struct CameraPose {
 class Camera {
 public:
     static constexpr double kDefaultFovY = 0.6108652381980153; // 35°
-    static constexpr double kMinDistance = 1.0; // 1 mm
+    static constexpr double kMinDistance = 0.01; // 0,01 mm (detalii de ordinul milimetrilor)
     static constexpr double kMaxDistance = 1.0e8; // 100 km
 
     Camera();
@@ -69,8 +70,22 @@ public:
     // Mărimea unui pixel, în mm, la adâncimea țintei.
     [[nodiscard]] double worldPerPixelAtTarget() const;
 
-    // Rotește în jurul țintei. Pitch-ul e limitat la ±90°.
+    // Rotește în jurul țintei sau, dacă e setat, în jurul pivotului (ca un corp rigid: punctul pivot rămâne
+    // pe loc pe ecran). Pitch-ul e limitat la ±90°.
     void orbit(double deltaYaw, double deltaPitch);
+    // Pivotul orbitei (selecția, punctul de sub cursor); nullopt = ținta camerei.
+    void setOrbitPivot(std::optional<Vec3d> pivot) { m_orbitPivot = pivot; }
+    [[nodiscard]] const std::optional<Vec3d>& orbitPivot() const { return m_orbitPivot; }
+
+    // Mută ținta de-a lungul direcției de privire la adâncimea punctului dat, fără să miște camera.
+    // Folosit înainte de zoom spre o suprafață: viteza zoom-ului și planurile de tăiere urmează adâncimea reală.
+    void retargetToDepth(const Vec3d& point);
+
+    // Cutia scenei (coordonate globale), ca planul îndepărtat să nu taie modelul când camera e foarte aproape
+    // de un detaliu.
+    void setSceneBounds(const Vec3d& min, const Vec3d& max);
+    // Planurile de tăiere manuale (Preferințe, ca „Clip Start / End” din Blender), în mm; 0 = automat.
+    void setClipOverride(double nearMm, double farMm);
     // Mută camera ca punctele de la adâncimea țintei să urmeze cursorul.
     void pan(Vec2d deltaPx);
     // Scalează distanța față de `anchor` (factor < 1 = apropiere). Punctul `anchor`
@@ -105,6 +120,10 @@ private:
     [[nodiscard]] Vec3d toLocalVector(const Vec3d& v) const;
 
     std::optional<Context> m_context;
+    std::optional<Vec3d> m_orbitPivot;
+    std::optional<std::pair<Vec3d, Vec3d>> m_sceneBounds;
+    double m_clipNear = 0.0;
+    double m_clipFar = 0.0;
     CameraPose m_pose;
     Projection m_projection = Projection::Perspective;
     double m_fovY = kDefaultFovY;

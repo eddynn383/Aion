@@ -403,7 +403,7 @@ private:
     {
         m_copy = e.modifiers.alt;
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, m_base);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_base);
         if (m_base && m_inference.valid()) {
             m_current = m_inference.point;
         }
@@ -623,7 +623,7 @@ private:
     {
         m_copy = e.modifiers.alt;
         const std::optional<Vec3d> from = m_phase == Phase::Center ? std::nullopt : std::optional(m_center);
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
         switch (m_phase) {
         case Phase::Center:
             m_hover = targetHover(ctx, e.screen);
@@ -817,7 +817,7 @@ private:
     {
         m_fromCenter = e.modifiers.alt;
         const std::optional<Vec3d> from = m_phase == Phase::Anchor ? std::nullopt : std::optional(m_anchor);
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
         switch (m_phase) {
         case Phase::Anchor:
             m_hover = targetHover(ctx, e.screen);

@@ -1,11 +1,16 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/inference/Inference.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
 #include "aion/core/model/MaterialLibrary.h"
+#include "aion/core/model/Interaction.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
+#include "aion/core/view/ModelPicking.h"
+#include "aion/core/view/Picking.h"
 
 #include <QColor>
 #include <QDateTime>
@@ -22,6 +27,7 @@
 #include <filesystem>
 #include <functional>
 #include <span>
+#include <utility>
 #include <limits>
 #include <set>
 
@@ -170,6 +176,102 @@ void Document::setDisplayDecimals(int decimals)
     emit selectionChanged();
     emit toolStatusChanged();
     emit changed();
+}
+
+namespace {
+
+model::CutListOptions cutListOptions(const QVariantMap& options)
+{
+    model::CutListOptions o;
+    o.sheetLength = options.value(QStringLiteral("sheetLength"), o.sheetLength).toDouble();
+    o.sheetWidth = options.value(QStringLiteral("sheetWidth"), o.sheetWidth).toDouble();
+    o.waste = options.value(QStringLiteral("waste"), o.waste).toDouble();
+    o.maxThickness = options.value(QStringLiteral("maxThickness"), o.maxThickness).toDouble();
+    return o;
+}
+
+} // namespace
+
+QVariantMap Document::quantityReport() const
+{
+    const model::QuantityReport r = model::quantityReport(m_model);
+    QVariantList objects;
+    for (const model::ObjectQuantity& o : r.objects) {
+        objects.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromStdString(o.name) },
+            { QStringLiteral("component"), o.component },
+            { QStringLiteral("count"), o.count },
+            { QStringLiteral("area"), o.area / 1e6 },
+            { QStringLiteral("volume"), o.volume / 1e9 },
+            { QStringLiteral("solid"), o.solid },
+            { QStringLiteral("sizeX"), o.size.x },
+            { QStringLiteral("sizeY"), o.size.y },
+            { QStringLiteral("sizeZ"), o.size.z },
+            { QStringLiteral("material"), QString::fromStdString(o.material) },
+            { QStringLiteral("tag"), QString::fromStdString(o.tag) },
+        });
+    }
+    const auto named = [](const std::vector<model::NamedArea>& list) {
+        QVariantList out;
+        for (const model::NamedArea& n : list) {
+            out.append(QVariantMap { { QStringLiteral("name"), QString::fromStdString(n.name) },
+                { QStringLiteral("area"), n.area / 1e6 } });
+        }
+        return out;
+    };
+    return {
+        { QStringLiteral("objects"), objects },
+        { QStringLiteral("materials"), named(r.materials) },
+        { QStringLiteral("tags"), named(r.tags) },
+        { QStringLiteral("totalArea"), r.totalArea / 1e6 },
+        { QStringLiteral("totalVolume"), r.totalVolume / 1e9 },
+        { QStringLiteral("horizontalArea"), r.horizontalArea / 1e6 },
+        { QStringLiteral("faceCount"), static_cast<int>(r.faceCount) },
+        { QStringLiteral("edgeLength"), r.edgeLength / 1000.0 },
+    };
+}
+
+QVariantMap Document::cutList(const QVariantMap& options) const
+{
+    const model::CutList list = model::cutList(m_model, cutListOptions(options));
+    QVariantList parts;
+    for (const model::CutPart& p : list.parts) {
+        parts.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromStdString(p.name) },
+            { QStringLiteral("material"), QString::fromStdString(p.material) },
+            { QStringLiteral("length"), p.length },
+            { QStringLiteral("width"), p.width },
+            { QStringLiteral("thickness"), p.thickness },
+            { QStringLiteral("count"), p.count },
+            { QStringLiteral("panel"), p.panel },
+            { QStringLiteral("flat"), p.flat },
+        });
+    }
+    QVariantList sheets;
+    for (const model::SheetNeed& s : list.sheets) {
+        sheets.append(QVariantMap {
+            { QStringLiteral("material"), QString::fromStdString(s.material) },
+            { QStringLiteral("thickness"), s.thickness },
+            { QStringLiteral("area"), s.partsArea / 1e6 },
+            { QStringLiteral("sheets"), s.sheets },
+        });
+    }
+    return { { QStringLiteral("parts"), parts }, { QStringLiteral("sheets"), sheets },
+        { QStringLiteral("edgeBanding"), list.edgeBanding / 1000.0 } };
+}
+
+bool Document::exportReport(const QString& path, const QString& kind, const QVariantMap& options)
+{
+    const std::string csv = kind == QLatin1String("cutlist")
+        ? model::toCsv(model::cutList(m_model, cutListOptions(options)), cutListOptions(options))
+        : model::toCsv(model::quantityReport(m_model));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)
+        || file.write(csv.data(), static_cast<qint64>(csv.size())) != static_cast<qint64>(csv.size())) {
+        setError(QStringLiteral("Raportul nu s-a putut salva în „%1”.").arg(QFileInfo(path).fileName()));
+        return false;
+    }
+    return true;
 }
 
 QString Document::formatLength(double mm) const
@@ -454,14 +556,34 @@ void Document::touch()
     emit changed();
 }
 
+std::size_t Document::validPathLength() const
+{
+    // În mijlocul unui undo, calea poate indica pentru scurt timp instanțe dispărute (până la repairContext()).
+    std::size_t valid = 0;
+    model::DefinitionId parent = m_model.root();
+    for (; valid < m_path.size(); ++valid) {
+        const model::Instance* inst = m_model.instances().find(m_path[valid]);
+        if (inst == nullptr || inst->parent != parent) {
+            break;
+        }
+        parent = inst->definition;
+    }
+    return valid;
+}
+
 model::DefinitionId Document::activeDefinition() const
 {
-    return m_path.empty() ? m_model.root() : m_model.instance(m_path.back()).definition;
+    const std::size_t valid = validPathLength();
+    return valid == 0 ? m_model.root() : m_model.instance(m_path[valid - 1]).definition;
 }
 
 math::Transform Document::contextTransform() const
 {
-    return model::worldTransform(m_model, m_path);
+    const std::size_t valid = validPathLength();
+    if (valid == m_path.size()) {
+        return model::worldTransform(m_model, m_path);
+    }
+    return model::worldTransform(m_model, { m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid) });
 }
 
 const std::unordered_map<geom::FaceId, geom::FaceTriangles>& Document::triangles(model::DefinitionId definition) const
@@ -520,7 +642,8 @@ QString Document::selectionSummary() const
     QStringList parts;
     std::size_t groups = 0;
     for (model::InstanceId id : m_selection.instances) {
-        groups += m_model.definition(m_model.instance(id).definition).group ? 1 : 0;
+        const model::Instance* inst = m_model.instances().find(id);
+        groups += inst != nullptr && m_model.definition(inst->definition).group ? 1 : 0;
     }
     if (groups > 0) {
         parts << plural(groups, "grup", "grupuri");
@@ -645,7 +768,8 @@ QVariantMap Document::entityInfo() const
     }
     const geom::Mesh& mesh = m_model.mesh(activeDefinition());
     QVariantList details;
-    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()) {
+    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()
+        && m_model.instances().contains(*m_selection.instances.begin())) {
         const model::InstanceId id = *m_selection.instances.begin();
         const model::Instance& inst = m_model.instance(id);
         const model::Definition& def = m_model.definition(inst.definition);
@@ -666,6 +790,17 @@ QVariantMap Document::entityInfo() const
         if (inst.material && m_model.materials().contains(inst.material)) {
             details << detail(QStringLiteral("Material"), QString::fromStdString(m_model.material(inst.material).name));
         }
+        const model::Behavior& b = inst.behavior;
+        info[QStringLiteral("behavior")] = QVariantMap {
+            { QStringLiteral("kind"),
+                b.kind == model::Behavior::Kind::Rotate ? QStringLiteral("rotate")
+                    : b.kind == model::Behavior::Kind::Slide ? QStringLiteral("slide")
+                                                             : QStringLiteral("none") },
+            { QStringLiteral("anchor"), static_cast<int>(b.anchor) },
+            { QStringLiteral("amount"), b.amount },
+            { QStringLiteral("duration"), b.duration },
+            { QStringLiteral("open"), b.open },
+        };
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -734,6 +869,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         }
     }
     ctx.guides = m_contextGuides;
+    if (m_snapToGrid) {
+        ctx.gridStep = m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance);
+    }
     ctx.libraryMaterial
         = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
     fn(*m_tool, ctx);
@@ -773,6 +911,11 @@ void Document::afterInteraction(const geom::Selection& before)
 
 void Document::repairContext()
 {
+    if (std::exchange(m_contextLost, false) && m_tool) {
+        const view::Camera camera;
+        tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        m_tool->cancel(ctx);
+    }
     // Calea se oprește la prima instanță care nu mai există sau nu mai e în definiția de deasupra.
     std::size_t valid = 0;
     model::DefinitionId parent = m_model.root();
@@ -785,6 +928,27 @@ void Document::repairContext()
     }
     if (valid < m_path.size()) {
         setPath({ m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid) });
+    }
+    m_selection.prune(m_model.mesh(activeDefinition()));
+    const model::DefinitionId active = activeDefinition();
+    std::erase_if(m_selection.instances, [&](model::InstanceId id) {
+        const model::Instance* inst = m_model.instances().find(id);
+        return inst == nullptr || inst->parent != active;
+    });
+}
+
+void Document::dropStaleReferences()
+{
+    const std::size_t valid = validPathLength();
+    if (valid < m_path.size()) {
+        // Contextul editat a dispărut: ieșim din el fără să atingem unealta (poate fi chiar ea în lucru);
+        // repairContext() o anulează după operație.
+        m_path.resize(valid);
+        m_stack.setActiveDefinition(activeDefinition());
+        m_selection.clear();
+        m_contextLost = true;
+        emit contextChanged();
+        return;
     }
     m_selection.prune(m_model.mesh(activeDefinition()));
     const model::DefinitionId active = activeDefinition();
@@ -1216,6 +1380,105 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
     afterInteraction(before);
 }
 
+bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
+{
+    const auto hit = view::interactiveInstanceAt(m_model, camera, screen);
+    if (!hit) {
+        return false;
+    }
+    for (const InteractionAnimation& a : m_interactions) {
+        if (a.instance == *hit) {
+            return true; // deja în mișcare
+        }
+    }
+    const model::Behavior& b = m_model.instance(*hit).behavior;
+    m_interactions.push_back({ *hit, 0.0, std::max(b.duration, 0.0), !b.open });
+    return true;
+}
+
+bool Document::advanceInteractions(double dt)
+{
+    if (m_interactions.empty()) {
+        return false;
+    }
+    ++m_interactionRevision;
+    std::vector<model::InstanceId> finished;
+    for (InteractionAnimation& a : m_interactions) {
+        a.elapsed += dt;
+        if (a.elapsed >= a.duration) {
+            finished.push_back(a.instance);
+        }
+    }
+    std::erase_if(m_interactions, [](const InteractionAnimation& a) { return a.elapsed >= a.duration; });
+    // La sfârșit, starea nouă intră în model (cu undo), ca o singură operație.
+    for (model::InstanceId id : finished) {
+        if (m_model.instances().contains(id)) {
+            const bool opening = !m_model.instance(id).behavior.open;
+            runOnModel(opening ? "Deschide" : "Închide", [id](model::Model& model) { model::toggleBehavior(model, id); });
+        }
+    }
+    emit changed();
+    return !m_interactions.empty();
+}
+
+std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
+{
+    for (const InteractionAnimation& a : m_interactions) {
+        if (a.instance == instance && m_model.instances().contains(instance)) {
+            const double k = a.duration > 0.0 ? std::clamp(a.elapsed / a.duration, 0.0, 1.0) : 1.0;
+            const double eased = k * k * (3.0 - 2.0 * k);
+            return model::transformAtOpenness(m_model, instance, a.opening ? eased : 1.0 - eased);
+        }
+    }
+    return std::nullopt;
+}
+
+void Document::setBehavior(const QVariantMap& behavior)
+{
+    if (m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    const QString kind = behavior.value(QStringLiteral("kind")).toString();
+    runOnModel("Comportament", [&](model::Model& model) {
+        // Întâi închidem (transformarea „închisă” e referința pentru orice comportament nou).
+        if (model.instance(id).behavior.open) {
+            model::toggleBehavior(model, id);
+        }
+        model::Instance inst = model.instance(id);
+        inst.behavior.kind = kind == QLatin1String("rotate") ? model::Behavior::Kind::Rotate
+            : kind == QLatin1String("slide")                ? model::Behavior::Kind::Slide
+                                                            : model::Behavior::Kind::None;
+        inst.behavior.anchor
+            = static_cast<model::Behavior::Anchor>(std::clamp(behavior.value(QStringLiteral("anchor")).toInt(), 0, 5));
+        inst.behavior.amount = behavior.value(QStringLiteral("amount"), inst.behavior.amount).toDouble();
+        inst.behavior.duration = std::clamp(behavior.value(QStringLiteral("duration"), 0.6).toDouble(), 0.0, 10.0);
+        inst.behavior.open = false;
+        model.setInstance(id, inst);
+    });
+}
+
+std::optional<math::Vec3d> Document::surfacePoint(const view::Camera& camera, math::Vec2d screen) const
+{
+    std::optional<math::Vec3d> best;
+    double bestDistance = std::numeric_limits<double>::infinity();
+    const auto consider = [&](const math::Vec3d& p) {
+        const double d = glm::dot(p - camera.eye(), camera.forward());
+        if (d > 0.0 && d < bestDistance) {
+            bestDistance = d;
+            best = p;
+        }
+    };
+    const view::PickResult hit = view::pick(m_model.mesh(m_model.root()), camera, screen);
+    if (hit.hit()) {
+        consider(hit.point);
+    }
+    if (const auto instance = view::pickInstance(m_model, m_model.root(), camera, screen)) {
+        consider(instance->point);
+    }
+    return best;
+}
+
 std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() const
 {
     if (m_selection.empty()) {
@@ -1234,6 +1497,9 @@ std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() c
         add(mesh.position(v));
     }
     for (model::InstanceId id : m_selection.instances) {
+        if (!m_model.instances().contains(id)) {
+            continue;
+        }
         const model::Instance& inst = m_model.instance(id);
         const auto [blo, bhi] = model::bounds(m_model, inst.definition);
         if (blo.x > bhi.x) {
@@ -1788,6 +2054,9 @@ void Document::structureChanged(const model::Model& model)
         }
     }
     std::erase_if(m_triangles, [&](const auto& entry) { return !model.definitions().contains(entry.first); });
+    // Înainte ca interfața să citească selecția (selectionSummary, Entity Info): după un undo, instanțele selectate
+    // sau cele din calea contextului pot să nu mai existe.
+    dropStaleReferences();
     emit outlineChanged();
     emit selectionChanged(); // Entity Info (de exemplu un tag schimbat prin undo)
     emit modelChanged();

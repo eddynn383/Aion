@@ -111,10 +111,11 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "AION_BUILD_TESTS": "OFF",
-        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten",
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten-qt",
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{QT_ROOT_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
-        "QT_HOST_PATH": "$env{QT_HOST_PATH}"
+        "QT_HOST_PATH": "$env{QT_HOST_PATH}",
+        "AION_WASM_JS_EXCEPTIONS": "ON"
       }
     }
   ],

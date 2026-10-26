@@ -7,6 +7,10 @@
 // cât timp isActive() e adevărat.
 namespace aion::view {
 
+// Interpolarea între două poziții: ținta liniar, unghiurile pe drumul cel mai scurt, distanța geometric.
+[[nodiscard]] CameraPose interpolatePose(const CameraPose& a, const CameraPose& b, double t);
+[[nodiscard]] double easeInOutCubic(double t);
+
 class CameraMotion {
 public:
     static constexpr double kDefaultTransitionSeconds = 0.35;

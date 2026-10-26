@@ -199,7 +199,7 @@ ImportResult importObj(
     }
     builder.finish();
     result.faces = model.mesh(def).faces().size();
-    result.instance = model.addInstance({ parent, def, {}, {}, {}, false, false, {} });
+    result.instance = model.addInstance({ parent, def, {}, {}, {}, false, false, {}, {} });
     return result;
 }
 

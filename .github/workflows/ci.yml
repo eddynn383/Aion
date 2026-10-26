@@ -49,8 +49,6 @@ jobs:
   windows:
     name: Windows (MSVC, Debug)
     runs-on: windows-latest
-    env:
-      VCPKG_ROOT: ${{ github.workspace }}\..\vcpkg
 
     steps:
       - uses: actions/checkout@v4
@@ -73,12 +71,15 @@ jobs:
           key: vcpkg-win-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-win-
 
-      # vcpkg-ul preinstalat pe runner e prea vechi pentru baseline-ul din vcpkg.json.
+      # vcpkg-ul de pe runner (și cel din Visual Studio, pus în VCPKG_ROOT de msvc-dev-cmd) e prea vechi pentru
+      # baseline-ul din vcpkg.json: folosim o clonă proprie, setată în VCPKG_ROOT pentru pașii următori.
       - name: Instalează vcpkg
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
-          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+          $root = Join-Path $env:RUNNER_TEMP "vcpkg-aion"
+          git clone https://github.com/microsoft/vcpkg "$root"
+          & "$root\bootstrap-vcpkg.bat" -disableMetrics
+          "VCPKG_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Configurare
         run: cmake --preset win-debug
@@ -176,7 +177,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/vcpkg/archives
-          key: vcpkg-wasm-app-${{ hashFiles('vcpkg.json', 'triplets/wasm32-emscripten.cmake') }}
+          key: vcpkg-wasm-app-${{ hashFiles('vcpkg.json', 'triplets/wasm32-emscripten-qt.cmake') }}
           restore-keys: vcpkg-wasm-app-
 
       - name: Instalează vcpkg

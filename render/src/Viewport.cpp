@@ -11,6 +11,7 @@
 #include <QNativeGestureEvent>
 #include <QPointingDevice>
 #include <QBuffer>
+#include <QDir>
 #include <QGuiApplication>
 #include <QLineF>
 #include <QQuickWindow>
@@ -240,6 +241,8 @@ void Viewport::updateCursor()
         setCursor(Qt::OpenHandCursor);
     } else if (m_navigationTool == QLatin1String("zoom")) {
         setCursor(m_zoomCursor);
+    } else if (m_navigationTool == QLatin1String("interact")) {
+        setCursor(Qt::PointingHandCursor);
     } else {
         unsetCursor();
     }
@@ -259,11 +262,15 @@ void Viewport::setDocument(Document* document)
     if (m_document) {
         // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
+        connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
+        connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
+            updateSceneBounds();
             zoomExtents();
         });
     }
+    updateSceneBounds();
     emit documentChanged();
     update();
 }
@@ -506,7 +513,8 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             continue;
         }
         const model::Instance& inst = model.instance(child);
-        const math::Transform childToWorld = toWorld * inst.transform;
+        // O ușă în mișcare (unealta Interact) se desenează cu transformarea animată.
+        const math::Transform childToWorld = toWorld * doc.displayTransform(child).value_or(inst.transform);
         if (ancestor && path[static_cast<std::size_t>(pathIndex)] == child) {
             DrawStyle inside;
             inside.material = inst.material ? inst.material : style.material;
@@ -805,20 +813,157 @@ QVariantMap Viewport::cameraState() const
         { QStringLiteral("distance"), p.distance }, { QStringLiteral("ortho"), isOrthographic() } };
 }
 
-void Viewport::animateToCamera(const QVariantMap& state)
+namespace {
+
+view::CameraPose poseFromState(const QVariantMap& state)
 {
-    if (state.isEmpty()) {
-        return;
-    }
     view::CameraPose pose;
     pose.target = { state.value(QStringLiteral("tx")).toDouble(), state.value(QStringLiteral("ty")).toDouble(),
         state.value(QStringLiteral("tz")).toDouble() };
     pose.yaw = state.value(QStringLiteral("yaw")).toDouble();
     pose.pitch = state.value(QStringLiteral("pitch")).toDouble();
     pose.distance = state.value(QStringLiteral("distance")).toDouble();
+    return pose;
+}
+
+std::vector<view::CameraPose> posesFromStates(const QVariantList& states)
+{
+    std::vector<view::CameraPose> poses;
+    for (const QVariant& s : states) {
+        poses.push_back(poseFromState(s.toMap()));
+    }
+    return poses;
+}
+
+} // namespace
+
+void Viewport::animateToCamera(const QVariantMap& state)
+{
+    if (state.isEmpty()) {
+        return;
+    }
     setOrthographic(state.value(QStringLiteral("ortho")).toBool());
-    m_motion.animateTo(m_camera, pose);
+    m_motion.animateTo(m_camera, poseFromState(state));
     requestAnimationFrame();
+}
+
+void Viewport::playScenes(const QVariantList& states, double transition, double delay, bool loop)
+{
+    if (states.isEmpty() || m_exporting) {
+        return;
+    }
+    m_motion.stop();
+    m_sceneAnimation.emplace(posesFromStates(states), transition, delay, loop);
+    m_loopScenes = loop;
+    m_sceneTime = 0.0;
+    m_playingScene = 0;
+    emit sceneAnimationChanged();
+    requestAnimationFrame();
+}
+
+void Viewport::stopScenes()
+{
+    if (!m_sceneAnimation || m_exporting) {
+        return;
+    }
+    m_sceneAnimation.reset();
+    m_playingScene = -1;
+    emit sceneAnimationChanged();
+}
+
+void Viewport::advanceSceneAnimation(double dt)
+{
+    m_sceneTime += dt;
+    // Fără buclă, redarea se oprește la sfârșit; cu buclă, o luăm de la capăt.
+    if (m_sceneTime >= m_sceneAnimation->duration()) {
+        // (Animația cu buclă se termină pe prima scenă, de unde reîncepe.)
+        m_camera.setPose(m_sceneAnimation->poseAt(m_sceneAnimation->duration()));
+        onCameraMoved();
+        if (m_sceneAnimation->duration() > 0.0 && m_loopScenes) {
+            m_sceneTime = std::fmod(m_sceneTime, m_sceneAnimation->duration());
+        } else {
+            stopScenes();
+            return;
+        }
+    }
+    m_camera.setPose(m_sceneAnimation->poseAt(m_sceneTime));
+    onCameraMoved();
+    const int scene = static_cast<int>(m_sceneAnimation->sceneAt(m_sceneTime));
+    if (scene != m_playingScene) {
+        m_playingScene = scene;
+        emit sceneAnimationChanged();
+    }
+}
+
+void Viewport::exportScenes(const QVariantList& states, double transition, double delay, bool loop,
+    const QString& directory, int fps)
+{
+    if (states.isEmpty() || m_exporting) {
+        return;
+    }
+    QDir().mkpath(directory);
+    m_motion.stop();
+    m_sceneAnimation.emplace(posesFromStates(states), transition, delay, loop);
+    m_exporting = true;
+    m_exportFps = std::clamp(fps, 1, 120);
+    m_exportFrame = 0;
+    m_exportFrames = std::max(1, static_cast<int>(std::ceil(m_sceneAnimation->duration() * m_exportFps)) + 1);
+    m_exportDirectory = directory;
+    m_exportProgress = 0.0;
+    m_playingScene = 0;
+    emit sceneAnimationChanged();
+    if (m_exportTimer == nullptr) {
+        m_exportTimer = new QTimer(this);
+        m_exportTimer->setSingleShot(true);
+        m_exportTimer->setInterval(0);
+        connect(m_exportTimer, &QTimer::timeout, this, &Viewport::exportNextFrame);
+    }
+    m_exportTimer->start();
+}
+
+void Viewport::exportNextFrame()
+{
+    if (!m_exporting || !m_sceneAnimation) {
+        return;
+    }
+    const double t = static_cast<double>(m_exportFrame) / m_exportFps;
+    m_camera.setPose(m_sceneAnimation->poseAt(t));
+    onCameraMoved();
+    const int scene = static_cast<int>(m_sceneAnimation->sceneAt(t));
+    if (scene != m_playingScene) {
+        m_playingScene = scene; // QML schimbă stilul scenei înainte de randare
+        emit sceneAnimationChanged();
+    }
+    const QString file = QStringLiteral("%1/frame_%2.png").arg(m_exportDirectory).arg(m_exportFrame, 5, 10, QLatin1Char('0'));
+    if (!saveImage(file)) {
+        cancelExport();
+        return;
+    }
+    ++m_exportFrame;
+    m_exportProgress = static_cast<double>(m_exportFrame) / m_exportFrames;
+    emit sceneAnimationChanged();
+    if (m_exportFrame < m_exportFrames) {
+        m_exportTimer->start();
+        return;
+    }
+    const int frames = m_exportFrame;
+    m_exporting = false;
+    m_sceneAnimation.reset();
+    m_playingScene = -1;
+    emit sceneAnimationChanged();
+    emit animationExported(m_exportDirectory, frames, m_exportFps);
+}
+
+void Viewport::cancelExport()
+{
+    if (!m_exporting) {
+        return;
+    }
+    m_exporting = false;
+    m_sceneAnimation.reset();
+    m_playingScene = -1;
+    emit sceneAnimationChanged();
+    emit animationExported(m_exportDirectory, 0, m_exportFps);
 }
 
 QImage Viewport::renderImage()
@@ -865,6 +1010,65 @@ QByteArray Viewport::captureThumbnail()
     buffer.open(QIODevice::WriteOnly);
     image.save(&buffer, "PNG");
     return bytes;
+}
+
+void Viewport::setOrbitPivot(int mode)
+{
+    mode = std::clamp(mode, 0, 2);
+    if (mode != m_orbitPivotMode) {
+        m_orbitPivotMode = mode;
+        emit navigationSettingsChanged();
+    }
+}
+
+void Viewport::setClipStart(double mm)
+{
+    m_clipStart = std::max(mm, 0.0);
+    m_camera.setClipOverride(m_clipStart, m_clipEnd);
+    emit navigationSettingsChanged();
+    update();
+}
+
+void Viewport::setClipEnd(double mm)
+{
+    m_clipEnd = std::max(mm, 0.0);
+    m_camera.setClipOverride(m_clipStart, m_clipEnd);
+    emit navigationSettingsChanged();
+    update();
+}
+
+void Viewport::beginOrbitAt(QPointF position)
+{
+    std::optional<view::Vec3d> pivot;
+    if (m_document && m_orbitPivotMode == 1) {
+        if (const auto bounds = m_document->selectionBounds()) {
+            pivot = (bounds->first + bounds->second) * 0.5;
+        }
+    } else if (m_document && m_orbitPivotMode == 2) {
+        pivot = m_document->surfacePoint(m_camera, toVec2(position));
+    }
+    m_camera.setOrbitPivot(pivot);
+}
+
+view::Vec3d Viewport::zoomAnchor(QPointF position)
+{
+    if (m_zoomToSurface && m_document) {
+        if (const auto surface = m_document->surfacePoint(m_camera, toVec2(position))) {
+            // Ținta la adâncimea suprafeței: pasul zoom-ului (proporțional cu distanța) devine mic lângă
+            // detaliile mici, iar zoom-ul nu mai trece prin ele.
+            m_camera.retargetToDepth(*surface);
+            return *surface;
+        }
+    }
+    return m_camera.zoomAnchorAt(toVec2(position));
+}
+
+void Viewport::updateSceneBounds()
+{
+    view::Vec3d lo;
+    view::Vec3d hi;
+    sceneBounds(lo, hi);
+    m_camera.setSceneBounds(lo, hi);
 }
 
 void Viewport::zoomToSelection()
@@ -927,6 +1131,9 @@ ViewportFrame Viewport::frameForRendering() const
     f.targetDistance = m_camera.pose().distance;
     f.orthographic = isOrthographic();
     f.gridVisible = m_gridVisible;
+    if (m_document && m_document->property("snapToGrid").toBool()) {
+        f.gridStep = m_document->property("gridStep").toDouble();
+    }
     f.devicePixelRatio = window() ? static_cast<float>(window()->effectiveDevicePixelRatio()) : 1.0f;
 
     f.colors.backgroundTop = toVec4(m_backgroundTop);
@@ -972,9 +1179,14 @@ ViewportFrame Viewport::frameForRendering() const
         appendBox(f.triangles, kDemoMin, kDemoMax);
         appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
-    f.meshRevision = (m_document ? m_document->revision() : 0u) * 2u + (m_demoVisible ? 1u : 0u);
+    f.meshRevision = ((m_document ? m_document->revision() + m_document->interactionRevision() * 7919u : 0u)) * 2u
+        + (m_demoVisible ? 1u : 0u);
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
+    // Pivotul orbitei, cât timp se orbitează în jurul lui.
+    if (m_drag == Drag::Orbit && m_camera.orbitPivot()) {
+        f.points.push_back({ glm::vec3(*m_camera.orbitPivot()), toVec4(m_accent), 8.0f });
+    }
     return f;
 }
 
@@ -1007,13 +1219,17 @@ void Viewport::onAfterAnimating()
     if (m_motion.update(m_camera, dt)) {
         onCameraMoved();
     }
+    if (m_sceneAnimation && !m_exporting) {
+        advanceSceneAnimation(dt);
+    }
+    const bool interacting = m_document && m_document->advanceInteractions(dt);
     if (m_turntableSecondsLeft > 0.0) {
         constexpr double kTurntableRadiansPerSecond = 0.8;
         m_camera.orbit(kTurntableRadiansPerSecond * dt, 0.0);
         m_turntableSecondsLeft -= dt;
         onCameraMoved();
     }
-    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0) {
+    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting) || interacting) {
         update();
     } else {
         m_ticking = false;
@@ -1056,7 +1272,7 @@ bool Viewport::event(QEvent* event)
             // value() e variația relativă a distanței dintre degete (pozitivă = depărtare = apropiere).
             const double factor = 1.0 / std::max(0.05, 1.0 + gesture->value());
             m_motion.stop();
-            m_camera.zoomAbout(factor, m_camera.zoomAnchorAt(toVec2(pos)));
+            m_camera.zoomAbout(factor, zoomAnchor(pos));
             onCameraMoved();
             showTransientCursor(m_zoomCursor);
             gesture->accept();
@@ -1083,6 +1299,7 @@ void Viewport::beginDrag(Drag drag, QPointF position)
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
+    stopScenes(); // ca în SketchUp: orice click oprește animația
     // Tastele (Measurements box, săgețile) ajung la viewport după un click în el.
     forceActiveFocus(Qt::MouseFocusReason);
     const auto mods = event->modifiers();
@@ -1106,6 +1323,12 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             drag = Drag::Pan;
         } else if (m_navigationTool == QLatin1String("zoom")) {
             drag = Drag::Zoom;
+        } else if (m_navigationTool == QLatin1String("interact")) {
+            if (m_document && m_document->interactAt(m_camera, toVec2(event->position()))) {
+                requestAnimationFrame();
+            }
+            event->accept();
+            return;
         }
     }
     if (drag == Drag::None && event->button() == Qt::LeftButton && m_document && m_document->hasTool()) {
@@ -1130,7 +1353,9 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     }
     beginDrag(drag, event->position());
     if (drag == Drag::Zoom) {
-        m_zoomDragAnchor = m_camera.zoomAnchorAt(toVec2(event->position()));
+        m_zoomDragAnchor = zoomAnchor(event->position());
+    } else if (drag == Drag::Orbit) {
+        beginOrbitAt(event->position());
     }
     updateCursor();
     event->accept();
@@ -1193,7 +1418,8 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
     // Dublu-click cu butonul din mijloc centrează vederea pe punctul de sub cursor (ca în SketchUp).
     if (event->button() == Qt::MiddleButton) {
         auto pose = m_camera.pose();
-        pose.target = m_camera.zoomAnchorAt(toVec2(event->position()));
+        const auto surface = m_document ? m_document->surfacePoint(m_camera, toVec2(event->position())) : std::nullopt;
+        pose.target = surface ? *surface : m_camera.zoomAnchorAt(toVec2(event->position()));
         m_motion.animateTo(m_camera, pose);
         requestAnimationFrame();
         event->accept();
@@ -1229,6 +1455,7 @@ view::Vec2d Viewport::orbitReleaseVelocity() const
 
 void Viewport::wheelEvent(QWheelEvent* event)
 {
+    stopScenes();
     const QPointF pos = event->position();
     setPointer(pos, true);
     const auto mods = event->modifiers();
@@ -1243,8 +1470,16 @@ void Viewport::wheelEvent(QWheelEvent* event)
             m_camera.pan(toVec2(d));
             showTransientCursor(Qt::ClosedHandCursor);
         } else {
+            // Pivotul se alege la începutul gestului (sau la fiecare eveniment, dacă dispozitivul nu are faze).
+            if (event->phase() == Qt::ScrollBegin || event->phase() == Qt::NoScrollPhase || !m_trackpadOrbiting) {
+                beginOrbitAt(pos);
+                m_trackpadOrbiting = true;
+            }
             m_camera.orbit(-d.x() * kOrbitRadiansPerPixel, -d.y() * kOrbitRadiansPerPixel);
             showTransientCursor(m_orbitCursor);
+        }
+        if (event->phase() == Qt::ScrollEnd) {
+            m_trackpadOrbiting = false;
         }
         onCameraMoved();
         event->accept();
@@ -1260,7 +1495,7 @@ void Viewport::wheelEvent(QWheelEvent* event)
         return;
     }
     const double factor = std::pow(kWheelZoomStep, steps);
-    m_motion.zoomSmoothly(factor, m_camera.zoomAnchorAt(toVec2(pos)));
+    m_motion.zoomSmoothly(factor, zoomAnchor(pos));
     showTransientCursor(m_zoomCursor);
     requestAnimationFrame();
     event->accept();

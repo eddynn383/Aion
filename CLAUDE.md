@@ -97,6 +97,20 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `RichTooltip` la hover lung (1,3 s), `ToolTour` (meniul Ajutor / palette). ADR 0013. Acțiuni de script:
   `moves:x,y` (hover în fereastră), `debug.demos` (galeria animațiilor).
 
+- **Navigare precisă** (ADR 0016): orbită în jurul selecției / cursorului, zoom spre suprafață, planuri de tăiere
+  adaptive + Clip start/end în Preferințe. Acțiune de script: `wheelw:x,y,z,trepte`.
+
+- **Snap la grid**: `Engine::withGridSnap` (doar puncte libere și distanțe pe direcții), `autoGridStep` = regula din
+  grid.frag, `ToolContext::gridStep`, Document `snapToGrid`/`gridStep`, pas fix desenat prin `params.z` în grid.frag.
+
+- **Raport de cantități** (ADR 0017): `model/Quantities.h` (general + listă de debitare + CSV), `QuantitiesDialog.qml`,
+  `DataTable.qml`; comanda `file.quantities` (Fișier). Acțiune de script: `debug.cutlist`.
+
+- **Animații și interacțiuni** (ADR 0018): `view/SceneAnimation`, `Viewport::playScenes/exportScenes`,
+  `AppInfo.encodeVideo` (`platform/VideoMac.mm`, AVFoundation; ffmpeg ca rezervă); `model::Behavior` pe instanțe,
+  `model/Interaction`, `view::interactiveInstanceAt`, unealta `interact` (în viewport, ca navigarea).
+  Acțiuni de script: `scene.add`, `exportvideo:cale.mp4`, `behavior:rotate,0,90`.
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 

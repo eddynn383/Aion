@@ -327,7 +327,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, m_start);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_start);
         if (m_inference.valid()) {
             m_current = m_inference.point;
         }
@@ -475,7 +475,7 @@ private:
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
         // Colțul opus nu folosește direcții din primul colț (ar da un dreptunghi degenerat),
         // dar folosește capetele, muchiile și alinierea cu punctele de referință, proiectate pe plan.
-        m_inference = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, e.screen, std::nullopt,
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, std::nullopt,
             m_origin ? std::optional(m_plane) : std::nullopt);
         if (m_inference.valid()) {
             m_current = m_origin ? m_plane.project(m_inference.point) : m_inference.point;
@@ -693,7 +693,7 @@ private:
     {
         // Adâncimea se poate lua dintr-un punct al geometriei (capăt, mijloc, muchie) sau de pe o față
         // paralelă; altfel e punctul de pe normală cel mai apropiat de cursor.
-        inference::Inference inf = m_engine.withGuides(ctx.guides).infer(ctx.mesh, ctx.camera, screen, std::nullopt);
+        inference::Inference inf = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, screen, std::nullopt);
         const double depth = glm::dot(inf.point - m_origin, m_normal);
         const bool fromPoint = (inf.kind == inference::Kind::Endpoint || inf.kind == inference::Kind::Midpoint
                                    || inf.kind == inference::Kind::OnEdge)

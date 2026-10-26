@@ -3,10 +3,17 @@
 #include "aion/core/Version.h"
 #include "aion/render/GraphicsApi.h"
 #include "platform/Platform.h"
+#include "platform/Video.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#if QT_CONFIG(process)
+#include <QProcess>
+#endif
+#include <QStandardPaths>
 #include <QKeySequence>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPointer>
 #include <QQuickWindow>
 
@@ -117,6 +124,62 @@ QString AppInfo::platformText(const QString& text) const
         .replace(QStringLiteral("Cmd"), QStringLiteral("Ctrl"));
     return result;
 #endif
+}
+
+QString AppInfo::encodeVideo(const QString& directory, int fps, const QString& output) const
+{
+    QDir dir(directory);
+    QStringList frames = dir.entryList({ QStringLiteral("frame_*.png") }, QDir::Files, QDir::Name);
+    if (frames.isEmpty()) {
+        return QStringLiteral("Nu există cadre de codat.");
+    }
+    for (QString& f : frames) {
+        f = dir.filePath(f);
+    }
+    QString error;
+    bool ok = platform::encodeVideoNative(frames, fps, output, &error);
+    if (!ok) {
+        // ffmpeg, dacă e instalat (în PATH sau în locurile obișnuite pentru Homebrew).
+        QString ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
+        if (ffmpeg.isEmpty()) {
+            ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"),
+                { QDir::homePath() + QStringLiteral("/homebrew/bin"), QStringLiteral("/opt/homebrew/bin"),
+                    QStringLiteral("/usr/local/bin") });
+        }
+#if !QT_CONFIG(process)
+        ffmpeg.clear(); // în browser nu se pot porni procese
+#endif
+        if (ffmpeg.isEmpty()) {
+            return error.isEmpty() ? QStringLiteral("Niciun encoder video (instalează ffmpeg); cadrele au rămas în ")
+                    + directory
+                                   : error;
+        }
+#if QT_CONFIG(process)
+        const int code = QProcess::execute(ffmpeg,
+            { QStringLiteral("-y"), QStringLiteral("-loglevel"), QStringLiteral("error"), QStringLiteral("-framerate"),
+                QString::number(fps), QStringLiteral("-i"), dir.filePath(QStringLiteral("frame_%05d.png")),
+                QStringLiteral("-vf"), QStringLiteral("scale=trunc(iw/2)*2:trunc(ih/2)*2"), QStringLiteral("-c:v"),
+                QStringLiteral("libx264"), QStringLiteral("-pix_fmt"), QStringLiteral("yuv420p"), output });
+        ok = code == 0;
+        if (!ok) {
+            return QStringLiteral("ffmpeg a eșuat (cod %1); cadrele au rămas în %2").arg(code).arg(directory);
+        }
+#endif
+    }
+    dir.removeRecursively();
+    return {};
+}
+
+void AppInfo::simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const
+{
+    if (item == nullptr || item->window() == nullptr) {
+        return;
+    }
+    QQuickWindow* window = item->window();
+    const QPointF scenePos = item->mapToScene(position);
+    QWheelEvent e(scenePos, window->mapToGlobal(scenePos), QPoint(), QPoint(0, angleDelta), Qt::NoButton, Qt::NoModifier,
+        Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(window, &e);
 }
 
 void AppInfo::simulateClick(QQuickItem* item, const QPointF& position) const

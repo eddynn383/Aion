@@ -22,7 +22,8 @@ Window {
     property bool leftPanelVisible: true
     property bool rightPanelVisible: true
     property string activeTool: "select"
-    readonly property var navigationTools: ["orbit", "pan", "zoom"]
+    // Uneltele tratate de viewport (nu de Document): navigarea și Interact.
+    readonly property var navigationTools: ["orbit", "pan", "zoom", "interact"]
 
     // Toate comenzile aplicației; apar în command palette și au scurtături.
     readonly property var commands: {
@@ -35,6 +36,10 @@ Window {
             { id: "file.exportObj", title: "Exportă OBJ…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
+            { id: "view.playScenes", title: viewport.scenesPlaying ? "Oprește animația scenelor" : "Redă animația scenelor", category: "Vedere", shortcut: "", icon: "play" },
+            { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
             { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
             { id: "view.top",    title: "Vedere de sus",     category: "Vedere", shortcut: "Ctrl+1", icon: "arrow-down" },
@@ -87,6 +92,10 @@ Window {
             { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
             { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
             { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" },
+            { id: "view.snapGrid", title: doc.snapToGrid ? "Oprește snap la grid" : "Snap la grid", category: "Vedere", shortcut: "Alt+G", icon: "grid-3x3" },
+            { id: "nav.pivotView", title: "Orbitează în jurul centrului vederii", category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "nav.pivotSelection", title: "Orbitează în jurul selecției", category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "nav.pivotCursor", title: "Orbitează în jurul punctului de sub cursor", category: "Vedere", shortcut: "", icon: "orbit" },
             { id: "app.preferences", title: "Preferințe…", category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
             { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" },
             { id: "app.tour", title: "Turul uneltelor (cum se folosește fiecare)", category: "Ajutor", shortcut: "", icon: "info" }
@@ -123,6 +132,14 @@ Window {
         case "file.exportGlb": fileDialog.ask("exportGlb"); break
         case "file.exportGltf": fileDialog.ask("exportGltf"); break
         case "file.exportPng": fileDialog.ask("exportPng"); break
+        case "file.quantities": quantitiesDialog.open(); break
+        case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
+        case "view.playScenes": viewport.scenesPlaying ? viewport.stopScenes() : scenesPanel.play(); break
+        case "file.exportVideo":
+            if (doc.scenes.length === 0) toast.show("Adaugă întâi scene (panoul Scene).")
+            else fileDialog.ask("exportVideo")
+            break
+        case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
         case "view.front": viewport.setStandardView(Viewport.Front); break
@@ -175,6 +192,13 @@ Window {
             break
         }
         case "ui.theme": Theme.cycleMode(); break
+        case "view.snapGrid":
+            doc.snapToGrid = !doc.snapToGrid
+            toast.show(doc.snapToGrid ? "Snap la grid: pornit (" + (doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : "pas automat") + ")" : "Snap la grid: oprit")
+            break
+        case "nav.pivotView": viewport.orbitPivot = 0; toast.show("Orbita: în jurul centrului vederii"); break
+        case "nav.pivotSelection": viewport.orbitPivot = 1; toast.show("Orbita: în jurul selecției"); break
+        case "nav.pivotCursor": viewport.orbitPivot = 2; toast.show("Orbita: în jurul punctului de sub cursor"); break
         case "app.preferences": preferencesDialog.open(); break
         case "app.about": aboutDialog.open(); break
         case "app.tour": toolTour.open(); break
@@ -234,6 +258,16 @@ Window {
                 } else if (action.startsWith("movew:")) {
                     const m = action.slice(6).split(",").map(Number)
                     AppInfo.simulateMove(viewport, viewport.projectToScreen(Qt.vector3d(m[0], m[1], m[2])))
+                } else if (action.startsWith("wheelw:")) {
+                    // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
+                    const wh = action.slice(7).split(",").map(Number)
+                    AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("behavior:")) {
+                    // „behavior:rotate,0,90” pe instanța selectată.
+                    const bh = action.slice(9).split(",")
+                    doc.setBehavior({ kind: bh[0], anchor: parseInt(bh[1]), amount: parseFloat(bh[2]), duration: 0.6 })
+                } else if (action.startsWith("exportvideo:")) {
+                    window.exportVideo(action.slice(12))
                 } else if (action.startsWith("moves:")) {
                     // Hover în coordonatele ferestrei (de exemplu pe un buton din toolbar).
                     const ms = action.slice(6).split(",").map(Number)
@@ -390,11 +424,27 @@ Window {
         category: "ui"
         property int themeMode: 0
         property real latitude: 45
+        property int orbitPivot: 0
+        property bool zoomToSurface: true
+        property real clipStart: 0
+        property real clipEnd: 0
+        property bool snapToGrid: false
+        property real animTransition: 2
+        property real animDelay: 1
+        property bool animLoop: true
+        property int animFps: 30
+        property real gridStep: 0
     }
     Component.onCompleted: {
         if (AppInfo.themeOverride === 0)
             Theme.mode = preferences.themeMode
         viewport.latitude = preferences.latitude
+        viewport.orbitPivot = preferences.orbitPivot
+        viewport.zoomToSurface = preferences.zoomToSurface
+        viewport.clipStart = preferences.clipStart
+        viewport.clipEnd = preferences.clipEnd
+        doc.snapToGrid = preferences.snapToGrid
+        doc.gridStep = preferences.gridStep
         window.openPendingFiles()
     }
     Connections {
@@ -404,6 +454,12 @@ Window {
     Connections {
         target: viewport
         function onAppearanceChanged() { preferences.latitude = viewport.latitude }
+        function onNavigationSettingsChanged() {
+            preferences.orbitPivot = viewport.orbitPivot
+            preferences.zoomToSurface = viewport.zoomToSurface
+            preferences.clipStart = viewport.clipStart
+            preferences.clipEnd = viewport.clipEnd
+        }
     }
 
     // Fișierele deschise din Finder (dublu-click pe un .aion, „Open With”) sau date în linia de comandă.
@@ -414,6 +470,13 @@ Window {
                 window.confirmDiscard(() => doc.openFile(path))
             else
                 doc.importFile(path)
+        }
+    }
+    Connections {
+        target: doc
+        function onGridSnapChanged() {
+            preferences.snapToGrid = doc.snapToGrid
+            preferences.gridStep = doc.gridStep
         }
     }
     Connections {
@@ -430,6 +493,16 @@ Window {
     AboutDialog {
         id: aboutDialog
         parent: window.contentItem
+    }
+    QuantitiesDialog {
+        id: quantitiesDialog
+        parent: window.contentItem
+        document: doc
+        onExportRequested: (kind, options) => {
+            fileDialog.reportKind = kind
+            fileDialog.reportOptions = options
+            fileDialog.ask("exportReport")
+        }
     }
     ToolTour {
         id: toolTour
@@ -479,6 +552,8 @@ Window {
 
         property string purpose: ""
         property var afterSave: null
+        property string reportKind: "general"
+        property var reportOptions: ({})
 
         function ask(what) {
             // În browser: selectorul de fișiere al browserului și download-uri.
@@ -494,11 +569,18 @@ Window {
                 case "exportGlb": window.webSave("glb"); break
                 case "exportGltf": window.webSave("gltf"); break
                 case "exportPng": window.webSave("png"); break
+                case "exportReport": {
+                    const name = doc.fileName + (reportKind === "cutlist" ? " - debitare" : " - cantitati") + ".csv"
+                    const path = WebFiles.temporaryPath(name)
+                    if (doc.exportReport(path, reportKind, reportOptions)) WebFiles.download(path, name)
+                    break
+                }
+                case "exportVideo": toast.show("Exportul video nu e disponibil în browser (folosește aplicația desktop)."); break
                 }
                 return
             }
             purpose = what
-            const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng"].includes(what)
+            const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng", "exportReport", "exportVideo"].includes(what)
             fileMode = save ? FileDialog.SaveFile : FileDialog.OpenFile
             switch (what) {
             case "open": title = "Deschide"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
@@ -508,9 +590,13 @@ Window {
             case "exportGlb": title = "Exportă GLB"; nameFilters = ["glTF binar (*.glb)"]; defaultSuffix = "glb"; break
             case "exportGltf": title = "Exportă glTF"; nameFilters = ["glTF (*.gltf)"]; defaultSuffix = "gltf"; break
             case "exportPng": title = "Exportă imaginea"; nameFilters = ["PNG (*.png)"]; defaultSuffix = "png"; break
+            case "exportReport": title = "Exportă raportul"; nameFilters = ["CSV (*.csv)"]; defaultSuffix = "csv"; break
+            case "exportVideo": title = "Exportă animația"; nameFilters = ["Video MP4 (*.mp4)"]; defaultSuffix = "mp4"; break
             }
             if (save)
-                selectedFile = "file:///" + doc.fileName + "." + defaultSuffix
+                selectedFile = "file:///" + doc.fileName
+                    + (what === "exportReport" ? (reportKind === "cutlist" ? " - debitare" : " - cantitati") : "")
+                    + "." + defaultSuffix
             open()
         }
 
@@ -532,6 +618,10 @@ Window {
                 if (viewport.saveImage(path)) toast.show("Imagine salvată: " + path.split("/").pop())
                 else toast.show("Imaginea nu a putut fi salvată.")
                 break
+            case "exportReport":
+                if (doc.exportReport(path, reportKind, reportOptions)) toast.show("Raport salvat: " + path.split("/").pop())
+                break
+            case "exportVideo": window.exportVideo(path); break
             }
             afterSave = null
         }
@@ -568,6 +658,35 @@ Window {
                 window.confirmDiscard(() => doc.openFile(path))
             else
                 doc.importFile(path)
+        }
+    }
+
+    // Animația scenelor → cadre PNG (viewport) → video MP4 (AppInfo.encodeVideo).
+    property string videoOutput: ""
+    function exportVideo(path) {
+        window.videoOutput = path
+        const frames = path.replace(/\.mp4$/i, "") + " - cadre"
+        viewport.exportScenes(scenesPanel.sceneStates(), scenesPanel.transition, scenesPanel.delay, scenesPanel.loop,
+                              frames, scenesPanel.fps)
+        toast.show("Se exportă animația… (vezi progresul în panoul Scene)")
+    }
+    Connections {
+        target: viewport
+        function onAnimationExported(directory, frames, fps) {
+            if (frames === 0) {
+                toast.show("Exportul animației a fost anulat.")
+                return
+            }
+            const error = AppInfo.encodeVideo(directory, fps, window.videoOutput)
+            toast.show(error.length === 0 ? "Video salvat: " + window.videoOutput.split("/").pop() : error)
+        }
+        // În timpul animației, fiecare scenă își aplică stilul.
+        function onSceneAnimationChanged() {
+            if (viewport.playingScene < 0 || viewport.playingScene >= doc.scenes.length)
+                return
+            const camera = doc.sceneCamera(doc.scenes[viewport.playingScene].id)
+            if (camera.style && camera.style.length > 0 && viewport.displayStyle !== camera.style)
+                viewport.displayStyle = camera.style
         }
     }
 
@@ -614,10 +733,20 @@ Window {
             document: doc
         }
         ScenesPanel {
+            id: scenesPanel
             anchors.fill: parent
             visible: leftTabs.currentIndex === 3
             document: doc
             viewport: viewport
+            transition: preferences.animTransition
+            delay: preferences.animDelay
+            loop: preferences.animLoop
+            fps: preferences.animFps
+            onTransitionChanged: preferences.animTransition = transition
+            onDelayChanged: preferences.animDelay = delay
+            onLoopChanged: preferences.animLoop = loop
+            onFpsChanged: preferences.animFps = fps
+            onExportVideoRequested: fileDialog.ask("exportVideo")
         }
         MaterialsPanel {
             anchors.fill: parent
@@ -797,6 +926,47 @@ Window {
                     small: true
                     text: "Renunță"
                     onClicked: doc.discardAutosave()
+                }
+            }
+        }
+
+        // Bara de redare a animației scenelor (nu apare în cadrele exportate).
+        Rectangle {
+            visible: viewport.scenesPlaying
+            anchors.top: parent.top
+            anchors.topMargin: Theme.space4
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: playerRow.implicitWidth + Theme.space3 * 2
+            height: 36
+            radius: 18
+            color: Theme.bgElevated
+            border.color: Theme.borderStrong
+            Row {
+                id: playerRow
+                anchors.centerIn: parent
+                spacing: Theme.space2
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "play"
+                    size: 14
+                    color: Theme.accent
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: viewport.playingScene >= 0 && viewport.playingScene < doc.scenes.length
+                          ? doc.scenes[viewport.playingScene].name + "  ·  " + (viewport.playingScene + 1) + " / " + doc.scenes.length
+                          : ""
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                IconButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26
+                    height: 26
+                    iconSize: Theme.iconSizeSm
+                    iconName: "x"
+                    tooltip: "Oprește animația (sau click în viewport)"
+                    onClicked: viewport.stopScenes()
                 }
             }
         }
@@ -1081,6 +1251,9 @@ Window {
         selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
         unitText: ["Auto", "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"
+        snapToGrid: doc.snapToGrid
+        gridText: doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : "auto"
+        onSnapToggled: window.runCommand("view.snapGrid")
     }
 
     CommandPalette {

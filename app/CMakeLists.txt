@@ -11,14 +11,17 @@ qt_add_executable(aion_app
     src/bridge/WebFiles.cpp
     src/bridge/WebFiles.h
     src/platform/Platform.h
+    src/platform/Video.h
 )
 
 if(APPLE)
     enable_language(OBJCXX)
-    target_sources(aion_app PRIVATE src/platform/PlatformMac.mm)
-    target_link_libraries(aion_app PRIVATE "-framework AppKit")
+    target_sources(aion_app PRIVATE src/platform/PlatformMac.mm src/platform/VideoMac.mm)
+    set_source_files_properties(src/platform/VideoMac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_link_libraries(aion_app PRIVATE "-framework AppKit" "-framework AVFoundation" "-framework CoreVideo"
+        "-framework CoreMedia")
 else()
-    target_sources(aion_app PRIVATE src/platform/PlatformOther.cpp)
+    target_sources(aion_app PRIVATE src/platform/PlatformOther.cpp src/platform/VideoOther.cpp)
 endif()
 
 set_target_properties(aion_app PROPERTIES
@@ -81,6 +84,8 @@ qt_add_qml_module(aion_app
         qml/overlays/PreferencesDialog.qml
         qml/overlays/AboutDialog.qml
         qml/overlays/ToolTour.qml
+        qml/overlays/QuantitiesDialog.qml
+        qml/components/DataTable.qml
         qml/components/ToolDemo.qml
         qml/components/GuideCard.qml
         qml/components/RichTooltip.qml

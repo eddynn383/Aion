@@ -356,6 +356,7 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     copy4(u.accent, m_frame.colors.accent);
     u.params[0] = m_rhi->isYUpInNDC() ? 1.0f : 0.0f;
     u.params[1] = m_rhi->isYUpInFramebuffer() ? 1.0f : 0.0f;
+    u.params[2] = static_cast<float>(m_frame.gridStep); // 0 = pasul automat
 
     // Umbrele: o proiecție ortografică din direcția soarelui care cuprinde toată scena.
     const glm::dvec3 center = (m_frame.sceneMin + m_frame.sceneMax) * 0.5;

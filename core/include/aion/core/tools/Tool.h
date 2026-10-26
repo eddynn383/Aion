@@ -121,6 +121,8 @@ struct ToolContext {
     const model::Material* libraryMaterial = nullptr;
     // Ghidajele contextului, pentru inferență.
     std::span<const inference::GuideRef> guides;
+    // Snap la grid: pasul în mm (0 = oprit).
+    double gridStep = 0.0;
     // Transformarea contextului editat (local → model), pentru ce se păstrează în coordonatele modelului.
     math::Transform toWorld;
 };

@@ -22,6 +22,8 @@ add_library(aion_core STATIC
     src/math/Intersect.cpp
     src/model/Model.cpp
     src/model/Operations.cpp
+    src/model/Quantities.cpp
+    src/model/Interaction.cpp
     src/model/MaterialLibrary.cpp
     src/model/Boolean.cpp
     src/math/Plane.cpp
@@ -29,6 +31,7 @@ add_library(aion_core STATIC
     src/text/FuzzyMatch.cpp
     src/view/Camera.cpp
     src/view/CameraMotion.cpp
+    src/view/SceneAnimation.cpp
     src/view/Picking.cpp
     src/view/ModelPicking.cpp
     src/inference/Inference.cpp
