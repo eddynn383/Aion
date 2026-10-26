@@ -88,6 +88,12 @@ Popover {
                 currentIndex: Theme.mode
                 onCurrentIndexChanged: Theme.mode = currentIndex
             }
+            Toggle {
+                width: parent.width
+                text: "Ghiduri animate la hover lung pe unelte"
+                checked: UserPrefs.hoverGuides
+                onToggled: UserPrefs.hoverGuides = checked
+            }
         }
 
         Section {

@@ -12,6 +12,8 @@ T.AbstractButton {
     property int iconSize: Theme.iconSizeLg
     // Starea „activ” folosește accentul plin (unealta curentă) sau doar o tentă discretă.
     property bool solidChecked: true
+    // Ghidul animat afișat la hover lung (id-ul uneltei din ToolGuides.js); gol = doar tooltip simplu.
+    property string guideId: ""
 
     implicitWidth: Theme.controlHeight + 4
     implicitHeight: Theme.controlHeight + 4
@@ -40,8 +42,28 @@ T.AbstractButton {
     }
 
     Tooltip {
-        visible: root.hovered && root.tooltip.length > 0
+        visible: root.hovered && root.tooltip.length > 0 && !guideLoader.active
         text: root.tooltip
         shortcut: root.shortcut
+    }
+
+    // Hover lung: tooltip-ul simplu se transformă în ghidul animat.
+    Timer {
+        interval: 1300
+        running: root.hovered && root.guideId.length > 0 && UserPrefs.hoverGuides && !root.down
+        onTriggered: guideLoader.active = true
+    }
+    onHoveredChanged: if (!hovered) guideLoader.active = false
+    onPressed: guideLoader.active = false
+    Loader {
+        id: guideLoader
+        active: false
+        sourceComponent: RichTooltip {
+            parent: root
+            toolId: root.guideId
+            shortcut: root.shortcut
+            Component.onCompleted: open()
+            onClosed: guideLoader.active = false
+        }
     }
 }

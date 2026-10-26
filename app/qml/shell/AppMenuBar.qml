@@ -115,6 +115,10 @@ Platform.MenuBar {
     Platform.Menu {
         title: "Ajutor"
         Platform.MenuItem {
+            text: "Turul uneltelor"
+            onTriggered: root.host.runCommand("app.tour")
+        }
+        Platform.MenuItem {
             text: "Caută comenzi…"
             onTriggered: root.host.openPalette()
         }
