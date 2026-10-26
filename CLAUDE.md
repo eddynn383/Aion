@@ -40,16 +40,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - Avertismente cunoscute, inofensive: `FindWrapOpenGL ... /usr/X11R6/lib` (XQuartz), și `ld: ... built for newer macOS version`
   pentru framework-urile Qt din Homebrew (deployment target-ul nostru e 13.0; contează abia la distribuție, Faza 10).
 
-- **Faza 1** aproape gata, pe ramura `feature/faza-1` (vezi bifele din `PLAN.md`). Verificat prin capturi: shell-ul
-  în ambele teme, grid, axe, cutia demo, vederile standard, proiecția paralelă, command palette, storybook;
-  60 fps în release la rotirea continuă a camerei. **Netestat de mine:** navigarea cu mouse-ul / trackpad-ul
-  (nu pot genera evenimente de input) și poziția butoanelor native ale ferestrei (nu apar în `grabWindow`).
+- **Faza 1** făcută și unită în `main` (2026-10-26). Navigarea cu mouse-ul și bara de titlu confirmate de utilizator;
+  trackpad-ul (două degete / pinch) încă netestat de el.
 - Unelte de verificare (variabile de mediu): `FORMA_SCREENSHOT`, `FORMA_SCREENSHOT_DELAY_MS`, `FORMA_THEME`,
   `FORMA_STORYBOOK=1`, `FORMA_STARTUP="view.top;palette:zoom;debug.benchmark"` (afișează fps în consolă).
 
 ## Următorii pași
-1. Utilizatorul testează navigarea (mouse + trackpad) și bara de titlu; ajustări după feedback; merge în `main`.
-2. Faza 2: nucleul geometric (cea mai riscantă parte).
+Faza 2: nucleul geometric (cea mai riscantă parte), pe ramura `feature/faza-2`.
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `forma::`,

@@ -255,12 +255,12 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 - [x] Fonturile Inter și Geist Mono încărcate din resurse
 - [x] Componente de bază: Button, IconButton, Input, NumberField, Tooltip, Popover, Panel, Tabs, Separator (+ Icon, Kbd, Toggle, Section)
 - [x] Pagină internă de „storybook” (vizibilă numai în debug) care arată toate componentele în ambele teme
-- [~] Shell: fereastră cu titlebar integrat (macOS: conținut sub bara de titlu, butoanele native păstrate), panouri laterale ascunzibile, toolbar plutitor, status bar (făcut; de verificat vizual poziția butoanelor native)
+- [x] Shell: fereastră cu titlebar integrat (macOS: conținut sub bara de titlu, butoanele native păstrate și centrate), panouri laterale ascunzibile, toolbar plutitor, status bar
 - [x] Command palette (Cmd+K) cu căutare fuzzy (inițial doar comenzi de vizualizare)
 - [x] `Viewport` bazat pe `QQuickRhiItem` (backend Metal pe macOS), integrat în shell
 - [x] Shadere de bază (compilate cu `qsb`): fețe cu iluminare simplă, linii, puncte
 - [x] Fundal cu gradient, **grid infinit** care se estompează și cele 3 axe colorate (roșu X, verde Y, albastru Z, cu Z în sus)
-- [~] `Camera`: orbit (butonul din mijloc sau Orbit tool), pan (Shift+mijloc), zoom spre cursor (scroll / trackpad pinch) (logica testată în core; de testat manual cu mouse-ul)
+- [x] `Camera`: orbit (butonul din mijloc sau Orbit tool), pan (Shift+mijloc), zoom spre cursor (scroll / trackpad pinch); unealta Zoom; cursoare dedicate pentru fiecare acțiune
 - [~] Suport trackpad macOS: două degete = orbit/pan, pinch = zoom (scris; de testat manual)
 - [x] Proiecție perspectivă și ortografică; vederi standard (Top, Front, Right, Iso) cu tranziții animate; „Zoom Extents”
 - [x] Inerție lină la orbit și zoom
