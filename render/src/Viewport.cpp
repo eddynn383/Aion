@@ -1,17 +1,24 @@
 #include "aion/render/Viewport.h"
 
+#include "aion/render/Document.h"
+
 #include "ViewportFrame.h"
 #include "ViewportRenderer.h"
 
 #include <QNativeGestureEvent>
 #include <QPointingDevice>
+#include <QGuiApplication>
+#include <QLineF>
 #include <QQuickWindow>
+#include <QStyleHints>
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
+#include <set>
 
 namespace aion::render {
 
@@ -27,6 +34,11 @@ constexpr int kTransientCursorMs = 450;
 // Cât de recentă trebuie să fie mișcarea ca, la eliberare, orbita să continue prin inerție.
 constexpr qint64 kInertiaWindowNs = 80'000'000;
 constexpr qint64 kInertiaMaxIdleNs = 40'000'000;
+// Clicurile succesive mai apropiate de atât (în pixeli) se numără împreună (dublu, triplu).
+constexpr double kMultiClickDistancePx = 5.0;
+
+constexpr float kEdgeWidth = 1.25f;
+constexpr float kHighlightedEdgeWidth = 2.25f;
 
 // Cutia demo (în mm), afișată până când modelul poate conține geometrie (Faza 3).
 constexpr glm::dvec3 kDemoMin { 0.0, 0.0, 0.0 };
@@ -158,6 +170,227 @@ void Viewport::updateCursor()
 
 Viewport::~Viewport() = default;
 
+void Viewport::setDocument(Document* document)
+{
+    if (document == m_document) {
+        return;
+    }
+    if (m_document) {
+        disconnect(m_document, nullptr, this, nullptr);
+    }
+    m_document = document;
+    if (m_document) {
+        // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
+        connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
+    }
+    emit documentChanged();
+    update();
+}
+
+tools::PointerEvent Viewport::toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount) const
+{
+    tools::PointerEvent e;
+    e.screen = toVec2(position);
+    e.modifiers.shift = modifiers.testFlag(Qt::ShiftModifier);
+    // Qt pe macOS: Cmd = ControlModifier, Control = MetaModifier.
+    e.modifiers.command = modifiers.testFlag(Qt::ControlModifier);
+    e.modifiers.alt = modifiers.testFlag(Qt::AltModifier);
+    e.clickCount = clickCount;
+    return e;
+}
+
+void Viewport::afterToolEvent()
+{
+    QRectF rect;
+    bool crossing = false;
+    if (m_document && m_document->tool()) {
+        const tools::Overlay overlay = m_document->tool()->overlay();
+        if (overlay.selectionRect) {
+            const auto [a, b] = *overlay.selectionRect;
+            rect = QRectF(QPointF(a.x, a.y), QPointF(b.x, b.y)).normalized();
+            crossing = overlay.crossing;
+        }
+    }
+    if (rect != m_selectionRect || crossing != m_selectionCrossing) {
+        m_selectionRect = rect;
+        m_selectionCrossing = crossing;
+        emit selectionRectChanged();
+    }
+    updateAnnotations();
+    update();
+}
+
+void Viewport::appendDocument(ViewportFrame& f) const
+{
+    const Document& doc = *m_document;
+    const geom::Mesh& mesh = doc.mesh();
+    const geom::Selection& selection = doc.selection();
+    const view::PickResult hover = doc.tool() ? doc.tool()->hover() : view::PickResult {};
+    const tools::Overlay overlay = doc.tool() ? doc.tool()->overlay() : tools::Overlay {};
+
+    for (const auto& [faceId, tri] : doc.triangles()) {
+        const geom::Face* face = mesh.faces().find(faceId);
+        if (face == nullptr) {
+            continue;
+        }
+        const glm::vec3 normal(face->plane.normal);
+        const float state = selection.contains(faceId) ? 2.0f
+            : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
+                                                                                   : 0.0f;
+        f.hasSelectedFaces = f.hasSelectedFaces || state > 1.5f;
+        for (std::uint32_t i : tri.indices) {
+            f.triangles.push_back({ glm::vec3(tri.points[i]), normal, state });
+        }
+    }
+
+    const std::set<geom::EdgeId> marked(overlay.markedEdges.begin(), overlay.markedEdges.end());
+    const glm::vec4 edge = toVec4(m_edge);
+    const glm::vec4 freeEdge = toVec4(m_freeEdge);
+    const glm::vec4 accent = toVec4(m_accent);
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        const geom::EdgeId id = mesh.edges().keys()[i];
+        const geom::Edge& e = mesh.edges().values()[i];
+        glm::vec4 color = e.faces.empty() ? freeEdge : edge;
+        float width = kEdgeWidth;
+        if (marked.contains(id)) {
+            color = toVec4(m_erase);
+            width = kHighlightedEdgeWidth;
+        } else if (selection.contains(id)) {
+            color = accent;
+            width = kHighlightedEdgeWidth;
+        } else if (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) {
+            color = withAlpha(m_accent, 0.75f);
+            width = kHighlightedEdgeWidth;
+        }
+        f.lines.push_back({ glm::vec3(mesh.position(e.v0)), glm::vec3(mesh.position(e.v1)), color, { width, 0.0f } });
+    }
+
+    const glm::vec4 preview = toVec4(m_preview);
+    for (const tools::OverlayLine& l : overlay.lines) {
+        if (l.onTop) {
+            f.topLines.push_back({ glm::vec3(l.a), glm::vec3(l.b), tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
+        } else {
+            f.lines.push_back({ glm::vec3(l.a), glm::vec3(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
+        }
+    }
+    for (const math::Vec3d& p : overlay.points) {
+        f.points.push_back({ glm::vec3(p), accent, 7.0f });
+    }
+    // Marcajul inferenței: un disc colorat cu margine în culoarea fundalului, peste tot restul.
+    if (overlay.marker) {
+        const glm::vec3 p(overlay.marker->point);
+        if (overlay.marker->kind == inference::Kind::Ground) {
+            f.topPoints.push_back({ p, preview, 6.0f });
+        } else {
+            f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.9f), 13.0f });
+            f.topPoints.push_back({ p, markerColor(overlay.marker->kind, overlay.marker->tint), 9.0f });
+        }
+    }
+    if (hover.kind == view::PickResult::Kind::Vertex) {
+        f.points.push_back({ glm::vec3(hover.point), accent, 9.0f });
+    }
+}
+
+glm::vec4 Viewport::tintColor(inference::Tint tint) const
+{
+    switch (tint) {
+    case inference::Tint::X:
+        return toVec4(m_axisX);
+    case inference::Tint::Y:
+        return toVec4(m_axisY);
+    case inference::Tint::Z:
+        return toVec4(m_axisZ);
+    case inference::Tint::Magenta:
+        return toVec4(m_inferenceMagenta);
+    case inference::Tint::Neutral:
+        break;
+    }
+    return withAlpha(m_preview, 0.8f);
+}
+
+// Culorile din SketchUp: capăt verde, mijloc cyan, pe muchie roșu, pe față albastru;
+// direcțiile au culoarea axei sau magenta.
+glm::vec4 Viewport::markerColor(inference::Kind kind, inference::Tint tint) const
+{
+    switch (kind) {
+    case inference::Kind::Endpoint:
+        return toVec4(m_axisY);
+    case inference::Kind::Midpoint:
+        return toVec4(m_inferenceCyan);
+    case inference::Kind::OnEdge:
+        return toVec4(m_axisX);
+    case inference::Kind::OnFace:
+        return toVec4(m_axisZ);
+    case inference::Kind::OnAxis:
+    case inference::Kind::Parallel:
+    case inference::Kind::Perpendicular:
+    case inference::Kind::FromPoint:
+    case inference::Kind::Intersection:
+        return tint == inference::Tint::Neutral ? toVec4(m_preview) : tintColor(tint);
+    case inference::Kind::None:
+    case inference::Kind::Ground:
+        break;
+    }
+    return toVec4(m_preview);
+}
+
+void Viewport::updateAnnotations()
+{
+    QVariantList list;
+    if (m_document && m_document->tool()) {
+        const tools::Overlay overlay = m_document->tool()->overlay();
+        constexpr double kMinDimensionPx = 36.0;
+        constexpr double kDimensionOffsetPx = 14.0;
+        for (const tools::Dimension& d : overlay.dimensions) {
+            const auto a = m_camera.project(d.a);
+            const auto b = m_camera.project(d.b);
+            if (!a || !b || glm::length(*b - *a) < kMinDimensionPx) {
+                continue;
+            }
+            // Eticheta stă lângă mijlocul segmentului, deplasată perpendicular (spre partea de sus a ecranului).
+            const view::Vec2d dir = glm::normalize(*b - *a);
+            view::Vec2d normal { -dir.y, dir.x };
+            if (normal.y > 0.0) {
+                normal = -normal;
+            }
+            const view::Vec2d p = (*a + *b) * 0.5 + normal * kDimensionOffsetPx;
+            list.append(QVariantMap {
+                { QStringLiteral("kind"), QStringLiteral("dimension") },
+                { QStringLiteral("x"), p.x },
+                { QStringLiteral("y"), p.y },
+                { QStringLiteral("text"), QString::fromStdString(d.text) },
+            });
+        }
+        if (overlay.marker && !overlay.marker->label.empty()) {
+            if (const auto p = m_camera.project(overlay.marker->point)) {
+                const glm::vec4 c = markerColor(overlay.marker->kind, overlay.marker->tint);
+                list.append(QVariantMap {
+                    { QStringLiteral("kind"), QStringLiteral("inference") },
+                    { QStringLiteral("x"), p->x },
+                    { QStringLiteral("y"), p->y },
+                    { QStringLiteral("text"), QString::fromStdString(overlay.marker->label) },
+                    { QStringLiteral("color"), QColor::fromRgbF(c.r, c.g, c.b, c.a) },
+                    { QStringLiteral("locked"), overlay.marker->locked },
+                });
+            }
+        }
+    }
+    if (list != m_annotations) {
+        m_annotations = list;
+        emit annotationsChanged();
+    }
+}
+
+void Viewport::setPointer(QPointF position, bool inside)
+{
+    if (position == m_hoverPosition && inside == m_pointerInside) {
+        return;
+    }
+    m_hoverPosition = position;
+    m_pointerInside = inside;
+    emit pointerPositionChanged();
+}
+
 QQuickRhiItemRenderer* Viewport::createRenderer()
 {
     // Qt preia renderer-ul și îl distruge pe firul de randare.
@@ -224,6 +457,12 @@ void Viewport::toggleProjection()
     setOrthographic(!isOrthographic());
 }
 
+QPointF Viewport::projectToScreen(const QVector3D& world) const
+{
+    const auto s = m_camera.project({ world.x(), world.y(), world.z() });
+    return s ? QPointF(s->x, s->y) : QPointF(-1, -1);
+}
+
 void Viewport::startTurntable(double seconds)
 {
     m_motion.stop();
@@ -233,7 +472,18 @@ void Viewport::startTurntable(double seconds)
 
 void Viewport::sceneBounds(view::Vec3d& min, view::Vec3d& max) const
 {
-    if (m_demoVisible) {
+    if (m_document && !m_document->mesh().vertices().empty()) {
+        min = view::Vec3d(std::numeric_limits<double>::max());
+        max = view::Vec3d(std::numeric_limits<double>::lowest());
+        for (const geom::Vertex& v : m_document->mesh().vertices().values()) {
+            min = glm::min(min, v.position);
+            max = glm::max(max, v.position);
+        }
+        if (m_demoVisible) {
+            min = glm::min(min, kDemoMin);
+            max = glm::max(max, kDemoMax);
+        }
+    } else if (m_demoVisible) {
         min = kDemoMin;
         max = kDemoMax;
     } else {
@@ -276,11 +526,15 @@ ViewportFrame Viewport::frameForRendering() const
         f.lines.push_back({ { 0, 0, 0 }, -dir * axisLength, withAlpha(color, 0.55f), { axisWidth, dash } });
     }
 
+    f.colors.accent = toVec4(m_accent);
+    if (m_document) {
+        appendDocument(f);
+    }
     if (m_demoVisible) {
         appendBox(f.triangles, kDemoMin, kDemoMax);
-        appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), 1.25f);
+        appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
-    f.meshRevision = m_demoVisible ? 1u : 2u;
+    f.meshRevision = (m_document ? m_document->revision() : 0u) * 2u + (m_demoVisible ? 1u : 0u);
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     return f;
@@ -288,6 +542,7 @@ ViewportFrame Viewport::frameForRendering() const
 
 void Viewport::onCameraMoved()
 {
+    updateAnnotations();
     emit cameraChanged();
     update();
 }
@@ -390,6 +645,8 @@ void Viewport::beginDrag(Drag drag, QPointF position)
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
+    // Tastele (Measurements box, săgețile) ajung la viewport după un click în el.
+    forceActiveFocus(Qt::MouseFocusReason);
     const auto mods = event->modifiers();
     const bool shift = mods.testFlag(Qt::ShiftModifier);
     // Pe macOS, Qt raportează tasta Control ca MetaModifier (Cmd devine ControlModifier).
@@ -407,6 +664,22 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             drag = Drag::Zoom;
         }
     }
+    if (drag == Drag::None && event->button() == Qt::LeftButton && m_document && m_document->hasTool()) {
+        // Numărăm noi clicurile (dublu, triplu), ca să funcționeze la fel pe toate platformele.
+        const qint64 now = m_frameClock.nsecsElapsed();
+        const qint64 interval = qint64(QGuiApplication::styleHints()->mouseDoubleClickInterval()) * 1'000'000;
+        const bool continues = now - m_lastClickNs <= interval
+            && QLineF(event->position(), m_lastClickPosition).length() <= kMultiClickDistancePx;
+        m_clickCount = continues ? std::min(m_clickCount + 1, 3) : 1;
+        m_lastClickNs = now;
+        m_lastClickPosition = event->position();
+
+        m_toolPressed = true;
+        m_document->pointerDown(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
+        afterToolEvent();
+        event->accept();
+        return;
+    }
     if (drag == Drag::None) {
         event->ignore();
         return;
@@ -423,7 +696,7 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
     const QPointF delta = event->position() - m_lastPointer;
     m_lastPointer = event->position();
-    m_hoverPosition = event->position();
+    setPointer(event->position(), contains(event->position()));
 
     if (m_drag == Drag::Orbit) {
         m_camera.orbit(-delta.x() * kOrbitRadiansPerPixel, -delta.y() * kOrbitRadiansPerPixel);
@@ -435,11 +708,23 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
     } else if (m_drag == Drag::Zoom) {
         m_camera.zoomAbout(std::exp(delta.y() * kDragZoomPerPixel), m_zoomDragAnchor);
         onCameraMoved();
+    } else if (m_toolPressed && m_document) {
+        m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
+        afterToolEvent();
     }
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_toolPressed && event->button() == Qt::LeftButton) {
+        m_toolPressed = false;
+        if (m_document) {
+            m_document->pointerUp(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
+            afterToolEvent();
+        }
+        event->accept();
+        return;
+    }
     if (m_drag == Drag::Orbit) {
         m_motion.setOrbitVelocity(orbitReleaseVelocity());
         requestAnimationFrame();
@@ -460,7 +745,8 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
         event->accept();
         return;
     }
-    event->ignore();
+    // Butonul stâng: clicurile multiple le numărăm în mousePressEvent.
+    event->setAccepted(event->button() == Qt::LeftButton && m_document && m_document->hasTool());
 }
 
 void Viewport::recordOrbitSample(QPointF delta)
@@ -490,7 +776,7 @@ view::Vec2d Viewport::orbitReleaseVelocity() const
 void Viewport::wheelEvent(QWheelEvent* event)
 {
     const QPointF pos = event->position();
-    m_hoverPosition = pos;
+    setPointer(pos, true);
     const auto mods = event->modifiers();
     // Trackpad-ul trimite evenimente cu fază (început, mișcare, inerție); rotița clasică nu.
     const bool trackpad = event->phase() != Qt::NoScrollPhase
@@ -526,10 +812,28 @@ void Viewport::wheelEvent(QWheelEvent* event)
     event->accept();
 }
 
+void Viewport::hoverEnterEvent(QHoverEvent* event)
+{
+    setPointer(event->position(), true);
+    QQuickRhiItem::hoverEnterEvent(event);
+}
+
 void Viewport::hoverMoveEvent(QHoverEvent* event)
 {
-    m_hoverPosition = event->position();
+    setPointer(event->position(), true);
+    // În timpul navigării cu butonul din mijloc nu actualizăm unealta (evenimentele vin prin mouseMove).
+    if (m_document && m_drag == Drag::None && !m_toolPressed) {
+        m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers()));
+        afterToolEvent();
+    }
     QQuickRhiItem::hoverMoveEvent(event);
+}
+
+void Viewport::hoverLeaveEvent(QHoverEvent* event)
+{
+    QQuickRhiItem::hoverLeaveEvent(event);
+    setPointer(m_hoverPosition, false);
+    update();
 }
 
 } // namespace aion::render

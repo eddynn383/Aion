@@ -286,42 +286,44 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 - [x] Teste de „fuzz”: secvențe aleatoare de operații + undo complet → modelul revine la starea inițială (10 000 de operații, `AION_FUZZ_SEED` pentru alte semințe)
 
 **Gata când:** toate testele trec sub ASan/UBSan, inclusiv fuzz-ul cu ≥ 10.000 de iterații.
-_(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 — de rulat cu LLVM din Homebrew sau în CI.)_
+_(2026-10-26: ✓ local sub UBSan, iar în CI pe GitHub sub ASan + UBSan; pe acest Mac ASan nu pornește cu Apple clang 17 / macOS 26.)_
 
 ---
 
 ### Faza 3 – Randarea modelului, selecția, primele unelte
-- [ ] `SceneBuffers`: buffere GPU generate din model și actualizate incremental la notificări
-- [ ] Fețe față/spate în culori diferite (neutru deschis / gri-albastru), muchii închise la culoare, anti-aliased
-- [ ] Selecție afișată cu **contur luminos** în screen-space + tentă subtilă de accent
-- [ ] `Picking`: ce față, muchie sau vârf e sub cursor (rază + toleranță în pixeli pentru muchii și vârfuri)
-- [ ] Interfață `Tool` în `core/tools` (onPointerDown/Move/Up, onKey, onCancel, overlay de desenat)
-- [ ] **Select:** click, Shift/Cmd pentru adăugare/scădere, dreptunghi stânga→dreapta (complet în interior) și dreapta→stânga (atinge), dublu-click = față + muchii, triplu-click = tot ce e conectat
-- [ ] **Line:** desenare continuă de segmente, Esc oprește
-- [ ] **Rectangle:** pe planul de sol sau pe o față existentă
-- [ ] **Eraser:** șterge muchii (și fețele care depind de ele)
-- [ ] Tasta Delete pe selecție, Cmd+Z / Cmd+Shift+Z
-- [ ] Toolbar plutitor cu iconițe în stil Lucide, tooltip cu numele și scurtătura; scurtături de tastatură (L, R, Space = Select, E)
-- [ ] Toate uneltele disponibile și din command palette
-- [ ] Highlight la hover și la selecție
+- [x] `SceneBuffers`: buffere GPU generate din model și actualizate incremental la notificări (triangularea se reface doar pentru fețele schimbate; buffer-ul GPU se reîncarcă întreg)
+- [x] Fețe față/spate în culori diferite (neutru deschis / gri-albastru), muchii închise la culoare, anti-aliased
+- [x] Selecție afișată cu **contur luminos** în screen-space + tentă subtilă de accent
+- [x] `Picking`: ce față, muchie sau vârf e sub cursor (rază + toleranță în pixeli pentru muchii și vârfuri)
+- [x] Interfață `Tool` în `core/tools` (onPointerDown/Move/Up, onKey, onCancel, overlay de desenat)
+- [x] **Select:** click, Shift/Cmd pentru adăugare/scădere, dreptunghi stânga→dreapta (complet în interior) și dreapta→stânga (atinge), dublu-click = față + muchii, triplu-click = tot ce e conectat
+- [x] **Line:** desenare continuă de segmente, Esc oprește
+- [x] **Rectangle:** pe planul de sol sau pe o față existentă
+- [x] **Eraser:** șterge muchii (și fețele care depind de ele)
+- [x] Tasta Delete pe selecție, Cmd+Z / Cmd+Shift+Z
+- [x] Toolbar plutitor cu iconițe în stil Lucide, tooltip cu numele și scurtătura; scurtături de tastatură (L, R, Space = Select, E)
+- [x] Toate uneltele disponibile și din command palette
+- [x] Highlight la hover și la selecție
 
 **Gata când:** poți desena un dreptunghi, îl împarți cu o linie în două fețe, selectezi una, o ștergi, apoi dai undo, totul fără erori `validate()`.
+_(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație (`AION_STARTUP` cu `clickw:`), cu `validate()` după fiecare comandă.)_
 
 ---
 
 ### Faza 4 – Inferența (snap)
-- [ ] `InferenceEngine` în `core/inference`, care primește raza cursorului și contextul (ultimul punct, entități din apropiere)
-- [ ] Puncte: Endpoint (verde), Midpoint (cyan), On Edge (roșu), On Face (albastru), Intersection, Center (cerc)
-- [ ] Direcții: paralel cu axele X/Y/Z (linie colorată), paralel sau perpendicular pe o muchie (magenta)
-- [ ] Inferențe de tip „from point”: urmărirea unui punct de referință pe o axă (linie punctată)
-- [ ] Lock: Shift blochează inferența curentă; săgețile ←↑→ blochează pe o axă
-- [ ] Prioritizare și histerezis, ca snap-ul să nu „sară” între candidați
-- [ ] Indicii vizuale: marcaj colorat animat discret + tooltip „pill” („Endpoint”, „On Red Axis”)
-- [ ] **Measurements box (VCB):** câmp plutitor lângă cursor, în Geist Mono. În timpul desenării tastezi o lungime (`2500`, `2.5m`, `3',6"`) și Enter. Pentru dreptunghi: `3000,2000`
-- [ ] Dimensiuni „live” afișate pe muchie în timpul desenării (ca în Figma)
-- [ ] Teste unitare pentru fiecare tip de inferență pe scene sintetice
+- [x] `InferenceEngine` în `core/inference`, care primește raza cursorului și contextul (ultimul punct, entități din apropiere)
+- [~] Puncte: Endpoint (verde), Midpoint (cyan), On Edge (roșu), On Face (albastru), Intersection, Center (cerc) — Center vine cu cercurile (Faza 5)
+- [x] Direcții: paralel cu axele X/Y/Z (linie colorată), paralel sau perpendicular pe o muchie (magenta)
+- [x] Inferențe de tip „from point”: urmărirea unui punct de referință pe o axă (linie punctată)
+- [x] Lock: Shift blochează inferența curentă; săgețile ←↑→ blochează pe o axă
+- [x] Prioritizare și histerezis, ca snap-ul să nu „sară” între candidați
+- [~] Indicii vizuale: marcaj colorat animat discret + tooltip „pill” („Endpoint”, „On Red Axis”) — marcajul nu e încă animat
+- [x] **Measurements box (VCB):** câmp plutitor lângă cursor, în Geist Mono. În timpul desenării tastezi o lungime (`2500`, `2.5m`, `3',6"`) și Enter. Pentru dreptunghi: `3000,2000`
+- [x] Dimensiuni „live” afișate pe muchie în timpul desenării (ca în Figma)
+- [x] Teste unitare pentru fiecare tip de inferență pe scene sintetice
 
 **Gata când:** poți desena exact o cameră de 4 × 3 m cu pereți perpendiculari numai din inferențe și VCB, fără să lovești manual punctele.
+✓ Testul `Unelte: o cameră de 4 × 3 m numai din inferențe și Measurements box` și verificarea prin input simulat în aplicație (ADR 0005).
 
 ---
 

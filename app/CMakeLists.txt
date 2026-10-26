@@ -64,6 +64,8 @@ qt_add_qml_module(aion_app
         qml/shell/ToolGroupButton.qml
         qml/shell/Toolbar.qml
         qml/overlays/CommandPalette.qml
+        qml/overlays/ViewportAnnotations.qml
+        qml/overlays/MeasurementsBox.qml
         qml/storybook/Storybook.qml
 )
 

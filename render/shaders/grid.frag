@@ -18,6 +18,7 @@ layout(std140, binding = 0) uniform Frame {
     vec4 faceFront;
     vec4 faceBack;
     vec4 forward;      // xyz = direcția de privire, w = 1 pentru proiecție ortografică
+    vec4 accent;       // culoarea selecției
     vec4 params;       // x = 1 dacă y crește în sus în NDC
 } frame;
 
@@ -75,7 +76,9 @@ void main()
         discard;
     vec3 rgb = mix(frame.gridMinor.rgb, frame.gridMajor.rgb, wMajor / (wMinor + wMajor + 1e-6));
 
-    vec4 clip = frame.viewProj * vec4(p, 1.0);
+    // Adâncimea grid-ului e împinsă puțin în spatele planului, ca fețele de pe sol (Z = 0) să-l acopere.
+    vec3 away = frame.forward.w > 0.5 ? frame.forward.xyz : normalize(p - frame.eye.xyz);
+    vec4 clip = frame.viewProj * vec4(p + away * dist * 0.002, 1.0);
     float depth = clip.z / clip.w;
     gl_FragDepth = frame.viewport.w > 0.5 ? depth : depth * 0.5 + 0.5;
     fragColor = vec4(rgb, alpha);

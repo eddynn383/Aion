@@ -7,6 +7,7 @@ Rectangle {
     property string message: "Gata"
     property int framesPerSecond: 0
     property bool orthographic: false
+    property string selectionText: ""
 
     height: Theme.statusBarHeight
     color: Theme.bgPanel
@@ -33,6 +34,7 @@ Rectangle {
 
         Repeater {
             model: [
+                root.selectionText,
                 "Unități: mm",
                 root.orthographic ? "Paralelă" : "Perspectivă",
                 AppInfo.graphicsApi,

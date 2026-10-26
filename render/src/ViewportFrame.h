@@ -28,6 +28,7 @@ static_assert(sizeof(PointInstance) == 32);
 struct MeshVertex {
     glm::vec3 position;
     glm::vec3 normal;
+    float state = 0.0f; // 0 = normal, 1 = sub cursor, 2 = selectat
 };
 
 struct ViewportColors {
@@ -37,6 +38,7 @@ struct ViewportColors {
     glm::vec4 gridMajor;
     glm::vec4 faceFront;
     glm::vec4 faceBack;
+    glm::vec4 accent;
 };
 
 struct ViewportFrame {
@@ -47,11 +49,15 @@ struct ViewportFrame {
     double targetDistance = 1.0;
     bool orthographic = false;
     bool gridVisible = true;
+    bool hasSelectedFaces = false; // activează conturul selecției
     float devicePixelRatio = 1.0f;
 
     ViewportColors colors {};
     std::vector<LineInstance> lines;
     std::vector<PointInstance> points;
+    // Desenate după tot restul, fără test de adâncime: ghidajele și marcajele inferenței.
+    std::vector<LineInstance> topLines;
+    std::vector<PointInstance> topPoints;
     std::vector<MeshVertex> triangles;
     // Crește când `triangles` se schimbă, ca renderer-ul să reîncarce buffer-ul numai atunci.
     unsigned meshRevision = 0;

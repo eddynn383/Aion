@@ -8,6 +8,7 @@ add_library(aion_core STATIC
     src/geom/MeshValidate.cpp
     src/geom/Operations.cpp
     src/geom/PlanarRegions.cpp
+    src/geom/Selection.cpp
     src/geom/Triangulate.cpp
     src/math/Intersect.cpp
     src/math/Plane.cpp
@@ -15,6 +16,10 @@ add_library(aion_core STATIC
     src/text/FuzzyMatch.cpp
     src/view/Camera.cpp
     src/view/CameraMotion.cpp
+    src/view/Picking.cpp
+    src/inference/Inference.cpp
+    src/units/Length.cpp
+    src/tools/Tools.cpp
 )
 add_library(aion::core ALIAS aion_core)
 

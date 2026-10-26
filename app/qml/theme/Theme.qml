@@ -44,6 +44,7 @@ QtObject {
     readonly property color accentHover: dark ? "#60A5FA" : "#1D4ED8"
     readonly property color accentSubtle: dark ? Qt.rgba(0.23, 0.51, 0.96, 0.16) : Qt.rgba(0.15, 0.39, 0.92, 0.10)
     readonly property color accentText: "#FFFFFF"
+    readonly property color danger: dark ? "#F87171" : "#DC2626"
     readonly property color focusRing: dark ? Qt.rgba(0.23, 0.51, 0.96, 0.55) : Qt.rgba(0.15, 0.39, 0.92, 0.45)
 
     readonly property color shadow: dark ? Qt.rgba(0, 0, 0, 0.55) : Qt.rgba(0, 0, 0, 0.14)
@@ -53,7 +54,8 @@ QtObject {
     readonly property color viewportBottom: dark ? "#0E0F11" : "#D9DEE5"
     readonly property color gridMinor: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color gridMajor: dark ? Qt.rgba(1, 1, 1, 0.13) : Qt.rgba(0, 0, 0, 0.15)
-    readonly property color edge: dark ? "#0B0B0D" : "#1F2023"
+    readonly property color edge: dark ? "#0B0B0D" : "#1F2023" // muchiile fețelor (contrast cu fața)
+    readonly property color edgeFree: dark ? "#C9CBD1" : "#1F2023" // liniile fără fețe (contrast cu fundalul)
     readonly property color faceFront: dark ? "#D9D6D0" : "#ECEAE5"
     readonly property color faceBack: dark ? "#7D8AA3" : "#9AA6BD"
 
@@ -61,6 +63,10 @@ QtObject {
     readonly property color axisX: "#EF4444"
     readonly property color axisY: "#22C55E"
     readonly property color axisZ: "#3B82F6"
+
+    // Inferență (snap): capăt = axisY, pe muchie = axisX, pe față = axisZ; în plus:
+    readonly property color inferenceCyan: "#06B6D4" // mijloc
+    readonly property color inferenceMagenta: "#D946EF" // paralel / perpendicular
 
     // Raze
     readonly property int radiusSm: 6

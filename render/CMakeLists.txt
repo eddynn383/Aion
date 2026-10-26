@@ -1,6 +1,8 @@
 add_library(aion_render STATIC
+    include/aion/render/Document.h
     include/aion/render/GraphicsApi.h
     include/aion/render/Viewport.h
+    src/Document.cpp
     src/GraphicsApi.cpp
     src/Viewport.cpp
     src/ViewportFrame.h
@@ -46,6 +48,8 @@ qt_add_shaders(aion_render "aion_render_shaders"
         shaders/point.frag
         shaders/mesh.vert
         shaders/mesh.frag
+        shaders/mask.frag
+        shaders/outline.frag
 )
 
 aion_configure_target(aion_render)

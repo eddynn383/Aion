@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QObject>
+#include <QPointF>
+#include <QQuickItem>
 #include <QString>
 #include <QStringList>
 #include <QtQml/qqmlregistration.h>
@@ -36,4 +38,10 @@ public:
 
     // Textul unei scurtături în forma platformei („Ctrl+K” devine „⌘K” pe macOS).
     Q_INVOKABLE QString shortcutText(const QString& sequence) const;
+
+    // Trimite un click real (mișcare, apăsare, eliberare) la poziția dată din item.
+    // Folosit de scripturile AION_STARTUP pentru verificarea uneltelor prin calea completă de input.
+    Q_INVOKABLE void simulateClick(QQuickItem* item, const QPointF& position) const;
+    // Doar mișcarea cursorului (hover), fără click.
+    Q_INVOKABLE void simulateMove(QQuickItem* item, const QPointF& position) const;
 };

@@ -54,10 +54,20 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   Designul: `docs/decisions/0003-nucleu-geometric.md`. Lipsește doar rularea sub ASan (vezi mai sus).
 
 - Toolbar-ul are unelte grupate ca în Figma (`shell/ToolGroupButton.qml`, `components/Menu.qml`).
+- **Faza 3** făcută pe `feature/faza-3`: `geom::Selection`, `view::pick` / `pickInRectangle`, `tools::Tool` +
+  Select / Line / Rectangle / Eraser (în core, cu teste), `render::Document` (model + istoric + selecție + unealtă),
+  contur de selecție în screen-space. Verificare prin input real: `AION_STARTUP="view.top;wait:700;tool.rectangle;clickw:x,y,z;..."`.
+- Prototipul WebAssembly e în PR #1 (`feature/wasm-core`): core + teste compilate cu Emscripten și rulate în Node, în CI.
+
+- **Faza 4** făcută pe `feature/faza-4` (pornită din `feature/faza-3`): `inference::Engine`, `units::parseLength`,
+  Line/Rectangle cu inferență, lock-uri (Shift, săgeți), VCB, cote live. Designul: `docs/decisions/0005-inferenta-si-vcb.md`.
+  Verificare: `AION_STARTUP="view.top;wait:900;tool.line;clickw:-2000,-1500,0;movew:-500,-1460,0;type:4m;key:enter;..."`
+  (`movew:` = doar hover, `type:` = text în VCB, `key:enter|escape|left|right|up|down`). Punctele trebuie să fie în viewport.
+- Merge-ul în `main` îl face utilizatorul (sau aprobă explicit): `feature/faza-3`, PR #1 (`feature/wasm-core`), `feature/faza-4`.
 
 ## Următorii pași
-1. Verifică primul run al CI-ului pe GitHub (n-a mai rulat niciodată; include ASan pe runner-ul macOS).
-2. Prototipul WebAssembly pentru `aion_core` (PLAN, secțiunea 9, pasul 4), apoi Faza 3.
+1. Utilizatorul testează Fazele 3–4 și face merge (sau îl aprobă).
+2. Faza 5: Push/Pull și transformări.
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

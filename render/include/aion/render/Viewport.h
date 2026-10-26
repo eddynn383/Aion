@@ -1,16 +1,23 @@
 #pragma once
 
+#include "aion/core/tools/Tool.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/CameraMotion.h"
+#include "aion/render/Document.h"
 
 #include <QColor>
 #include <QCursor>
 #include <QElapsedTimer>
 #include <QPointF>
+#include <QPointer>
+#include <QRectF>
 #include <QQuickRhiItem>
 #include <QTimer>
+#include <QVariantList>
 #include <QVector3D>
 #include <QtQml/qqmlregistration.h>
+
+#include <glm/vec4.hpp>
 
 #include <atomic>
 #include <deque>
@@ -33,8 +40,16 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(QColor axisYColor MEMBER m_axisY NOTIFY appearanceChanged)
     Q_PROPERTY(QColor axisZColor MEMBER m_axisZ NOTIFY appearanceChanged)
     Q_PROPERTY(QColor edgeColor MEMBER m_edge NOTIFY appearanceChanged)
+    // Muchiile fără fețe stau direct pe fundal, deci au nevoie de altă culoare (în dark mode, deschisă).
+    Q_PROPERTY(QColor freeEdgeColor MEMBER m_freeEdge NOTIFY appearanceChanged)
     Q_PROPERTY(QColor faceFrontColor MEMBER m_faceFront NOTIFY appearanceChanged)
     Q_PROPERTY(QColor faceBackColor MEMBER m_faceBack NOTIFY appearanceChanged)
+    Q_PROPERTY(QColor accentColor MEMBER m_accent NOTIFY appearanceChanged)
+    Q_PROPERTY(QColor previewColor MEMBER m_preview NOTIFY appearanceChanged)
+    Q_PROPERTY(QColor eraseColor MEMBER m_erase NOTIFY appearanceChanged)
+    // Culorile inferenței care nu sunt ale axelor: mijloc (cyan), paralel/perpendicular (magenta).
+    Q_PROPERTY(QColor inferenceCyanColor MEMBER m_inferenceCyan NOTIFY appearanceChanged)
+    Q_PROPERTY(QColor inferenceMagentaColor MEMBER m_inferenceMagenta NOTIFY appearanceChanged)
     Q_PROPERTY(bool gridVisible MEMBER m_gridVisible NOTIFY appearanceChanged)
     Q_PROPERTY(bool demoVisible MEMBER m_demoVisible NOTIFY appearanceChanged)
 
@@ -48,6 +63,18 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(QVector3D cameraUp READ cameraUp NOTIFY cameraChanged)
     Q_PROPERTY(QVector3D cameraForward READ cameraForward NOTIFY cameraChanged)
     Q_PROPERTY(double cameraDistance READ cameraDistance NOTIFY cameraChanged)
+
+    // Documentul afișat; uneltele lui primesc evenimentele butonului stâng.
+    Q_PROPERTY(aion::render::Document* document READ document WRITE setDocument NOTIFY documentChanged)
+    // Dreptunghiul de selecție în curs (gol dacă nu există), pentru desenul din QML.
+    Q_PROPERTY(QRectF selectionRect READ selectionRect NOTIFY selectionRectChanged)
+    Q_PROPERTY(bool selectionCrossing READ selectionCrossing NOTIFY selectionRectChanged)
+    // Etichetele desenate de QML peste viewport: inferența („Endpoint”) și cotele live.
+    // Fiecare element: { kind: "inference" | "dimension", x, y, text, color, locked }.
+    Q_PROPERTY(QVariantList annotations READ annotations NOTIFY annotationsChanged)
+    // Poziția cursorului în viewport (pentru Measurements box) și dacă e deasupra lui.
+    Q_PROPERTY(QPointF pointerPosition READ pointerPosition NOTIFY pointerPositionChanged)
+    Q_PROPERTY(bool pointerInside READ pointerInside NOTIFY pointerPositionChanged)
 
     // Cadre pe secundă în ultima secundă (0 când viewport-ul nu se redesenează).
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY framesPerSecondChanged)
@@ -63,6 +90,14 @@ public:
     void setOrthographic(bool orthographic);
     bool reducedMotion() const { return m_reducedMotion; }
     void setReducedMotion(bool reduced);
+
+    Document* document() const { return m_document; }
+    void setDocument(Document* document);
+    QRectF selectionRect() const { return m_selectionRect; }
+    bool selectionCrossing() const { return m_selectionCrossing; }
+    QVariantList annotations() const { return m_annotations; }
+    QPointF pointerPosition() const { return m_hoverPosition; }
+    bool pointerInside() const { return m_pointerInside; }
 
     QString navigationTool() const { return m_navigationTool; }
     void setNavigationTool(const QString& tool);
@@ -81,6 +116,8 @@ public:
     Q_INVOKABLE void toggleProjection();
     // Rotește camera continuu timp de `seconds` secunde (pentru măsurarea fps-ului).
     Q_INVOKABLE void startTurntable(double seconds);
+    // Poziția pe ecran (în coordonatele item-ului) a unui punct 3D; pentru scripturile de verificare.
+    Q_INVOKABLE QPointF projectToScreen(const QVector3D& world) const;
 
     // Apelat de renderer (pe firul de randare, cu firul GUI blocat).
     ViewportFrame frameForRendering() const;
@@ -91,6 +128,10 @@ signals:
     void reducedMotionChanged();
     void navigationToolChanged();
     void framesPerSecondChanged();
+    void documentChanged();
+    void selectionRectChanged();
+    void annotationsChanged();
+    void pointerPositionChanged();
 
 protected:
     QQuickRhiItemRenderer* createRenderer() override;
@@ -104,11 +145,20 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void hoverMoveEvent(QHoverEvent* event) override;
+    void hoverEnterEvent(QHoverEvent* event) override;
+    void hoverLeaveEvent(QHoverEvent* event) override;
 
 private:
     enum class Drag { None, Orbit, Pan, Zoom };
 
     void updateCursor();
+    tools::PointerEvent toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount = 1) const;
+    void afterToolEvent();
+    void updateAnnotations();
+    void setPointer(QPointF position, bool inside);
+    glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
+    glm::vec4 tintColor(inference::Tint tint) const;
+    void appendDocument(ViewportFrame& f) const;
     void showTransientCursor(const QCursor& cursor);
     void onCameraMoved();
     void requestAnimationFrame();
@@ -133,6 +183,15 @@ private:
     };
     std::deque<OrbitSample> m_orbitSamples;
     QPointF m_hoverPosition;
+    QPointer<Document> m_document;
+    bool m_toolPressed = false;
+    int m_clickCount = 0;
+    qint64 m_lastClickNs = 0;
+    QPointF m_lastClickPosition;
+    QRectF m_selectionRect;
+    bool m_selectionCrossing = false;
+    QVariantList m_annotations;
+    bool m_pointerInside = false;
     view::Vec3d m_zoomDragAnchor { 0.0, 0.0, 0.0 };
 
     QCursor m_orbitCursor { Qt::SizeAllCursor };
@@ -149,10 +208,16 @@ private:
     QColor m_axisY { 0x22, 0xC5, 0x5E };
     QColor m_axisZ { 0x3B, 0x82, 0xF6 };
     QColor m_edge { 0x11, 0x11, 0x13 };
+    QColor m_freeEdge { 0xC9, 0xCB, 0xD1 };
     QColor m_faceFront { 0xE8, 0xE6, 0xE1 };
     QColor m_faceBack { 0x8F, 0x9B, 0xB3 };
+    QColor m_accent { 0x3B, 0x82, 0xF6 };
+    QColor m_preview { 0xED, 0xED, 0xED };
+    QColor m_erase { 0xEF, 0x44, 0x44 };
+    QColor m_inferenceCyan { 0x06, 0xB6, 0xD4 };
+    QColor m_inferenceMagenta { 0xD9, 0x46, 0xEF };
     bool m_gridVisible = true;
-    bool m_demoVisible = true;
+    bool m_demoVisible = false;
     bool m_reducedMotion = false;
     QString m_navigationTool;
 

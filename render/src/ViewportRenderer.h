@@ -24,6 +24,9 @@ private:
     void createPipelines();
     void ensureInstanceBuffer(std::unique_ptr<QRhiBuffer>& buffer, quint32 bytes);
     void updateUniforms(QRhiResourceUpdateBatch* batch);
+    // Ținta în care se desenează masca fețelor selectate (refăcută când se schimbă mărimea).
+    void ensureMaskTarget(QSize size);
+    void releaseMaskTarget();
 
     enum class Depth { None, Test, TestAndWrite };
     std::unique_ptr<QRhiGraphicsPipeline> makePipeline(const QString& vertexShader,
@@ -49,6 +52,19 @@ private:
     std::unique_ptr<QRhiGraphicsPipeline> m_gridPipeline;
     std::unique_ptr<QRhiGraphicsPipeline> m_linePipeline;
     std::unique_ptr<QRhiGraphicsPipeline> m_pointPipeline;
+    std::unique_ptr<QRhiGraphicsPipeline> m_topLinePipeline;
+    std::unique_ptr<QRhiGraphicsPipeline> m_topPointPipeline;
+
+    // Conturul selecției: masca fețelor selectate vizibile, apoi un contur în screen-space.
+    QSize m_maskSize;
+    std::unique_ptr<QRhiTexture> m_maskTexture;
+    std::unique_ptr<QRhiRenderBuffer> m_maskDepth;
+    std::unique_ptr<QRhiTextureRenderTarget> m_maskTarget;
+    std::unique_ptr<QRhiRenderPassDescriptor> m_maskPass;
+    std::unique_ptr<QRhiGraphicsPipeline> m_maskPipeline;
+    std::unique_ptr<QRhiSampler> m_maskSampler;
+    std::unique_ptr<QRhiShaderResourceBindings> m_outlineBindings;
+    std::unique_ptr<QRhiGraphicsPipeline> m_outlinePipeline;
 
     ViewportFrame m_frame;
 };
