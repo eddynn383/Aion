@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <deque>
+#include <optional>
 
 namespace aion::render {
 
@@ -113,6 +114,8 @@ public:
 
     Q_INVOKABLE void setStandardView(aion::render::Viewport::StandardView view);
     Q_INVOKABLE void zoomExtents();
+    // Încadrează selecția documentului (sau tot modelul, dacă nu e nimic selectat).
+    Q_INVOKABLE void zoomToSelection();
     Q_INVOKABLE void toggleProjection();
     // Rotește camera continuu timp de `seconds` secunde (pentru măsurarea fps-ului).
     Q_INVOKABLE void startTurntable(double seconds);
@@ -130,6 +133,8 @@ signals:
     void framesPerSecondChanged();
     void documentChanged();
     void selectionRectChanged();
+    // Click dreapta (fără tragere): ce era sub cursor a devenit selecția; QML deschide meniul contextual.
+    void contextMenuRequested(QPointF position);
     void annotationsChanged();
     void pointerPositionChanged();
 
@@ -159,6 +164,18 @@ private:
     glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
     glm::vec4 tintColor(inference::Tint tint) const;
     void appendDocument(ViewportFrame& f) const;
+    // Cum se desenează o definiție: estompată (în afara grupului editat), selectată, sub cursor, marcată de gumă.
+    struct DrawStyle {
+        bool dim = false;
+        bool selected = false;
+        bool hovered = false;
+        bool marked = false;
+    };
+    // Desenează definiția și tot ce conține. `pathIndex`: câte instanțe din calea contextului s-au parcurs
+    // (egal cu lungimea căii = contextul editat; -1 = în afara căii).
+    void appendDefinition(ViewportFrame& f, const Document& doc, model::DefinitionId definition,
+        const math::Transform& toWorld, int pathIndex, DrawStyle style, const view::PickResult& hover,
+        const tools::Overlay& overlay) const;
     void showTransientCursor(const QCursor& cursor);
     void onCameraMoved();
     void requestAnimationFrame();
@@ -185,6 +202,7 @@ private:
     QPointF m_hoverPosition;
     QPointer<Document> m_document;
     bool m_toolPressed = false;
+    std::optional<QPointF> m_rightPress;
     int m_clickCount = 0;
     qint64 m_lastClickNs = 0;
     QPointF m_lastClickPosition;

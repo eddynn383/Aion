@@ -97,3 +97,20 @@ void AppInfo::simulateMove(QQuickItem* item, const QPointF& position) const
         Qt::NoModifier);
     QCoreApplication::sendEvent(window, &e);
 }
+
+void AppInfo::simulateRightClick(QQuickItem* item, const QPointF& position) const
+{
+    if (item == nullptr || item->window() == nullptr) {
+        return;
+    }
+    QQuickWindow* window = item->window();
+    const QPointF scenePos = item->mapToScene(position);
+    const QPointF globalPos = window->mapToGlobal(scenePos);
+    const auto send = [&](QEvent::Type type, Qt::MouseButton button, Qt::MouseButtons buttons) {
+        QMouseEvent e(type, scenePos, scenePos, globalPos, button, buttons, Qt::NoModifier);
+        QCoreApplication::sendEvent(window, &e);
+    };
+    send(QEvent::MouseMove, Qt::NoButton, Qt::NoButton);
+    send(QEvent::MouseButtonPress, Qt::RightButton, Qt::RightButton);
+    send(QEvent::MouseButtonRelease, Qt::RightButton, Qt::NoButton);
+}

@@ -4,6 +4,7 @@
 #include "aion/core/geom/Mesh.h"
 #include "aion/core/geom/Selection.h"
 #include "aion/core/inference/Inference.h"
+#include "aion/core/model/Model.h"
 #include "aion/core/math/Vec.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/Picking.h"
@@ -74,6 +75,7 @@ struct Overlay {
     bool crossing = false;
     // Muchiile marcate de unealtă (de exemplu cele pe care Eraser le va șterge).
     std::vector<geom::EdgeId> markedEdges;
+    std::vector<model::InstanceId> markedInstances;
     std::optional<InferenceMarker> marker;
     std::vector<Dimension> dimensions;
 };
@@ -85,11 +87,29 @@ struct Measurement {
 };
 
 // Tot ce poate folosi o unealtă; aplicația îl construiește și îl ține în viață.
+// Ce cere o unealtă documentului după un eveniment: intrarea într-un grup (dublu-click) sau ieșirea (Esc).
+struct ToolRequests {
+    model::InstanceId enter;
+    bool exit = false;
+};
+
 struct ToolContext {
-    geom::Mesh& mesh;
+    ToolContext(geom::Mesh& mesh, commands::CommandStack& stack, geom::Selection& selection, const view::Camera& camera)
+        : mesh(mesh)
+        , stack(stack)
+        , selection(selection)
+        , camera(camera)
+    {
+    }
+
+    geom::Mesh& mesh; // geometria contextului de editare
     commands::CommandStack& stack;
     geom::Selection& selection;
-    const view::Camera& camera;
+    const view::Camera& camera; // în coordonatele contextului (vezi Camera::inContext)
+    // Modelul și definiția editată; nul în testele care lucrează pe o singură geometrie.
+    model::Model* model = nullptr;
+    model::DefinitionId context;
+    ToolRequests* requests = nullptr;
 };
 
 class Tool {
@@ -129,6 +149,12 @@ struct SurfacePoint {
     view::PickResult pick;
 };
 [[nodiscard]] std::optional<SurfacePoint> surfacePoint(const ToolContext& ctx, Vec2d screen);
+
+// Ce e sub cursor, inclusiv grupurile și obiectele din context (cea mai apropiată dintre geometrie și instanțe).
+[[nodiscard]] view::PickResult pickWithInstances(const ToolContext& ctx, Vec2d screen, view::PickOptions options = {});
+
+// Ce selectează un click (Select): o muchie (cu toată curba ei), o față sau o instanță.
+[[nodiscard]] geom::Selection selectionAt(const ToolContext& ctx, Vec2d screen);
 
 // Șterge selecția: fețele selectate, apoi muchiile selectate (cu fețele lor). O singură comandă.
 bool deleteSelection(ToolContext& ctx);

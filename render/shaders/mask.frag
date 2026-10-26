@@ -7,5 +7,6 @@ layout(location = 0) out vec4 fragColor;
 
 void main()
 {
-    fragColor = vec4(v_state > 1.5 ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+    // Stările: 0 normal, 1 sub cursor, 2 selectat, 3 estompat (în afara contextului de editare).
+    fragColor = vec4(v_state > 1.5 && v_state < 2.5 ? 1.0 : 0.0, 0.0, 0.0, 1.0);
 }

@@ -10,6 +10,7 @@ void Selection::add(const Selection& other)
 {
     edges.insert(other.edges.begin(), other.edges.end());
     faces.insert(other.faces.begin(), other.faces.end());
+    instances.insert(other.instances.begin(), other.instances.end());
 }
 
 void Selection::remove(const Selection& other)
@@ -19,6 +20,9 @@ void Selection::remove(const Selection& other)
     }
     for (FaceId f : other.faces) {
         faces.erase(f);
+    }
+    for (model::InstanceId i : other.instances) {
+        instances.erase(i);
     }
 }
 
@@ -32,6 +36,11 @@ void Selection::toggle(const Selection& other)
     for (FaceId f : other.faces) {
         if (!faces.erase(f)) {
             faces.insert(f);
+        }
+    }
+    for (model::InstanceId i : other.instances) {
+        if (!instances.erase(i)) {
+            instances.insert(i);
         }
     }
 }

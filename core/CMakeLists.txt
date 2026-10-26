@@ -14,12 +14,15 @@ add_library(aion_core STATIC
     src/geom/Transformations.cpp
     src/geom/Triangulate.cpp
     src/math/Intersect.cpp
+    src/model/Model.cpp
+    src/model/Operations.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
     src/text/FuzzyMatch.cpp
     src/view/Camera.cpp
     src/view/CameraMotion.cpp
     src/view/Picking.cpp
+    src/view/ModelPicking.cpp
     src/inference/Inference.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp

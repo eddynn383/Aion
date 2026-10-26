@@ -14,7 +14,7 @@ Item {
         { id: "select", tools: [
             { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 } ] },
         { id: "lines", tools: [
-            { id: "line", icon: "pen-line", name: "Line", key: "L", phase: 3 },
+            { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3 },
             { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 } ] },
         { id: "shapes", tools: [
             { id: "rectangle", icon: "square",   name: "Rectangle", key: "R", phase: 3 },

@@ -50,6 +50,7 @@ qt_add_qml_module(aion_app
         qml/components/Input.qml
         qml/components/Kbd.qml
         qml/components/Menu.qml
+        qml/components/ContextMenu.qml
         qml/components/NumberField.qml
         qml/components/Panel.qml
         qml/components/Popover.qml
@@ -63,6 +64,9 @@ qt_add_qml_module(aion_app
         qml/shell/TitleBar.qml
         qml/shell/ToolGroupButton.qml
         qml/shell/Toolbar.qml
+        qml/shell/Outliner.qml
+        qml/shell/TagsPanel.qml
+        qml/shell/EntityInfo.qml
         qml/overlays/CommandPalette.qml
         qml/overlays/ViewportAnnotations.qml
         qml/overlays/MeasurementsBox.qml
@@ -70,8 +74,8 @@ qt_add_qml_module(aion_app
 )
 
 # Fonturile (OFL) și iconițele Lucide (ISC), incluse în aplicație.
-file(GLOB AION_FONT_FILES "${PROJECT_SOURCE_DIR}/resources/fonts/*.ttf")
-file(GLOB AION_ICON_FILES "${PROJECT_SOURCE_DIR}/resources/icons/*.svg")
+file(GLOB AION_FONT_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/resources/fonts/*.ttf")
+file(GLOB AION_ICON_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/resources/icons/*.svg")
 qt_add_resources(aion_app "aion_assets"
     PREFIX "/aion"
     BASE "${PROJECT_SOURCE_DIR}/resources"
@@ -99,6 +103,18 @@ if(APPLE)
     target_sources(aion_app PRIVATE "${AION_ICON_DIR}/Aion.icns")
     set_source_files_properties("${AION_ICON_DIR}/Aion.icns" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     set_target_properties(aion_app PROPERTIES MACOSX_BUNDLE_ICON_FILE Aion.icns)
+
+    # macOS ține minte iconița unei aplicații după cale; fără reînregistrare, Dock-ul și Finder-ul pot arăta
+    # în continuare iconița generică dintr-o compilare mai veche.
+    set(AION_LSREGISTER
+        "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister")
+    if(EXISTS "${AION_LSREGISTER}")
+        add_custom_command(TARGET aion_app POST_BUILD
+            COMMAND touch "$<TARGET_BUNDLE_DIR:aion_app>"
+            COMMAND "${AION_LSREGISTER}" -f "$<TARGET_BUNDLE_DIR:aion_app>"
+            VERBATIM
+        )
+    endif()
 endif()
 
 target_link_libraries(aion_app PRIVATE

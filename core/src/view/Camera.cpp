@@ -87,33 +87,78 @@ void Camera::setPose(const CameraPose& pose)
     m_pose.distance = std::clamp(pose.distance, kMinDistance, kMaxDistance);
 }
 
+Vec3d Camera::toLocalVector(const Vec3d& v) const
+{
+    return m_context ? glm::normalize(m_context->toLocal.applyToVector(v)) : v;
+}
+
 Vec3d Camera::forward() const
+{
+    return toLocalVector(worldForward());
+}
+
+Vec3d Camera::right() const
+{
+    return toLocalVector(worldRight());
+}
+
+Vec3d Camera::up() const
+{
+    return toLocalVector(worldUp());
+}
+
+Vec3d Camera::eye() const
+{
+    return m_context ? m_context->toLocal.applyToPoint(worldEye()) : worldEye();
+}
+
+double Camera::nearPlane() const
+{
+    return m_context ? worldNear() / m_context->scale : worldNear();
+}
+
+double Camera::farPlane() const
+{
+    return m_context ? worldFar() / m_context->scale : worldFar();
+}
+
+Camera Camera::inContext(const math::Transform& toWorld) const
+{
+    Camera c = *this;
+    const math::Transform base = m_context ? m_context->toWorld : math::Transform {};
+    const math::Transform combined = base * toWorld;
+    const double det = std::abs(glm::determinant(glm::dmat3(combined.matrix())));
+    c.m_context = Context { combined, combined.inverse(), det > 1e-300 ? std::cbrt(det) : 1.0 };
+    return c;
+}
+
+Vec3d Camera::worldForward() const
 {
     const double cp = std::cos(m_pose.pitch);
     return { cp * std::cos(m_pose.yaw), cp * std::sin(m_pose.yaw), std::sin(m_pose.pitch) };
 }
 
-Vec3d Camera::right() const
+Vec3d Camera::worldRight() const
 {
     return { std::sin(m_pose.yaw), -std::cos(m_pose.yaw), 0.0 };
 }
 
-Vec3d Camera::up() const
+Vec3d Camera::worldUp() const
 {
-    return glm::cross(right(), forward());
+    return glm::cross(worldRight(), worldForward());
 }
 
-Vec3d Camera::eye() const
+Vec3d Camera::worldEye() const
 {
-    return m_pose.target - forward() * m_pose.distance;
+    return m_pose.target - worldForward() * m_pose.distance;
 }
 
 Mat4d Camera::viewMatrix() const
 {
-    const Vec3d f = forward();
-    const Vec3d r = right();
-    const Vec3d u = up();
-    const Vec3d e = eye();
+    const Vec3d f = worldForward();
+    const Vec3d r = worldRight();
+    const Vec3d u = worldUp();
+    const Vec3d e = worldEye();
 
     Mat4d v(1.0);
     v[0][0] = r.x;
@@ -131,7 +176,7 @@ Mat4d Camera::viewMatrix() const
     return v;
 }
 
-double Camera::nearPlane() const
+double Camera::worldNear() const
 {
     if (m_projection == Projection::Orthographic) {
         return -m_pose.distance * kFarFactor;
@@ -139,7 +184,7 @@ double Camera::nearPlane() const
     return std::max(m_pose.distance * kNearFactor, kMinNear);
 }
 
-double Camera::farPlane() const
+double Camera::worldFar() const
 {
     return m_pose.distance * kFarFactor;
 }
@@ -150,9 +195,9 @@ Mat4d Camera::projectionMatrix() const
     if (m_projection == Projection::Orthographic) {
         const double halfH = m_pose.distance * std::tan(m_fovY * 0.5);
         const double halfW = halfH * aspect;
-        return glm::ortho(-halfW, halfW, -halfH, halfH, nearPlane(), farPlane());
+        return glm::ortho(-halfW, halfW, -halfH, halfH, worldNear(), worldFar());
     }
-    return glm::perspective(m_fovY, aspect, nearPlane(), farPlane());
+    return glm::perspective(m_fovY, aspect, worldNear(), worldFar());
 }
 
 Ray Camera::rayAt(Vec2d screen) const
@@ -162,21 +207,28 @@ Ray Camera::rayAt(Vec2d screen) const
     const double tanHalf = std::tan(m_fovY * 0.5);
     const double aspect = m_viewport.x / m_viewport.y;
 
-    const Vec3d f = forward();
-    const Vec3d r = right();
-    const Vec3d u = up();
+    const Vec3d f = worldForward();
+    const Vec3d r = worldRight();
+    const Vec3d u = worldUp();
 
+    Ray ray;
     if (m_projection == Projection::Orthographic) {
         const double halfH = m_pose.distance * tanHalf;
-        const Vec3d onEyePlane = eye() + r * (x * halfH * aspect) + u * (y * halfH);
-        return { onEyePlane + f * nearPlane(), f };
+        const Vec3d onEyePlane = worldEye() + r * (x * halfH * aspect) + u * (y * halfH);
+        ray = { onEyePlane + f * worldNear(), f };
+    } else {
+        const Vec3d dir = f + r * (x * tanHalf * aspect) + u * (y * tanHalf);
+        ray = { worldEye(), glm::normalize(dir) };
     }
-    const Vec3d dir = f + r * (x * tanHalf * aspect) + u * (y * tanHalf);
-    return { eye(), glm::normalize(dir) };
+    if (m_context) {
+        ray = { m_context->toLocal.applyToPoint(ray.origin), toLocalVector(ray.direction) };
+    }
+    return ray;
 }
 
-std::optional<Vec2d> Camera::project(const Vec3d& world) const
+std::optional<Vec2d> Camera::project(const Vec3d& point) const
 {
+    const Vec3d world = m_context ? m_context->toWorld.applyToPoint(point) : point;
     const glm::dvec4 clip = projectionMatrix() * viewMatrix() * glm::dvec4(world, 1.0);
     if (clip.w <= 0.0) {
         return std::nullopt;
@@ -188,7 +240,8 @@ std::optional<Vec2d> Camera::project(const Vec3d& world) const
 
 double Camera::worldPerPixelAtTarget() const
 {
-    return 2.0 * m_pose.distance * std::tan(m_fovY * 0.5) / m_viewport.y;
+    const double world = 2.0 * m_pose.distance * std::tan(m_fovY * 0.5) / m_viewport.y;
+    return m_context ? world / m_context->scale : world;
 }
 
 void Camera::orbit(double deltaYaw, double deltaPitch)

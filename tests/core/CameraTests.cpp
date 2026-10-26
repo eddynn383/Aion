@@ -5,6 +5,7 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -235,4 +236,30 @@ TEST_CASE("Reduce Motion face tranzițiile instantanee", "[core][view][motion]")
 
     motion.setOrbitVelocity({ 3.0, 0.0 });
     CHECK_FALSE(motion.isActive());
+}
+
+TEST_CASE("Camera: în contextul unui grup, razele și proiecțiile sunt în coordonate locale", "[core][camera]")
+{
+    using aion::math::Transform;
+    aion::view::Camera world;
+    world.setViewportSize(1200, 800);
+    world.setPose(aion::view::standardViewPose(aion::view::StandardView::Iso, { { 500, 300, 0 }, 0, 0, 9000 }));
+    const Transform toWorld = Transform::translation({ 2000, 0, 0 })
+        * Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, 0.7) * Transform::scaling({ 0, 0, 0 }, { 2, 2, 2 });
+    const aion::view::Camera local = world.inContext(toWorld);
+    CHECK(local.hasContext());
+
+    const aion::math::Vec3d p { 120, -340, 560 };
+    const auto a = local.project(p);
+    const auto b = world.project(toWorld.applyToPoint(p));
+    REQUIRE(a);
+    REQUIRE(b);
+    CHECK(glm::length(*a - *b) < 1e-6);
+
+    // Raza locală prin pixelul punctului trece prin punct.
+    const aion::math::Ray ray = local.rayAt(*a);
+    const aion::math::Vec3d toP = p - ray.origin;
+    const aion::math::Vec3d along = ray.direction * glm::dot(toP, ray.direction);
+    CHECK(glm::length(toP - along) < 1e-6);
+    CHECK(local.worldPerPixelAtTarget() * 2.0 == Catch::Approx(world.worldPerPixelAtTarget()));
 }

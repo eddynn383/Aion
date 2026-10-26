@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Operations.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/units/Length.h"
@@ -7,6 +8,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -31,7 +33,7 @@ struct Target {
     geom::Selection selection;
     std::set<geom::VertexId> vertices;
 
-    [[nodiscard]] bool empty() const { return vertices.empty(); }
+    [[nodiscard]] bool empty() const { return vertices.empty() && selection.instances.empty(); }
 };
 
 Target targetAt(const ToolContext& ctx, Vec2d screen)
@@ -40,8 +42,11 @@ Target targetAt(const ToolContext& ctx, Vec2d screen)
     if (!ctx.selection.empty()) {
         t.selection = ctx.selection;
     } else {
-        const view::PickResult hit = view::pick(ctx.mesh, ctx.camera, screen);
+        const view::PickResult hit = pickWithInstances(ctx, screen);
         switch (hit.kind) {
+        case view::PickResult::Kind::Instance:
+            t.selection.instances.insert(hit.instance);
+            break;
         case view::PickResult::Kind::Vertex:
             t.vertices.insert(hit.vertex);
             return t;
@@ -55,6 +60,10 @@ Target targetAt(const ToolContext& ctx, Vec2d screen)
             break;
         }
     }
+    // Obiectele blocate nu se mută, nu se rotesc și nu se scalează.
+    if (ctx.model != nullptr) {
+        std::erase_if(t.selection.instances, [&](model::InstanceId i) { return ctx.model->instance(i).locked; });
+    }
     t.vertices = geom::verticesOf(ctx.mesh, t.selection);
     return t;
 }
@@ -62,7 +71,7 @@ Target targetAt(const ToolContext& ctx, Vec2d screen)
 // Ce se evidențiază la hover când nu e nimic selectat: entitatea pe care ar lucra unealta.
 view::PickResult targetHover(const ToolContext& ctx, Vec2d screen)
 {
-    return ctx.selection.empty() ? view::pick(ctx.mesh, ctx.camera, screen) : view::PickResult {};
+    return ctx.selection.empty() ? pickWithInstances(ctx, screen) : view::PickResult {};
 }
 
 // Muchiile atinse de transformare, pentru previzualizare.
@@ -73,9 +82,31 @@ struct PreviewEdge {
     bool movesB = false;
 };
 
-std::vector<PreviewEdge> previewEdges(const geom::Mesh& mesh, const std::set<geom::VertexId>& vertices)
+std::vector<PreviewEdge> previewEdges(const ToolContext& ctx, const Target& target)
 {
+    const geom::Mesh& mesh = ctx.mesh;
+    const std::set<geom::VertexId>& vertices = target.vertices;
     std::vector<PreviewEdge> out;
+    // Instanțele: muchiile cutiei lor, mutate întregi.
+    if (ctx.model != nullptr) {
+        for (model::InstanceId id : target.selection.instances) {
+            const model::Instance& inst = ctx.model->instance(id);
+            const auto [lo, hi] = model::bounds(*ctx.model, inst.definition);
+            if (lo.x > hi.x) {
+                continue;
+            }
+            std::array<Vec3d, 8> c {};
+            for (std::size_t k = 0; k < 8; ++k) {
+                c[k] = inst.transform.applyToPoint(
+                    { (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z });
+            }
+            constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
+                { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+            for (const auto& [a, b] : kEdges) {
+                out.push_back({ c[std::size_t(a)], c[std::size_t(b)], true, true });
+            }
+        }
+    }
     for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
         const geom::Edge& e = mesh.edges().values()[i];
         const bool a = vertices.contains(e.v0);
@@ -189,6 +220,45 @@ double worldPerPixelAt(const view::Camera& camera, const Vec3d& p)
     return 1000.0 / glm::length(*b - *a);
 }
 
+// Aplică transformarea pe țintă: vârfurile geometriei și instanțele (într-o singură comandă).
+void transformTarget(ToolContext& ctx, const std::string& name, const Target& target, const Transform& t)
+{
+    if (ctx.model == nullptr) {
+        ctx.stack.run(name, [&](geom::Mesh& mesh) { geom::transformVertices(mesh, target.vertices, t); });
+        return;
+    }
+    ctx.stack.run(name, [&](model::Model& model) {
+        geom::transformVertices(model.mesh(ctx.context), target.vertices, t);
+        model::transformInstances(model, target.selection.instances, t);
+    });
+}
+
+// Copiile țintei, câte una pentru fiecare transformare (array). Instanțele unei componente rămân legate.
+geom::Selection copyTarget(ToolContext& ctx, const geom::Selection& source, const std::vector<Transform>& transforms)
+{
+    geom::Selection copies;
+    const auto copyGeometry = [&](geom::Mesh& mesh) {
+        for (const Transform& t : transforms) {
+            copies.add(geom::copySelection(mesh, { source.edges, source.faces, {} }, t));
+        }
+    };
+    if (ctx.model == nullptr) {
+        ctx.stack.run("Copy", copyGeometry);
+        return copies;
+    }
+    ctx.stack.run("Copy", [&](model::Model& model) {
+        copyGeometry(model.mesh(ctx.context));
+        for (const Transform& t : transforms) {
+            for (model::InstanceId i : source.instances) {
+                if (model.instances().contains(i)) {
+                    copies.instances.insert(model::copyInstance(model, i, t));
+                }
+            }
+        }
+    });
+    return copies;
+}
+
 // Ultima copie, pentru array: entitățile copiate și transformarea unei copii, generată din pas.
 struct LastCopy {
     geom::Selection source;
@@ -201,23 +271,20 @@ bool applyArray(ToolContext& ctx, std::optional<LastCopy>& last, const ArrayRequ
     if (!last || ctx.stack.undoName() != "Copy") {
         return false;
     }
+    std::vector<Transform> steps;
     if (request.divide) {
         // Copia existentă se înlocuiește cu `count` copii împărțite pe aceeași distanță.
         ctx.stack.undo();
-        geom::Selection copies;
-        ctx.stack.run("Copy", [&](geom::Mesh& mesh) {
-            for (int k = 1; k <= request.count; ++k) {
-                copies.add(geom::copySelection(mesh, last->source, last->step(double(k) / request.count)));
-            }
-        });
-        ctx.selection = copies;
+        for (int k = 1; k <= request.count; ++k) {
+            steps.push_back(last->step(double(k) / request.count));
+        }
+        ctx.selection = copyTarget(ctx, last->source, steps);
     } else {
+        for (int k = 2; k <= request.count; ++k) {
+            steps.push_back(last->step(double(k)));
+        }
         geom::Selection copies = ctx.selection;
-        ctx.stack.run("Array", [&](geom::Mesh& mesh) {
-            for (int k = 2; k <= request.count; ++k) {
-                copies.add(geom::copySelection(mesh, last->source, last->step(double(k))));
-            }
-        });
+        copies.add(copyTarget(ctx, last->source, steps));
         ctx.selection = copies;
     }
     ctx.selection.prune(ctx.mesh);
@@ -243,7 +310,7 @@ public:
             }
             m_base = m_inference.point;
             m_current = *m_base;
-            m_preview = previewEdges(ctx.mesh, m_target.vertices);
+            m_preview = previewEdges(ctx, m_target);
             m_engine.restartFrom(*m_base);
             m_dragging = false;
             return;
@@ -349,14 +416,11 @@ private:
         if (glm::length(delta) > tol::kLength) {
             const Transform t = Transform::translation(delta);
             if (m_copy) {
-                geom::Selection copy;
                 const geom::Selection source = m_target.selection;
-                ctx.stack.run("Copy", [&](geom::Mesh& mesh) { copy = geom::copySelection(mesh, source, t); });
-                ctx.selection = copy;
+                ctx.selection = copyTarget(ctx, source, { t });
                 m_lastCopy = LastCopy { source, [delta](double k) { return Transform::translation(delta * k); } };
             } else {
-                const auto vertices = m_target.vertices;
-                ctx.stack.run("Move", [&](geom::Mesh& mesh) { geom::transformVertices(mesh, vertices, t); });
+                transformTarget(ctx, "Move", m_target, t);
                 m_lastCopy.reset();
             }
             ctx.selection.prune(ctx.mesh);
@@ -399,7 +463,7 @@ public:
             }
             m_center = m_inference.point;
             m_normal = m_axisLock ? inference::axisDirection(*m_axisLock) : m_hoverNormal;
-            m_preview = previewEdges(ctx.mesh, m_target.vertices);
+            m_preview = previewEdges(ctx, m_target);
             m_reference = m_center;
             m_phase = Phase::Reference;
             return;
@@ -599,18 +663,15 @@ private:
         if (std::abs(m_angle) > 1e-9) {
             const Transform t = rotation();
             if (m_copy) {
-                geom::Selection copy;
                 const geom::Selection source = m_target.selection;
-                ctx.stack.run("Copy", [&](geom::Mesh& mesh) { copy = geom::copySelection(mesh, source, t); });
-                ctx.selection = copy;
+                ctx.selection = copyTarget(ctx, source, { t });
                 const Vec3d center = m_center;
                 const Vec3d normal = m_normal;
                 const double angle = m_angle;
                 m_lastCopy = LastCopy { source,
                     [center, normal, angle](double k) { return Transform::rotation(center, normal, angle * k); } };
             } else {
-                const auto vertices = m_target.vertices;
-                ctx.stack.run("Rotate", [&](geom::Mesh& mesh) { geom::transformVertices(mesh, vertices, t); });
+                transformTarget(ctx, "Rotate", m_target, t);
                 m_lastCopy.reset();
             }
             ctx.selection.prune(ctx.mesh);
@@ -654,8 +715,8 @@ public:
                 return;
             }
             m_anchor = m_inference.point;
-            m_center = centerOf(ctx.mesh, m_target.vertices);
-            m_preview = previewEdges(ctx.mesh, m_target.vertices);
+            m_center = centerOf(ctx, m_target);
+            m_preview = previewEdges(ctx, m_target);
             m_reference = m_anchor;
             m_phase = Phase::Reference;
             return;
@@ -733,13 +794,17 @@ public:
 private:
     enum class Phase { Anchor, Reference, Factor };
 
-    static Vec3d centerOf(const geom::Mesh& mesh, const std::set<geom::VertexId>& vertices)
+    static Vec3d centerOf(const ToolContext& ctx, const Target& target)
     {
         Vec3d lo { 1e300 };
         Vec3d hi { -1e300 };
-        for (geom::VertexId v : vertices) {
-            lo = glm::min(lo, mesh.position(v));
-            hi = glm::max(hi, mesh.position(v));
+        for (geom::VertexId v : target.vertices) {
+            lo = glm::min(lo, ctx.mesh.position(v));
+            hi = glm::max(hi, ctx.mesh.position(v));
+        }
+        for (const PreviewEdge& e : previewEdges(ctx, Target { target.selection, {} })) {
+            lo = glm::min(lo, glm::min(e.a, e.b));
+            hi = glm::max(hi, glm::max(e.a, e.b));
         }
         return (lo + hi) * 0.5;
     }
@@ -785,9 +850,7 @@ private:
     void commit(ToolContext& ctx)
     {
         if (std::abs(m_factor - 1.0) > 1e-9) {
-            const Transform t = scaling();
-            const auto vertices = m_target.vertices;
-            ctx.stack.run("Scale", [&](geom::Mesh& mesh) { geom::transformVertices(mesh, vertices, t); });
+            transformTarget(ctx, "Scale", m_target, scaling());
             ctx.selection.prune(ctx.mesh);
         }
         m_phase = Phase::Anchor;
