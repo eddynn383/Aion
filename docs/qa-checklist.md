@@ -30,6 +30,7 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Copii ale unui obiect se modifică împreună; Fă unic; Desface
 - [ ] Outliner (selectare, redenumire, ascundere); Tag-uri (vizibilitate); Entity Info (dimensiuni, arie, lungime)
 - [ ] Meniul de click dreapta: geometrie, un obiect, două obiecte, spațiu gol, în grup
+- [ ] Undo / Redo imediat după Creează grup (grupul selectat), din interiorul grupului, după Desface și după Interact: fără crash
 ## Fișiere
 - [ ] Salvează / Deschide `.aion`, punctul de „modificat” din titlu, întrebarea la închidere
 - [ ] Autosalvare: închide forțat aplicația cu modificări, repornește → bannerul de recuperare
