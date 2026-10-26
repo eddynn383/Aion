@@ -89,8 +89,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Faza 9** pe `feature/faza-9`: ghidaje, Tape Measure, Protractor, Dimension, Text, Section Plane, Intersect Faces,
   booleene (Manifold), Scene. ADR 0011.
 
+- **Faza 10** începută pe `feature/faza-10`: unități de afișare în core, picking cu test pe cutii, `docs/qa-checklist.md`.
+
 ## Următorii pași
-1. Faza 10: finisare macOS și distribuție (PLAN.md).
+1. Faza 10: meniul nativ (Qt.labs.platform), About, Preferințe (UI pentru unități), asocierea `.aion` (Info.plist +
+   QEvent::FileOpen), script macdeployqt + DMG + semnare/notarizare. Apoi Fazele 11 (Windows) și 12 (Web).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,
