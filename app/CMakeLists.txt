@@ -74,8 +74,8 @@ qt_add_qml_module(aion_app
 )
 
 # Fonturile (OFL) și iconițele Lucide (ISC), incluse în aplicație.
-file(GLOB AION_FONT_FILES "${PROJECT_SOURCE_DIR}/resources/fonts/*.ttf")
-file(GLOB AION_ICON_FILES "${PROJECT_SOURCE_DIR}/resources/icons/*.svg")
+file(GLOB AION_FONT_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/resources/fonts/*.ttf")
+file(GLOB AION_ICON_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/resources/icons/*.svg")
 qt_add_resources(aion_app "aion_assets"
     PREFIX "/aion"
     BASE "${PROJECT_SOURCE_DIR}/resources"

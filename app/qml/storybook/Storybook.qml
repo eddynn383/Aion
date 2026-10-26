@@ -116,7 +116,7 @@ Rectangle {
                 width: column.width
                 title: "IconButton și Tooltip"
                 IconButton { iconName: "mouse-pointer-2"; tooltip: "Select"; shortcut: "Space"; checked: true }
-                IconButton { iconName: "pen-line"; tooltip: "Line"; shortcut: "L" }
+                IconButton { iconName: "line-segment"; tooltip: "Line"; shortcut: "L" }
                 IconButton { iconName: "square"; tooltip: "Rectangle"; shortcut: "R" }
                 IconButton { iconName: "eye"; tooltip: "Tentă subtilă"; checked: true; solidChecked: false }
             }
