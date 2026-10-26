@@ -18,5 +18,11 @@ target_link_libraries(aion_tests PRIVATE aion::core Catch2::Catch2WithMain)
 
 aion_configure_target(aion_tests)
 
+# În WebAssembly (Node), testele au nevoie de sistemul de fișiere real: Catch2 scrie lista testelor
+# într-un fișier temporar la descoperire.
+if(EMSCRIPTEN)
+    target_link_options(aion_tests PRIVATE -sNODERAWFS=1)
+endif()
+
 # Testele sunt descoperite la rularea ctest, nu la build, ca un test blocat să nu blocheze build-ul.
 catch_discover_tests(aion_tests DISCOVERY_MODE PRE_TEST)
