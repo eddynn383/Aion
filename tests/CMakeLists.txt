@@ -10,6 +10,8 @@ add_executable(forma_tests
     core/SlotMapTests.cpp
     core/MeshTests.cpp
     core/CommandStackTests.cpp
+    core/GeometryTests.cpp
+    core/GeometryFuzzTests.cpp
 )
 
 target_link_libraries(forma_tests PRIVATE forma::core Catch2::Catch2WithMain)

@@ -45,8 +45,14 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - Unelte de verificare (variabile de mediu): `FORMA_SCREENSHOT`, `FORMA_SCREENSHOT_DELAY_MS`, `FORMA_THEME`,
   `FORMA_STORYBOOK=1`, `FORMA_STARTUP="view.top;palette:zoom;debug.benchmark"` (afișează fps în consolă).
 
+- **Faza 2** făcută pe `feature/faza-2`: `core/math`, `geom::Mesh` (topologie, primitive Euler, înregistrarea
+  schimbărilor, `validate()`), `geom::drawLine` / `drawPolygon` / `eraseEdge` cu recalcularea fețelor pe plan,
+  triangulare earcut, `commands::CommandStack`. 62 de teste, inclusiv fuzz de 10 000 de operații (~40 s în debug).
+  Designul: `docs/decisions/0003-nucleu-geometric.md`. Lipsește doar rularea sub ASan (vezi mai sus).
+
 ## Următorii pași
-Faza 2: nucleul geometric (cea mai riscantă parte), pe ramura `feature/faza-2`.
+1. Merge `feature/faza-2` în `main` după confirmarea utilizatorului.
+2. Prototipul WebAssembly pentru `forma_core` (PLAN, secțiunea 9, pasul 4), apoi Faza 3.
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `forma::`,

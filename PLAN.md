@@ -273,19 +273,20 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 ---
 
 ### Faza 2 – Nucleul geometric și comenzile
-- [ ] `core/math`: `Vec3d`, `Plane`, `Ray`, `Segment`, `Transform`, `Tolerance`, intersecții (segment-segment 3D, rază-plan, rază-triunghi, punct-în-poligon)
-- [ ] `SlotMap` și ID-uri stabile
-- [ ] Topologie: `Vertex`, `Edge`, `EdgeUse`, `Loop`, `Face`
-- [ ] Operații Euler + `Model::validate()`
-- [ ] `addEdge(a, b)` cu: îmbinarea vârfurilor coincidente, împărțirea muchiilor intersectate, detectarea ciclurilor coplanare închise și crearea fețelor
-- [ ] Fețe cu găuri (inner loops), împărțirea unei fețe de o muchie care o traversează
-- [ ] Triangularea fețelor cu earcut, pentru randare
-- [ ] `Command`, `CommandStack`, tranzacții, undo/redo
-- [ ] Sistem de notificări `ModelObserver` (entități adăugate, modificate, șterse)
-- [ ] **Teste unitare extinse:** pătrat → 1 față; pătrat împărțit de diagonală → 2 fețe; pătrat în pătrat → față cu gaură; undo/redo pe fiecare caz; `validate()` după fiecare pas
-- [ ] Teste de „fuzz”: secvențe aleatoare de operații + undo complet → modelul revine la starea inițială
+- [x] `core/math`: `Vec3d`, `Plane`, `Ray`, `Segment`, `Transform`, `Tolerance`, intersecții (segment-segment 3D, rază-plan, rază-triunghi, punct-în-poligon)
+- [x] `SlotMap` și ID-uri stabile
+- [x] Topologie: `Vertex`, `Edge`, `EdgeUse`, `Loop`, `Face`
+- [x] Operații Euler + `Model::validate()` (în `geom::Mesh`, vezi ADR 0003)
+- [x] `addEdge(a, b)` cu: îmbinarea vârfurilor coincidente, împărțirea muchiilor intersectate, detectarea ciclurilor coplanare închise și crearea fețelor (`geom::drawLine`)
+- [x] Fețe cu găuri (inner loops), împărțirea unei fețe de o muchie care o traversează
+- [x] Triangularea fețelor cu earcut, pentru randare
+- [x] `Command`, `CommandStack`, tranzacții, undo/redo
+- [x] Sistem de notificări `ModelObserver` (entități adăugate, modificate, șterse) (`geom::MeshObserver`)
+- [x] **Teste unitare extinse:** pătrat → 1 față; pătrat împărțit de diagonală → 2 fețe; pătrat în pătrat → față cu gaură; undo/redo pe fiecare caz; `validate()` după fiecare pas
+- [x] Teste de „fuzz”: secvențe aleatoare de operații + undo complet → modelul revine la starea inițială (10 000 de operații, `FORMA_FUZZ_SEED` pentru alte semințe)
 
 **Gata când:** toate testele trec sub ASan/UBSan, inclusiv fuzz-ul cu ≥ 10.000 de iterații.
+_(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 — de rulat cu LLVM din Homebrew sau în CI.)_
 
 ---
 
