@@ -1,7 +1,8 @@
 # Plan de implementare – Modelator 3D (clonă inspirată de SketchUp)
 
 > **Nume:** `Aion` — „modelează ce rămâne” (vezi `docs/decisions/0004-nume-aion.md`).
-> Nu folosim numele, logo-ul, iconițele sau formatul `.skp` ale SketchUp.
+> Nu folosim numele, logo-ul sau iconițele SketchUp, iar formatul nostru e `.aion`, nu `.skp`.
+> Fișierele `.skp` pot fi doar **importate**, prin SDK-ul oficial SketchUp (Faza 7b, ADR 0007).
 
 Acest document este planul de referință al proiectului. Îl urmăm fază cu fază.
 Fiecare sarcină are o căsuță de bifat, iar fiecare fază are **criterii de „gata”**.
@@ -20,7 +21,7 @@ Nu trecem la faza următoare până nu sunt îndeplinite criteriile fazei curent
 
 ### Ce NU facem (cel puțin în primele versiuni)
 - Randare fotorealistă, animații, plugin-uri Ruby, colaborare în timp real.
-- Import/export `.skp`.
+- Export `.skp` și citirea lui fără SDK-ul oficial (formatul e închis). Importul prin SDK e în Faza 7b.
 - Modelare parametrică/NURBS (rămânem la geometrie poligonală, ca SketchUp).
 
 ---
@@ -328,18 +329,19 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ---
 
 ### Faza 5 – Push/Pull și transformări
-- [ ] **Push/Pull:** extrudarea unei fețe pe normală; creează fețele laterale; cu inferență pe adâncime (până la o altă față sau un alt punct); VCB pentru distanță; Ctrl/Option = creează față nouă (păstrează originalul)
-- [ ] Push/Pull până la anulare: dacă ajunge la fața opusă, materialul dispare și se face gaură (ex.: fereastră în perete)
-- [ ] Double-click Push/Pull = repetă ultima distanță
-- [ ] **Move (M):** mută selecția sau o muchie/un vârf (deformează geometria conectată); Option = copiere; `x3` sau `/3` în VCB = array
-- [ ] **Rotate (Q):** raportor pe plan cu inferență de plan; unghi din VCB; copiere radială
-- [ ] **Scale (S):** cu mânere, uniform sau pe axă, din colț sau din centru (Option)
-- [ ] **Offset (F):** offset al conturului unei fețe
-- [ ] **Circle (C), Arc (A), Polygon:** curbe aproximate cu segmente (24 implicit), marcate ca „curbă” pentru selecție și afișare netedă
-- [ ] **Follow Me:** extrudarea unei fețe pe un traseu (opțional în această fază)
-- [ ] Fețe netede (smooth/soft edges) pentru suprafețe curbe
+- [x] **Push/Pull:** extrudarea unei fețe pe normală; creează fețele laterale; cu inferență pe adâncime (până la o altă față sau un alt punct); VCB pentru distanță; Ctrl/Option = creează față nouă (păstrează originalul)
+- [x] Push/Pull până la anulare: dacă ajunge la fața opusă, materialul dispare și se face gaură (ex.: fereastră în perete)
+- [x] Double-click Push/Pull = repetă ultima distanță
+- [x] **Move (M):** mută selecția sau o muchie/un vârf (deformează geometria conectată); Option = copiere; `x3` sau `/3` în VCB = array
+- [x] **Rotate (Q):** raportor pe plan cu inferență de plan; unghi din VCB; copiere radială
+- [~] **Scale (S):** cu mânere, uniform sau pe axă, din colț sau din centru (Option) — deocamdată uniform: punct fix, referință, factor (VCB); din centru cu Option. Mânerele și scalarea pe axă rămân de făcut
+- [x] **Offset (F):** offset al conturului unei fețe
+- [x] **Circle (C), Arc (A), Polygon:** curbe aproximate cu segmente (24 implicit), marcate ca „curbă” pentru selecție și afișare netedă
+- [ ] **Follow Me:** extrudarea unei fețe pe un traseu (opțional în această fază) — amânat
+- [x] Fețe netede (smooth/soft edges) pentru suprafețe curbe
 
 **Gata când:** poți modela o căsuță: pereți, acoperiș în două ape, o ușă și o fereastră tăiate prin Push/Pull, cu undo/redo complet pe tot istoricul.
+✓ Testul `Faza 5, „gata când”` (fiecare stare revine identic la undo/redo) și aceeași căsuță construită în aplicație numai cu uneltele (ADR 0006).
 
 ---
 
@@ -362,10 +364,24 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 - [ ] Autosalvare periodică și recuperare după crash
 - [ ] Export **OBJ** (+ MTL) și **glTF/GLB**
 - [ ] Import OBJ (ca grup)
+- [ ] Import **glTF/GLB** (păstrează ierarhia de noduri ca grupuri); calea fără licențe pentru modelele exportate din SketchUp
 - [ ] Export imagine PNG din viewport
 - [ ] Teste: round-trip salvare → încărcare → model identic (`validate()` + comparare)
 
 **Gata când:** toate modelele de test trec round-trip-ul, iar exportul glTF se deschide corect într-un viewer extern (de exemplu Blender).
+
+---
+
+### Faza 7b – Import `.skp` (opțional, numai desktop)
+- [ ] **Verificarea licenței SketchUp C SDK** (developer.sketchup.com): permite folosirea într-un modelator independent?
+      Ce atribuire cere? Se poate redistribui biblioteca cu aplicația? Decizia se trece în ADR 0007. Fără acord, faza nu începe.
+- [ ] Modul separat `plugins/skp` (țintă `aion_skp`), construit numai dacă SDK-ul e găsit (`AION_SKP_SDK_DIR`); nu intră în `core/` și nici în Web
+- [ ] Citire: fețe (cu găuri), muchii (soft/smooth), curbe, grupuri, componente (definiții + instanțe), tag-uri, materiale și texturi, scene (camera)
+- [ ] Conversie în modelul nostru, cu `validate()` după import; ce nu se poate converti apare într-un raport („12 fețe neplanare au fost triangulate”)
+- [ ] Comanda „Importă .skp…” (ca grup, cu undo), progres pentru fișiere mari
+- [ ] Teste pe fișiere `.skp` de probă (create de noi, fără modele cu drepturi de autor)
+
+**Gata când:** un model `.skp` cu grupuri, componente, tag-uri și texturi se importă corect (structură păstrată, `validate()` trece).
 
 ---
 

@@ -6,9 +6,12 @@ add_library(aion_core STATIC
     src/commands/CommandStack.cpp
     src/geom/Mesh.cpp
     src/geom/MeshValidate.cpp
+    src/geom/Offset.cpp
     src/geom/Operations.cpp
     src/geom/PlanarRegions.cpp
+    src/geom/PushPull.cpp
     src/geom/Selection.cpp
+    src/geom/Transformations.cpp
     src/geom/Triangulate.cpp
     src/math/Intersect.cpp
     src/math/Plane.cpp
@@ -20,6 +23,9 @@ add_library(aion_core STATIC
     src/inference/Inference.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp
+    src/tools/ToolHelpers.cpp
+    src/tools/TransformTools.cpp
+    src/tools/ShapeTools.cpp
 )
 add_library(aion::core ALIAS aion_core)
 

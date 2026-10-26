@@ -97,6 +97,40 @@ void appendBoxEdges(std::vector<LineInstance>& out, const glm::dvec3& lo, const 
     }
 }
 
+// Normala într-un vârf al feței: media fețelor legate de ea prin muchii soft în jurul vârfului
+// (umbrirea netedă a suprafețelor curbe); normala feței dacă vârful nu are muchii soft.
+glm::dvec3 smoothNormal(const geom::Mesh& mesh, geom::FaceId face, geom::VertexId vertex)
+{
+    const geom::Vertex& v = mesh.vertex(vertex);
+    const auto isSoft = [&](geom::EdgeId e) { return mesh.edge(e).soft; };
+    if (std::none_of(v.edges.begin(), v.edges.end(), isSoft)) {
+        return mesh.face(face).plane.normal;
+    }
+    std::vector<geom::FaceId> group { face };
+    for (bool grew = true; grew;) {
+        grew = false;
+        for (geom::EdgeId id : v.edges) {
+            const geom::Edge& e = mesh.edge(id);
+            if (!e.soft || std::none_of(e.faces.begin(), e.faces.end(), [&](geom::FaceId f) {
+                    return std::find(group.begin(), group.end(), f) != group.end();
+                })) {
+                continue;
+            }
+            for (geom::FaceId f : e.faces) {
+                if (std::find(group.begin(), group.end(), f) == group.end()) {
+                    group.push_back(f);
+                    grew = true;
+                }
+            }
+        }
+    }
+    glm::dvec3 sum { 0.0 };
+    for (geom::FaceId f : group) {
+        sum += mesh.face(f).plane.normal;
+    }
+    return glm::length(sum) > 1e-12 ? glm::normalize(sum) : mesh.face(face).plane.normal;
+}
+
 } // namespace
 
 Viewport::Viewport(QQuickItem* parent)
@@ -238,8 +272,15 @@ void Viewport::appendDocument(ViewportFrame& f) const
             : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
                                                                                    : 0.0f;
         f.hasSelectedFaces = f.hasSelectedFaces || state > 1.5f;
+        // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
+        std::vector<geom::VertexId> ids = mesh.loopVertices(face->outer);
+        for (const geom::Loop& h : face->inner) {
+            const auto hv = mesh.loopVertices(h);
+            ids.insert(ids.end(), hv.begin(), hv.end());
+        }
         for (std::uint32_t i : tri.indices) {
-            f.triangles.push_back({ glm::vec3(tri.points[i]), normal, state });
+            const glm::vec3 n = i < ids.size() ? glm::vec3(smoothNormal(mesh, faceId, ids[i])) : normal;
+            f.triangles.push_back({ glm::vec3(tri.points[i]), n, state });
         }
     }
 
@@ -252,6 +293,11 @@ void Viewport::appendDocument(ViewportFrame& f) const
         const geom::Edge& e = mesh.edges().values()[i];
         glm::vec4 color = e.faces.empty() ? freeEdge : edge;
         float width = kEdgeWidth;
+        const bool highlighted = marked.contains(id) || selection.contains(id)
+            || (hover.kind == view::PickResult::Kind::Edge && hover.edge == id);
+        if (e.soft && !highlighted) {
+            continue; // muchiile soft (laturile unui cilindru) nu se desenează
+        }
         if (marked.contains(id)) {
             color = toVec4(m_erase);
             width = kHighlightedEdgeWidth;

@@ -60,6 +60,14 @@ public:
     void removeEdge(EdgeId id);
     FaceId addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner = {});
     void removeFace(FaceId id);
+    // Mută un vârf (fără verificări: fețele atinse trebuie apoi aduse la zi, vezi transformVertices).
+    void setPosition(VertexId id, const Vec3d& position);
+    // Stilul unei muchii (vezi Edge): soft, curba din care face parte.
+    void setEdgeStyle(EdgeId id, bool soft, std::uint32_t curve, bool smoothCurve);
+    // Un identificator de curbă nefolosit.
+    [[nodiscard]] std::uint32_t newCurveId() const;
+    // Schimbă planul unei fețe (de exemplu după ce i s-au mutat vârfurile).
+    void setFacePlane(FaceId id, const math::Plane& plane);
     // Înlocuiește muchia cu două muchii prin vârful `at` și actualizează buclele fețelor.
     // Întoarce (muchia dinspre v0, muchia dinspre v1).
     std::pair<EdgeId, EdgeId> splitEdge(EdgeId id, VertexId at);

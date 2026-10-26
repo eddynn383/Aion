@@ -4,6 +4,7 @@
 #include "aion/core/math/Plane.h"
 #include "aion/core/math/Vec.h"
 
+#include <cstdint>
 #include <vector>
 
 // Topologia non-manifold (radial-edge simplificat, vezi ADR 0003): muchiile pot avea 0..n fețe.
@@ -22,6 +23,12 @@ struct Edge {
     VertexId v0;
     VertexId v1;
     std::vector<FaceId> faces; // fețele care folosesc muchia (radial)
+    // O muchie „soft” nu se desenează și netezește umbrirea dintre fețele ei (laturile unui cilindru).
+    bool soft = false;
+    // Curba din care face parte (0 = niciuna): cercurile, arcele și poligoanele se selectează și se șterg întregi.
+    std::uint32_t curve = 0;
+    // Curbă netedă (cerc, arc): extrudată, are laturile soft. Laturile unui poligon rămân muchii vizibile.
+    bool smoothCurve = false;
 
     [[nodiscard]] VertexId other(VertexId v) const { return v == v0 ? v1 : v0; }
     [[nodiscard]] bool hasVertex(VertexId v) const { return v == v0 || v == v1; }

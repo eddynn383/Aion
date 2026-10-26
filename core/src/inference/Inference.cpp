@@ -41,27 +41,6 @@ std::optional<Vec3d> closestOnLine(const math::Ray& ray, const Vec3d& origin, co
     return origin + dir * s;
 }
 
-// Punctul de pe dreaptă a cărui proiecție e cea mai apropiată de cursor (pe ecran, nu în 3D:
-// în perspectivă cele două diferă, iar utilizatorul vede ecranul).
-std::optional<Vec3d> lineUnderCursor(const view::Camera& camera, Vec2d screen, const Vec3d& origin, const Vec3d& dir)
-{
-    const math::Ray ray = camera.rayAt(screen);
-    const double step = camera.worldPerPixelAtTarget() * 100.0;
-    const auto pa = camera.project(origin);
-    const auto pb = camera.project(origin + dir * step);
-    if (pa && pb) {
-        const Vec2d ab = *pb - *pa;
-        const double len2 = glm::dot(ab, ab);
-        if (len2 > 1e-9) {
-            const Vec2d q = *pa + ab * (glm::dot(screen - *pa, ab) / len2);
-            if (const auto p = closestOnLine(camera.rayAt(q), origin, dir)) {
-                return p;
-            }
-        }
-    }
-    return closestOnLine(ray, origin, dir);
-}
-
 // Intersecția a două drepte în spațiu; nullopt dacă sunt paralele sau nu se ating (în toleranța dată).
 std::optional<Vec3d> intersectLines(const Vec3d& o1, const Vec3d& d1, const Vec3d& o2, const Vec3d& d2, double eps)
 {
@@ -134,6 +113,27 @@ struct Linear {
 };
 
 } // namespace
+
+// Punctul de pe dreaptă a cărui proiecție e cea mai apropiată de cursor (pe ecran, nu în 3D:
+// în perspectivă cele două diferă, iar utilizatorul vede ecranul).
+std::optional<Vec3d> pointOnLineUnderCursor(const view::Camera& camera, Vec2d screen, const Vec3d& origin, const Vec3d& dir)
+{
+    const math::Ray ray = camera.rayAt(screen);
+    const double step = camera.worldPerPixelAtTarget() * 100.0;
+    const auto pa = camera.project(origin);
+    const auto pb = camera.project(origin + dir * step);
+    if (pa && pb) {
+        const Vec2d ab = *pb - *pa;
+        const double len2 = glm::dot(ab, ab);
+        if (len2 > 1e-9) {
+            const Vec2d q = *pa + ab * (glm::dot(screen - *pa, ab) / len2);
+            if (const auto p = closestOnLine(camera.rayAt(q), origin, dir)) {
+                return p;
+            }
+        }
+    }
+    return closestOnLine(ray, origin, dir);
+}
 
 Tint axisTint(Axis axis)
 {
@@ -308,7 +308,7 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
             if (std::abs(glm::dot(dir.dir, ray.direction)) > kMaxViewAlignment) {
                 continue;
             }
-            const auto p = lineUnderCursor(camera, screen, *from, dir.dir);
+            const auto p = pointOnLineUnderCursor(camera, screen, *from, dir.dir);
             if (!p) {
                 continue;
             }
@@ -454,7 +454,7 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
                 if (std::abs(glm::dot(ad, ray.direction)) > kMaxViewAlignment) {
                     continue;
                 }
-                const auto p = lineUnderCursor(camera, screen, r, ad);
+                const auto p = pointOnLineUnderCursor(camera, screen, r, ad);
                 if (!p || tol::samePoint(*p, r)) {
                     continue;
                 }
@@ -508,7 +508,7 @@ Inference Engine::inferLocked(const geom::Mesh& mesh, const view::Camera& camera
         if (target) {
             p = origin + dir * glm::dot(*target - origin, dir);
         } else {
-            p = lineUnderCursor(camera, screen, origin, dir);
+            p = pointOnLineUnderCursor(camera, screen, origin, dir);
         }
         if (!p) {
             Inference keep = m_last;
@@ -600,10 +600,12 @@ void Engine::toggleAxisLock(Axis axis)
         unlock();
         return;
     }
-    if (!m_lastFrom) {
+    // Fără punct de pornire (de exemplu imediat după primul click al lui Move), axa trece prin ultimul punct inferat.
+    const std::optional<Vec3d> origin = m_lastFrom ? m_lastFrom : (m_last.valid() ? std::optional(m_last.point) : std::nullopt);
+    if (!origin) {
         return;
     }
-    m_lock = { LockKind::Line, *m_lastFrom, axisDirection(axis), {}, Kind::OnAxis, axis };
+    m_lock = { LockKind::Line, *origin, axisDirection(axis), {}, Kind::OnAxis, axis };
 }
 
 void Engine::toggleReferenceLock()
@@ -629,6 +631,12 @@ void Engine::reset()
     m_references.clear();
     m_referenceEdge.reset();
     m_referenceDirection.reset();
+}
+
+void Engine::restartFrom(const Vec3d& from)
+{
+    resetLock();
+    m_lastFrom = from;
 }
 
 void Engine::resetLock()

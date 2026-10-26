@@ -2,11 +2,13 @@
 #include "aion/core/tools/Tool.h"
 #include "aion/core/view/Picking.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
 using namespace aion;
+using Catch::Approx;
 using geom::Mesh;
 using math::Vec2d;
 using math::Vec3d;
@@ -303,4 +305,245 @@ TEST_CASE("Unelte: dreptunghi din Measurements box, în sensul cursorului", "[co
     }
     CHECK(glm::length(lo - Vec3d { -2000, 1000, 0 }) < 1e-6);
     CHECK(glm::length(hi - Vec3d { 1000, 3000, 0 }) < 1e-6);
+}
+
+TEST_CASE("Unelte: Push/Pull prin tragere, prin VCB și dublu-click", "[core][tools][pushpull]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 1000, 500 }, 0, 0, 9000 }));
+    auto rect = tools::makeTool("rectangle");
+    auto pp = tools::makeTool("pushpull");
+    s.click(*rect, { 0, 0, 0 });
+    s.click(*rect, { 2000, 1000, 0 });
+    REQUIRE(s.mesh.faces().size() == 1);
+
+    // Click pe față, mișcare în sus, apoi tastăm înălțimea.
+    s.click(*pp, { 1000, 500, 0 });
+    pp->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 500, 800 })));
+    CHECK(pp->measurement()->value == "800 mm");
+    REQUIRE(pp->applyMeasurement(s.ctx, "1.2m"));
+    CHECK(s.mesh.faces().size() == 6);
+    Vec3d hi { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(std::abs(hi.z - 1200) < 1e-6);
+    CHECK(s.stack.undoName() == "Push/Pull");
+
+    // Tragere pe fața de sus până la capătul unei muchii aflate mai sus (inferență pe adâncime).
+    geom::drawLine(s.mesh, { 3000, 0, 0 }, { 3000, 0, 2000 });
+    const tools::PointerEvent down { s.screen({ 1000, 500, 1200 }), {}, 1 };
+    pp->pointerDown(s.ctx, down);
+    pp->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 500, 1600 })));
+    pp->pointerMove(s.ctx, Scene::at(s.screen({ 3000, 0, 2000 }) + Vec2d { 3, -2 }));
+    CHECK(pp->overlay().marker->label == "Endpoint");
+    pp->pointerUp(s.ctx, Scene::at(s.screen({ 3000, 0, 2000 })));
+    hi = Vec3d { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(std::abs(hi.z - 2000) < 1e-6);
+
+    // Dublu-click pe fața de sus repetă ultima distanță (+800).
+    const Vec2d top = s.screen({ 1000, 500, 2000 });
+    pp->pointerMove(s.ctx, Scene::at(top));
+    pp->pointerDown(s.ctx, { top, {}, 1 });
+    pp->pointerUp(s.ctx, Scene::at(top));
+    pp->pointerDown(s.ctx, { top, {}, 2 });
+    pp->pointerUp(s.ctx, Scene::at(top));
+    hi = Vec3d { -1e9 };
+    for (geom::VertexId v : s.mesh.vertices().keys()) {
+        hi = glm::max(hi, s.mesh.position(v));
+    }
+    CHECK(std::abs(hi.z - 2800) < 1e-6);
+}
+
+namespace {
+
+double maxCoord(const Mesh& mesh, int axis)
+{
+    double hi = -1e18;
+    for (geom::VertexId v : mesh.vertices().keys()) {
+        hi = std::max(hi, mesh.position(v)[axis]);
+    }
+    return hi;
+}
+
+// Cutie 2000 × 1000 × 1000 desenată cu uneltele.
+void toolBox(Scene& s)
+{
+    auto rect = tools::makeTool("rectangle");
+    s.click(*rect, { 0, 0, 0 });
+    rect->pointerMove(s.ctx, Scene::at(s.screen({ 2000, 1000, 0 })));
+    REQUIRE(rect->applyMeasurement(s.ctx, "2000,1000"));
+    geom::pushPull(s.mesh, s.mesh.faces().keys().front(), -1000);
+    REQUIRE(s.mesh.faces().size() == 6);
+}
+
+} // namespace
+
+TEST_CASE("Unelte: Move cu distanța tastată, copiere și array", "[core][tools][transform]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 2000, 1000, 500 }, 0, 0, 14000 }));
+    toolBox(s);
+    auto move = tools::makeTool("move");
+    auto select = tools::makeTool("select");
+    s.click(*select, { 1000, 500, 1000 }, {}, 3); // triplu-click: toată cutia
+    REQUIRE(s.selection.faces.size() == 6);
+
+    // Mutare de 500 pe axa roșie.
+    s.click(*move, { 0, 0, 1000 });
+    move->pointerMove(s.ctx, Scene::at(s.screen({ 800, 0, 1000 })));
+    REQUIRE(move->applyMeasurement(s.ctx, "500"));
+    CHECK(maxCoord(s.mesh, 0) == Approx(2500));
+    CHECK(s.stack.undoName() == "Move");
+    CHECK(s.selection.faces.size() == 6);
+
+    // Copie cu Option la 3000, apoi x3: în total trei copii.
+    tools::Modifiers option;
+    option.alt = true;
+    s.click(*move, { 500, 0, 1000 }, option);
+    move->pointerMove(s.ctx, { s.screen({ 1500, 0, 1000 }), option, 1 });
+    REQUIRE(move->applyMeasurement(s.ctx, "3000"));
+    CHECK(s.mesh.faces().size() == 12);
+    REQUIRE(move->applyMeasurement(s.ctx, "x3"));
+    CHECK(s.mesh.faces().size() == 24);
+    CHECK(maxCoord(s.mesh, 0) == Approx(2500 + 9000));
+
+    // „/2” după o copie nouă: copia se înlocuiește cu două, la jumătate și la capăt.
+    s.stack.undo();
+    REQUIRE(s.mesh.faces().size() == 12);
+    CHECK_FALSE(move->applyMeasurement(s.ctx, "/2")); // ultima comandă nu mai e o copiere
+}
+
+TEST_CASE("Unelte: Rotate cu unghiul tastat și Scale cu factorul tastat", "[core][tools][transform]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 0, 0, 500 }, 0, 0, 12000 }));
+    toolBox(s);
+    auto select = tools::makeTool("select");
+    s.click(*select, { 1000, 500, 1000 }, {}, 3);
+    REQUIRE(s.selection.faces.size() == 6);
+
+    // Centrul pe colțul de sus (0, 0, 1000). Colțul e și pe fețele laterale, deci alegem axa cu săgeata sus.
+    auto rotate = tools::makeTool("rotate");
+    rotate->pointerMove(s.ctx, Scene::at(s.screen({ 0, 0, 1000 })));
+    REQUIRE(rotate->key(s.ctx, { tools::Key::Up, {} }));
+    s.click(*rotate, { 0, 0, 1000 });
+    s.click(*rotate, { 2000, 0, 1000 }); // referința: capătul laturii de pe axa roșie
+    rotate->pointerMove(s.ctx, Scene::at(s.screen({ 100, 1500, 1000 })));
+    REQUIRE(rotate->applyMeasurement(s.ctx, "90"));
+    CHECK(s.stack.undoName() == "Rotate");
+    // Cutia stă acum între x = −1000 și 0, y = 0 și 2000.
+    CHECK(maxCoord(s.mesh, 1) == Approx(2000));
+    CHECK(maxCoord(s.mesh, 0) == Approx(0).margin(1e-6));
+
+    auto scale = tools::makeTool("scale");
+    s.click(*scale, { 0, 0, 1000 });
+    s.click(*scale, { 0, 2000, 1000 });
+    scale->pointerMove(s.ctx, Scene::at(s.screen({ 0, 2500, 1000 })));
+    REQUIRE(scale->applyMeasurement(s.ctx, "2"));
+    CHECK(maxCoord(s.mesh, 1) == Approx(4000));
+    CHECK(maxCoord(s.mesh, 2) == Approx(1000));
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
+}
+
+TEST_CASE("Unelte: acoperiș în două ape cu Move pe linia de coamă (săgeata sus)", "[core][tools][transform]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 500, 500 }, 0, 0, 9000 }));
+    toolBox(s);
+    auto line = tools::makeTool("line");
+    // Coama: între mijloacele laturilor scurte ale feței de sus.
+    s.click(*line, { 0, 500, 1000 });
+    s.click(*line, { 2000, 500, 1000 });
+    line->key(s.ctx, { tools::Key::Escape, {} });
+    REQUIRE(s.mesh.faces().size() == 7);
+
+    auto move = tools::makeTool("move");
+    s.click(*move, { 1000, 500, 1000 }); // fără selecție: mută muchia de sub cursor
+    REQUIRE(move->key(s.ctx, { tools::Key::Up, {} }));
+    // Cu axa albastră blocată, cursorul poate fi oriunde: rămâne pe verticală.
+    move->pointerMove(s.ctx, Scene::at(s.screen({ 1500, 900, 1300 })));
+    CHECK(move->overlay().marker->locked);
+    REQUIRE(move->applyMeasurement(s.ctx, "800"));
+    CHECK(maxCoord(s.mesh, 2) == Approx(1800));
+    CHECK(s.mesh.faces().size() == 7);
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
+}
+
+TEST_CASE("Unelte: cerc, cilindru neted, selecția și ștergerea curbei", "[core][tools][curves]")
+{
+    Scene s;
+    auto circle = tools::makeTool("circle");
+    s.click(*circle, { 1000, 1000, 0 });
+    circle->pointerMove(s.ctx, Scene::at(s.screen({ 1400, 1000, 0 })));
+    REQUIRE(circle->applyMeasurement(s.ctx, "500"));
+    REQUIRE(s.mesh.faces().size() == 1);
+    CHECK(s.mesh.edges().size() == 24);
+    const std::uint32_t curve = s.mesh.edges().values().front().curve;
+    CHECK(curve != 0);
+    for (const geom::Edge& e : s.mesh.edges().values()) {
+        CHECK(e.curve == curve);
+        CHECK(std::abs(glm::length(s.mesh.position(e.v0) - Vec3d { 1000, 1000, 0 }) - 500) < 1e-6);
+    }
+
+    // Un click pe o muchie selectează tot cercul.
+    auto select = tools::makeTool("select");
+    s.click(*select, { 1500, 1000, 0 });
+    CHECK(s.selection.edges.size() == 24);
+    s.selection.clear();
+
+    // Extrudat: un cilindru cu laturile soft și capacul tot o curbă.
+    geom::pushPull(s.mesh, s.mesh.faces().keys().front(), -800);
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
+    CHECK(s.mesh.faces().size() == 26);
+    int soft = 0;
+    int capCurve = 0;
+    for (const geom::Edge& e : s.mesh.edges().values()) {
+        soft += e.soft ? 1 : 0;
+        const double z0 = s.mesh.position(e.v0).z;
+        const double z1 = s.mesh.position(e.v1).z;
+        if (z0 > 799 && z1 > 799) {
+            capCurve += (e.curve != 0 && e.curve != curve) ? 1 : 0;
+        }
+    }
+    CHECK(soft == 24);
+    CHECK(capCurve == 24);
+
+    // Guma pe o muchie a cercului de jos: dispare toată curba (și fețele ei).
+    auto eraser = tools::makeTool("eraser");
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1000, 1000, 400 }, 0, 0, 8000 }));
+    const Vec2d onBottom = s.screen({ 1000, 500, 0 });
+    s.drag(*eraser, onBottom, onBottom + Vec2d { 1, 0 });
+    CHECK(std::none_of(s.mesh.edges().values().begin(), s.mesh.edges().values().end(),
+        [&](const geom::Edge& e) { return e.curve == curve; }));
+}
+
+TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin capete și săgeată", "[core][tools][curves]")
+{
+    Scene s;
+    auto polygon = tools::makeTool("polygon");
+    s.click(*polygon, { 1000, 1000, 0 });
+    polygon->pointerMove(s.ctx, Scene::at(s.screen({ 1400, 1000, 0 })));
+    REQUIRE(polygon->applyMeasurement(s.ctx, "8s"));
+    REQUIRE(polygon->applyMeasurement(s.ctx, "400"));
+    REQUIRE(s.mesh.faces().size() == 1);
+    CHECK(s.mesh.edges().size() == 8);
+    geom::pushPull(s.mesh, s.mesh.faces().keys().front(), -500);
+    CHECK(std::none_of(s.mesh.edges().values().begin(), s.mesh.edges().values().end(),
+        [](const geom::Edge& e) { return e.soft; }));
+
+    Scene a;
+    auto arc = tools::makeTool("arc");
+    a.click(*arc, { 0, 0, 0 });
+    a.click(*arc, { 2000, 0, 0 });
+    arc->pointerMove(a.ctx, Scene::at(a.screen({ 1000, 300, 0 })));
+    REQUIRE(arc->applyMeasurement(a.ctx, "500"));
+    CHECK(a.mesh.edges().size() == 12);
+    CHECK(a.mesh.faces().empty());
+    REQUIRE(a.mesh.findVertexNear({ 0, 0, 0 }, 1e-6));
+    REQUIRE(a.mesh.findVertexNear({ 2000, 0, 0 }, 1e-6));
+    CHECK(a.mesh.findVertexNear({ 1000, 500, 0 }, 1e-6)); // vârful din mijloc, pe săgeată
 }
