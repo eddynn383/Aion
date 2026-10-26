@@ -54,7 +54,8 @@ QtObject {
     readonly property color viewportBottom: dark ? "#0E0F11" : "#D9DEE5"
     readonly property color gridMinor: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color gridMajor: dark ? Qt.rgba(1, 1, 1, 0.13) : Qt.rgba(0, 0, 0, 0.15)
-    readonly property color edge: dark ? "#0B0B0D" : "#1F2023"
+    readonly property color edge: dark ? "#0B0B0D" : "#1F2023" // muchiile fețelor (contrast cu fața)
+    readonly property color edgeFree: dark ? "#C9CBD1" : "#1F2023" // liniile fără fețe (contrast cu fundalul)
     readonly property color faceFront: dark ? "#D9D6D0" : "#ECEAE5"
     readonly property color faceBack: dark ? "#7D8AA3" : "#9AA6BD"
 

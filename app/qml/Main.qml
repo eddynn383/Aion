@@ -245,6 +245,7 @@ Window {
         axisYColor: Theme.axisY
         axisZColor: Theme.axisZ
         edgeColor: Theme.edge
+        freeEdgeColor: Theme.edgeFree
         faceFrontColor: Theme.faceFront
         faceBackColor: Theme.faceBack
         accentColor: Theme.accent

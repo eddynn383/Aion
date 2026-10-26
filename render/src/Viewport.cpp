@@ -243,11 +243,12 @@ void Viewport::appendDocument(ViewportFrame& f) const
 
     const std::set<geom::EdgeId> marked(overlay.markedEdges.begin(), overlay.markedEdges.end());
     const glm::vec4 edge = toVec4(m_edge);
+    const glm::vec4 freeEdge = toVec4(m_freeEdge);
     const glm::vec4 accent = toVec4(m_accent);
     for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
         const geom::EdgeId id = mesh.edges().keys()[i];
         const geom::Edge& e = mesh.edges().values()[i];
-        glm::vec4 color = edge;
+        glm::vec4 color = e.faces.empty() ? freeEdge : edge;
         float width = kEdgeWidth;
         if (marked.contains(id)) {
             color = toVec4(m_erase);

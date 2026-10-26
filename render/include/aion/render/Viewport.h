@@ -37,6 +37,8 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(QColor axisYColor MEMBER m_axisY NOTIFY appearanceChanged)
     Q_PROPERTY(QColor axisZColor MEMBER m_axisZ NOTIFY appearanceChanged)
     Q_PROPERTY(QColor edgeColor MEMBER m_edge NOTIFY appearanceChanged)
+    // Muchiile fără fețe stau direct pe fundal, deci au nevoie de altă culoare (în dark mode, deschisă).
+    Q_PROPERTY(QColor freeEdgeColor MEMBER m_freeEdge NOTIFY appearanceChanged)
     Q_PROPERTY(QColor faceFrontColor MEMBER m_faceFront NOTIFY appearanceChanged)
     Q_PROPERTY(QColor faceBackColor MEMBER m_faceBack NOTIFY appearanceChanged)
     Q_PROPERTY(QColor accentColor MEMBER m_accent NOTIFY appearanceChanged)
@@ -182,6 +184,7 @@ private:
     QColor m_axisY { 0x22, 0xC5, 0x5E };
     QColor m_axisZ { 0x3B, 0x82, 0xF6 };
     QColor m_edge { 0x11, 0x11, 0x13 };
+    QColor m_freeEdge { 0xC9, 0xCB, 0xD1 };
     QColor m_faceFront { 0xE8, 0xE6, 0xE1 };
     QColor m_faceBack { 0x8F, 0x9B, 0xB3 };
     QColor m_accent { 0x3B, 0x82, 0xF6 };

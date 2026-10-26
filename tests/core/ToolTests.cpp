@@ -217,3 +217,4 @@ TEST_CASE("Picking: vârful are prioritate, iar muchiile ascunse nu se aleg", "[
     const auto empty = view::pick(s.mesh, s.camera, s.screen({ 3000, 3000, 0 }));
     CHECK_FALSE(empty.hit());
 }
+
