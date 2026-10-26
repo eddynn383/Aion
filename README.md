@@ -1,7 +1,18 @@
-# Forma
+# Aion
+
+**Aion — modelează ce rămâne.** · *Aion — shape what lasts.*
 
 Modelator 3D modern și nativ, inspirat de ușurința de lucru a SketchUp.
 Prima țintă este macOS; urmează Windows și Web.
+
+### De unde vine numele
+În greaca veche, **αἰών** (*aiṓn*) înseamnă „veac, durată, eternitate”. În mitologia elenistică,
+Aion e zeul timpului fără sfârșit, reprezentat adesea în interiorul unui inel pe care îl rotește.
+Arhitectura e arta lucrurilor făcute să dureze, iar gestul de bază al aplicației e tot o rotire:
+orbita în jurul modelului.
+
+Pentru cei atenți: **A**xes · **I**ntersections · **O**rbits · **N**odes, adică exact ce face nucleul.
+Și, citit repede, „a-**Ion**”: aplicația s-a născut în România.
 
 Planul complet de implementare se află în [`PLAN.md`](PLAN.md).
 
@@ -38,7 +49,7 @@ Pentru build-ul optimizat: `make run CONFIG=release`.
 ### În VS Code
 Instalează extensiile recomandate (VS Code le propune la deschiderea proiectului), apoi:
 - **⇧⌘B** compilează;
-- **F5** compilează și pornește aplicația cu debugger (configurația „Forma (debug)”).
+- **F5** compilează și pornește aplicația cu debugger (configurația „Aion (debug)”).
 
 ### Instalare manuală (dacă nu vrei `make setup`)
 1. `xcode-select --install`
@@ -86,10 +97,10 @@ Gizmo-ul din colțul viewport-ului: click pe o axă = vederea dinspre ea, click 
 ### Variabile de mediu pentru dezvoltare
 | Variabilă | Efect |
 |---|---|
-| `FORMA_THEME=light\|dark` | Forțează tema |
-| `FORMA_SCREENSHOT=cale.png` | Salvează fereastra după randare și închide aplicația (`FORMA_SCREENSHOT_DELAY_MS` = întârzierea) |
-| `FORMA_STORYBOOK=1` | Deschide pagina cu componente (doar debug) |
-| `FORMA_STARTUP="view.top;palette:zoom"` | Rulează comenzi la pornire; `debug.benchmark` măsoară fps-ul |
+| `AION_THEME=light\|dark` | Forțează tema |
+| `AION_SCREENSHOT=cale.png` | Salvează fereastra după randare și închide aplicația (`AION_SCREENSHOT_DELAY_MS` = întârzierea) |
+| `AION_STORYBOOK=1` | Deschide pagina cu componente (doar debug) |
+| `AION_STARTUP="view.top;palette:zoom"` | Rulează comenzi la pornire; `debug.benchmark` măsoară fps-ul |
 
 ## Convenții
 Vezi secțiunea „Convenții de lucru” din [`PLAN.md`](PLAN.md).

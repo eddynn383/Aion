@@ -1,6 +1,6 @@
-#include "forma/core/geom/Mesh.h"
-#include "forma/core/math/Intersect.h"
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/geom/Mesh.h"
+#include "aion/core/math/Intersect.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 
@@ -8,7 +8,7 @@
 #include <set>
 #include <sstream>
 
-namespace forma::geom {
+namespace aion::geom {
 
 namespace {
 
@@ -252,4 +252,4 @@ ValidationReport Mesh::validate(ValidationLevel level) const
     return report;
 }
 
-} // namespace forma::geom
+} // namespace aion::geom

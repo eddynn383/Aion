@@ -1,6 +1,6 @@
 #include "bridge/IconProvider.h"
 #include "bridge/NavigationCursors.h"
-#include "forma/render/GraphicsApi.h"
+#include "aion/render/GraphicsApi.h"
 #include "platform/Platform.h"
 
 #include <QDirIterator>
@@ -14,14 +14,14 @@
 
 #include <cstdlib>
 
-Q_IMPORT_QML_PLUGIN(Forma_RenderPlugin)
+Q_IMPORT_QML_PLUGIN(Aion_RenderPlugin)
 
 namespace {
 
 // Inter (UI) și Geist Mono (valori numerice) sunt incluse în aplicație.
 void loadFonts()
 {
-    QDirIterator it(QStringLiteral(":/forma/fonts"), { QStringLiteral("*.ttf") });
+    QDirIterator it(QStringLiteral(":/aion/fonts"), { QStringLiteral("*.ttf") });
     while (it.hasNext()) {
         if (QFontDatabase::addApplicationFont(it.next()) < 0) {
             qWarning("Fontul %s nu s-a putut încărca", qPrintable(it.filePath()));
@@ -33,11 +33,11 @@ void loadFonts()
     QGuiApplication::setFont(ui);
 }
 
-// Pentru verificări vizuale automate: FORMA_SCREENSHOT=cale.png salvează fereastra
-// după ce s-a randat și închide aplicația. FORMA_THEME=light|dark forțează tema.
+// Pentru verificări vizuale automate: AION_SCREENSHOT=cale.png salvează fereastra
+// după ce s-a randat și închide aplicația. AION_THEME=light|dark forțează tema.
 void scheduleScreenshotIfRequested(QQmlApplicationEngine& engine)
 {
-    const QString path = qEnvironmentVariable("FORMA_SCREENSHOT");
+    const QString path = qEnvironmentVariable("AION_SCREENSHOT");
     if (path.isEmpty() || engine.rootObjects().isEmpty()) {
         return;
     }
@@ -45,7 +45,7 @@ void scheduleScreenshotIfRequested(QQmlApplicationEngine& engine)
     if (window == nullptr) {
         return;
     }
-    const int delayMs = qEnvironmentVariableIntValue("FORMA_SCREENSHOT_DELAY_MS");
+    const int delayMs = qEnvironmentVariableIntValue("AION_SCREENSHOT_DELAY_MS");
     QTimer::singleShot(delayMs > 0 ? delayMs : 1500, window, [window, path] {
         const bool saved = window->grabWindow().save(path);
         qInfo("Captură %s: %s", saved ? "salvată" : "EȘUATĂ", qPrintable(path));
@@ -57,12 +57,12 @@ void scheduleScreenshotIfRequested(QQmlApplicationEngine& engine)
 
 int main(int argc, char* argv[])
 {
-    forma::render::selectPreferredGraphicsApi();
+    aion::render::selectPreferredGraphicsApi();
 
     QGuiApplication app(argc, argv);
-    QGuiApplication::setApplicationName(QStringLiteral("Forma"));
-    QGuiApplication::setOrganizationName(QStringLiteral("Forma"));
-    QGuiApplication::setOrganizationDomain(QStringLiteral("forma.dev"));
+    QGuiApplication::setApplicationName(QStringLiteral("Aion"));
+    QGuiApplication::setOrganizationName(QStringLiteral("Aion"));
+    QGuiApplication::setOrganizationDomain(QStringLiteral("aion.dev"));
 
     loadFonts();
 
@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(EXIT_FAILURE); }, Qt::QueuedConnection);
-    engine.loadFromModule("Forma", "Main");
+    engine.loadFromModule("Aion", "Main");
 
     if (!engine.rootObjects().isEmpty()) {
         auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());

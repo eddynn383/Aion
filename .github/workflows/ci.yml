@@ -38,7 +38,7 @@ jobs:
           "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
 
       - name: Configurare
-        run: cmake --preset mac-debug -DFORMA_WARNINGS_AS_ERRORS=ON
+        run: cmake --preset mac-debug -DAION_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build --preset mac-debug

@@ -25,13 +25,13 @@ public:
     QString version() const;
     QString graphicsApi() const;
 
-    // Tema cerută prin FORMA_THEME (0 = sistem, 1 = light, 2 = dark).
+    // Tema cerută prin AION_THEME (0 = sistem, 1 = light, 2 = dark).
     int themeOverride() const;
     bool reduceMotion() const;
     bool debugBuild() const;
-    // FORMA_STORYBOOK=1 deschide pagina de componente la pornire (pentru capturi automate).
+    // AION_STORYBOOK=1 deschide pagina de componente la pornire (pentru capturi automate).
     bool storybookOnStart() const;
-    // FORMA_STARTUP="view.top;palette:zoom" rulează comenzi la pornire (pentru verificări automate).
+    // AION_STARTUP="view.top;palette:zoom" rulează comenzi la pornire (pentru verificări automate).
     QStringList startupActions() const;
 
     // Textul unei scurtături în forma platformei („Ctrl+K” devine „⌘K” pe macOS).

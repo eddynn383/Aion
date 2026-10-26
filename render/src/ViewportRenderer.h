@@ -7,7 +7,7 @@
 
 #include <memory>
 
-namespace forma::render {
+namespace aion::render {
 
 // Randează un cadru al viewport-ului pe firul de randare: fundal, fețe, grid, linii, puncte.
 class ViewportRenderer final : public QQuickRhiItemRenderer {
@@ -53,4 +53,4 @@ private:
     ViewportFrame m_frame;
 };
 
-} // namespace forma::render
+} // namespace aion::render

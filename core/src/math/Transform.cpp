@@ -1,12 +1,12 @@
-#include "forma/core/math/Transform.h"
+#include "aion/core/math/Transform.h"
 
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/matrix.hpp>
 
-namespace forma::math {
+namespace aion::math {
 
 Transform Transform::translation(const Vec3d& offset)
 {
@@ -68,4 +68,4 @@ bool Transform::isIdentity() const
     return true;
 }
 
-} // namespace forma::math
+} // namespace aion::math

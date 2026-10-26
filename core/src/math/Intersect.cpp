@@ -1,13 +1,13 @@
-#include "forma/core/math/Intersect.h"
+#include "aion/core/math/Intersect.h"
 
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <cmath>
 
-namespace forma::math {
+namespace aion::math {
 
 namespace {
 
@@ -148,4 +148,4 @@ PointLocation locatePoint(const Vec2d& p, std::span<const Vec2d> polygon, double
     return inside ? PointLocation::Inside : PointLocation::Outside;
 }
 
-} // namespace forma::math
+} // namespace aion::math

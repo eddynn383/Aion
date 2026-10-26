@@ -1,8 +1,8 @@
-#include "forma/core/text/FuzzyMatch.h"
+#include "aion/core/text/FuzzyMatch.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-using forma::text::fuzzyMatch;
+using aion::text::fuzzyMatch;
 
 TEST_CASE("Interogarea goală se potrivește cu orice", "[core][text][fuzzy]")
 {

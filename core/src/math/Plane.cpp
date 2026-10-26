@@ -1,12 +1,12 @@
-#include "forma/core/math/Plane.h"
+#include "aion/core/math/Plane.h"
 
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 
 #include <cmath>
 
-namespace forma::math {
+namespace aion::math {
 
 namespace {
 
@@ -98,4 +98,4 @@ Vec3d PlaneFrame::toWorld(const Vec2d& p) const
     return m_origin + m_u * p.x + m_v * p.y;
 }
 
-} // namespace forma::math
+} // namespace aion::math

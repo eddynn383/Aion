@@ -1,5 +1,5 @@
-#include "forma/core/commands/CommandStack.h"
-#include "forma/core/geom/Operations.h"
+#include "aion/core/commands/CommandStack.h"
+#include "aion/core/geom/Operations.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -9,8 +9,8 @@
 #include <sstream>
 #include <string>
 
-using namespace forma::geom;
-using forma::commands::CommandStack;
+using namespace aion::geom;
+using aion::commands::CommandStack;
 
 namespace {
 
@@ -97,7 +97,7 @@ std::string describe(const Vec3d& p)
 
 std::uint32_t baseSeed()
 {
-    if (const char* env = std::getenv("FORMA_FUZZ_SEED")) {
+    if (const char* env = std::getenv("AION_FUZZ_SEED")) {
         return static_cast<std::uint32_t>(std::strtoul(env, nullptr, 10));
     }
     return 20261026u;

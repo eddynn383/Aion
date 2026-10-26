@@ -1,5 +1,5 @@
 import QtQuick
-import Forma
+import Aion
 
 // Scurtătură de tastatură afișată ca o etichetă mică („⌘K”).
 Rectangle {

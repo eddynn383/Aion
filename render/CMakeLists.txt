@@ -1,37 +1,37 @@
-add_library(forma_render STATIC
-    include/forma/render/GraphicsApi.h
-    include/forma/render/Viewport.h
+add_library(aion_render STATIC
+    include/aion/render/GraphicsApi.h
+    include/aion/render/Viewport.h
     src/GraphicsApi.cpp
     src/Viewport.cpp
     src/ViewportFrame.h
     src/ViewportRenderer.cpp
     src/ViewportRenderer.h
 )
-add_library(forma::render ALIAS forma_render)
+add_library(aion::render ALIAS aion_render)
 
-target_include_directories(forma_render PUBLIC
+target_include_directories(aion_render PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 # Fișierul generat pentru înregistrarea tipurilor QML include header-ele după nume („Viewport.h”).
-target_include_directories(forma_render PRIVATE include/forma/render)
+target_include_directories(aion_render PRIVATE include/aion/render)
 
 # QRhi e un API „semi-public”: header-ele lui vin cu ținta GuiPrivate.
-target_link_libraries(forma_render
-    PUBLIC forma::core Qt6::Gui Qt6::Quick
+target_link_libraries(aion_render
+    PUBLIC aion::core Qt6::Gui Qt6::Quick
     PRIVATE Qt6::GuiPrivate
 )
 
-# Viewport-ul se înregistrează în QML ca modulul Forma.Render.
-qt_add_qml_module(forma_render
-    URI Forma.Render
+# Viewport-ul se înregistrează în QML ca modulul Aion.Render.
+qt_add_qml_module(aion_render
+    URI Aion.Render
     VERSION 1.0
     NO_PLUGIN_OPTIONAL
 )
 
 # Shaderele se compilează la build (qsb) pentru Metal, Direct3D, Vulkan și OpenGL / WebGL 2.
-qt_add_shaders(forma_render "forma_render_shaders"
-    PREFIX "/forma/shaders"
+qt_add_shaders(aion_render "aion_render_shaders"
+    PREFIX "/aion/shaders"
     BASE shaders
     GLSL "300es,330"
     HLSL 50
@@ -48,4 +48,4 @@ qt_add_shaders(forma_render "forma_render_shaders"
         shaders/mesh.frag
 )
 
-forma_configure_target(forma_render)
+aion_configure_target(aion_render)

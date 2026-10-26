@@ -2,20 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Forma (debug)",
+      "name": "Aion (debug)",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/build/mac-debug/app/Forma.app/Contents/MacOS/Forma",
+      "program": "${workspaceFolder}/build/mac-debug/app/Aion.app/Contents/MacOS/Aion",
       "cwd": "${workspaceFolder}",
-      "preLaunchTask": "Forma: build"
+      "preLaunchTask": "Aion: build"
     },
     {
       "name": "Teste (debug)",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/build/mac-debug/tests/forma_tests",
+      "program": "${workspaceFolder}/build/mac-debug/tests/aion_tests",
       "cwd": "${workspaceFolder}",
-      "preLaunchTask": "Forma: build"
+      "preLaunchTask": "Aion: build"
     }
   ]
 }

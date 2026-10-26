@@ -23,7 +23,7 @@ if [[ -z "${QT_ROOT_DIR:-}" ]] && command -v brew >/dev/null 2>&1; then
 fi
 
 build_dir="build/$preset"
-app="$build_dir/app/Forma.app"
+app="$build_dir/app/Aion.app"
 
 configure() {
     if [[ ! -f "$build_dir/build.ninja" ]]; then
@@ -52,7 +52,7 @@ case "$command" in
         build
         if [[ "$(uname)" == "Darwin" ]]; then
             # Rulăm direct executabilul, ca mesajele aplicației să apară în terminal.
-            "$app/Contents/MacOS/Forma"
+            "$app/Contents/MacOS/Aion"
         else
             echo "Aplicația se poate rula deocamdată doar pe macOS."
         fi

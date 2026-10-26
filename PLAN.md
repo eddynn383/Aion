@@ -1,6 +1,6 @@
 # Plan de implementare – Modelator 3D (clonă inspirată de SketchUp)
 
-> **Nume de lucru:** `Forma` (se poate schimba oricând).
+> **Nume:** `Aion` — „modelează ce rămâne” (vezi `docs/decisions/0004-nume-aion.md`).
 > Nu folosim numele, logo-ul, iconițele sau formatul `.skp` ale SketchUp.
 
 Acest document este planul de referință al proiectului. Îl urmăm fază cu fază.
@@ -70,19 +70,19 @@ Nu trecem la faza următoare până nu sunt îndeplinite criteriile fazei curent
 ### Structura directoarelor
 
 ```
-forma/
+aion/
 ├── CMakeLists.txt
 ├── CMakePresets.json
 ├── vcpkg.json
 ├── PLAN.md
-├── core/                # headere publice în core/include/forma/core/<modul>/, surse în core/src/
+├── core/                # headere publice în core/include/aion/core/<modul>/, surse în core/src/
 │   ├── math/          # Vec3d, Plane, Ray, Transform, toleranțe
 │   ├── geom/          # topologie: Vertex, Edge, Loop, Face; operații Euler
 │   ├── model/         # Model, Entity, Group, ComponentDefinition/Instance, Tag, Material
 │   ├── inference/     # motorul de snap/inferență
 │   ├── tools/         # Select, Line, Rectangle, Circle, PushPull, Move, Rotate, ...
 │   ├── commands/      # Command, CommandStack (undo/redo), tranzacții
-│   └── io/            # format propriu (.forma), export OBJ/glTF
+│   └── io/            # format propriu (.aion), export OBJ/glTF
 ├── render/
 │   ├── Viewport.*     # QQuickRhiItem
 │   ├── Camera.*       # orbit/pan/zoom, perspectivă/ortografic
@@ -178,7 +178,7 @@ Interfața e discretă și lasă modelul în prim-plan, iar viewport-ul arată v
 ### 5.2 Layout (inspirat de Figma)
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ ● ● ●   Forma · Casa.forma            [⌘K Caută comenzi]   Share │  ← titlebar integrat (fără bară nativă separată)
+│ ● ● ●   Aion · Casa.aion            [⌘K Caută comenzi]   Share │  ← titlebar integrat (fără bară nativă separată)
 ├────────┬─────────────────────────────────────────────┬───────────┤
 │ Layers │                                             │ Inspector │
 │ Outline│               VIEWPORT 3D                   │ Transform │
@@ -215,7 +215,7 @@ Interfața e discretă și lasă modelul în prim-plan, iar viewport-ul arată v
 Toate componentele folosesc **numai tokeni**. Nu scriem culori „hardcodate”, ca temele să rămână consecvente.
 
 ### 5.4 Calitatea grafică a viewport-ului (peste SketchUp)
-| Element | SketchUp | Forma |
+| Element | SketchUp | Aion |
 |---|---|---|
 | Iluminare | lumină simplă, „plată” | **iluminare din mediu HDR (IBL)** + lumină solară, **tonemapping ACES**, randare liniară/sRGB corectă |
 | Ocluzie | lipsă | **SSAO / GTAO**: colțurile și îmbinările capătă adâncime |
@@ -237,7 +237,7 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 
 ### Faza 0 – Fundația proiectului
 - [x] Repository git, `.gitignore`, `.clang-format`, `.clang-tidy`, `.editorconfig`
-- [x] `CMakeLists.txt` cu ținte separate: `forma_core` (lib), `forma_render` (lib), `forma_app` (exe), `forma_tests`
+- [x] `CMakeLists.txt` cu ținte separate: `aion_core` (lib), `aion_render` (lib), `aion_app` (exe), `aion_tests`
 - [x] `CMakePresets.json`: `mac-debug` (cu ASan/UBSan), `mac-release`, plus `core-debug` (fără Qt)
 - [x] `vcpkg.json` cu glm, nlohmann-json, catch2, earcut-hpp, tinygltf
 - [x] Găsirea Qt 6 prin `CMAKE_PREFIX_PATH` = `$QT_ROOT_DIR` (documentată în README)
@@ -283,7 +283,7 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 - [x] `Command`, `CommandStack`, tranzacții, undo/redo
 - [x] Sistem de notificări `ModelObserver` (entități adăugate, modificate, șterse) (`geom::MeshObserver`)
 - [x] **Teste unitare extinse:** pătrat → 1 față; pătrat împărțit de diagonală → 2 fețe; pătrat în pătrat → față cu gaură; undo/redo pe fiecare caz; `validate()` după fiecare pas
-- [x] Teste de „fuzz”: secvențe aleatoare de operații + undo complet → modelul revine la starea inițială (10 000 de operații, `FORMA_FUZZ_SEED` pentru alte semințe)
+- [x] Teste de „fuzz”: secvențe aleatoare de operații + undo complet → modelul revine la starea inițială (10 000 de operații, `AION_FUZZ_SEED` pentru alte semințe)
 
 **Gata când:** toate testele trec sub ASan/UBSan, inclusiv fuzz-ul cu ≥ 10.000 de iterații.
 _(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 — de rulat cu LLVM din Homebrew sau în CI.)_
@@ -355,7 +355,7 @@ _(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 �
 ---
 
 ### Faza 7 – Fișiere și export
-- [ ] Format propriu `.forma`: arhivă ZIP cu `model.json` (topologie, entități, tag-uri, materiale), texturi și thumbnail; câmp `formatVersion` pentru migrări
+- [ ] Format propriu `.aion`: arhivă ZIP cu `model.json` (topologie, entități, tag-uri, materiale), texturi și thumbnail; câmp `formatVersion` pentru migrări
 - [ ] Salvare și deschidere, „documente recente”, marcaj „modificat” în titlul ferestrei
 - [ ] Autosalvare periodică și recuperare după crash
 - [ ] Export **OBJ** (+ MTL) și **glTF/GLB**
@@ -399,7 +399,7 @@ _(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 �
 
 ### Faza 10 – Finisare macOS și distribuție (v1.0 macOS)
 - [ ] Meniul nativ macOS (App menu, Preferences cu Cmd+,), Dark Mode, scurtături standard
-- [ ] Iconița aplicației, ecran „About”, asociere cu fișierele `.forma`
+- [ ] Iconița aplicației, ecran „About”, asociere cu fișierele `.aion`
 - [ ] Performanță: modele cu ≥ 100.000 de fețe; profilare cu Instruments; BVH pentru picking și inferență
 - [ ] Preferințe: unități, precizie, scurtături personalizabile
 - [ ] Build **Universal** (arm64 + x86_64)
@@ -424,9 +424,9 @@ _(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 �
 ---
 
 ### Faza 12 – Web
-- [ ] Compilarea `forma_core` cu **Emscripten** (ar trebui să meargă fără modificări datorită regulii „zero Qt în core”)
+- [ ] Compilarea `aion_core` cu **Emscripten** (ar trebui să meargă fără modificări datorită regulii „zero Qt în core”)
 - [ ] Variantă A: **Qt for WebAssembly** pentru întreaga aplicație (Qt Quick + backend WebGL). Cel mai puțin cod nou; efectele grafice scumpe pot fi reduse pe web
-- [ ] Variantă B (dacă A e prea grea sau lentă): UI web nativ (TypeScript) + `forma_core` în WASM, cu randare WebGL/WebGPU
+- [ ] Variantă B (dacă A e prea grea sau lentă): UI web nativ (TypeScript) + `aion_core` în WASM, cu randare WebGL/WebGPU
 - [ ] Decizia A vs. B documentată într-un ADR, după un prototip de măsurare (dimensiune, timp de încărcare, fps)
 - [ ] Salvare și încărcare prin File System Access API și download/upload; IndexedDB pentru autosalvare
 - [ ] CI cu Emscripten; deploy pe hosting static
@@ -453,7 +453,7 @@ _(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 �
 ## 8. Convenții de lucru
 
 - **Cod:** C++20, `clang-format` obligatoriu, fără `new`/`delete` manual (RAII, `std::unique_ptr`), fără excepții în bucle fierbinți.
-- **Denumiri:** `PascalCase` pentru tipuri, `camelCase` pentru funcții și variabile, `m_` pentru membri privați, namespace `forma::`.
+- **Denumiri:** `PascalCase` pentru tipuri, `camelCase` pentru funcții și variabile, `m_` pentru membri privați, namespace `aion::`.
 - **Teste:** orice funcționalitate din `core/` vine cu teste. Bug-urile de geometrie primesc întâi un test care le reproduce.
 - **Commit-uri:** mici, cu mesaj clar, de exemplu `core/geom: split face by crossing edge`.
 - **Decizii importante:** câte un ADR scurt în `docs/decisions/NNNN-titlu.md`.
@@ -466,7 +466,7 @@ _(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 �
 1. Faza 0, integral.
 2. Faza 1: viewport și cameră.
 3. Faza 2: nucleul geometric, cea mai importantă și mai riscantă parte. Îi alocăm timp generos.
-4. Mic prototip: `forma_core` compilat cu Emscripten (validează din timp drumul spre web).
+4. Mic prototip: `aion_core` compilat cu Emscripten (validează din timp drumul spre web).
 5. Fazele 3 → 4 → 5: aici aplicația devine utilizabilă (**MVP**).
 
 **MVP = fazele 0–5:** desenezi, folosești inferența, faci Push/Pull, transformi, ai undo/redo. Totul pe macOS.

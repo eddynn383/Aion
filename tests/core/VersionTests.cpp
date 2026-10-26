@@ -1,4 +1,4 @@
-#include "forma/core/Version.h"
+#include "aion/core/Version.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -6,9 +6,9 @@
 
 TEST_CASE("Versiunea din core corespunde cu cea din string", "[core][version]")
 {
-    const auto v = forma::version();
+    const auto v = aion::version();
     const std::string expected
         = std::to_string(v.major) + "." + std::to_string(v.minor) + "." + std::to_string(v.patch);
 
-    REQUIRE(forma::versionString() == expected);
+    REQUIRE(aion::versionString() == expected);
 }

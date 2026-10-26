@@ -1,6 +1,6 @@
 #include "ViewportRenderer.h"
 
-#include "forma/render/Viewport.h"
+#include "aion/render/Viewport.h"
 
 #include <QFile>
 #include <QMatrix4x4>
@@ -13,7 +13,7 @@
 #include <array>
 #include <cstring>
 
-namespace forma::render {
+namespace aion::render {
 
 namespace {
 
@@ -36,7 +36,7 @@ struct FrameUniforms {
 
 QShader loadShader(const QString& name)
 {
-    QFile file(QStringLiteral(":/forma/shaders/%1.qsb").arg(name));
+    QFile file(QStringLiteral(":/aion/shaders/%1.qsb").arg(name));
     if (!file.open(QIODevice::ReadOnly)) {
         qFatal("Shaderul %s lipsește din resurse", qPrintable(name));
     }
@@ -316,4 +316,4 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     cb->endPass();
 }
 
-} // namespace forma::render
+} // namespace aion::render

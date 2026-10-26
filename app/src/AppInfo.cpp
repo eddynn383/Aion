@@ -1,7 +1,7 @@
 #include "AppInfo.h"
 
-#include "forma/core/Version.h"
-#include "forma/render/GraphicsApi.h"
+#include "aion/core/Version.h"
+#include "aion/render/GraphicsApi.h"
 #include "platform/Platform.h"
 
 #include <QKeySequence>
@@ -14,18 +14,18 @@ AppInfo::AppInfo(QObject* parent)
 
 QString AppInfo::version() const
 {
-    const auto v = forma::versionString();
+    const auto v = aion::versionString();
     return QString::fromUtf8(v.data(), static_cast<qsizetype>(v.size()));
 }
 
 QString AppInfo::graphicsApi() const
 {
-    return forma::render::graphicsApiName(QQuickWindow::graphicsApi());
+    return aion::render::graphicsApiName(QQuickWindow::graphicsApi());
 }
 
 int AppInfo::themeOverride() const
 {
-    const QString theme = qEnvironmentVariable("FORMA_THEME");
+    const QString theme = qEnvironmentVariable("AION_THEME");
     if (theme == QLatin1String("light")) {
         return 1;
     }
@@ -51,12 +51,12 @@ bool AppInfo::debugBuild() const
 
 bool AppInfo::storybookOnStart() const
 {
-    return debugBuild() && qEnvironmentVariableIntValue("FORMA_STORYBOOK") == 1;
+    return debugBuild() && qEnvironmentVariableIntValue("AION_STORYBOOK") == 1;
 }
 
 QStringList AppInfo::startupActions() const
 {
-    return qEnvironmentVariable("FORMA_STARTUP").split(QLatin1Char(';'), Qt::SkipEmptyParts);
+    return qEnvironmentVariable("AION_STARTUP").split(QLatin1Char(';'), Qt::SkipEmptyParts);
 }
 
 QString AppInfo::shortcutText(const QString& sequence) const

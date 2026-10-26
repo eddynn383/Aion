@@ -35,7 +35,7 @@ QImage IconProvider::requestImage(const QString& id, QSize* size, const QSize& r
 
 QImage renderLucideIcon(const QString& name, const QColor& color, QSize size, double strokeWidth)
 {
-    QFile file(QStringLiteral(":/forma/icons/%1.svg").arg(name));
+    QFile file(QStringLiteral(":/aion/icons/%1.svg").arg(name));
     if (!file.open(QIODevice::ReadOnly)) {
         qWarning("Iconiță lipsă: %s", qPrintable(name));
         return {};

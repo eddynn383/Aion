@@ -28,7 +28,7 @@
       "inherits": "mac-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "FORMA_ENABLE_SANITIZERS": "ON"
+        "AION_ENABLE_SANITIZERS": "ON"
       }
     },
     {
@@ -45,8 +45,8 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "FORMA_BUILD_APP": "OFF",
-        "FORMA_ENABLE_SANITIZERS": "ON"
+        "AION_BUILD_APP": "OFF",
+        "AION_ENABLE_SANITIZERS": "ON"
       }
     }
   ],

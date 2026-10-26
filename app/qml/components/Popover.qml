@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Fereastră plutitoare (meniuri, command palette, detalii) cu umbră moale.
 T.Popup {

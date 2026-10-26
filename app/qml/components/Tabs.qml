@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Tab-uri compacte în stil „segmented control”. model: listă de titluri.
 T.TabBar {

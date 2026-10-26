@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
-import Forma
+import Aion
 
 // Gizmo de navigare minimalist: axele camerei proiectate pe ecran.
 // Click pe un capăt de axă = vederea standard corespunzătoare; click pe centru = Iso.

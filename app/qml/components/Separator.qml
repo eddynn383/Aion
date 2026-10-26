@@ -1,5 +1,5 @@
 import QtQuick
-import Forma
+import Aion
 
 // Linie subțire de 1 px. Lungimea o dă cine o folosește (width sau height / anchors).
 Rectangle {

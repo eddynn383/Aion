@@ -1,12 +1,12 @@
-#include "forma/core/geom/Triangulate.h"
+#include "aion/core/geom/Triangulate.h"
 
-#include "forma/core/geom/Mesh.h"
+#include "aion/core/geom/Mesh.h"
 
 #include <mapbox/earcut.hpp>
 
 #include <array>
 
-namespace forma::geom {
+namespace aion::geom {
 
 std::vector<std::uint32_t> triangulatePolygon(std::span<const std::vector<math::Vec2d>> rings)
 {
@@ -54,4 +54,4 @@ FaceTriangles triangulateFace(const Mesh& mesh, FaceId id)
     return out;
 }
 
-} // namespace forma::geom
+} // namespace aion::geom

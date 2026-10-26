@@ -1,10 +1,10 @@
-#include "forma/core/commands/CommandStack.h"
+#include "aion/core/commands/CommandStack.h"
 
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 
-namespace forma::commands {
+namespace aion::commands {
 
 CommandStack::CommandStack(geom::Mesh& mesh)
     : m_mesh(mesh)
@@ -128,4 +128,4 @@ void CommandStack::afterChange()
     }
 }
 
-} // namespace forma::commands
+} // namespace aion::commands

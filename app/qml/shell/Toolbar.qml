@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Effects
-import Forma
+import Aion
 
 // Toolbar plutitor, jos în viewport (ca în Figma).
 // Uneltele de desen devin funcționale în Faza 3; Orbit, Pan și Zoom funcționează de acum.

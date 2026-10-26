@@ -1,9 +1,9 @@
-#include "forma/core/geom/Mesh.h"
+#include "aion/core/geom/Mesh.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace forma::geom;
-using forma::math::Plane;
+using namespace aion::geom;
+using aion::math::Plane;
 
 namespace {
 

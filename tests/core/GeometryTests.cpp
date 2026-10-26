@@ -1,7 +1,7 @@
-#include "forma/core/commands/CommandStack.h"
-#include "forma/core/geom/Operations.h"
-#include "forma/core/geom/Triangulate.h"
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/commands/CommandStack.h"
+#include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Triangulate.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 
@@ -9,8 +9,8 @@
 
 #include <algorithm>
 
-using namespace forma::geom;
-using forma::commands::CommandStack;
+using namespace aion::geom;
+using aion::commands::CommandStack;
 
 namespace {
 
@@ -71,8 +71,8 @@ TEST_CASE("Pătrat → o față", "[core][geom][draw]")
     CHECK(mesh.edges().size() == 4);
     CHECK(mesh.vertices().size() == 4);
     // Fețele de pe sol privesc în jos, ca în SketchUp.
-    CHECK(forma::tol::samePoint(mesh.face(f).plane.normal, { 0, 0, -1 }));
-    CHECK(forma::tol::equal(faceArea(mesh, f), 1e6, 1e-6));
+    CHECK(aion::tol::samePoint(mesh.face(f).plane.normal, { 0, 0, -1 }));
+    CHECK(aion::tol::equal(faceArea(mesh, f), 1e6, 1e-6));
 }
 
 TEST_CASE("Fața apare abia când ciclul se închide", "[core][geom][draw]")
@@ -98,9 +98,9 @@ TEST_CASE("Pătrat împărțit de diagonală → două fețe", "[core][geom][dra
     REQUIRE(mesh.faces().size() == 2);
     for (FaceId f : mesh.faces().keys()) {
         CHECK(mesh.face(f).outer.uses.size() == 3);
-        CHECK(forma::tol::equal(faceArea(mesh, f), 5e5, 1e-6));
+        CHECK(aion::tol::equal(faceArea(mesh, f), 5e5, 1e-6));
         // Fețele moștenesc orientarea feței împărțite.
-        CHECK(forma::tol::samePoint(mesh.face(f).plane.normal, { 0, 0, -1 }));
+        CHECK(aion::tol::samePoint(mesh.face(f).plane.normal, { 0, 0, -1 }));
     }
     const EdgeId diagonal = mesh.findEdge(mesh.findVertexNear({ 0, 0, 0 }, 1), mesh.findVertexNear({ 1000, 1000, 0 }, 1));
     REQUIRE(diagonal);
@@ -119,7 +119,7 @@ TEST_CASE("Pătrat în pătrat → față cu gaură", "[core][geom][draw]")
     const auto withHole = std::find_if(faces.begin(), faces.end(), [&](FaceId f) { return !mesh.face(f).inner.empty(); });
     REQUIRE(withHole != faces.end());
     CHECK(mesh.face(*withHole).inner.size() == 1);
-    CHECK(forma::tol::equal(faceArea(mesh, *withHole), 9e6 - 1e6, 1e-6));
+    CHECK(aion::tol::equal(faceArea(mesh, *withHole), 9e6 - 1e6, 1e-6));
     CHECK_FALSE(faceContainsPoint(mesh, *withHole, { 1500, 1500, 0 }));
     CHECK(faceContainsPoint(mesh, *withHole, { 500, 500, 0 }));
 }
@@ -280,7 +280,7 @@ TEST_CASE("Triangularea unei fețe cu gaură acoperă exact aria", "[core][geom]
     for (FaceId f : mesh.faces().keys()) {
         total += faceArea(mesh, f);
     }
-    CHECK(forma::tol::equal(total, 6e6, 1e-6));
+    CHECK(aion::tol::equal(total, 6e6, 1e-6));
 }
 
 TEST_CASE("Redesenarea unei muchii șterse reface fața", "[core][geom][draw]")

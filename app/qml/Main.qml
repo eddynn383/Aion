@@ -1,6 +1,6 @@
 import QtQuick
-import Forma
-import Forma.Render
+import Aion
+import Aion.Render
 
 Window {
     id: window
@@ -10,7 +10,7 @@ Window {
     minimumWidth: 960
     minimumHeight: 600
     visible: true
-    title: "Forma"
+    title: "Aion"
     color: Theme.bgApp
     // Conținutul continuă sub bara de titlu (macOS: butoanele native rămân, fără fundal propriu).
     flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
@@ -82,7 +82,7 @@ Window {
         }
     }
 
-    // Comenzile din FORMA_STARTUP; „palette:text” deschide command palette cu textul dat.
+    // Comenzile din AION_STARTUP; „palette:text” deschide command palette cu textul dat.
     Timer {
         running: AppInfo.startupActions.length > 0
         interval: 300

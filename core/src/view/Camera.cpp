@@ -1,4 +1,4 @@
-#include "forma/core/view/Camera.h"
+#include "aion/core/view/Camera.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/geometric.hpp>
@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace forma::view {
+namespace aion::view {
 
 namespace {
 
@@ -249,4 +249,4 @@ CameraPose Camera::framing(const Vec3d& boundsMin, const Vec3d& boundsMax) const
     return p;
 }
 
-} // namespace forma::view
+} // namespace aion::view

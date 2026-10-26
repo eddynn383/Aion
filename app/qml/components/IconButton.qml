@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Buton pătrat cu iconiță, pentru toolbar și bare. Tooltip-ul arată numele și scurtătura.
 T.AbstractButton {

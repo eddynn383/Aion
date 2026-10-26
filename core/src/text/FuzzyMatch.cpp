@@ -1,9 +1,9 @@
-#include "forma/core/text/FuzzyMatch.h"
+#include "aion/core/text/FuzzyMatch.h"
 
 #include <algorithm>
 #include <limits>
 
-namespace forma::text {
+namespace aion::text {
 
 namespace {
 
@@ -194,4 +194,4 @@ std::optional<FuzzyMatch> fuzzyMatch(std::string_view query, std::string_view te
     return result;
 }
 
-} // namespace forma::text
+} // namespace aion::text

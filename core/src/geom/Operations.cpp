@@ -1,9 +1,9 @@
-#include "forma/core/geom/Operations.h"
+#include "aion/core/geom/Operations.h"
 
-#include "forma/core/geom/PlanarRegions.h"
-#include "forma/core/geom/Triangulate.h"
-#include "forma/core/math/Intersect.h"
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/geom/PlanarRegions.h"
+#include "aion/core/geom/Triangulate.h"
+#include "aion/core/math/Intersect.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
 
@@ -11,7 +11,7 @@
 #include <map>
 #include <set>
 
-namespace forma::geom {
+namespace aion::geom {
 
 namespace {
 
@@ -381,4 +381,4 @@ void eraseEdge(Mesh& mesh, EdgeId id)
     }
 }
 
-} // namespace forma::geom
+} // namespace aion::geom

@@ -1,13 +1,13 @@
-#include "forma/core/geom/Id.h"
-#include "forma/core/geom/SlotMap.h"
+#include "aion/core/geom/Id.h"
+#include "aion/core/geom/SlotMap.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <string>
 
-using forma::geom::SlotMap;
-using forma::geom::VertexId;
+using aion::geom::SlotMap;
+using aion::geom::VertexId;
 
 TEST_CASE("SlotMap: ID-uri stabile la inserare și ștergere", "[core][geom][slotmap]")
 {

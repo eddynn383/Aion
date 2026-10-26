@@ -1,7 +1,7 @@
 pragma Singleton
 
 import QtQuick
-import Forma
+import Aion
 
 // Design tokens (PLAN.md, secțiunea 5.3).
 // Componentele folosesc numai valori de aici, fără culori hardcodate.

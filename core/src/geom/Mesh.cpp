@@ -1,11 +1,11 @@
-#include "forma/core/geom/Mesh.h"
+#include "aion/core/geom/Mesh.h"
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <cassert>
 
-namespace forma::geom {
+namespace aion::geom {
 
 namespace {
 
@@ -402,4 +402,4 @@ bool Mesh::sameAs(const Mesh& other) const
     return same(m_vertices, other.m_vertices) && same(m_edges, other.m_edges) && same(m_faces, other.m_faces);
 }
 
-} // namespace forma::geom
+} // namespace aion::geom

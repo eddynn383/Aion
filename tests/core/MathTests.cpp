@@ -1,7 +1,7 @@
-#include "forma/core/math/Intersect.h"
-#include "forma/core/math/Plane.h"
-#include "forma/core/math/Tolerance.h"
-#include "forma/core/math/Transform.h"
+#include "aion/core/math/Intersect.h"
+#include "aion/core/math/Plane.h"
+#include "aion/core/math/Tolerance.h"
+#include "aion/core/math/Transform.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
@@ -11,9 +11,9 @@
 #include <array>
 #include <vector>
 
-using namespace forma::math;
-using forma::tol::equal;
-using forma::tol::samePoint;
+using namespace aion::math;
+using aion::tol::equal;
+using aion::tol::samePoint;
 
 TEST_CASE("Planul din trei puncte și din poligon", "[core][math][plane]")
 {
@@ -148,6 +148,6 @@ TEST_CASE("Transformările se compun și se inversează", "[core][math][transfor
     const Transform squash = Transform::scaling({ 0, 0, 0 }, { 1, 1, 0.5 });
     const Vec3d n = glm::normalize(Vec3d { 0, 1, 1 }); // fața prin (0,1,0)-(0,0,1)
     const Vec3d edge = squash.applyToVector({ 0, -1, 1 });
-    CHECK(forma::tol::isZero(glm::dot(squash.applyToNormal(n), edge), 1e-9));
+    CHECK(aion::tol::isZero(glm::dot(squash.applyToNormal(n), edge), 1e-9));
     CHECK(equal(glm::length(squash.applyToNormal(n)), 1.0, 1e-12));
 }

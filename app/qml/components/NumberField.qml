@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import Forma
+import Aion
 
 // Câmp numeric în stil Figma: etichetă scurtă în stânga (trage de ea pentru a modifica valoarea),
 // valoarea în Geist Mono, unitatea în dreapta. Săgețile ↑/↓ modifică cu `step` (Shift = ×10).

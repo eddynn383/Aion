@@ -1,17 +1,17 @@
-#include "forma/core/Version.h"
+#include "aion/core/Version.h"
 
 #include "VersionConfig.h"
 
-namespace forma {
+namespace aion {
 
 Version version() noexcept
 {
-    return { FORMA_VERSION_MAJOR, FORMA_VERSION_MINOR, FORMA_VERSION_PATCH };
+    return { AION_VERSION_MAJOR, AION_VERSION_MINOR, AION_VERSION_PATCH };
 }
 
 std::string_view versionString() noexcept
 {
-    return FORMA_VERSION_STRING;
+    return AION_VERSION_STRING;
 }
 
-} // namespace forma
+} // namespace aion

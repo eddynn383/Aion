@@ -1,8 +1,8 @@
-#include "forma/core/geom/PlanarRegions.h"
+#include "aion/core/geom/PlanarRegions.h"
 
-#include "forma/core/geom/Mesh.h"
-#include "forma/core/math/Intersect.h"
-#include "forma/core/math/Tolerance.h"
+#include "aion/core/geom/Mesh.h"
+#include "aion/core/math/Intersect.h"
+#include "aion/core/math/Tolerance.h"
 
 #include <algorithm>
 #include <array>
@@ -11,7 +11,7 @@
 #include <numeric>
 #include <unordered_map>
 
-namespace forma::geom {
+namespace aion::geom {
 
 namespace {
 
@@ -251,4 +251,4 @@ std::vector<PlanarRegion> findPlanarRegions(const Mesh& mesh, const math::Plane&
     return regions;
 }
 
-} // namespace forma::geom
+} // namespace aion::geom

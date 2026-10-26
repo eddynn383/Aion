@@ -1,6 +1,6 @@
-#include "forma/core/math/Tolerance.h"
-#include "forma/core/view/Camera.h"
-#include "forma/core/view/CameraMotion.h"
+#include "aion/core/math/Tolerance.h"
+#include "aion/core/view/Camera.h"
+#include "aion/core/view/CameraMotion.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
@@ -8,9 +8,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
-using namespace forma::view;
-using forma::tol::kAngle;
-using forma::tol::samePoint;
+using namespace aion::view;
+using aion::tol::kAngle;
+using aion::tol::samePoint;
 
 namespace {
 
@@ -67,12 +67,12 @@ TEST_CASE("Baza camerei e ortonormală", "[core][view][camera]")
     const double pitch = GENERATE(-glm::half_pi<double>(), -0.3, 0.0, 0.9, glm::half_pi<double>());
     c.setPose({ {}, 2.1, pitch, 100.0 });
 
-    CHECK(forma::tol::equal(glm::length(c.forward()), 1.0, kAngle));
-    CHECK(forma::tol::equal(glm::length(c.right()), 1.0, kAngle));
-    CHECK(forma::tol::equal(glm::length(c.up()), 1.0, kAngle));
-    CHECK(forma::tol::isZero(glm::dot(c.forward(), c.right()), kAngle));
-    CHECK(forma::tol::isZero(glm::dot(c.forward(), c.up()), kAngle));
-    CHECK(forma::tol::isZero(c.right().z, kAngle));
+    CHECK(aion::tol::equal(glm::length(c.forward()), 1.0, kAngle));
+    CHECK(aion::tol::equal(glm::length(c.right()), 1.0, kAngle));
+    CHECK(aion::tol::equal(glm::length(c.up()), 1.0, kAngle));
+    CHECK(aion::tol::isZero(glm::dot(c.forward(), c.right()), kAngle));
+    CHECK(aion::tol::isZero(glm::dot(c.forward(), c.up()), kAngle));
+    CHECK(aion::tol::isZero(c.right().z, kAngle));
 }
 
 TEST_CASE("Orbit limitează pitch-ul și păstrează ținta", "[core][view][camera]")
@@ -81,9 +81,9 @@ TEST_CASE("Orbit limitează pitch-ul și păstrează ținta", "[core][view][came
     const Vec3d target = c.pose().target;
 
     c.orbit(0.0, 10.0);
-    CHECK(forma::tol::equal(c.pose().pitch, glm::half_pi<double>(), kAngle));
+    CHECK(aion::tol::equal(c.pose().pitch, glm::half_pi<double>(), kAngle));
     c.orbit(0.0, -20.0);
-    CHECK(forma::tol::equal(c.pose().pitch, -glm::half_pi<double>(), kAngle));
+    CHECK(aion::tol::equal(c.pose().pitch, -glm::half_pi<double>(), kAngle));
 
     c.orbit(7.0, 0.0);
     CHECK(c.pose().yaw > -glm::pi<double>());
@@ -124,7 +124,7 @@ TEST_CASE("Zoom spre cursor ține pe loc punctul de sub cursor", "[core][view][c
     const Vec3d anchor = c.zoomAnchorAt(cursor);
 
     c.zoomAbout(0.5, anchor);
-    CHECK(forma::tol::equal(c.pose().distance, 4000.0));
+    CHECK(aion::tol::equal(c.pose().distance, 4000.0));
     const auto after = c.project(anchor);
     REQUIRE(after.has_value());
     CHECK(sameScreen(*after, cursor));
@@ -134,9 +134,9 @@ TEST_CASE("Zoom-ul respectă limitele de distanță", "[core][view][camera]")
 {
     Camera c = makeCamera();
     c.zoomAbout(1e-9, c.pose().target);
-    CHECK(forma::tol::equal(c.pose().distance, Camera::kMinDistance));
+    CHECK(aion::tol::equal(c.pose().distance, Camera::kMinDistance));
     c.zoomAbout(1e20, c.pose().target);
-    CHECK(forma::tol::equal(c.pose().distance, Camera::kMaxDistance));
+    CHECK(aion::tol::equal(c.pose().distance, Camera::kMaxDistance));
 }
 
 TEST_CASE("Pan mută scena odată cu cursorul", "[core][view][camera]")
@@ -187,8 +187,8 @@ TEST_CASE("Tranziția ajunge la destinație pe drumul cel mai scurt", "[core][vi
     }
     CHECK_FALSE(motion.isActive());
     CHECK(samePoint(c.pose().target, target.target));
-    CHECK(forma::tol::equal(c.pose().yaw, target.yaw, kAngle));
-    CHECK(forma::tol::equal(c.pose().distance, target.distance));
+    CHECK(aion::tol::equal(c.pose().yaw, target.yaw, kAngle));
+    CHECK(aion::tol::equal(c.pose().distance, target.distance));
 }
 
 TEST_CASE("Inerția orbitei se stinge", "[core][view][motion]")
@@ -220,7 +220,7 @@ TEST_CASE("Zoom-ul lin ajunge exact la factorul cerut", "[core][view][motion]")
         motion.update(c, 1.0 / 60.0);
     }
     CHECK_FALSE(motion.isActive());
-    CHECK(forma::tol::equal(c.pose().distance, 2000.0, 2.0));
+    CHECK(aion::tol::equal(c.pose().distance, 2000.0, 2.0));
 }
 
 TEST_CASE("Reduce Motion face tranzițiile instantanee", "[core][view][motion]")

@@ -1,6 +1,6 @@
 #include "CommandSearch.h"
 
-#include "forma/core/text/FuzzyMatch.h"
+#include "aion/core/text/FuzzyMatch.h"
 
 #include <algorithm>
 
@@ -118,12 +118,12 @@ void CommandSearch::refilter()
     for (int i = 0; i < m_commands.size(); ++i) {
         const QVariantMap cmd = commandAt(i);
         const QByteArray title = cmd.value(QStringLiteral("title")).toString().toUtf8();
-        if (auto m = forma::text::fuzzyMatch(query.toStdString(), title.toStdString())) {
+        if (auto m = aion::text::fuzzyMatch(query.toStdString(), title.toStdString())) {
             m_results.push_back({ i, m->score, std::move(m->positions) });
             continue;
         }
         const QByteArray full = (cmd.value(QStringLiteral("category")).toString() + QLatin1Char(' ')).toUtf8() + title;
-        if (auto m = forma::text::fuzzyMatch(query.toStdString(), full.toStdString())) {
+        if (auto m = aion::text::fuzzyMatch(query.toStdString(), full.toStdString())) {
             m_results.push_back({ i, m->score - kCategoryOnlyPenalty, {} });
         }
     }
