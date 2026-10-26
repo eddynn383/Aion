@@ -54,10 +54,14 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   Designul: `docs/decisions/0003-nucleu-geometric.md`. Lipsește doar rularea sub ASan (vezi mai sus).
 
 - Toolbar-ul are unelte grupate ca în Figma (`shell/ToolGroupButton.qml`, `components/Menu.qml`).
+- **Faza 3** făcută pe `feature/faza-3`: `geom::Selection`, `view::pick` / `pickInRectangle`, `tools::Tool` +
+  Select / Line / Rectangle / Eraser (în core, cu teste), `render::Document` (model + istoric + selecție + unealtă),
+  contur de selecție în screen-space. Verificare prin input real: `AION_STARTUP="view.top;wait:700;tool.rectangle;clickw:x,y,z;..."`.
+- Prototipul WebAssembly e în PR #1 (`feature/wasm-core`): core + teste compilate cu Emscripten și rulate în Node, în CI.
 
 ## Următorii pași
-1. Verifică primul run al CI-ului pe GitHub (n-a mai rulat niciodată; include ASan pe runner-ul macOS).
-2. Prototipul WebAssembly pentru `aion_core` (PLAN, secțiunea 9, pasul 4), apoi Faza 3.
+1. Utilizatorul testează Faza 3 (desen, selecție, ștergere, undo); merge `feature/faza-3` și PR #1.
+2. Faza 4: inferența (snap) și Measurements box (VCB).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,

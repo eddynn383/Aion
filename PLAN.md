@@ -286,26 +286,27 @@ Fiecare efect se poate dezactiva din Preferințe (preset-uri: *Performanță*, *
 - [x] Teste de „fuzz”: secvențe aleatoare de operații + undo complet → modelul revine la starea inițială (10 000 de operații, `AION_FUZZ_SEED` pentru alte semințe)
 
 **Gata când:** toate testele trec sub ASan/UBSan, inclusiv fuzz-ul cu ≥ 10.000 de iterații.
-_(2026-10-26: trec sub UBSan; ASan nu pornește cu Apple clang 17 pe macOS 26 — de rulat cu LLVM din Homebrew sau în CI.)_
+_(2026-10-26: ✓ local sub UBSan, iar în CI pe GitHub sub ASan + UBSan; pe acest Mac ASan nu pornește cu Apple clang 17 / macOS 26.)_
 
 ---
 
 ### Faza 3 – Randarea modelului, selecția, primele unelte
-- [ ] `SceneBuffers`: buffere GPU generate din model și actualizate incremental la notificări
-- [ ] Fețe față/spate în culori diferite (neutru deschis / gri-albastru), muchii închise la culoare, anti-aliased
-- [ ] Selecție afișată cu **contur luminos** în screen-space + tentă subtilă de accent
-- [ ] `Picking`: ce față, muchie sau vârf e sub cursor (rază + toleranță în pixeli pentru muchii și vârfuri)
-- [ ] Interfață `Tool` în `core/tools` (onPointerDown/Move/Up, onKey, onCancel, overlay de desenat)
-- [ ] **Select:** click, Shift/Cmd pentru adăugare/scădere, dreptunghi stânga→dreapta (complet în interior) și dreapta→stânga (atinge), dublu-click = față + muchii, triplu-click = tot ce e conectat
-- [ ] **Line:** desenare continuă de segmente, Esc oprește
-- [ ] **Rectangle:** pe planul de sol sau pe o față existentă
-- [ ] **Eraser:** șterge muchii (și fețele care depind de ele)
-- [ ] Tasta Delete pe selecție, Cmd+Z / Cmd+Shift+Z
-- [ ] Toolbar plutitor cu iconițe în stil Lucide, tooltip cu numele și scurtătura; scurtături de tastatură (L, R, Space = Select, E)
-- [ ] Toate uneltele disponibile și din command palette
-- [ ] Highlight la hover și la selecție
+- [x] `SceneBuffers`: buffere GPU generate din model și actualizate incremental la notificări (triangularea se reface doar pentru fețele schimbate; buffer-ul GPU se reîncarcă întreg)
+- [x] Fețe față/spate în culori diferite (neutru deschis / gri-albastru), muchii închise la culoare, anti-aliased
+- [x] Selecție afișată cu **contur luminos** în screen-space + tentă subtilă de accent
+- [x] `Picking`: ce față, muchie sau vârf e sub cursor (rază + toleranță în pixeli pentru muchii și vârfuri)
+- [x] Interfață `Tool` în `core/tools` (onPointerDown/Move/Up, onKey, onCancel, overlay de desenat)
+- [x] **Select:** click, Shift/Cmd pentru adăugare/scădere, dreptunghi stânga→dreapta (complet în interior) și dreapta→stânga (atinge), dublu-click = față + muchii, triplu-click = tot ce e conectat
+- [x] **Line:** desenare continuă de segmente, Esc oprește
+- [x] **Rectangle:** pe planul de sol sau pe o față existentă
+- [x] **Eraser:** șterge muchii (și fețele care depind de ele)
+- [x] Tasta Delete pe selecție, Cmd+Z / Cmd+Shift+Z
+- [x] Toolbar plutitor cu iconițe în stil Lucide, tooltip cu numele și scurtătura; scurtături de tastatură (L, R, Space = Select, E)
+- [x] Toate uneltele disponibile și din command palette
+- [x] Highlight la hover și la selecție
 
 **Gata când:** poți desena un dreptunghi, îl împarți cu o linie în două fețe, selectezi una, o ștergi, apoi dai undo, totul fără erori `validate()`.
+_(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație (`AION_STARTUP` cu `clickw:`), cu `validate()` după fiecare comandă.)_
 
 ---
 
