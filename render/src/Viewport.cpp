@@ -404,6 +404,10 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
                 material->color.a / 255.0f };
             surface = { material->roughness, material->metallic };
         }
+        glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f };
+        if (const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr) {
+            backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f, back->color.a / 255.0f };
+        }
         const bool transparent = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
         std::vector<MeshVertex>& target = transparent ? f.transparent : f.triangles;
         // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
@@ -415,7 +419,7 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         for (std::uint32_t i : tri.indices) {
             const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
             target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
-                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface });
+                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor });
         }
     }
 

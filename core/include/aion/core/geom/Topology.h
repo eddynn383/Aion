@@ -58,6 +58,7 @@ struct Face {
     Loop outer;
     std::vector<Loop> inner;
     model::MaterialId material; // nul = materialul implicit (sau al grupului din care face parte)
+    model::MaterialId backMaterial; // materialul de pe verso; nul = ca fața (sau culoarea implicită a versoului)
 
     bool operator==(const Face&) const = default;
 };

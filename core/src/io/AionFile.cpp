@@ -63,6 +63,7 @@ json meshToJson(const geom::Mesh& mesh)
         faces.push_back({
             { "id", mesh.faces().keys()[i].value },
             { "material", f.material.value },
+            { "backMaterial", f.backMaterial.value },
             { "plane", { f.plane.normal.x, f.plane.normal.y, f.plane.normal.z, f.plane.d } },
             { "outer", loopToJson(f.outer) },
             { "inner", inner },
@@ -105,6 +106,7 @@ geom::ChangeSet meshFromJson(const json& j)
         face.plane = { { p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>() }, p.at(3).get<double>() };
         face.outer = loopFromJson(f.at("outer"));
         face.material = model::MaterialId { f.value("material", std::uint64_t { 0 }) };
+        face.backMaterial = model::MaterialId { f.value("backMaterial", std::uint64_t { 0 }) };
         for (const json& h : f.at("inner")) {
             face.inner.push_back(loopFromJson(h));
         }

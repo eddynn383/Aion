@@ -3,6 +3,10 @@
 #include "aion/core/geom/Operations.h"
 
 #include <glm/common.hpp>
+#include <glm/geometric.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/matrix.hpp>
+#include <glm/trigonometric.hpp>
 
 #include <limits>
 
@@ -198,6 +202,82 @@ std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId defi
         }
     }
     return { lo, hi };
+}
+
+namespace {
+
+// M = T · R · S · T(−lo): rotația (coloane ortonormate) și scara (lungimile coloanelor) dintr-o transformare.
+struct Decomposed {
+    glm::dmat3 rotation { 1.0 };
+    math::Vec3d scale { 1.0 };
+};
+
+Decomposed decompose(const math::Transform& t)
+{
+    const glm::dmat3 m(t.matrix());
+    Decomposed d;
+    for (int i = 0; i < 3; ++i) {
+        const double length = glm::length(m[i]);
+        d.scale[i] = length;
+        d.rotation[i] = length > 1e-12 ? m[i] / length : math::Vec3d { i == 0, i == 1, i == 2 };
+    }
+    // O oglindire apare ca scară negativă pe X (rotația rămâne o rotație adevărată).
+    if (glm::determinant(d.rotation) < 0.0) {
+        d.rotation[0] = -d.rotation[0];
+        d.scale.x = -d.scale.x;
+    }
+    return d;
+}
+
+} // namespace
+
+Placement placementOf(const Model& model, InstanceId instance)
+{
+    const Instance& inst = model.instance(instance);
+    const auto [lo, hi] = bounds(model, inst.definition);
+    const math::Vec3d corner = lo.x <= hi.x ? lo : math::Vec3d { 0.0 };
+    const math::Vec3d extent = lo.x <= hi.x ? hi - lo : math::Vec3d { 0.0 };
+    const Decomposed d = decompose(inst.transform);
+    Placement p;
+    p.position = inst.transform.applyToPoint(corner);
+    p.rotationZ = glm::degrees(std::atan2(d.rotation[0].y, d.rotation[0].x));
+    p.scale = d.scale;
+    p.size = glm::abs(extent * d.scale);
+    return p;
+}
+
+void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
+{
+    Instance inst = model.instance(instance);
+    const auto [lo, hi] = bounds(model, inst.definition);
+    const math::Vec3d corner = lo.x <= hi.x ? lo : math::Vec3d { 0.0 };
+    const math::Vec3d extent = lo.x <= hi.x ? hi - lo : math::Vec3d { 0.0 };
+    Decomposed d = decompose(inst.transform);
+
+    // Rotația în jurul lui Z: diferența față de unghiul curent, aplicată peste rotația existentă.
+    const double current = std::atan2(d.rotation[0].y, d.rotation[0].x);
+    const double delta = glm::radians(wanted.rotationZ) - current;
+    const glm::dmat3 rz(glm::rotate(glm::dmat4(1.0), delta, math::Vec3d { 0, 0, 1 }));
+    d.rotation = rz * d.rotation;
+
+    math::Vec3d scale = wanted.scale;
+    for (int i = 0; i < 3; ++i) {
+        if (wanted.size[i] > 0.0 && extent[i] > 1e-9) {
+            scale[i] = std::copysign(wanted.size[i] / extent[i], scale[i] == 0.0 ? 1.0 : scale[i]);
+        }
+        if (std::abs(scale[i]) < 1e-9) {
+            scale[i] = 1e-9; // o scară nulă ar turti obiectul ireversibil
+        }
+    }
+    glm::dmat3 rs = d.rotation;
+    for (int i = 0; i < 3; ++i) {
+        rs[i] *= scale[i];
+    }
+    // Colțul minim (local) ajunge în poziția cerută.
+    glm::dmat4 m(rs);
+    m[3] = glm::dvec4(wanted.position - rs * corner, 1.0);
+    inst.transform = math::Transform(m);
+    model.setInstance(instance, inst);
 }
 
 } // namespace aion::model

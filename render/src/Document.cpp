@@ -67,21 +67,6 @@ const model::Color kTagPalette[] = {
     { 0x8B, 0x5C, 0xF6, 255 }, { 0x14, 0xB8, 0xA6, 255 }, { 0xEF, 0x44, 0x44, 255 }, { 0x84, 0xCC, 0x16, 255 },
 };
 
-// „1.2 × 0.6 × 2.4 m” sau „155.4 × 155.4 × 186.3 mm”: o singură unitate, după cea mai mare dimensiune.
-QString formatSize(const math::Vec3d& size)
-{
-    const bool meters = std::max({ size.x, size.y, size.z }) >= 1000.0;
-    const auto number = [&](double mm) {
-        QString s = QString::number(meters ? mm / 1000.0 : mm, 'f', meters ? 3 : 1);
-        while (s.contains(QLatin1Char('.')) && (s.endsWith(QLatin1Char('0')) || s.endsWith(QLatin1Char('.')))) {
-            s.chop(1);
-        }
-        return s;
-    };
-    return number(size.x) + QStringLiteral(" × ") + number(size.y) + QStringLiteral(" × ") + number(size.z)
-        + (meters ? QStringLiteral(" m") : QStringLiteral(" mm"));
-}
-
 QString formatArea(double mm2)
 {
     if (mm2 >= 1e6) {
@@ -756,6 +741,20 @@ QVariantList Document::tags() const
     return out;
 }
 
+namespace {
+QVariantMap materialEntry(const model::Material& m); // mai jos, la materiale
+} // namespace
+
+QVariantMap Document::materialInfo(model::MaterialId id) const
+{
+    if (!id || !m_model.materials().contains(id)) {
+        return { { QStringLiteral("id"), 0.0 }, { QStringLiteral("name"), QStringLiteral("Implicit") } };
+    }
+    QVariantMap entry = materialEntry(m_model.material(id));
+    entry[QStringLiteral("id")] = static_cast<double>(id.value);
+    return entry;
+}
+
 QVariantMap Document::entityInfo() const
 {
     QVariantMap info;
@@ -783,13 +782,21 @@ QVariantMap Document::entityInfo() const
         if (!def.group) {
             details << detail(QStringLiteral("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
         }
-        const auto [lo, hi] = model::bounds(m_model, inst.definition);
-        if (lo.x <= hi.x) {
-            details << detail(QStringLiteral("Dimensiuni"), formatSize(hi - lo));
-        }
-        if (inst.material && m_model.materials().contains(inst.material)) {
-            details << detail(QStringLiteral("Material"), QString::fromStdString(m_model.material(inst.material).name));
-        }
+        // Dimensiunile și materialul au controale proprii în Inspector (editabile).
+        const model::Placement placement = model::placementOf(m_model, id);
+        info[QStringLiteral("placement")] = QVariantMap {
+            { QStringLiteral("px"), placement.position.x },
+            { QStringLiteral("py"), placement.position.y },
+            { QStringLiteral("pz"), placement.position.z },
+            { QStringLiteral("rotation"), placement.rotationZ },
+            { QStringLiteral("sx"), placement.scale.x },
+            { QStringLiteral("sy"), placement.scale.y },
+            { QStringLiteral("sz"), placement.scale.z },
+            { QStringLiteral("dx"), placement.size.x },
+            { QStringLiteral("dy"), placement.size.y },
+            { QStringLiteral("dz"), placement.size.z },
+        };
+        info[QStringLiteral("material")] = materialInfo(inst.material);
         const model::Behavior& b = inst.behavior;
         info[QStringLiteral("behavior")] = QVariantMap {
             { QStringLiteral("kind"),
@@ -815,13 +822,23 @@ QVariantMap Document::entityInfo() const
                 area += 0.5 * glm::length(glm::cross(t.points[t.indices[i + 1]] - a, t.points[t.indices[i + 2]] - a));
             }
         }
-        if (m_selection.faces.size() == 1) {
-            const geom::Face& face = mesh.face(*m_selection.faces.begin());
-            details << detail(QStringLiteral("Material"),
-                face.material && m_model.materials().contains(face.material)
-                    ? QString::fromStdString(m_model.material(face.material).name)
-                    : QStringLiteral("Implicit"));
+        // Materialele de pe față și verso: comune tuturor fețelor selectate sau „mixt”.
+        std::set<model::MaterialId> fronts;
+        std::set<model::MaterialId> backs;
+        for (geom::FaceId f : m_selection.faces) {
+            if (const geom::Face* face = mesh.faces().find(f)) {
+                fronts.insert(face->material);
+                backs.insert(face->backMaterial);
+            }
         }
+        const auto sideInfo = [&](const std::set<model::MaterialId>& ids) {
+            if (ids.size() == 1) {
+                return materialInfo(*ids.begin());
+            }
+            return QVariantMap { { QStringLiteral("id"), -1.0 }, { QStringLiteral("name"), QStringLiteral("Mixt") } };
+        };
+        info[QStringLiteral("frontMaterial")] = sideInfo(fronts);
+        info[QStringLiteral("backMaterial")] = sideInfo(backs);
         info[QStringLiteral("kind")] = QStringLiteral("faces");
         info[QStringLiteral("title")]
             = m_selection.faces.size() == 1 ? QStringLiteral("Față") : plural(m_selection.faces.size(), "față", "fețe");
@@ -1681,6 +1698,68 @@ QVariantMap Document::currentMaterial() const
     }
     return QVariantMap { { QStringLiteral("source"), QStringLiteral("default") },
         { QStringLiteral("name"), QStringLiteral("Implicit") }, { QStringLiteral("color"), QColor(0, 0, 0, 0) } };
+}
+
+void Document::setPlacement(const QVariantMap& placement)
+{
+    if (m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    model::Placement p = model::placementOf(m_model, id);
+    const auto value = [&](const char* key, double fallback) {
+        return placement.value(QLatin1String(key), fallback).toDouble();
+    };
+    p.position = { value("px", p.position.x), value("py", p.position.y), value("pz", p.position.z) };
+    p.rotationZ = value("rotation", p.rotationZ);
+    p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
+    // Dimensiunile se aplică doar dacă au fost cerute explicit (altfel ar anula o scară tocmai schimbată).
+    p.size = { value("dx", 0.0), value("dy", 0.0), value("dz", 0.0) };
+    runOnModel("Transformare", [&](model::Model& model) { model::setPlacement(model, id, p); });
+}
+
+void Document::assignMaterial(const QVariantMap& material, const QString& side)
+{
+    if (m_selection.empty()) {
+        return;
+    }
+    const bool back = side == QLatin1String("back");
+    runOnModel("Material", [&](model::Model& model) {
+        model::MaterialId id { static_cast<std::uint64_t>(material.value(QStringLiteral("id"), 0.0).toDouble()) };
+        if (material.contains(QStringLiteral("library"))) {
+            const int index = material.value(QStringLiteral("library")).toInt();
+            if (index >= 0 && index < static_cast<int>(model::builtinMaterials().size())) {
+                const model::Material& lib = model::builtinMaterials()[static_cast<std::size_t>(index)];
+                id = {};
+                for (std::size_t i = 0; i < model.materials().size(); ++i) {
+                    if (model.materials().values()[i].name == lib.name) {
+                        id = model.materials().keys()[i];
+                    }
+                }
+                if (!id) {
+                    id = model.addMaterial(lib);
+                }
+            }
+        }
+        if (id && !model.materials().contains(id)) {
+            return;
+        }
+        for (model::InstanceId instance : m_selection.instances) {
+            model::Instance inst = model.instance(instance);
+            inst.material = id;
+            model.setInstance(instance, inst);
+        }
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        for (geom::FaceId face : m_selection.faces) {
+            if (mesh.faces().contains(face)) {
+                if (back) {
+                    mesh.setFaceBackMaterial(face, id);
+                } else {
+                    mesh.setFaceMaterial(face, id);
+                }
+            }
+        }
+    });
 }
 
 void Document::selectLibraryMaterial(int index)

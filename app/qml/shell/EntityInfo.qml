@@ -71,6 +71,144 @@ Column {
         }
     }
 
+    // Materialul grupului sau al obiectului (fețele fără material proprii îl preiau).
+    MaterialSwatch {
+        visible: root.isInstance
+        width: parent.width
+        label: "Material"
+        document: root.document
+        material: root.isInstance && root.info.material ? root.info.material : ({ id: 0, name: "Implicit" })
+        onPicked: (m) => root.document.assignMaterial(m, "front")
+    }
+
+    // Fețele: materialul pe față și pe verso (Paint Bucket vopsește partea pe care o vezi).
+    Column {
+        visible: root.info.kind === "faces"
+        width: parent.width
+        spacing: Theme.space2
+        MaterialSwatch {
+            width: parent.width
+            label: "Față"
+            document: root.document
+            material: root.info.frontMaterial ?? ({ id: 0, name: "Implicit" })
+            onPicked: (m) => root.document.assignMaterial(m, "front")
+        }
+        MaterialSwatch {
+            width: parent.width
+            label: "Verso"
+            document: root.document
+            material: root.info.backMaterial ?? ({ id: 0, name: "Implicit" })
+            onPicked: (m) => root.document.assignMaterial(m, "back")
+        }
+    }
+
+    // Transformarea: poziția colțului, rotația în jurul lui Z, dimensiunile (cu proporții blocate) și scara.
+    Column {
+        id: transformBox
+        visible: root.isInstance
+        width: parent.width
+        spacing: Theme.space2
+
+        readonly property var p: root.isInstance && root.info.placement ? root.info.placement : ({})
+        property bool lockProportions: false
+        readonly property real third: (width - Theme.space1 * 2) / 3
+
+        // Dimensiunea nouă pe o axă; cu proporții blocate, celelalte se scalează la fel.
+        function setSize(axis, value) {
+            const old = { dx: p.dx, dy: p.dy, dz: p.dz }
+            if (!(old[axis] > 0) || !(value > 0))
+                return
+            const sizes = { dx: old.dx, dy: old.dy, dz: old.dz }
+            if (lockProportions) {
+                const k = value / old[axis]
+                sizes.dx = old.dx * k; sizes.dy = old.dy * k; sizes.dz = old.dz * k
+            } else {
+                sizes[axis] = value
+            }
+            root.document.setPlacement(sizes)
+        }
+
+        Text {
+            text: "Poziție (mm)"
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeSm
+        }
+        Row {
+            spacing: Theme.space1
+            NumberField {
+                width: transformBox.third; label: "X"; decimals: 0
+                value: transformBox.p.px ?? 0
+                onValueModified: (v) => root.document.setPlacement({ px: v })
+            }
+            NumberField {
+                width: transformBox.third; label: "Y"; decimals: 0
+                value: transformBox.p.py ?? 0
+                onValueModified: (v) => root.document.setPlacement({ py: v })
+            }
+            NumberField {
+                width: transformBox.third; label: "Z"; decimals: 0
+                value: transformBox.p.pz ?? 0
+                onValueModified: (v) => root.document.setPlacement({ pz: v })
+            }
+        }
+
+        Item {
+            width: parent.width
+            height: Theme.controlHeightSm
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Dimensiuni (mm)"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            IconButton {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: 24
+                height: 24
+                iconSize: Theme.iconSizeSm
+                iconName: "lock"
+                tooltip: transformBox.lockProportions ? "Proporții blocate" : "Blochează proporțiile"
+                checked: transformBox.lockProportions
+                solidChecked: false
+                onClicked: transformBox.lockProportions = !transformBox.lockProportions
+            }
+        }
+        Row {
+            spacing: Theme.space1
+            NumberField {
+                width: transformBox.third; label: "L"; decimals: 0; from: 0.01
+                value: transformBox.p.dx ?? 0
+                onValueModified: (v) => transformBox.setSize("dx", v)
+            }
+            NumberField {
+                width: transformBox.third; label: "l"; decimals: 0; from: 0.01
+                value: transformBox.p.dy ?? 0
+                onValueModified: (v) => transformBox.setSize("dy", v)
+            }
+            NumberField {
+                width: transformBox.third; label: "h"; decimals: 0; from: 0.01
+                value: transformBox.p.dz ?? 0
+                onValueModified: (v) => transformBox.setSize("dz", v)
+            }
+        }
+
+        Row {
+            spacing: Theme.space1
+            NumberField {
+                width: transformBox.third; label: "Rot."; unit: "°"; decimals: 0; from: -360; to: 360
+                value: transformBox.p.rotation ?? 0
+                onValueModified: (v) => root.document.setPlacement({ rotation: v })
+            }
+            NumberField {
+                width: transformBox.third * 2 + Theme.space1; label: "Scară"; unit: "×"; decimals: 3; step: 0.1; from: 0.001
+                // Scara uniformă (media); pentru scări diferite pe axe, folosește dimensiunile.
+                value: transformBox.p.sx !== undefined ? (Math.abs(transformBox.p.sx) + Math.abs(transformBox.p.sy) + Math.abs(transformBox.p.sz)) / 3 : 1
+                onValueModified: (v) => root.document.setPlacement({ sx: v, sy: v, sz: v })
+            }
+        }
+    }
+
     // Tag-ul: „pastile” cu tag-urile modelului.
     Column {
         visible: root.isInstance

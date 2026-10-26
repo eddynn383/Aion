@@ -199,6 +199,11 @@ public:
     Q_INVOKABLE QString localPath(const QUrl& url) const;
 
     // --- Materiale ---
+    // Inspector: plasarea instanței selectate (px, py, pz, rotation, sx, sy, sz, dx, dy, dz; dimensiunile au
+    // prioritate față de scară) și materialul selecției. `material`: { id } din model sau { library } din bibliotecă,
+    // gol = fără material; `side`: "front" sau "back" (pentru fețe).
+    Q_INVOKABLE void setPlacement(const QVariantMap& placement);
+    Q_INVOKABLE void assignMaterial(const QVariantMap& material, const QString& side);
     Q_INVOKABLE void selectLibraryMaterial(int index);
     Q_INVOKABLE void selectModelMaterial(double materialId);
     Q_INVOKABLE void selectDefaultMaterial();
@@ -311,6 +316,7 @@ private:
     void repairContext();
     // Varianta sigură în mijlocul unei notificări de la model (fără să anuleze unealta).
     void dropStaleReferences();
+    QVariantMap materialInfo(model::MaterialId id) const;
     std::size_t validPathLength() const;
     bool m_contextLost = false;
     void setPath(std::vector<model::InstanceId> path);

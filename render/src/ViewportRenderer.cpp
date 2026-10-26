@@ -82,6 +82,7 @@ QRhiVertexInputLayout meshLayout()
         { 0, 2, QRhiVertexInputAttribute::Float, offsetof(MeshVertex, state) },
         { 0, 3, QRhiVertexInputAttribute::Float4, offsetof(MeshVertex, color) },
         { 0, 4, QRhiVertexInputAttribute::Float2, offsetof(MeshVertex, material) },
+        { 0, 5, QRhiVertexInputAttribute::Float4, offsetof(MeshVertex, backColor) },
     });
     return layout;
 }

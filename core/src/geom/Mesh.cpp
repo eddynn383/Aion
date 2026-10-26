@@ -256,9 +256,10 @@ void Mesh::detachFace(FaceId id, const Face& face)
     });
 }
 
-FaceId Mesh::addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner, model::MaterialId material)
+FaceId Mesh::addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner, model::MaterialId material,
+    model::MaterialId backMaterial)
 {
-    const FaceId id = m_faces.insert(Face { plane, std::move(outer), std::move(inner), material });
+    const FaceId id = m_faces.insert(Face { plane, std::move(outer), std::move(inner), material, backMaterial });
     if (m_recording) {
         m_recording->faces[id];
     }
@@ -307,6 +308,15 @@ void Mesh::setFaceMaterial(FaceId id, model::MaterialId material)
     }
     touch(id);
     m_faces.at(id).material = material;
+}
+
+void Mesh::setFaceBackMaterial(FaceId id, model::MaterialId material)
+{
+    if (m_faces.at(id).backMaterial == material) {
+        return;
+    }
+    touch(id);
+    m_faces.at(id).backMaterial = material;
 }
 
 void Mesh::setFacePlane(FaceId id, const math::Plane& plane)

@@ -69,7 +69,7 @@ void foldFace(Mesh& mesh, FaceId id)
             plane = plane->flipped();
         }
         Loop loop { { edgeUse(a, b), edgeUse(b, c), edgeUse(c, a) } };
-        mesh.addFace(*plane, std::move(loop), {}, face.material);
+        mesh.addFace(*plane, std::move(loop), {}, face.material, face.backMaterial);
     }
 }
 
@@ -172,6 +172,7 @@ Selection copyEntities(const Mesh& source, const Selection& selection, Mesh& mes
         Vec3d sample;
         Vec3d normal;
         model::MaterialId material;
+        model::MaterialId backMaterial;
     };
     std::vector<FaceCopy> faces;
     for (FaceId f : selection.faces) {
@@ -190,7 +191,7 @@ Selection copyEntities(const Mesh& source, const Selection& selection, Mesh& mes
             }
         }
         faces.push_back({ transform.applyToPoint(faceInteriorPoint(source, f)),
-            glm::normalize(transform.applyToNormal(face->plane.normal)), face->material });
+            glm::normalize(transform.applyToNormal(face->plane.normal)), face->material, face->backMaterial });
     }
     struct Segment {
         Vec3d a;
@@ -236,6 +237,7 @@ Selection copyEntities(const Mesh& source, const Selection& selection, Mesh& mes
             if (faceContainsPoint(mesh, f, copy.sample)) {
                 const FaceId oriented = orientFace(mesh, f, copy.normal);
                 mesh.setFaceMaterial(oriented, copy.material);
+                mesh.setFaceBackMaterial(oriented, copy.backMaterial);
                 out.faces.insert(oriented);
                 break;
             }

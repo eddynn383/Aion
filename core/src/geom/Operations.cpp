@@ -203,10 +203,12 @@ void refacePlane(Mesh& mesh, const Plane& plane, const std::set<EdgeId>& newEdge
     // Fețele vechi care nu mai corespund unei regiuni au fost împărțite sau modificate.
     std::map<FaceId, Vec3d> sourceNormals;
     std::map<FaceId, model::MaterialId> sourceMaterials;
+    std::map<FaceId, model::MaterialId> sourceBackMaterials;
     for (FaceId f : existing) {
         if (!matched.contains(f)) {
             sourceNormals[f] = mesh.face(f).plane.normal;
             sourceMaterials[f] = mesh.face(f).material;
+            sourceBackMaterials[f] = mesh.face(f).backMaterial;
             mesh.removeFace(f);
             result.removedFaces.push_back(f);
         }
@@ -227,7 +229,8 @@ void refacePlane(Mesh& mesh, const Plane& plane, const std::set<EdgeId>& newEdge
         }
         // Bucățile unei fețe împărțite își păstrează materialul.
         const model::MaterialId material = nf.source ? sourceMaterials[nf.source] : model::MaterialId {};
-        result.createdFaces.push_back(mesh.addFace(facePlane, std::move(outer), std::move(holes), material));
+        const model::MaterialId backMaterial = nf.source ? sourceBackMaterials[nf.source] : model::MaterialId {};
+        result.createdFaces.push_back(mesh.addFace(facePlane, std::move(outer), std::move(holes), material, backMaterial));
     }
 }
 

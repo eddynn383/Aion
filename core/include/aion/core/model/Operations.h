@@ -53,6 +53,21 @@ struct BooleanResult {
 // iar cele două dispar. Subtract scade `b` din `a`.
 BooleanResult booleanOperation(Model& model, InstanceId a, InstanceId b, BooleanKind kind);
 
+// Plasarea unei instanțe, ca în Inspector: poziția colțului minim al cutiei (în coordonatele părintelui), rotația în
+// jurul axei Z (grade), scara pe axele proprii și dimensiunile rezultate (mm).
+struct Placement {
+    math::Vec3d position { 0.0 };
+    double rotationZ = 0.0;
+    math::Vec3d scale { 1.0 };
+    math::Vec3d size { 0.0 };
+};
+
+[[nodiscard]] Placement placementOf(const Model& model, InstanceId instance);
+
+// Aplică poziția, rotația și scara cerute; rotațiile în jurul altor axe se păstrează. `size`, dacă e nenul pe o axă,
+// are prioritate față de `scale` pe acea axă (scara se calculează din dimensiunea dorită).
+void setPlacement(Model& model, InstanceId instance, const Placement& wanted);
+
 // Cutia (min, max) a geometriei unei definiții, cu tot ce conține, în coordonatele ei.
 [[nodiscard]] std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition);
 
