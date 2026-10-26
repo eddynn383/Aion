@@ -14,6 +14,8 @@ add_library(aion_core STATIC
     src/geom/Transformations.cpp
     src/geom/Triangulate.cpp
     src/math/Intersect.cpp
+    src/model/Model.cpp
+    src/model/Operations.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
     src/text/FuzzyMatch.cpp

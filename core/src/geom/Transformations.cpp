@@ -164,7 +164,7 @@ bool transformVertices(Mesh& mesh, const std::set<VertexId>& vertices, const mat
     return true;
 }
 
-Selection copySelection(Mesh& mesh, const Selection& selection, const math::Transform& transform)
+Selection copyEntities(const Mesh& source, const Selection& selection, Mesh& mesh, const math::Transform& transform)
 {
     // Tot ce se copiază, citit înainte ca desenul să schimbe modelul.
     std::set<EdgeId> edges(selection.edges.begin(), selection.edges.end());
@@ -174,7 +174,7 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
     };
     std::vector<FaceCopy> faces;
     for (FaceId f : selection.faces) {
-        const Face* face = mesh.faces().find(f);
+        const Face* face = source.faces().find(f);
         if (face == nullptr) {
             continue;
         }
@@ -188,7 +188,7 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
                 edges.insert(u.edge);
             }
         }
-        faces.push_back({ transform.applyToPoint(faceInteriorPoint(mesh, f)),
+        faces.push_back({ transform.applyToPoint(faceInteriorPoint(source, f)),
             glm::normalize(transform.applyToNormal(face->plane.normal)) });
     }
     struct Segment {
@@ -198,9 +198,9 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
     };
     std::vector<Segment> segments;
     std::map<std::uint32_t, std::uint32_t> curves; // curba sursă → curba copiei
-    std::uint32_t nextCurve = mesh.newCurveId();
+    std::uint32_t nextCurve = std::max(source.newCurveId(), mesh.newCurveId());
     for (EdgeId e : edges) {
-        if (const Edge* edge = mesh.edges().find(e)) {
+        if (const Edge* edge = source.edges().find(e)) {
             Edge style = *edge;
             if (style.curve != 0) {
                 const auto [it, inserted] = curves.try_emplace(style.curve, nextCurve);
@@ -208,7 +208,7 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
                 style.curve = it->second;
             }
             segments.push_back(
-                { transform.applyToPoint(mesh.position(edge->v0)), transform.applyToPoint(mesh.position(edge->v1)), style });
+                { transform.applyToPoint(source.position(edge->v0)), transform.applyToPoint(source.position(edge->v1)), style });
         }
     }
 
@@ -240,6 +240,11 @@ Selection copySelection(Mesh& mesh, const Selection& selection, const math::Tran
     }
     out.prune(mesh);
     return out;
+}
+
+Selection copySelection(Mesh& mesh, const Selection& selection, const math::Transform& transform)
+{
+    return copyEntities(mesh, selection, mesh, transform);
 }
 
 } // namespace aion::geom

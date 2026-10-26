@@ -6,37 +6,82 @@
 
 namespace aion::commands {
 
-CommandStack::CommandStack(geom::Mesh& mesh)
-    : m_mesh(mesh)
-#ifdef NDEBUG
-    , m_validate(false)
-#else
-    , m_validate(true)
-#endif
+namespace {
+
+std::function<void(const geom::ValidationReport&)> abortOnInvalid()
 {
-    m_onInvalid = [](const geom::ValidationReport& report) {
+    return [](const geom::ValidationReport& report) {
         std::fprintf(stderr, "Modelul nu mai e valid:\n%s", report.text().c_str());
         std::abort();
     };
+}
+
+#ifdef NDEBUG
+constexpr bool kValidateByDefault = false;
+#else
+constexpr bool kValidateByDefault = true;
+#endif
+
+} // namespace
+
+CommandStack::CommandStack(geom::Mesh& mesh)
+    : m_mesh(&mesh)
+    , m_validate(kValidateByDefault)
+    , m_onInvalid(abortOnInvalid())
+{
+}
+
+CommandStack::CommandStack(model::Model& model)
+    : m_model(&model)
+    , m_active(model.root())
+    , m_validate(kValidateByDefault)
+    , m_onInvalid(abortOnInvalid())
+{
+}
+
+void CommandStack::setActiveDefinition(model::DefinitionId definition)
+{
+    assert(m_model != nullptr);
+    m_active = definition;
+}
+
+geom::Mesh& CommandStack::activeMesh()
+{
+    return m_model ? m_model->mesh(m_active) : *m_mesh;
 }
 
 void CommandStack::beginTransaction(std::string name)
 {
     assert(!inTransaction());
     m_transactionName = std::move(name);
-    m_mesh.beginRecording();
+    if (m_model) {
+        m_model->beginRecording();
+    } else {
+        m_mesh->beginRecording();
+    }
 }
 
 bool CommandStack::commit()
 {
     assert(inTransaction());
-    geom::ChangeSet changes = m_mesh.endRecording();
     std::string name = std::move(*m_transactionName);
     m_transactionName.reset();
-    if (changes.empty()) {
+    std::unique_ptr<Command> command;
+    if (m_model) {
+        model::ChangeSet changes = m_model->endRecording();
+        if (!changes.empty()) {
+            command = std::make_unique<ModelCommand>(*m_model, std::move(name), std::move(changes));
+        }
+    } else {
+        geom::ChangeSet changes = m_mesh->endRecording();
+        if (!changes.empty()) {
+            command = std::make_unique<RecordedCommand>(*m_mesh, std::move(name), std::move(changes));
+        }
+    }
+    if (!command) {
         return false;
     }
-    m_undo.push_back(std::make_unique<RecordedCommand>(std::move(name), std::move(changes)));
+    m_undo.push_back(std::move(command));
     m_redo.clear();
     afterChange();
     return true;
@@ -45,15 +90,20 @@ bool CommandStack::commit()
 void CommandStack::abort()
 {
     assert(inTransaction());
-    const geom::ChangeSet changes = m_mesh.endRecording();
     m_transactionName.reset();
-    m_mesh.apply(changes, geom::ChangeDirection::Backward);
+    if (m_model) {
+        const model::ChangeSet changes = m_model->endRecording();
+        m_model->apply(changes, geom::ChangeDirection::Backward);
+    } else {
+        const geom::ChangeSet changes = m_mesh->endRecording();
+        m_mesh->apply(changes, geom::ChangeDirection::Backward);
+    }
 }
 
 void CommandStack::push(std::unique_ptr<Command> command)
 {
     assert(!inTransaction());
-    command->apply(m_mesh);
+    command->apply();
     m_undo.push_back(std::move(command));
     m_redo.clear();
     afterChange();
@@ -77,7 +127,7 @@ bool CommandStack::undo()
     }
     std::unique_ptr<Command> command = std::move(m_undo.back());
     m_undo.pop_back();
-    command->revert(m_mesh);
+    command->revert();
     m_redo.push_back(std::move(command));
     afterChange();
     return true;
@@ -91,7 +141,7 @@ bool CommandStack::redo()
     }
     std::unique_ptr<Command> command = std::move(m_redo.back());
     m_redo.pop_back();
-    command->apply(m_mesh);
+    command->apply();
     m_undo.push_back(std::move(command));
     afterChange();
     return true;
@@ -118,7 +168,8 @@ void CommandStack::setOnInvalid(std::function<void(const geom::ValidationReport&
 void CommandStack::afterChange()
 {
     if (m_validate) {
-        const geom::ValidationReport report = m_mesh.validate(m_validationLevel);
+        const geom::ValidationReport report
+            = m_model ? m_model->validate(m_validationLevel) : m_mesh->validate(m_validationLevel);
         if (!report.ok() && m_onInvalid) {
             m_onInvalid(report);
         }

@@ -76,6 +76,8 @@ bool transformVertices(Mesh& mesh, const std::set<VertexId>& vertices, const mat
 // Copia transformată a selecției (Option în Move și Rotate), lipită de geometria existentă ca orice desen.
 // Întoarce entitățile copiei.
 Selection copySelection(Mesh& mesh, const Selection& selection, const math::Transform& transform);
+// La fel, dar din altă geometrie (de exemplu la Make Group sau Explode): `source` poate fi și `mesh`.
+Selection copyEntities(const Mesh& source, const Selection& selection, Mesh& mesh, const math::Transform& transform);
 
 // Conturul exterior al feței deplasat cu `distance` (pozitiv = spre interior), în planul feței.
 // nullopt dacă rezultatul s-ar autointersecta, s-ar întoarce pe dos sau ar atinge o gaură.

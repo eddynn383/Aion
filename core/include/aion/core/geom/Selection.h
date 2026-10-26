@@ -1,6 +1,7 @@
 #pragma once
 
 #include "aion/core/geom/Id.h"
+#include "aion/core/model/Ids.h"
 
 #include <set>
 
@@ -12,14 +13,18 @@ class Mesh;
 struct Selection {
     std::set<EdgeId> edges;
     std::set<FaceId> faces;
+    // Grupurile și componentele selectate (instanțe plasate în contextul de editare).
+    std::set<model::InstanceId> instances;
 
-    [[nodiscard]] bool empty() const { return edges.empty() && faces.empty(); }
+    [[nodiscard]] bool empty() const { return edges.empty() && faces.empty() && instances.empty(); }
     [[nodiscard]] bool contains(EdgeId e) const { return edges.contains(e); }
     [[nodiscard]] bool contains(FaceId f) const { return faces.contains(f); }
+    [[nodiscard]] bool contains(model::InstanceId i) const { return instances.contains(i); }
     void clear()
     {
         edges.clear();
         faces.clear();
+        instances.clear();
     }
 
     void add(const Selection& other);

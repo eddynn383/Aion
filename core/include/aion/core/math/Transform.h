@@ -30,6 +30,9 @@ public:
     [[nodiscard]] const Mat4d& matrix() const { return m_matrix; }
     [[nodiscard]] bool isIdentity() const;
 
+    // Egalitate exactă (pentru compararea stărilor la undo).
+    bool operator==(const Transform&) const = default;
+
 private:
     Mat4d m_matrix { 1.0 };
 };
