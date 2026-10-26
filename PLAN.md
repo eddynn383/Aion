@@ -456,6 +456,95 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 
 ---
 
+## 6b. Etapa 2 – organizare, animații, interacțiuni (cerințele din 2026-10-27)
+
+Ordinea ține cont de dependențe: întâi schimbările mici de UI, apoi modelul de organizare (pe el se sprijină
+scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le folosesc), apoi camerele și luminile.
+
+### Decizii de organizare (valabile pentru toată etapa)
+- **Formă** = geometrie liberă (fețe, muchii). **Obiect** = geometrie încapsulată, cu transformare proprie
+  (azi „grup” cu geometrie sau „obiect” cu copii); copiile legate rămân („Duplicare legată”).
+  **Grup** = colecție de obiecte și alte grupuri, ca în Blender: modul principal de organizare, apare ca folder în
+  Outliner și se mută împreună. **Tag** = etichetă opțională, transversală: o față, o muchie, un obiect sau un grup
+  poate avea un tag, iar elemente din grupuri diferite pot avea același tag (de exemplu „Pereți” pe pereții din
+  toate camerele). Tag-urile ascund, afișează și selectează.
+- Comenzi: ⌘G = Creează obiect (din forme), ⌥⌘G = Grupează (obiecte), ⌥D = Duplicare legată.
+- Fișierele vechi se migrează: un grup cu geometrie devine obiect; un „obiect” cu copii rămâne obiect cu copii legate.
+  Formatul `.aion` trece la versiunea 2 (cu migrare automată și test).
+
+### Faza 13 – Toolbar, obiecte primitive, Materiale
+- [ ] Toolbar: un grup „Desen” (Line, Arc, Rectangle, Circle, Polygon); Eraser singur; Paint Bucket scos din toolbar
+      (îl pornește alegerea unui material)
+- [ ] Grup nou „Obiecte”: Cub, Sferă, Con, Cilindru — click pe sol (sau pe o față), trage pentru mărime, VCB pentru
+      dimensiuni; rezultatul e direct un obiect (core: generatoare de primitive, cu teste)
+- [ ] Panoul Materiale: click pe un material → unealta Paint Bucket activă, cursor găleată; grila de culori umple
+      lățimea panoului
+
+### Faza 14 – Pagina de Preferințe
+- [ ] Pagină întreagă (nu popover), cu categorii în stânga: General, Unități, Salvare, Aspect, Viewport, Navigare,
+      Grid și snap, Ghiduri, Scurtături
+- [ ] Unități (unitate, precizie, format), autosalvare (pornit/oprit, interval 1–30 min, câte copii de rezervă)
+- [ ] Temă: Sistem / Light / Dark + temă personalizată (accent, fundaluri, panouri, viewport, grid, muchii, fețe),
+      salvată și resetabilă; tokenii din `Theme.qml` devin suprascriibili
+- [ ] Viewport: anti-aliasing (MSAA), calitatea umbrelor, limită de fps / economisire baterie, afișarea fps
+- [ ] Scurtături: lista completă (personalizarea vine mai târziu)
+
+### Faza 15 – Panoul din stânga: acordeon; Outliner unit cu Tag-urile
+- [ ] Secțiuni acordeon (Outliner, Materiale, Scene), redimensionabile, starea păstrată
+- [ ] Modelul de organizare de mai sus (core + migrare + teste): grupuri ca foldere, obiecte, forme; tag pe fețe,
+      muchii, obiecte, grupuri
+- [ ] Outliner ca în Blender: arbore grupuri → obiecte, ochi (vizibil), lacăt, drag & drop între grupuri,
+      redenumire; sub el, lista tag-urilor (vizibil, „Selectează tot ce are tag-ul”, culoare)
+- [ ] Inspector: tag-ul selecției (inclusiv pentru fețe și muchii)
+
+### Faza 16 – Scene = stări ale modelului
+- [ ] O scenă reține camera, stilul, tag-urile vizibile, obiectele ascunse și **pozițiile obiectelor**
+- [ ] Aplicarea unei scene: tranziție a camerei și a obiectelor (cu undo); „Actualizează scena” recapturează tot
+- [ ] Redarea și exportul animației scenelor se mută în Timeline (Faza 17); scenele nu mai au legătură cu animațiile
+
+### Faza 17 – Timeline și keyframe-uri (animații salvate)
+- [ ] Core: `Animation` (nume, durată, fps) cu piste pe obiecte (poziție, rotație, scară, culoarea materialului) și
+      o pistă a camerei; keyframe-uri cu easing; evaluare la un moment dat (cu teste)
+- [ ] Bara de timeline (ca în Figma/Blender): riglă, playhead, play/pauză/buclă, pistele selecției cu romburi,
+      „◆ Keyframe” și auto-key, mutarea keyframe-urilor prin tragere
+- [ ] Animații multiple, salvate în `.aion`; exportul video (MP4) din timeline
+- [ ] O animație poate fi pornită dintr-o interacțiune (Faza 18)
+
+### Faza 18 – Interacțiuni cu blocuri (puzzle) și Modul Interacțiune
+- [ ] Core: reguli pe obiect: eveniment (click, click dreapta, dublu-click, hover intrare/ieșire, apăsare lungă,
+      drag, tastă) → secvență de acțiuni înlănțuite (mută la/cu, rotește, scalează, ascunde/arată/comută,
+      schimbă materialul/culoarea, pornește o animație, mergi la scenă, așteaptă, repetă, dacă/altfel pe o stare)
+- [ ] Editor vizual cu blocuri tip puzzle (ca Sketchware/Scratch): paletă colorată pe categorii, blocuri trase și
+      îmbinate vertical, parametri în bloc; interacțiunile actuale (balama, glisare) devin blocuri gata făcute
+- [ ] Modul Interacțiune: modelul nu mai poate fi editat; la hover pe un obiect cu interacțiuni apare cursorul
+      evenimentului disponibil (mână, săgeată de drag etc.); ieșire cu Esc
+
+### Faza 19 – Camere și lumini ca obiecte
+- [ ] Camere: transformare, FOV, proiecție, planuri de tăiere; „Privește prin cameră”; pot fi folosite în scene și
+      pe timeline
+- [ ] Lumini: punctuală, spot, direcțională, de suprafață; culoare, intensitate, rază, con, umbre
+- [ ] Randare: mai multe lumini în shader (până la 8), umbre pentru soare + o lumină spot; gizmo-uri în viewport,
+      în Outliner și Inspector, salvate în `.aion`
+
+### Faza 20 – Import `.skp` (Faza 7b)
+- [ ] SDK-ul SketchUp (Trimble) se descarcă de pe developer.sketchup.com cu un cont și acceptarea licenței — pasul
+      tău; licența se verifică de tine (ADR 0007)
+- [ ] Modulul `plugins/skp` se construiește doar cu `AION_SKP_SDK_DIR`; restul ca în Faza 7b
+
+### Setări rămase pentru Inspector, în ordinea priorității
+1. Muchii: lungime editabilă, soft / netedă / ascunsă (unghi de netezire)
+2. Selecție multiplă: proprietățile comune („mixt” unde diferă), totaluri, aliniere și distribuire
+3. Cantitățile selecției: arie, volum, „Solid ✓/✗” cu motivul
+4. Mobilier: materialul plăcii, direcția fibrei, cantul pe laturi (alimentează lista de debitare)
+5. Atribute personalizate (cheie–valoare), incluse în raportul de cantități
+6. Ghidaje, cote, note și planuri de secțiune selectabile, cu proprietăți în Inspector
+7. Fără selecție: informațiile modelului (autor, descriere, locație), statistici
+8. Arce și cercuri: raza și numărul de segmente
+9. Texturi: poziționare (după ce există texturi)
+10. Vizibilitate avansată: umbre proiectate/primite, vizibil doar în anumite scene
+
+---
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |
