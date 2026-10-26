@@ -1,4 +1,5 @@
 #include "aion/core/commands/CommandStack.h"
+#include "aion/core/geom/Operations.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -84,4 +85,26 @@ TEST_CASE("CommandStack: validarea după comandă raportează un model stricat",
     CHECK(failures == 1);
     stack.undo();
     CHECK(failures == 1); // după undo modelul e din nou valid
+}
+
+TEST_CASE("CommandStack: starea salvată (modificat / nemodificat)", "[core][commands]")
+{
+    aion::geom::Mesh mesh;
+    aion::commands::CommandStack stack { mesh };
+    CHECK(stack.isClean());
+    stack.run("A", [](aion::geom::Mesh& m) { aion::geom::drawLine(m, { 0, 0, 0 }, { 1000, 0, 0 }); });
+    CHECK_FALSE(stack.isClean());
+    stack.markClean();
+    CHECK(stack.isClean());
+    stack.run("B", [](aion::geom::Mesh& m) { aion::geom::drawLine(m, { 0, 0, 0 }, { 0, 1000, 0 }); });
+    CHECK_FALSE(stack.isClean());
+    stack.undo();
+    CHECK(stack.isClean()); // înapoi la starea salvată
+    stack.undo();
+    CHECK_FALSE(stack.isClean());
+    stack.redo();
+    CHECK(stack.isClean());
+    stack.run("C", [](aion::geom::Mesh& m) { aion::geom::drawLine(m, { 0, 0, 0 }, { 0, 0, 1000 }); });
+    stack.undo();
+    CHECK(stack.isClean());
 }

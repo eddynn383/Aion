@@ -1,15 +1,26 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/io/AionFile.h"
+#include "aion/core/io/Exchange.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/units/Length.h"
 
 #include <QColor>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QSettings>
+#include <QStandardPaths>
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <functional>
+#include <span>
 #include <limits>
 #include <set>
 
@@ -72,11 +83,285 @@ Document::Document(QObject* parent)
     // În debug, un model invalid oprește aplicația (CommandStack); în release nu se verifică.
     retriangulate(m_model.root());
     setActiveTool(QStringLiteral("select"));
+
+    // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate.
+    m_hasRecovery = QFile::exists(autosavePath());
+    m_autosaveTimer.setInterval(60'000);
+    connect(&m_autosaveTimer, &QTimer::timeout, this, &Document::autosave);
+    m_autosaveTimer.start();
 }
 
 Document::~Document()
 {
+    // O închidere normală fără modificări nesalvate nu lasă nimic de recuperat.
+    if (!modified() && !m_hasRecovery) {
+        removeAutosave();
+    }
     m_model.removeObserver(this);
+}
+
+// --- Fișiere ---
+
+namespace {
+
+constexpr int kMaxRecentFiles = 8;
+const QString kRecentKey = QStringLiteral("files/recent");
+const QString kRecoverySourceKey = QStringLiteral("recovery/source");
+const QString kRecoveryTimeKey = QStringLiteral("recovery/time");
+
+} // namespace
+
+QString Document::autosavePath()
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dir);
+    return dir + QStringLiteral("/autosave.aion");
+}
+
+QString Document::fileName() const
+{
+    return m_filePath.isEmpty() ? QStringLiteral("Fără titlu") : QFileInfo(m_filePath).completeBaseName();
+}
+
+QStringList Document::recentFiles() const
+{
+    QStringList files = QSettings().value(kRecentKey).toStringList();
+    files.erase(std::remove_if(files.begin(), files.end(), [](const QString& f) { return !QFile::exists(f); }), files.end());
+    return files;
+}
+
+QString Document::recoveryInfo() const
+{
+    QSettings settings;
+    const QString source = settings.value(kRecoverySourceKey).toString();
+    const QDateTime time = settings.value(kRecoveryTimeKey).toDateTime();
+    const QString when = time.isValid() ? time.toString(QStringLiteral("d MMM, HH:mm")) : QString();
+    const QString name = source.isEmpty() ? QStringLiteral("un document nesalvat") : QFileInfo(source).fileName();
+    return when.isEmpty() ? name : name + QStringLiteral(" (") + when + QStringLiteral(")");
+}
+
+void Document::setFilePath(const QString& path)
+{
+    m_filePath = path;
+    emit fileChanged();
+}
+
+void Document::addRecentFile(const QString& path)
+{
+    QSettings settings;
+    QStringList files = settings.value(kRecentKey).toStringList();
+    files.removeAll(path);
+    files.prepend(path);
+    while (files.size() > kMaxRecentFiles) {
+        files.removeLast();
+    }
+    settings.setValue(kRecentKey, files);
+    emit recentFilesChanged();
+}
+
+void Document::clearRecentFiles()
+{
+    QSettings().remove(kRecentKey);
+    emit recentFilesChanged();
+}
+
+void Document::setError(const QString& message)
+{
+    m_lastError = message;
+    emit errorChanged();
+}
+
+QString Document::localPath(const QUrl& url) const
+{
+    return url.isLocalFile() ? url.toLocalFile() : url.toString();
+}
+
+void Document::replaceModel(const model::Model& model)
+{
+    if (m_tool) {
+        const view::Camera camera;
+        tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        m_tool->cancel(ctx);
+    }
+    m_path.clear();
+    m_selection.clear();
+    m_model = model;
+    m_stack.setActiveDefinition(m_model.root());
+    m_stack.clear();
+    m_stack.markClean();
+    m_triangles.clear();
+    for (model::DefinitionId d : m_model.definitions().keys()) {
+        retriangulate(d);
+    }
+    emit contextChanged();
+    emit selectionChanged();
+    emit outlineChanged();
+    emit modelChanged();
+    emit historyChanged();
+    emit documentReplaced();
+    touch();
+}
+
+void Document::newDocument()
+{
+    replaceModel(model::Model {});
+    setFilePath({});
+    removeAutosave();
+}
+
+bool Document::openFile(const QString& path)
+{
+    const io::LoadResult result = io::loadFile(std::filesystem::path(path.toStdString()));
+    if (!result.model) {
+        setError(QStringLiteral("„%1” nu a putut fi deschis. %2")
+                     .arg(QFileInfo(path).fileName(), QString::fromStdString(result.error)));
+        return false;
+    }
+    replaceModel(*result.model);
+    setFilePath(path);
+    addRecentFile(path);
+    removeAutosave();
+    return true;
+}
+
+bool Document::saveFile(const QString& path, const QByteArray& thumbnailPng)
+{
+    const QString target = path.isEmpty() ? m_filePath : path;
+    if (target.isEmpty()) {
+        setError(QStringLiteral("Alege unde salvezi documentul."));
+        return false;
+    }
+    std::string error;
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(thumbnailPng.constData());
+    if (!io::saveFile(std::filesystem::path(target.toStdString()), m_model,
+            std::span(bytes, static_cast<std::size_t>(thumbnailPng.size())), &error)) {
+        setError(QStringLiteral("„%1” nu a putut fi salvat. %2")
+                     .arg(QFileInfo(target).fileName(), QString::fromStdString(error)));
+        return false;
+    }
+    m_stack.markClean();
+    setFilePath(target);
+    addRecentFile(target);
+    removeAutosave();
+    return true;
+}
+
+bool Document::importFile(const QString& path)
+{
+    const QFileInfo info(path);
+    const QString ext = info.suffix().toLower();
+    io::ImportResult result;
+    const auto run = [&](const std::function<io::ImportResult(model::Model&)>& import) {
+        const geom::Selection before = m_selection;
+        m_stack.run("Importă " + info.fileName().toStdString(), [&](model::Model& model) { result = import(model); });
+        m_selection.clear();
+        if (result.instance && m_model.instances().contains(result.instance)) {
+            m_selection.instances.insert(result.instance);
+        }
+        afterInteraction(before);
+        emit outlineChanged();
+    };
+    if (ext == QLatin1String("obj")) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            setError(QStringLiteral("„%1” nu poate fi citit.").arg(info.fileName()));
+            return false;
+        }
+        const QByteArray text = file.readAll();
+        run([&](model::Model& model) {
+            return io::importObj(model, activeDefinition(), std::string_view(text.constData(), std::size_t(text.size())),
+                info.completeBaseName().toStdString());
+        });
+    } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
+        run([&](model::Model& model) {
+            return io::importGltf(model, activeDefinition(), std::filesystem::path(path.toStdString()));
+        });
+    } else {
+        setError(QStringLiteral("Formatul „.%1” nu se poate importa (OBJ, glTF, GLB).").arg(ext));
+        return false;
+    }
+    if (!result.instance) {
+        setError(QStringLiteral("„%1” nu a putut fi importat. %2")
+                     .arg(info.fileName(), QString::fromStdString(result.error)));
+        return false;
+    }
+    return true;
+}
+
+bool Document::exportFile(const QString& path)
+{
+    const QFileInfo info(path);
+    const QString ext = info.suffix().toLower();
+    std::string error;
+    bool ok = false;
+    if (ext == QLatin1String("obj")) {
+        const QString mtlName = info.completeBaseName() + QStringLiteral(".mtl");
+        QFile obj(path);
+        QFile mtl(info.dir().filePath(mtlName));
+        ok = obj.open(QIODevice::WriteOnly | QIODevice::Truncate) && mtl.open(QIODevice::WriteOnly | QIODevice::Truncate);
+        if (ok) {
+            const std::string objText = io::exportObj(m_model, {}, mtlName.toStdString());
+            const std::string mtlText = io::exportMtl();
+            ok = obj.write(objText.data(), qint64(objText.size())) == qint64(objText.size())
+                && mtl.write(mtlText.data(), qint64(mtlText.size())) == qint64(mtlText.size());
+        }
+    } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
+        ok = io::exportGltf(m_model, std::filesystem::path(path.toStdString()), ext == QLatin1String("glb"), {}, &error);
+    } else {
+        setError(QStringLiteral("Formatul „.%1” nu se poate exporta (OBJ, glTF, GLB).").arg(ext));
+        return false;
+    }
+    if (!ok) {
+        setError(QStringLiteral("„%1” nu a putut fi exportat. %2").arg(info.fileName(), QString::fromStdString(error)));
+    }
+    return ok;
+}
+
+void Document::autosave()
+{
+    if (!modified()) {
+        return;
+    }
+    if (io::saveFile(std::filesystem::path(autosavePath().toStdString()), m_model)) {
+        QSettings settings;
+        settings.setValue(kRecoverySourceKey, m_filePath);
+        settings.setValue(kRecoveryTimeKey, QDateTime::currentDateTime());
+    }
+}
+
+void Document::removeAutosave()
+{
+    QFile::remove(autosavePath());
+    QSettings settings;
+    settings.remove(kRecoverySourceKey);
+    settings.remove(kRecoveryTimeKey);
+    if (m_hasRecovery) {
+        m_hasRecovery = false;
+        emit recoveryChanged();
+    }
+}
+
+void Document::recoverAutosave()
+{
+    const QString source = QSettings().value(kRecoverySourceKey).toString();
+    const io::LoadResult result = io::loadFile(std::filesystem::path(autosavePath().toStdString()));
+    if (!result.model) {
+        setError(QStringLiteral("Sesiunea nu a putut fi recuperată. %1").arg(QString::fromStdString(result.error)));
+        discardAutosave();
+        return;
+    }
+    replaceModel(*result.model);
+    setFilePath(source);
+    // Recuperat, dar nesalvat: documentul rămâne marcat ca modificat.
+    m_stack.markDirty();
+    m_hasRecovery = false;
+    emit recoveryChanged();
+    emit historyChanged();
+}
+
+void Document::discardAutosave()
+{
+    removeAutosave();
 }
 
 void Document::touch()

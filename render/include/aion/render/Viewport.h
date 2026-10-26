@@ -5,7 +5,9 @@
 #include "aion/core/view/CameraMotion.h"
 #include "aion/render/Document.h"
 
+#include <QByteArray>
 #include <QColor>
+#include <QImage>
 #include <QCursor>
 #include <QElapsedTimer>
 #include <QPointF>
@@ -114,6 +116,10 @@ public:
 
     Q_INVOKABLE void setStandardView(aion::render::Viewport::StandardView view);
     Q_INVOKABLE void zoomExtents();
+    // Imaginea viewport-ului, fără elementele de interfață puse peste el (toolbar, gizmo, etichete).
+    Q_INVOKABLE bool saveImage(const QString& path);
+    // Previzualizarea pentru fișierul .aion: PNG de cel mult 512 px lățime.
+    Q_INVOKABLE QByteArray captureThumbnail();
     // Încadrează selecția documentului (sau tot modelul, dacă nu e nimic selectat).
     Q_INVOKABLE void zoomToSelection();
     Q_INVOKABLE void toggleProjection();
@@ -184,6 +190,7 @@ private:
     void recordOrbitSample(QPointF delta);
     view::Vec2d orbitReleaseVelocity() const;
     void sceneBounds(view::Vec3d& min, view::Vec3d& max) const;
+    QImage renderImage();
 
     view::Camera m_camera;
     view::CameraMotion m_motion;

@@ -5,6 +5,7 @@
 #include "aion/core/math/Transform.h"
 
 #include <set>
+#include <unordered_map>
 
 #include <vector>
 
@@ -86,6 +87,25 @@ Selection copyEntities(const Mesh& source, const Selection& selection, Mesh& mes
 // Offset (F): desenează conturul deplasat (care împarte fața sau adaugă un inel în jurul ei).
 // Muchiile noi moștenesc curbele conturului. Întoarce false dacă offset-ul nu se poate face.
 bool offsetFace(Mesh& mesh, FaceId face, double distance);
+
+// Construirea directă a geometriei importate (OBJ, glTF): fără intersecții și fără refacerea planurilor, pentru
+// că geometria vine deja curată și poate fi mare. Vârfurile se refolosesc după poziție (grilă de 0.01 mm).
+class MeshBuilder {
+public:
+    explicit MeshBuilder(Mesh& mesh);
+
+    VertexId vertex(const Vec3d& position);
+    // O față din punctele date, în ordinea lor (normala după regula mâinii drepte). Poligoanele neplane se împart
+    // în triunghiuri; cele degenerate sau identice cu o față existentă se sar. Întoarce fețele create.
+    std::vector<FaceId> face(const std::vector<Vec3d>& points);
+    // La final: fețele coplanare vecine se unesc, iar muchiile dintre fețe aproape coplanare (sub `smoothAngle`
+    // radiani) devin soft, ca suprafețele curbe triangulate să arate netede.
+    void finish(double smoothAngle = 0.35);
+
+private:
+    Mesh& m_mesh;
+    std::unordered_map<std::uint64_t, VertexId> m_grid;
+};
 
 // Regiunea unei fețe (în interior, nu pe margine și nu într-o gaură).
 [[nodiscard]] bool faceContainsPoint(const Mesh& mesh, FaceId face, const Vec3d& point);
