@@ -4,6 +4,8 @@ include(Catch)
 add_executable(forma_tests
     core/VersionTests.cpp
     core/ToleranceTests.cpp
+    core/FuzzyMatchTests.cpp
+    core/CameraTests.cpp
 )
 
 target_link_libraries(forma_tests PRIVATE forma::core Catch2::Catch2WithMain)

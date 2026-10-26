@@ -10,7 +10,7 @@ sau formatul `.skp` ale SketchUp).
 
 ## Decizii deja luate (nu le redeschide fără motiv)
 - Platforme: **macOS întâi**, apoi Windows, apoi Web, din același cod.
-- Stack: **C++20, Qt 6 (≥ 6.7) cu Qt Quick/QML** (nu Qt Widgets), randare cu **Qt RHI** (`QQuickRhiItem`, Metal pe macOS),
+- Stack: **C++20, Qt 6 (≥ 6.9) cu Qt Quick/QML** (nu Qt Widgets), randare cu **Qt RHI** (`QQuickRhiItem`, Metal pe macOS),
   **CMake + Ninja + vcpkg**, **Catch2**, glm, earcut, Manifold (mai târziu), nlohmann-json, tinygltf.
 - `core/` **nu include niciodată Qt** (ca să poată fi compilat și pentru WebAssembly).
 - Geometrie non-manifold de tip radial-edge (muchii libere, muchii cu mai mult de 2 fețe), unitate internă mm, comparații numai prin `core/include/forma/core/math/Tolerance.h`.
@@ -40,8 +40,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - Avertismente cunoscute, inofensive: `FindWrapOpenGL ... /usr/X11R6/lib` (XQuartz), și `ld: ... built for newer macOS version`
   pentru framework-urile Qt din Homebrew (deployment target-ul nostru e 13.0; contează abia la distribuție, Faza 10).
 
+- **Faza 1** făcută și unită în `main` (2026-10-26). Navigarea cu mouse-ul și bara de titlu confirmate de utilizator;
+  trackpad-ul (două degete / pinch) încă netestat de el.
+- Unelte de verificare (variabile de mediu): `FORMA_SCREENSHOT`, `FORMA_SCREENSHOT_DELAY_MS`, `FORMA_THEME`,
+  `FORMA_STORYBOOK=1`, `FORMA_STARTUP="view.top;palette:zoom;debug.benchmark"` (afișează fps în consolă).
+
 ## Următorii pași
-Faza 1 (vezi `PLAN.md`).
+Faza 2: nucleul geometric (cea mai riscantă parte), pe ramura `feature/faza-2`.
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `forma::`,

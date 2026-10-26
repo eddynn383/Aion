@@ -1,34 +1,51 @@
 import QtQuick
 import Forma
 
-// Panou lateral cu titlu. Conținutul se pune ca elemente copil.
+// Panou lateral: antet (titlu sau tab-uri) și conținut așezat sub el.
 Rectangle {
     id: root
 
     property string title: ""
+    // Element opțional afișat în antet în locul titlului (de exemplu Tabs).
+    property alias header: headerSlot.data
     default property alias content: body.data
 
     color: Theme.bgPanel
 
-    Text {
-        id: header
-        anchors.left: parent.left
+    Item {
+        id: headerArea
         anchors.top: parent.top
-        anchors.margins: Theme.space4
-        text: root.title
-        color: Theme.textSecondary
-        font.pixelSize: Theme.fontSizeSm
-        font.weight: Font.DemiBold
-        font.capitalization: Font.AllUppercase
-        font.letterSpacing: 0.6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Theme.space3
+        height: Theme.controlHeightSm
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.space1
+            anchors.verticalCenter: parent.verticalCenter
+            visible: headerSlot.children.length === 0
+            text: root.title
+            color: Theme.textPrimary
+            font.pixelSize: Theme.fontSizeMd
+            font.weight: Font.DemiBold
+        }
+
+        Item {
+            id: headerSlot
+            anchors.fill: parent
+        }
     }
 
     Item {
         id: body
-        anchors.top: header.bottom
+        anchors.top: headerArea.bottom
+        anchors.topMargin: Theme.space3
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: Theme.space4
+        anchors.leftMargin: Theme.space4
+        anchors.rightMargin: Theme.space4
+        anchors.bottomMargin: Theme.space4
     }
 }

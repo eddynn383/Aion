@@ -2,6 +2,9 @@ find_package(glm CONFIG REQUIRED)
 
 add_library(forma_core STATIC
     src/Version.cpp
+    src/text/FuzzyMatch.cpp
+    src/view/Camera.cpp
+    src/view/CameraMotion.cpp
 )
 add_library(forma::core ALIAS forma_core)
 

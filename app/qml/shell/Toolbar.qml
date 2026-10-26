@@ -1,56 +1,82 @@
 import QtQuick
+import QtQuick.Effects
 import Forma
 
 // Toolbar plutitor, jos în viewport (ca în Figma).
-// Uneltele sunt doar vizuale până în Faza 3.
-Rectangle {
+// Uneltele de desen devin funcționale în Faza 3; Orbit, Pan și Zoom funcționează de acum.
+Item {
     id: root
 
     property string activeTool: "select"
+    readonly property var tools: [
+        { id: "select",    icon: "mouse-pointer-2",    name: "Select",    key: "Space" },
+        { id: "line",      icon: "pen-line",           name: "Line",      key: "L" },
+        { id: "rectangle", icon: "square",             name: "Rectangle", key: "R" },
+        { id: "circle",    icon: "circle",             name: "Circle",    key: "C" },
+        { id: "pushpull",  icon: "arrow-up-from-line", name: "Push/Pull", key: "P" },
+        { id: "move",      icon: "move",               name: "Move",      key: "M" },
+        { id: "rotate",    icon: "rotate-cw",          name: "Rotate",    key: "Q" },
+        { id: "eraser",    icon: "eraser",             name: "Eraser",    key: "E" },
+        { id: "-" },
+        { id: "orbit",     icon: "orbit",              name: "Orbit",     key: "O" },
+        { id: "pan",       icon: "hand",               name: "Pan",       key: "H" },
+        { id: "zoom",      icon: "zoom-in",            name: "Zoom",      key: "Z" }
+    ]
 
-    implicitWidth: tools.implicitWidth + Theme.space2 * 2
-    implicitHeight: tools.implicitHeight + Theme.space2 * 2
-    radius: Theme.radiusLg
-    color: Theme.bgElevated
-    border.color: Theme.borderSubtle
+    signal toolSelected(string id)
 
-    // Umbră simplă (MultiEffect va fi folosit în Faza 1).
-    Rectangle {
-        z: -1
-        anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.leftMargin: -1
-        anchors.rightMargin: -1
-        anchors.bottomMargin: -6
-        radius: parent.radius + 2
+    implicitWidth: bar.implicitWidth
+    implicitHeight: bar.implicitHeight
+
+    RectangularShadow {
+        anchors.fill: bar
+        radius: bar.radius
+        offset.y: 6
+        blur: 24
+        spread: -2
         color: Theme.shadow
-        opacity: 0.6
     }
 
-    Row {
-        id: tools
-        anchors.centerIn: parent
-        spacing: Theme.space1
+    Rectangle {
+        id: bar
+        implicitWidth: row.implicitWidth + Theme.space1 * 2 + 2
+        implicitHeight: row.implicitHeight + Theme.space1 * 2 + 2
+        radius: Theme.radiusLg
+        color: Theme.bgElevated
+        border.color: Theme.borderStrong
 
-        Repeater {
-            model: [
-                { id: "select",    glyph: "↖", name: "Select",    key: "Space" },
-                { id: "line",      glyph: "╱", name: "Line",      key: "L" },
-                { id: "rectangle", glyph: "▭", name: "Rectangle", key: "R" },
-                { id: "circle",    glyph: "◯", name: "Circle",    key: "C" },
-                { id: "pushpull",  glyph: "⇅", name: "Push/Pull", key: "P" },
-                { id: "move",      glyph: "✥", name: "Move",      key: "M" },
-                { id: "rotate",    glyph: "⟳", name: "Rotate",    key: "Q" },
-                { id: "eraser",    glyph: "⌫", name: "Eraser",    key: "E" }
-            ]
+        Row {
+            id: row
+            anchors.centerIn: parent
+            spacing: 2
 
-            delegate: IconButton {
-                required property var modelData
-                glyph: modelData.glyph
-                tooltip: modelData.name
-                shortcut: modelData.key
-                checked: root.activeTool === modelData.id
-                onClicked: root.activeTool = modelData.id
+            Repeater {
+                model: root.tools
+
+                delegate: Loader {
+                    required property var modelData
+                    anchors.verticalCenter: parent.verticalCenter
+                    sourceComponent: modelData.id === "-" ? divider : button
+
+                    Component {
+                        id: divider
+                        Item {
+                            width: Theme.space2 + 1
+                            height: 20
+                            Separator { anchors.centerIn: parent; height: parent.height }
+                        }
+                    }
+                    Component {
+                        id: button
+                        IconButton {
+                            iconName: modelData.icon
+                            tooltip: modelData.name
+                            shortcut: modelData.key
+                            checked: root.activeTool === modelData.id
+                            onClicked: root.toolSelected(modelData.id)
+                        }
+                    }
+                }
             }
         }
     }
