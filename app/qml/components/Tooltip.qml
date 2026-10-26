@@ -8,10 +8,21 @@ T.ToolTip {
 
     property string shortcut: ""
 
+    // Deasupra elementului; dedesubt când nu are loc (de exemplu în bara de titlu).
+    property bool placeBelow: false
+
     delay: 450
     timeout: -1
-    y: -implicitHeight - Theme.space2
+    // Templates nu calculează mărimea implicită; fără ea, fundalul ar avea 0 × 0.
+    implicitWidth: Math.max(implicitBackgroundWidth, implicitContentWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(implicitBackgroundHeight, implicitContentHeight + topPadding + bottomPadding)
+    y: placeBelow ? (parent ? parent.height : 0) + Theme.space2 : -implicitHeight - Theme.space2
     x: (parent ? (parent.width - implicitWidth) / 2 : 0)
+
+    onAboutToShow: {
+        if (parent)
+            placeBelow = parent.mapToItem(null, 0, 0).y < implicitHeight + Theme.space4
+    }
     padding: Theme.space2
     leftPadding: Theme.space3
     rightPadding: shortcut.length > 0 ? Theme.space2 : Theme.space3
