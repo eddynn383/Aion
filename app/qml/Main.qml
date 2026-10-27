@@ -411,6 +411,10 @@ Window {
                     // Click în coordonatele ferestrei (butoane, câmpuri).
                     const cs = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
+                } else if (action.startsWith("shape:")) {
+                    // „shape:segments=12”: mărimea formei selectate (ca din Inspector).
+                    const kv = action.slice(6).split("=")
+                    doc.setShapeValue(kv[0], parseFloat(kv[1]))
                 } else if (action.startsWith("draglight:")) {
                     // „draglight:dx,dy,shift”: trage marcajul primei lumini cu (dx, dy) pixeli; afișează poziția.
                     const dl = action.slice(10).split(",").map(Number)

@@ -533,14 +533,14 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 - [ ] Modulul `plugins/skp` se construiește doar cu `AION_SKP_SDK_DIR`; restul ca în Faza 7b
 
 ### Setări rămase pentru Inspector, în ordinea priorității
-1. Muchii: lungime editabilă, soft / netedă / ascunsă (unghi de netezire)
+1. ~~Muchii: lungime editabilă, soft / netedă~~ — făcut (2026-10-27): linie, arc, cerc, poligon, dreptunghi recunoscute din geometrie, cu mărimi editabile
 2. Selecție multiplă: proprietățile comune („mixt” unde diferă), totaluri, aliniere și distribuire
 3. Cantitățile selecției: arie, volum, „Solid ✓/✗” cu motivul
 4. Mobilier: materialul plăcii, direcția fibrei, cantul pe laturi (alimentează lista de debitare)
 5. Atribute personalizate (cheie–valoare), incluse în raportul de cantități
 6. Ghidaje, cote, note și planuri de secțiune selectabile, cu proprietăți în Inspector
 7. Fără selecție: informațiile modelului (autor, descriere, locație), statistici
-8. Arce și cercuri: raza și numărul de segmente
+8. ~~Arce și cercuri: raza și numărul de segmente~~ — făcut (vezi 1)
 9. ~~Texturi: poziționare~~ — făcut în Faza 24 (Inspector + unealta Poziționează textura)
 10. Vizibilitate avansată: umbre proiectate/primite, vizibil doar în anumite scene
 

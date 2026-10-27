@@ -1,6 +1,7 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Shapes.h"
 #include "aion/core/inference/Inference.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
@@ -976,6 +977,30 @@ QVariantMap Document::entityInfo() const
     } else {
         info[QStringLiteral("kind")] = QStringLiteral("mixed");
         info[QStringLiteral("title")] = selectionSummary();
+    }
+    // Forma recunoscută (linie, arc, cerc, poligon, dreptunghi), cu mărimile ei editabile.
+    if (const auto shape = geom::recognizeShape(mesh, m_selection)) {
+        static const char* const kKinds[] = { "line", "arc", "circle", "polygon", "rectangle" };
+        static const char* const kTitles[] = { "Linie", "Arc", "Cerc", "Poligon", "Dreptunghi" };
+        info[QStringLiteral("title")] = QString::fromUtf8(kTitles[static_cast<int>(shape->kind)]);
+        if (shape->kind == geom::ShapeInfo::Kind::Line) {
+            details.clear(); // lungimea e în câmpul editabil
+        }
+        info[QStringLiteral("shape")] = QVariantMap {
+            { QStringLiteral("kind"), QString::fromLatin1(kKinds[static_cast<int>(shape->kind)]) },
+            { QStringLiteral("length"), shape->length }, { QStringLiteral("radius"), shape->radius },
+            { QStringLiteral("angle"), shape->angle }, { QStringLiteral("segments"), shape->segments },
+            { QStringLiteral("width"), shape->width }, { QStringLiteral("height"), shape->height },
+            { QStringLiteral("segmentsEditable"), shape->segmentsEditable } };
+    }
+    // Muchiile selectate: soft (toate, niciuna sau mixt).
+    if (!m_selection.edges.empty()) {
+        int soft = 0;
+        for (geom::EdgeId e : m_selection.edges) {
+            const geom::Edge* edge = mesh.edges().find(e);
+            soft += edge != nullptr && edge->soft ? 1 : 0;
+        }
+        info[QStringLiteral("edgesSoft")] = soft == 0 ? 0 : soft == static_cast<int>(m_selection.edges.size()) ? 1 : -1;
     }
     info[QStringLiteral("details")] = details;
     return info;
@@ -3730,6 +3755,55 @@ void Document::setParameter(const QString& key, double value)
         return;
     }
     runOnModel("Parametru", [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), value); });
+}
+
+void Document::setShapeValue(const QString& key, double value)
+{
+    const auto shape = geom::recognizeShape(m_model.mesh(activeDefinition()), m_selection);
+    if (!shape || value <= 0.0) {
+        return;
+    }
+    static const std::map<QString, const char*> kNames { { QStringLiteral("length"), "Lungimea liniei" },
+        { QStringLiteral("radius"), "Raza" }, { QStringLiteral("segments"), "Segmente" },
+        { QStringLiteral("width"), "Lățimea" }, { QStringLiteral("height"), "Înălțimea" } };
+    const auto name = kNames.find(key);
+    if (name == kNames.end()) {
+        return;
+    }
+    bool ok = true;
+    runOnModel(name->second, [&](model::Model& model) {
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        if (key == QLatin1String("length")) {
+            ok = geom::setLineLength(mesh, *shape, value);
+        } else if (key == QLatin1String("radius")) {
+            ok = geom::setShapeRadius(mesh, *shape, value);
+        } else if (key == QLatin1String("width") || key == QLatin1String("height")) {
+            ok = geom::setRectangleSize(mesh, *shape, key == QLatin1String("width") ? value : shape->width,
+                key == QLatin1String("height") ? value : shape->height);
+        } else if (const auto selection = geom::setShapeSegments(mesh, *shape, static_cast<int>(std::lround(value)))) {
+            m_selection = *selection;
+        } else {
+            ok = false;
+        }
+    });
+    if (!ok) {
+        setError(QStringLiteral("Mărimea nu se poate schimba așa (o muchie ar ajunge de lungime zero)."));
+    }
+}
+
+void Document::setSelectedEdgesSoft(bool soft)
+{
+    if (m_selection.edges.empty()) {
+        return;
+    }
+    runOnModel(soft ? "Muchii soft" : "Muchii vizibile", [&](model::Model& model) {
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        for (geom::EdgeId e : m_selection.edges) {
+            if (const geom::Edge* edge = mesh.edges().find(e)) {
+                mesh.setEdgeStyle(e, soft, edge->curve, edge->smoothCurve);
+            }
+        }
+    });
 }
 
 void Document::mirrorSelection(int axis)

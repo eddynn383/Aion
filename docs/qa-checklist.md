@@ -189,3 +189,9 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Meniul soarelui → Mediu: Studio / Exterior / Înnorat schimbă lumina și reflexiile metalelor
 - [ ] Preferințe → Viewport: preset-urile Performanță / Echilibrat / Calitate; SSAO întunecă contactele; după repornire setările rămân
 - [ ] Orbită apoi oprire: după ~0,4 s marginile devin mai fine (MSAA 8×)
+## Forme în Inspector
+- [ ] Click pe o linie → „Linie” cu lungimea editabilă (capătul se mută pe direcția ei); comutatorul Netedă (soft)
+- [ ] Click pe marginea unui cerc / arc / poligon → raza și segmentele (laturile); arcul arată și unghiul
+- [ ] După Push/Pull, segmentele sunt dezactivate (cu explicație); raza se poate schimba
+- [ ] Click pe un dreptunghi → Lățime (latura pe X / orizontală) și Înălțime
+- [ ] Fiecare schimbare = un pas de undo
