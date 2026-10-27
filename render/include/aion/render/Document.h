@@ -319,6 +319,8 @@ public:
     // Salvează obiectul selectat în bibliotecă (cu miniatura dată, PNG). Întoarce false dacă nu se poate.
     Q_INVOKABLE bool saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng);
     Q_INVOKABLE void removeLibraryItem(const QString& id);
+    // Mărimea obiectului din bibliotecă (pentru previzualizarea la tragere): { dx, dy, dz } în mm, păstrată între apeluri.
+    Q_INVOKABLE QVariantMap libraryItemSize(const QString& id) const;
 
     // --- Scripturi (ADR 0027) ---
     // Tot ce face un script între beginMacro și endMacro e un singur pas de undo (endMacro(false) îl anulează).
@@ -528,6 +530,7 @@ private:
     // Miniatura texturii (data URL), păstrată între apeluri.
     QString textureThumbnail(model::TextureId id) const;
     mutable std::map<std::uint64_t, std::pair<std::size_t, QString>> m_thumbnails;
+    mutable std::map<QString, QVariantMap> m_librarySizes;
     std::size_t validPathLength() const;
     bool m_contextLost = false;
     void setPath(std::vector<model::InstanceId> path);

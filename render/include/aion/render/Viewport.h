@@ -177,6 +177,9 @@ public:
     Q_INVOKABLE QPointF projectToScreen(const QVector3D& world) const;
     // Punctul din lume sub poziția dată: pe suprafața atinsă sau pe sol (Z = 0); altfel ținta camerei.
     Q_INVOKABLE QVector3D dropPointAt(const QPointF& position) const;
+    // Previzualizarea unui obiect tras din bibliotecă: o cutie (colțul minim și mărimea, în mm) desenată peste model.
+    Q_INVOKABLE void setDropPreview(const QVector3D& corner, const QVector3D& size);
+    Q_INVOKABLE void clearDropPreview();
 
     // Apelat de renderer (pe firul de randare, cu firul GUI blocat).
     ViewportFrame frameForRendering() const;
@@ -241,6 +244,7 @@ private:
     int m_playingScene = -1;
     // Cât se captează o imagine (PNG, cadrele unui video): fără selecție, hover și marcaje.
     bool m_cleanCapture = false;
+    std::optional<std::pair<QVector3D, QVector3D>> m_dropPreview;
     bool m_exporting = false;
     double m_exportProgress = 0.0;
     int m_exportFrame = 0;

@@ -1319,6 +1319,18 @@ void Viewport::beginOrbitAt(QPointF position)
     m_camera.setOrbitPivot(pivot);
 }
 
+void Viewport::setDropPreview(const QVector3D& corner, const QVector3D& size)
+{
+    m_dropPreview = std::pair { corner, size };
+    update();
+}
+
+void Viewport::clearDropPreview()
+{
+    m_dropPreview.reset();
+    update();
+}
+
 QVector3D Viewport::dropPointAt(const QPointF& position) const
 {
     view::Vec3d p = m_camera.pose().target;
@@ -1508,6 +1520,22 @@ ViewportFrame Viewport::frameForRendering() const
         + (m_demoVisible ? 1u : 0u) + (m_cleanCapture ? 0x40000000u : 0u)
         + static_cast<unsigned>(f.textureSignature & 0xFFFFu) * 2654435761u;
 
+    // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.
+    if (m_dropPreview) {
+        const glm::vec3 lo(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z());
+        const glm::vec3 hi = lo + glm::vec3(m_dropPreview->second.x(), m_dropPreview->second.y(), m_dropPreview->second.z());
+        const glm::vec4 color = toVec4(m_accent);
+        std::array<glm::vec3, 8> c {};
+        for (std::size_t k = 0; k < 8; ++k) {
+            c[k] = { (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z };
+        }
+        constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
+            { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+        for (const auto& [a, b] : kEdges) {
+            f.topLines.push_back({ c[std::size_t(a)], c[std::size_t(b)], color, { 1.5f, 0.0f } });
+        }
+        f.topPoints.push_back({ lo, color, 7.0f });
+    }
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     // Pivotul orbitei, cât timp se orbitează în jurul lui.
     if (m_drag == Drag::Orbit && m_camera.orbitPivot()) {

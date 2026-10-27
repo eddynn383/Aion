@@ -3681,6 +3681,34 @@ bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thu
     return true;
 }
 
+QVariantMap Document::libraryItemSize(const QString& id) const
+{
+    if (const auto it = m_librarySizes.find(id); it != m_librarySizes.end()) {
+        return it->second;
+    }
+    // Obiectul construit într-un model temporar (generatorul cu parametrii impliciți, sau fișierul).
+    std::optional<model::Model> temp;
+    if (id.startsWith(QLatin1String("gen:"))) {
+        temp.emplace();
+        model::createParametric(*temp, temp->root(), id.mid(4).toStdString(), {}, {});
+    } else if (id.startsWith(QLatin1String("file:"))) {
+        io::LoadResult loaded = io::loadFile(toPath(id.mid(5)));
+        if (loaded.model) {
+            temp = std::move(*loaded.model);
+        }
+    }
+    QVariantMap size;
+    if (temp) {
+        const auto [lo, hi] = model::bounds(*temp, temp->root());
+        if (lo.x <= hi.x) {
+            size = { { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
+                { QStringLiteral("dz"), hi.z - lo.z } };
+        }
+    }
+    m_librarySizes[id] = size;
+    return size;
+}
+
 void Document::removeLibraryItem(const QString& id)
 {
     if (id.startsWith(QLatin1String("file:")) && QFile::remove(id.mid(5))) {
