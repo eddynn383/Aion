@@ -22,4 +22,5 @@
 ## Limite și urmări
 
 - Fără auto-key, fără curbe Bézier editabile, fără piste pentru alte proprietăți (vizibilitate, materialul întreg).
-- La export, obiectele selectate apar cu evidențierea selecției: de ascuns în exporturi.
+- ~~La export, obiectele selectate apar cu evidențierea selecției~~ — rezolvat: capturile (PNG, cadrele video)
+  se randează fără selecție, hover, overlay-ul uneltei și marcajele camerelor / luminilor.
