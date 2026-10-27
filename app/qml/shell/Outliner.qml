@@ -111,7 +111,7 @@ Item {
             radius: Theme.radiusSm
             color: dropArea.containsDrag && row.isGroup ? Theme.accentSubtle
                  : modelData.selected ? Theme.accentSubtle
-                 : rowArea.containsMouse ? Theme.bgHover : "transparent"
+                 : rowHover.hovered ? Theme.bgHover : "transparent"
             border.color: dropArea.containsDrag && row.isGroup ? Theme.accent : "transparent"
 
             // Trasul rândului (drag & drop între grupuri).
@@ -234,40 +234,48 @@ Item {
                 }
             }
 
+            // Acțiunile rândului (RowAction: locuri fixe, se estompează): o comandă sau o stare, apoi ochiul.
+            HoverHandler { id: rowHover }
             Row {
                 id: actions
                 anchors.right: parent.right
                 anchors.rightMargin: 2
                 anchors.verticalCenter: parent.verticalCenter
-                IconButton {
-                    width: 22; height: 22; iconSize: 13
-                    visible: row.modelData.kind === "camera" && (rowArea.containsMouse || hovered)
+                // Camera: privește prin ea.
+                RowAction {
+                    visible: row.modelData.kind === "camera"
+                    shown: rowHover.hovered
                     iconName: "video"
                     tooltip: "Privește prin cameră"
                     onClicked: root.viewport.animateToCamera(root.document.cameraView(row.modelData.id), 0.8)
                 }
-                IconButton {
-                    width: 22; height: 22; iconSize: 13
+                // Lumina: aprinsă / stinsă (stinsă se vede mereu).
+                RowAction {
                     visible: row.modelData.kind === "light"
-                    iconName: row.modelData.enabled ? "lightbulb" : "x"
+                    shown: rowHover.hovered
+                    active: row.modelData.enabled === false
+                    iconName: row.modelData.enabled ? "lightbulb" : "lightbulb-off"
                     tooltip: row.modelData.enabled ? "Stinge" : "Aprinde"
                     onClicked: {
                         root.document.selectObject("light", row.modelData.id)
                         root.document.setObjectProperties({ enabled: !row.modelData.enabled })
                     }
                 }
-                IconButton {
-                    width: 22; height: 22; iconSize: 13
-                    visible: !row.isSceneObject && (rowArea.containsMouse || hovered || row.modelData.locked)
+                // Obiectele și grupurile: blocat (se vede mereu când e blocat).
+                RowAction {
+                    visible: !row.isSceneObject
+                    shown: rowHover.hovered
+                    active: row.modelData.locked
                     iconName: row.modelData.locked ? "lock" : "lock-open"
                     tooltip: row.modelData.locked ? "Deblochează" : "Blochează"
                     onClicked: root.document.setInstanceLocked(row.modelData.id, !row.modelData.locked)
                 }
-                IconButton {
-                    width: 22; height: 22; iconSize: 13
-                    visible: rowArea.containsMouse || hovered || row.modelData.hidden
+                RowAction {
+                    shown: rowHover.hovered
+                    active: row.modelData.hidden
                     iconName: row.modelData.hidden ? "eye-off" : "eye"
-                    tooltip: row.modelData.hidden ? "Arată" : "Ascunde"
+                    tooltip: row.isSceneObject ? (row.modelData.hidden ? "Arată marcajul" : "Ascunde marcajul din viewport")
+                                               : (row.modelData.hidden ? "Arată" : "Ascunde")
                     onClicked: {
                         if (row.isSceneObject) {
                             root.document.selectObject(row.modelData.kind, row.modelData.id)

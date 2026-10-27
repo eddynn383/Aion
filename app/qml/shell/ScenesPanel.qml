@@ -76,9 +76,9 @@ Item {
             property bool editing: false
 
             width: ListView.view.width
-            height: Theme.controlHeight
+            height: Theme.controlHeightSm
             radius: Theme.radiusSm
-            color: rowArea.containsMouse ? Theme.bgHover : "transparent"
+            color: rowHover.hovered ? Theme.bgHover : "transparent"
 
             MouseArea {
                 id: rowArea
@@ -116,30 +116,24 @@ Item {
                 }
             }
 
+            // Acțiunile (RowAction: locuri fixe, ca în celelalte secțiuni): șterge, apoi actualizează.
+            HoverHandler { id: rowHover }
             Row {
                 id: actions
                 anchors.right: parent.right
-                anchors.rightMargin: Theme.space1
+                anchors.rightMargin: 2
                 anchors.verticalCenter: parent.verticalCenter
-                visible: rowArea.containsMouse || updateButton.hovered || deleteButton.hovered
-
-                IconButton {
-                    id: updateButton
-                    width: 24
-                    height: 24
-                    iconSize: Theme.iconSizeSm
-                    iconName: "rotate-ccw"
-                    tooltip: "Actualizează cu starea curentă (camera și obiectele)"
-                    onClicked: root.document.updateScene(row.modelData.id, root.viewport.cameraState(), root.viewport.displayStyle)
-                }
-                IconButton {
-                    id: deleteButton
-                    width: 24
-                    height: 24
-                    iconSize: Theme.iconSizeSm
+                RowAction {
+                    shown: rowHover.hovered
                     iconName: "trash-2"
                     tooltip: "Șterge scena"
                     onClicked: root.document.removeScene(row.modelData.id)
+                }
+                RowAction {
+                    shown: rowHover.hovered
+                    iconName: "rotate-ccw"
+                    tooltip: "Actualizează cu starea curentă (camera și obiectele)"
+                    onClicked: root.document.updateScene(row.modelData.id, root.viewport.cameraState(), root.viewport.displayStyle)
                 }
             }
         }

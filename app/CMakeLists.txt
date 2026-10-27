@@ -97,6 +97,7 @@ qt_add_qml_module(aion_app
         qml/components/DataTable.qml
         qml/components/MaterialSwatch.qml
         qml/components/AccordionSection.qml
+        qml/components/RowAction.qml
         qml/components/ToolDemo.qml
         qml/components/GuideCard.qml
         qml/components/RichTooltip.qml

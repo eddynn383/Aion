@@ -212,6 +212,11 @@ Window {
         case "edit.array": arrayPanel.start(); break
         case "edit.soften": softenPanel.start(); break
         case "library.save": window.saveToLibrary(); break
+        case "debug.objectsOnly":
+            preferences.leftLibrary = preferences.leftTags = preferences.leftMaterials = false
+            preferences.leftScenes = preferences.leftInteractions = false
+            preferences.leftOutliner = true
+            break
         case "debug.materialsOnly":
             preferences.leftOutliner = preferences.leftLibrary = preferences.leftTags = false
             preferences.leftScenes = preferences.leftInteractions = false
