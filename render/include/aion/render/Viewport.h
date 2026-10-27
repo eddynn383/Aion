@@ -159,6 +159,8 @@ public:
     Q_INVOKABLE void exportScenes(const QVariantList& states, double transition, double delay, bool loop,
         const QString& directory, int fps);
     Q_INVOKABLE void cancelExport();
+    // Randează animația activă din timeline (cu camera ei, dacă are) în PNG-uri; la sfârșit emite animationExported.
+    Q_INVOKABLE void exportAnimation(const QString& directory, int fps);
     bool scenesPlaying() const { return m_sceneAnimation.has_value() && !m_exporting; }
     int playingScene() const { return m_playingScene; }
     double exportProgress() const { return m_exportProgress; }
@@ -238,6 +240,8 @@ private:
     int m_exportFps = 30;
     QString m_exportDirectory;
     QTimer* m_exportTimer = nullptr;
+    bool m_exportTimeline = false; // exportul vine din timeline (nu din scene)
+    void applyAnimationCamera();
 
     int m_shadowMapSize = 2048;
     int m_orbitPivotMode = 0;
@@ -261,6 +265,7 @@ private:
         bool hovered = false;
         bool marked = false;
         model::MaterialId material; // materialul grupului, pentru fețele fără material
+        std::optional<glm::vec4> colorOverride; // culoarea animată (timeline), peste toate fețele
     };
     // Desenează definiția și tot ce conține. `pathIndex`: câte instanțe din calea contextului s-au parcurs
     // (egal cu lungimea căii = contextul editat; -1 = în afara căii).

@@ -14,6 +14,7 @@ struct GuideTag;
 struct AnnotationTag;
 struct SectionTag;
 struct SceneTag;
+struct AnimationTag;
 
 using DefinitionId = geom::Id<DefinitionTag>;
 using InstanceId = geom::Id<InstanceTag>;
@@ -23,5 +24,6 @@ using GuideId = geom::Id<GuideTag>;
 using AnnotationId = geom::Id<AnnotationTag>;
 using SectionId = geom::Id<SectionTag>;
 using SceneId = geom::Id<SceneTag>;
+using AnimationId = geom::Id<AnimationTag>;
 
 } // namespace aion::model

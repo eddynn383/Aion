@@ -46,7 +46,8 @@ Item {
         // Zona goală de sub arbore: drop aici scoate obiectul din grup (îl pune în model).
         footer: Item {
             width: tree.width
-            height: Math.max(48, tree.height - tree.contentHeight + 48)
+            // Restul spațiului de sub rânduri (calculat din numărul lor, nu din contentHeight, care include footer-ul).
+            height: Math.max(48, tree.height - tree.count * (Theme.controlHeightSm + 1))
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 2

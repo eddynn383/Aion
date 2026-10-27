@@ -70,6 +70,14 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] „Adaugă scena curentă” reține camera, stilul, pozițiile obiectelor, ce e ascuns și tag-urile ascunse
 - [ ] Click pe o scenă: camera și obiectele trec lin (durata din slider-ul „Tranziție”); ⌘Z anulează aplicarea
 - [ ] ↻ pe o scenă o recapturează; fișierele vechi (scene doar cu cameră) schimbă doar camera
+## Timeline (Faza 17, ADR 0020)
+- [ ] ⌥T deschide timeline-ul; „Animație nouă” din meniul din stânga sus; redenumire (dublu-click), ștergere
+- [ ] Selectează un obiect → ◆ Keyframe la 0 s; mută playhead-ul, mută/rotește/redimensionează obiectul → ◆; Play (Space)
+- [ ] Culoare: pune material, ◆ Culoare; alt material, alt moment, ◆ Culoare → culoarea se schimbă lin
+- [ ] Cameră: ◆ Cameră în două momente cu vederi diferite → camera se mișcă la redare
+- [ ] Romburile: drag = mută în timp; click dreapta = easing / șterge; Delete șterge cheia selectată
+- [ ] Click de editare în viewport iese din previzualizare (obiectele revin la model); buclă; Durată / fps (⚙)
+- [ ] Exportă video → MP4 cu animația și camera ei
 ## Grafică
 - [ ] Materiale (bibliotecă, în model, pipetă ⌥, ⌘ conectate, ⇧ același material), sticlă transparentă
 - [ ] Stiluri: materiale, clay, linii, wireframe, X-Ray; profile; ceață; umbre (oră, lună)

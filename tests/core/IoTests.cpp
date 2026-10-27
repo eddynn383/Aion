@@ -89,7 +89,7 @@ Model sampleModel()
     m.addAnnotation({ model::Annotation::Kind::Dimension, m.root(), { 0, 0, 0 }, { 6000, 0, 0 }, { 0, -500, 0 }, "" });
     m.addAnnotation({ model::Annotation::Kind::Text, m.root(), { 3000, 0, 1000 }, {}, { 0, -800, 600 }, "Ușa" });
     m.addSection({ "Secțiune 1", { 3000, 2000, 1200 }, { 0, 0, 1 }, false });
-    m.addScene({ "Fațada", { 3000, 2000, 1000 }, 0.4, 0.2, 15000, false, "clay" });
+    m.addScene({ "Fațada", { 3000, 2000, 1000 }, 0.4, 0.2, 15000, false, "clay", false, {}, {}, {} });
     requireValid(m);
     return m;
 }

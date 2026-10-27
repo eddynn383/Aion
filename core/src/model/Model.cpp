@@ -72,7 +72,7 @@ bool sameMap(const geom::SlotMap<IdT, T>& a, const geom::SlotMap<IdT, T>& b)
 bool ChangeSet::empty() const
 {
     return definitions.empty() && instances.empty() && tags.empty() && materials.empty() && guides.empty()
-        && annotations.empty() && sections.empty() && scenes.empty()
+        && annotations.empty() && sections.empty() && scenes.empty() && animations.empty()
         && std::all_of(meshes.begin(), meshes.end(), [](const auto& m) { return m.second.empty(); });
 }
 
@@ -112,6 +112,7 @@ Model& Model::operator=(const Model& other)
     m_annotations = other.m_annotations;
     m_sections = other.m_sections;
     m_scenes = other.m_scenes;
+    m_animations = other.m_animations;
     m_meshes.clear();
     for (const auto& [id, mesh] : other.m_meshes) {
         auto copy = std::make_unique<geom::Mesh>(*mesh);
@@ -470,6 +471,21 @@ void Model::setScene(SceneId id, Scene scene)
     setEntity(m_scenes, &ChangeSet::scenes, id, std::move(scene));
 }
 
+AnimationId Model::addAnimation(Animation animation)
+{
+    return addEntity(m_animations, &ChangeSet::animations, std::move(animation));
+}
+
+void Model::removeAnimation(AnimationId id)
+{
+    removeEntity(m_animations, &ChangeSet::animations, id);
+}
+
+void Model::setAnimation(AnimationId id, Animation animation)
+{
+    setEntity(m_animations, &ChangeSet::animations, id, std::move(animation));
+}
+
 void Model::beginRecording()
 {
     assert(!m_recording);
@@ -499,6 +515,7 @@ ChangeSet Model::endRecording()
     finishChanges(changes.annotations, m_annotations);
     finishChanges(changes.sections, m_sections);
     finishChanges(changes.scenes, m_scenes);
+    finishChanges(changes.animations, m_animations);
     // O definiție creată și ștearsă în aceeași operație nu lasă nicio urmă.
     for (DefinitionId id : m_createdWhileRecording) {
         if (!changes.definitions.contains(id) && !m_definitions.contains(id)) {
@@ -536,6 +553,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.annotations, m_annotations, direction);
         applyChanges(changes.sections, m_sections, direction);
         applyChanges(changes.scenes, m_scenes, direction);
+        applyChanges(changes.animations, m_animations, direction);
         for (const auto& [id, change] : changes.definitions) {
             if (change.before && !change.after) {
                 m_definitions.erase(id);
@@ -553,6 +571,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.annotations, m_annotations, direction);
         applyChanges(changes.sections, m_sections, direction);
         applyChanges(changes.scenes, m_scenes, direction);
+        applyChanges(changes.animations, m_animations, direction);
         applyChanges(changes.instances, m_instances, direction);
         applyChanges(changes.tags, m_tags, direction);
         applyMeshes();
@@ -568,7 +587,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
     }
     if (!changes.definitions.empty() || !changes.instances.empty() || !changes.tags.empty()
         || !changes.materials.empty() || !changes.guides.empty() || !changes.annotations.empty()
-        || !changes.sections.empty() || !changes.scenes.empty()) {
+        || !changes.sections.empty() || !changes.scenes.empty() || !changes.animations.empty()) {
         m_structureDirty = true;
         notifyStructure();
     }
@@ -694,7 +713,7 @@ bool Model::sameAs(const Model& other) const
         || !sameMap(m_instances, other.m_instances) || !sameMap(m_tags, other.m_tags)
         || !sameMap(m_materials, other.m_materials) || !sameMap(m_guides, other.m_guides)
         || !sameMap(m_annotations, other.m_annotations) || !sameMap(m_sections, other.m_sections)
-        || !sameMap(m_scenes, other.m_scenes)) {
+        || !sameMap(m_scenes, other.m_scenes) || !sameMap(m_animations, other.m_animations)) {
         return false;
     }
     for (const auto& [id, mesh] : m_meshes) {

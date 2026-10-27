@@ -274,6 +274,7 @@ void Viewport::setDocument(Document* document)
         connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
         connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
         connect(m_document, &Document::animationStarted, this, &Viewport::requestAnimationFrame);
+        connect(m_document, &Document::timelineTimeChanged, this, &Viewport::applyAnimationCamera);
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
             updateSceneBounds();
@@ -414,6 +415,9 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
                 material->color.a / 255.0f };
             surface = { material->roughness, material->metallic };
         }
+        if (style.colorOverride) {
+            color = *style.colorOverride;
+        }
         glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f };
         if (const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr) {
             backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f, back->color.a / 255.0f };
@@ -546,6 +550,10 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         }
         if (inst.material) {
             childStyle.material = inst.material;
+        }
+        if (const auto animated = doc.displayColor(child)) {
+            childStyle.colorOverride = glm::vec4(animated->r / 255.0f, animated->g / 255.0f, animated->b / 255.0f,
+                animated->a / 255.0f);
         }
         childStyle.dim = dim;
         appendDefinition(f, doc, inst.definition, childToWorld, -1, childStyle, hover, overlay);
@@ -942,18 +950,61 @@ void Viewport::exportScenes(const QVariantList& states, double transition, doubl
     m_exportTimer->start();
 }
 
+void Viewport::applyAnimationCamera()
+{
+    if (!m_document || !m_document->previewing()) {
+        return;
+    }
+    const QVariantMap camera = m_document->animationCamera();
+    if (!camera.isEmpty()) {
+        m_motion.stop();
+        m_camera.setPose(poseFromState(camera));
+        onCameraMoved();
+    }
+}
+
+void Viewport::exportAnimation(const QString& directory, int fps)
+{
+    if (m_exporting || !m_document || m_document->currentAnimation() == nullptr) {
+        return;
+    }
+    QDir().mkpath(directory);
+    m_motion.stop();
+    m_document->pause();
+    m_exporting = true;
+    m_exportTimeline = true;
+    m_exportFps = std::clamp(fps, 1, 120);
+    m_exportFrame = 0;
+    m_exportFrames = std::max(1, static_cast<int>(std::ceil(m_document->animationDuration() * m_exportFps)) + 1);
+    m_exportDirectory = directory;
+    m_exportProgress = 0.0;
+    emit sceneAnimationChanged();
+    if (m_exportTimer == nullptr) {
+        m_exportTimer = new QTimer(this);
+        m_exportTimer->setSingleShot(true);
+        m_exportTimer->setInterval(0);
+        connect(m_exportTimer, &QTimer::timeout, this, &Viewport::exportNextFrame);
+    }
+    m_exportTimer->start();
+}
+
 void Viewport::exportNextFrame()
 {
-    if (!m_exporting || !m_sceneAnimation) {
+    if (!m_exporting || (!m_sceneAnimation && !m_exportTimeline)) {
         return;
     }
     const double t = static_cast<double>(m_exportFrame) / m_exportFps;
-    m_camera.setPose(m_sceneAnimation->poseAt(t));
-    onCameraMoved();
-    const int scene = static_cast<int>(m_sceneAnimation->sceneAt(t));
-    if (scene != m_playingScene) {
-        m_playingScene = scene; // QML schimbă stilul scenei înainte de randare
-        emit sceneAnimationChanged();
+    if (m_exportTimeline) {
+        m_document->setTimelineTime(t); // pozele obiectelor și camera animației
+        applyAnimationCamera();
+    } else {
+        m_camera.setPose(m_sceneAnimation->poseAt(t));
+        onCameraMoved();
+        const int scene = static_cast<int>(m_sceneAnimation->sceneAt(t));
+        if (scene != m_playingScene) {
+            m_playingScene = scene; // QML schimbă stilul scenei înainte de randare
+            emit sceneAnimationChanged();
+        }
     }
     const QString file = QStringLiteral("%1/frame_%2.png").arg(m_exportDirectory).arg(m_exportFrame, 5, 10, QLatin1Char('0'));
     if (!saveImage(file)) {
@@ -969,6 +1020,7 @@ void Viewport::exportNextFrame()
     }
     const int frames = m_exportFrame;
     m_exporting = false;
+    m_exportTimeline = false;
     m_sceneAnimation.reset();
     m_playingScene = -1;
     emit sceneAnimationChanged();
@@ -981,6 +1033,7 @@ void Viewport::cancelExport()
         return;
     }
     m_exporting = false;
+    m_exportTimeline = false;
     m_sceneAnimation.reset();
     m_playingScene = -1;
     emit sceneAnimationChanged();
@@ -1245,6 +1298,9 @@ void Viewport::onAfterAnimating()
         advanceSceneAnimation(dt);
     }
     const bool interacting = m_document && m_document->advanceInteractions(dt);
+    if (interacting && m_document->playing()) {
+        applyAnimationCamera();
+    }
     if (m_turntableSecondsLeft > 0.0) {
         constexpr double kTurntableRadiansPerSecond = 0.8;
         m_camera.orbit(kTurntableRadiansPerSecond * dt, 0.0);
@@ -1354,6 +1410,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         }
     }
     if (drag == Drag::None && event->button() == Qt::LeftButton && m_document && m_document->hasTool()) {
+        // Un click de editare iese din previzualizarea animației: uneltele lucrează pe model.
+        m_document->endPreview();
         // Numărăm noi clicurile (dublu, triplu), ca să funcționeze la fel pe toate platformele.
         const qint64 now = m_frameClock.nsecsElapsed();
         const qint64 interval = qint64(QGuiApplication::styleHints()->mouseDoubleClickInterval()) * 1'000'000;

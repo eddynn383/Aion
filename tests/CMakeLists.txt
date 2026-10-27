@@ -23,6 +23,7 @@ add_executable(aion_tests
     core/QuantitiesTests.cpp
     core/InteractionTests.cpp
     core/PrimitiveTests.cpp
+    core/AnimationTests.cpp
 )
 
 target_link_libraries(aion_tests PRIVATE aion::core Catch2::Catch2WithMain)

@@ -25,6 +25,7 @@ add_library(aion_core STATIC
     src/model/Operations.cpp
     src/model/Quantities.cpp
     src/model/Interaction.cpp
+    src/model/AnimationEval.cpp
     src/model/MaterialLibrary.cpp
     src/model/Boolean.cpp
     src/math/Plane.cpp

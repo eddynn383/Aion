@@ -20,6 +20,7 @@ Window {
     flags: Qt.platform.os === "osx" ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
 
     property bool leftPanelVisible: true
+    property bool timelineVisible: false
     property bool rightPanelVisible: true
     property string activeTool: "select"
     // Uneltele tratate de viewport (nu de Document): navigarea și Interact.
@@ -37,6 +38,8 @@ Window {
             { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
+            { id: "ui.timeline", title: window.timelineVisible ? "Ascunde timeline-ul" : "Timeline (animații)", category: "Interfață", shortcut: "Alt+T", icon: "film" },
+            { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "film" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
             { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
@@ -132,6 +135,11 @@ Window {
         case "file.exportGltf": fileDialog.ask("exportGltf"); break
         case "file.exportPng": fileDialog.ask("exportPng"); break
         case "file.quantities": quantitiesDialog.open(); break
+        case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
+        case "file.exportVideo":
+            if (doc.activeAnimation > 0) fileDialog.ask("exportVideo")
+            else { window.timelineVisible = true; toast.show("Creează întâi o animație în timeline.") }
+            break
         case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
         case "debug.materials": preferences.leftMaterials = true; break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
@@ -258,6 +266,15 @@ Window {
                     // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("anim:")) {
+                    // „anim:new”, „anim:key”, „anim:color”, „anim:camera”, „anim:time,1.5”, „anim:play”.
+                    const an = action.slice(5).split(",")
+                    if (an[0] === "new") { doc.createAnimation(); window.timelineVisible = true }
+                    else if (an[0] === "key") doc.keySelection()
+                    else if (an[0] === "color") doc.keySelectionColor()
+                    else if (an[0] === "camera") doc.keyCamera(viewport.cameraState())
+                    else if (an[0] === "time") doc.timelineTime = parseFloat(an[1])
+                    else if (an[0] === "play") doc.play()
                 } else if (action.startsWith("scene:")) {
                     // „scene:0” aplică scena cu indexul dat (camera și obiectele).
                     const sc = doc.scenes[parseInt(action.slice(6))]
@@ -704,8 +721,8 @@ Window {
     function exportVideo(path) {
         window.videoOutput = path
         const frames = path.replace(/\.mp4$/i, "") + " - cadre"
-        // Exportul video vine din timeline (Faza 17).
-        toast.show("Exportul video se face din timeline.")
+        viewport.exportAnimation(frames, doc.timeline.fps ?? 30)
+        toast.show("Se exportă animația… (progresul e în timeline)")
     }
     Connections {
         target: viewport
@@ -821,7 +838,7 @@ Window {
         id: viewport
         onFramesPerSecondChanged: if (AppInfo.startupActions.length > 0) console.info("fps:", framesPerSecond)
         anchors.top: titleBar.bottom
-        anchors.bottom: statusBar.top
+        anchors.bottom: timeline.visible ? timeline.top : statusBar.top
         anchors.left: leftPanel.right
         anchors.right: rightPanel.left
 
@@ -1145,6 +1162,20 @@ Window {
         anchors.bottom: rightPanel.bottom
         anchors.right: rightPanel.left
         visible: rightPanel.visible
+    }
+
+    // Timeline-ul animațiilor, sub viewport (⌥T).
+    Timeline {
+        id: timeline
+        visible: window.timelineVisible
+        anchors.bottom: statusBar.top
+        anchors.left: leftPanel.right
+        anchors.right: rightPanel.left
+        height: 200
+        document: doc
+        viewport: viewport
+        onCloseRequested: window.timelineVisible = false
+        onExportRequested: fileDialog.ask("exportVideo")
     }
 
     StatusBar {

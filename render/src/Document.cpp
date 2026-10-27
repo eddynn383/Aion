@@ -5,6 +5,7 @@
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
 #include "aion/core/model/MaterialLibrary.h"
+#include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Interaction.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
@@ -1582,6 +1583,319 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
     afterInteraction(before);
 }
 
+// --- Timeline ---
+
+QVariantList Document::animations() const
+{
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.animations().size(); ++i) {
+        const model::Animation& a = m_model.animations().values()[i];
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.animations().keys()[i].value) },
+            { QStringLiteral("name"), QString::fromStdString(a.name) }, { QStringLiteral("duration"), a.duration } });
+    }
+    return out;
+}
+
+const model::Animation* Document::currentAnimation() const
+{
+    return m_activeAnimation ? m_model.animations().find(m_activeAnimation) : nullptr;
+}
+
+double Document::animationDuration() const
+{
+    const model::Animation* a = currentAnimation();
+    return a ? a->duration : 0.0;
+}
+
+void Document::setActiveAnimation(double id)
+{
+    const model::AnimationId next { static_cast<std::uint64_t>(id) };
+    if (next == m_activeAnimation) {
+        return;
+    }
+    m_activeAnimation = m_model.animations().contains(next) ? next : model::AnimationId {};
+    m_playing = false;
+    emit timelineChanged();
+    emit changed();
+}
+
+QVariantMap Document::timeline() const
+{
+    const model::Animation* a = currentAnimation();
+    if (a == nullptr) {
+        return {};
+    }
+    QVariantList tracks;
+    for (const model::ObjectTrack& t : a->tracks) {
+        const model::Instance* inst = m_model.instances().find(t.instance);
+        QString name = QStringLiteral("(șters)");
+        if (inst != nullptr) {
+            const model::Definition& def = m_model.definition(inst->definition);
+            name = QString::fromStdString(inst->name.empty() ? def.name : inst->name);
+        }
+        QVariantList transform;
+        for (const model::TransformKey& k : t.transform) {
+            transform.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), static_cast<int>(k.easing) } });
+        }
+        QVariantList color;
+        for (const model::ColorKey& k : t.color) {
+            color.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), static_cast<int>(k.easing) } });
+        }
+        tracks.append(QVariantMap { { QStringLiteral("instance"), static_cast<double>(t.instance.value) },
+            { QStringLiteral("name"), name }, { QStringLiteral("transform"), transform }, { QStringLiteral("color"), color },
+            { QStringLiteral("selected"), m_selection.instances.contains(t.instance) } });
+    }
+    QVariantList camera;
+    for (const model::CameraKey& k : a->camera) {
+        camera.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), static_cast<int>(k.easing) } });
+    }
+    return { { QStringLiteral("name"), QString::fromStdString(a->name) }, { QStringLiteral("duration"), a->duration },
+        { QStringLiteral("fps"), a->fps }, { QStringLiteral("loop"), a->loop }, { QStringLiteral("tracks"), tracks },
+        { QStringLiteral("camera"), camera } };
+}
+
+void Document::setTimelineTime(double seconds)
+{
+    const double t = std::clamp(seconds, 0.0, std::max(animationDuration(), 0.0));
+    const bool wasPreviewing = m_previewing;
+    m_timelineTime = t;
+    m_previewing = currentAnimation() != nullptr;
+    ++m_interactionRevision;
+    emit timelineTimeChanged();
+    if (wasPreviewing != m_previewing) {
+        emit timelineChanged();
+    }
+    emit changed();
+}
+
+template <class Fn>
+void Document::editAnimation(const char* name, Fn&& fn)
+{
+    if (!currentAnimation()) {
+        return;
+    }
+    const model::AnimationId id = m_activeAnimation;
+    runOnModel(name, [&](model::Model& model) {
+        model::Animation a = model.animations().at(id);
+        fn(a);
+        model.setAnimation(id, a);
+    });
+    ++m_interactionRevision;
+    emit timelineChanged();
+}
+
+void Document::createAnimation()
+{
+    model::AnimationId created;
+    runOnModel("Animație nouă", [&](model::Model& model) {
+        model::Animation a;
+        a.name = "Animația " + std::to_string(model.animations().size() + 1);
+        created = model.addAnimation(a);
+    });
+    m_activeAnimation = created;
+    m_timelineTime = 0.0;
+    emit timelineChanged();
+    emit timelineTimeChanged();
+}
+
+void Document::renameAnimation(double id, const QString& name)
+{
+    const model::AnimationId a { static_cast<std::uint64_t>(id) };
+    if (!m_model.animations().contains(a) || name.trimmed().isEmpty()) {
+        return;
+    }
+    runOnModel("Redenumește animația", [&](model::Model& model) {
+        model::Animation anim = model.animations().at(a);
+        anim.name = name.trimmed().toStdString();
+        model.setAnimation(a, anim);
+    });
+    emit timelineChanged();
+}
+
+void Document::removeAnimation(double id)
+{
+    const model::AnimationId a { static_cast<std::uint64_t>(id) };
+    if (!m_model.animations().contains(a)) {
+        return;
+    }
+    runOnModel("Șterge animația", [&](model::Model& model) { model.removeAnimation(a); });
+    if (m_activeAnimation == a) {
+        m_activeAnimation = {};
+        m_previewing = false;
+        m_playing = false;
+    }
+    emit timelineChanged();
+    emit changed();
+}
+
+void Document::setAnimationSettings(double duration, int fps, bool loop)
+{
+    editAnimation("Setările animației", [&](model::Animation& a) {
+        a.duration = std::clamp(duration, 0.1, 3600.0);
+        a.fps = std::clamp(fps, 1, 120);
+        a.loop = loop;
+    });
+}
+
+void Document::keySelection()
+{
+    if (m_selection.instances.empty()) {
+        setError(QStringLiteral("Selectează obiectele pe care vrei să le animezi, apoi pune keyframe-ul."));
+        return;
+    }
+    const double t = m_timelineTime;
+    editAnimation("Keyframe", [&](model::Animation& a) {
+        for (model::InstanceId id : m_selection.instances) {
+            model::setTransformKey(a, id, t, m_model.instance(id).transform);
+        }
+    });
+}
+
+void Document::keySelectionColor()
+{
+    if (m_selection.instances.empty()) {
+        setError(QStringLiteral("Selectează obiectele, apoi pune keyframe-ul de culoare."));
+        return;
+    }
+    const double t = m_timelineTime;
+    editAnimation("Keyframe culoare", [&](model::Animation& a) {
+        for (model::InstanceId id : m_selection.instances) {
+            const model::Instance& inst = m_model.instance(id);
+            model::Color c { 220, 220, 220, 255 };
+            if (inst.material && m_model.materials().contains(inst.material)) {
+                c = m_model.material(inst.material).color;
+            }
+            model::setColorKey(a, id, t, c);
+        }
+    });
+}
+
+void Document::keyCamera(const QVariantMap& camera)
+{
+    const double t = m_timelineTime;
+    editAnimation("Keyframe cameră", [&](model::Animation& a) {
+        model::setCameraKey(a, { t,
+            { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
+                camera.value(QStringLiteral("tz")).toDouble() },
+            camera.value(QStringLiteral("yaw")).toDouble(), camera.value(QStringLiteral("pitch")).toDouble(),
+            camera.value(QStringLiteral("distance")).toDouble(), model::Easing::EaseInOut });
+    });
+}
+
+namespace {
+
+model::KeyKind keyKind(const QString& kind)
+{
+    return kind == QLatin1String("color") ? model::KeyKind::Color
+        : kind == QLatin1String("camera") ? model::KeyKind::Camera
+                                          : model::KeyKind::Transform;
+}
+
+} // namespace
+
+void Document::removeKey(const QString& kind, double instance, double time)
+{
+    editAnimation("Șterge keyframe-ul", [&](model::Animation& a) {
+        model::removeKey(a, keyKind(kind), toInstanceId(instance), time);
+    });
+}
+
+void Document::moveKey(const QString& kind, double instance, double time, double newTime)
+{
+    editAnimation("Mută keyframe-ul", [&](model::Animation& a) {
+        model::moveKey(a, keyKind(kind), toInstanceId(instance), time, newTime);
+    });
+}
+
+void Document::setKeyEasing(const QString& kind, double instance, double time, int easing)
+{
+    const auto e = static_cast<model::Easing>(std::clamp(easing, 0, 4));
+    const double tol = 0.5 / 30.0;
+    editAnimation("Easing", [&](model::Animation& a) {
+        if (keyKind(kind) == model::KeyKind::Camera) {
+            for (model::CameraKey& k : a.camera) {
+                if (std::abs(k.time - time) < tol) {
+                    k.easing = e;
+                }
+            }
+            return;
+        }
+        for (model::ObjectTrack& t : a.tracks) {
+            if (t.instance != toInstanceId(instance)) {
+                continue;
+            }
+            for (model::TransformKey& k : t.transform) {
+                if (keyKind(kind) == model::KeyKind::Transform && std::abs(k.time - time) < tol) {
+                    k.easing = e;
+                }
+            }
+            for (model::ColorKey& k : t.color) {
+                if (keyKind(kind) == model::KeyKind::Color && std::abs(k.time - time) < tol) {
+                    k.easing = e;
+                }
+            }
+        }
+    });
+}
+
+void Document::play()
+{
+    if (!currentAnimation()) {
+        return;
+    }
+    if (m_timelineTime >= animationDuration() - 1e-9) {
+        m_timelineTime = 0.0;
+    }
+    m_playing = true;
+    m_previewing = true;
+    emit timelineChanged();
+    emit animationStarted();
+}
+
+void Document::pause()
+{
+    if (m_playing) {
+        m_playing = false;
+        emit timelineChanged();
+    }
+}
+
+void Document::endPreview()
+{
+    if (!m_previewing && !m_playing) {
+        return;
+    }
+    m_playing = false;
+    m_previewing = false;
+    ++m_interactionRevision;
+    emit timelineChanged();
+    emit changed();
+}
+
+QVariantMap Document::animationCamera() const
+{
+    const model::Animation* a = currentAnimation();
+    if (a == nullptr || !m_previewing) {
+        return {};
+    }
+    const auto c = model::evaluateCamera(*a, m_timelineTime);
+    if (!c) {
+        return {};
+    }
+    return { { QStringLiteral("tx"), c->target.x }, { QStringLiteral("ty"), c->target.y }, { QStringLiteral("tz"), c->target.z },
+        { QStringLiteral("yaw"), c->yaw }, { QStringLiteral("pitch"), c->pitch }, { QStringLiteral("distance"), c->distance } };
+}
+
+std::optional<model::Color> Document::displayColor(model::InstanceId instance) const
+{
+    const model::Animation* a = m_previewing ? currentAnimation() : nullptr;
+    if (a == nullptr) {
+        return std::nullopt;
+    }
+    const model::ObjectTrack* t = model::findTrack(*a, instance);
+    return t ? model::evaluateColor(*t, m_timelineTime) : std::nullopt;
+}
+
 void Document::applyScene(double sceneId, double seconds)
 {
     const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
@@ -1635,6 +1949,32 @@ bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
 
 bool Document::advanceInteractions(double dt)
 {
+    bool playingNow = false;
+    if (m_playing) {
+        const model::Animation* a = currentAnimation();
+        if (a == nullptr) {
+            m_playing = false;
+            emit timelineChanged();
+        } else {
+            m_timelineTime += dt;
+            if (m_timelineTime >= a->duration) {
+                if (a->loop && a->duration > 0.0) {
+                    m_timelineTime = std::fmod(m_timelineTime, a->duration);
+                } else {
+                    m_timelineTime = a->duration;
+                    m_playing = false;
+                    emit timelineChanged();
+                }
+            }
+            ++m_interactionRevision;
+            emit timelineTimeChanged();
+            emit changed();
+            playingNow = m_playing;
+        }
+    }
+    if (playingNow && !m_sceneTransition && m_interactions.empty()) {
+        return true;
+    }
     if (m_sceneTransition) {
         ++m_interactionRevision;
         m_sceneTransition->elapsed += dt;
@@ -1643,11 +1983,11 @@ bool Document::advanceInteractions(double dt)
         }
         emit changed();
         if (m_interactions.empty()) {
-            return m_sceneTransition.has_value();
+            return m_sceneTransition.has_value() || playingNow;
         }
     }
     if (m_interactions.empty()) {
-        return false;
+        return playingNow;
     }
     ++m_interactionRevision;
     std::vector<model::InstanceId> finished;
@@ -1666,11 +2006,20 @@ bool Document::advanceInteractions(double dt)
         }
     }
     emit changed();
-    return !m_interactions.empty();
+    return !m_interactions.empty() || playingNow;
 }
 
 std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
 {
+    if (m_previewing) {
+        if (const model::Animation* a = currentAnimation()) {
+            if (const model::ObjectTrack* t = model::findTrack(*a, instance)) {
+                if (auto value = model::evaluateTransform(*t, m_timelineTime)) {
+                    return value;
+                }
+            }
+        }
+    }
     if (m_sceneTransition) {
         const auto it = m_sceneTransition->moves.find(instance);
         if (it != m_sceneTransition->moves.end()) {
