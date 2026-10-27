@@ -570,13 +570,14 @@ scripturile, care expun tot ce există deja.
       umbrire netedă, un singur flag)_
 
 ### Faza 24 – Texturi și UV
-- [ ] Materialul poate avea o imagine (PNG / JPG, salvată în arhiva `.aion`), cu mărime reală (mm pe repetiție)
-- [ ] UV implicit: proiecție plană pe fiecare față (după normală), la scara texturii; transformare pe față
-      (deplasare, rotație, scară) pentru „Position Texture”
-- [ ] Shader: eșantionare din texturi (atlas sau array de texturi), cu mipmap-uri
-- [ ] Biblioteca de materiale primește texturi procedurale generate la pornire (lemn, cărămidă, parchet, beton,
-      gresie) — fără imagini binare în repo; import de imagine proprie din editorul de material
-- [ ] Unealta „Poziționează textura” (mutare / rotire / scalare pe față); export glTF / OBJ cu UV și imagini
+- [x] Materialul poate avea o imagine (PNG / JPG, salvată în arhiva `.aion`), cu mărime reală (mm pe repetiție)
+- [x] UV implicit: proiecție plană pe fiecare față (după normală), la scara texturii; transformare pe față
+      (deplasare, rotație, scară) pentru „Position Texture” _(ADR 0024)_
+- [x] Shader: eșantionare din texturi (array de texturi), cu mipmap-uri
+- [x] Biblioteca de materiale primește texturi procedurale (lemn, cărămidă, parchet, beton, gresie) — fără imagini
+      binare în repo; import de imagine proprie din editorul de material
+- [x] Poziția texturii pe fețele selectate (Inspector); export glTF / OBJ cu UV și imagini
+- [ ] Mânere de poziționare a texturii direct pe față, în viewport
 
 ### Faza 25 – Obiecte dinamice (parametrice)
 - [ ] Core: o definiție poate avea un generator (`door`, `window`, `table`, `shelf`, `stairs`…) și parametri

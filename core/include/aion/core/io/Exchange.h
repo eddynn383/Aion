@@ -2,9 +2,12 @@
 
 #include "aion/core/model/Model.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 // Schimbul de modele cu alte programe: OBJ (+ MTL) și glTF / GLB (ADR 0009).
 // Aion lucrează în mm cu Z în sus; OBJ și glTF folosesc de obicei metri cu Y în sus.
@@ -19,7 +22,10 @@ struct ExportOptions {
 // OBJ: fiecare grup sau obiect devine un `o`; fețele sunt triangulate, cu câte o normală pe față.
 [[nodiscard]] std::string exportObj(const model::Model& model, const ExportOptions& options = {},
     std::string_view materialLibrary = "model.mtl");
-[[nodiscard]] std::string exportMtl();
+// Materialele folosite (`newmtl` după numele din model, cu `map_Kd` pentru texturi) și fișierele imaginilor de
+// scris lângă .mtl: (nume, octeți).
+[[nodiscard]] std::string exportMtl(const model::Model& model);
+[[nodiscard]] std::vector<std::pair<std::string, std::vector<std::uint8_t>>> exportTextureFiles(const model::Model& model);
 
 // glTF 2.0 (`binary` = .glb). Definițiile devin mesh-uri partajate de instanțe (copiile unui obiect rămân copii).
 bool exportGltf(const model::Model& model, const std::filesystem::path& path, bool binary,

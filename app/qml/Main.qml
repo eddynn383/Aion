@@ -709,6 +709,8 @@ Window {
         property var afterSave: null
         property string reportKind: "general"
         property var reportOptions: ({})
+        // Imaginea aleasă pentru o textură (editorul de material).
+        property var textureCallback: null
 
         function ask(what) {
             // În browser: selectorul de fișiere al browserului și download-uri.
@@ -731,6 +733,7 @@ Window {
                     break
                 }
                 case "exportVideo": toast.show("Exportul video nu e disponibil în browser (folosește aplicația desktop)."); break
+                case "textureImage": WebFiles.pick("texture", "Imagini (*.png *.jpg *.jpeg)"); break
                 }
                 return
             }
@@ -741,6 +744,7 @@ Window {
             case "open": title = "Deschide"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
             case "saveAs": title = "Salvează"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
             case "import": title = "Importă"; nameFilters = ["Modele 3D (*.obj *.gltf *.glb)"]; defaultSuffix = ""; break
+            case "textureImage": title = "Alege imaginea texturii"; nameFilters = ["Imagini (*.png *.jpg *.jpeg)"]; defaultSuffix = ""; break
             case "exportObj": title = "Exportă OBJ"; nameFilters = ["OBJ (*.obj)"]; defaultSuffix = "obj"; break
             case "exportGlb": title = "Exportă GLB"; nameFilters = ["glTF binar (*.glb)"]; defaultSuffix = "glb"; break
             case "exportGltf": title = "Exportă glTF"; nameFilters = ["glTF (*.gltf)"]; defaultSuffix = "gltf"; break
@@ -777,6 +781,7 @@ Window {
                 if (doc.exportReport(path, reportKind, reportOptions)) toast.show("Raport salvat: " + path.split("/").pop())
                 break
             case "exportVideo": window.exportVideo(path); break
+            case "textureImage": if (textureCallback) textureCallback(path); break
             }
             afterSave = null
         }
@@ -809,7 +814,9 @@ Window {
     Connections {
         target: WebFiles
         function onFilePicked(purpose, path) {
-            if (purpose === "open")
+            if (purpose === "texture") {
+                if (fileDialog.textureCallback) fileDialog.textureCallback(path)
+            } else if (purpose === "open")
                 window.confirmDiscard(() => doc.openFile(path))
             else
                 doc.importFile(path)
@@ -1001,6 +1008,10 @@ Window {
                         anchors.fill: parent
                         document: doc
                         onPaintRequested: window.selectTool("paint")
+                        onPickTextureImage: {
+                            fileDialog.textureCallback = (path) => materialsPanel.textureChosen(path)
+                            fileDialog.ask("textureImage")
+                        }
                     }
                 }
                 AccordionSection {

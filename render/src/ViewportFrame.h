@@ -5,6 +5,8 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include <QImage>
+
 #include <optional>
 #include <vector>
 
@@ -33,6 +35,7 @@ struct MeshVertex {
     glm::vec4 color { 0.0f, 0.0f, 0.0f, -1.0f }; // culoarea materialului (a = opacitate; a < 0 = fără material)
     glm::vec2 material { 0.85f, 0.0f }; // rugozitate, metalic
     glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f }; // materialul de pe verso (a < 0 = ca fața / culoarea versoului)
+    glm::vec3 uv { 0.0f, 0.0f, -1.0f }; // coordonatele texturii și stratul ei în array (z < 0 = fără textură)
 };
 
 // O lumină a modelului, gata pentru shader (cel mult kMaxLights).
@@ -80,6 +83,10 @@ struct ViewportFrame {
     std::vector<MeshVertex> triangles;
     // Fețele transparente (sticlă, x-ray): desenate după cele opace, cu amestec.
     std::vector<MeshVertex> transparent;
+    // Texturile materialelor (câte un strat în array-ul din shader, în ordinea din model) și semnătura lor:
+    // renderer-ul le reîncarcă doar când semnătura se schimbă.
+    std::vector<QImage> textures;
+    std::size_t textureSignature = 0;
     // Crește când `triangles` se schimbă, ca renderer-ul să reîncarce buffer-ul numai atunci.
     unsigned meshRevision = 0;
 

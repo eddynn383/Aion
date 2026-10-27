@@ -7,6 +7,7 @@ layout(location = 2) in float v_state;
 layout(location = 3) in vec4 v_color;
 layout(location = 4) in vec2 v_material;
 layout(location = 5) in vec4 v_backColor;
+layout(location = 6) in vec3 v_uv;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -38,6 +39,7 @@ layout(std140, binding = 0) uniform Frame {
 } frame;
 
 layout(binding = 1) uniform sampler2D shadowMap;
+layout(binding = 2) uniform sampler2DArray materialTextures;
 
 vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
 vec3 toSrgb(vec3 c) { return pow(c, vec3(1.0 / 2.2)); }
@@ -100,6 +102,9 @@ void main()
     float metallic = hasMaterial ? v_material.y : 0.0;
 
     vec3 albedo = toLinear(base);
+    // Textura materialului (doar pe față, nu pe un verso cu material propriu), nuanțată de culoarea lui.
+    if (v_uv.z > -0.5 && !backMaterial && style != 1)
+        albedo *= toLinear(texture(materialTextures, v_uv).rgb);
     vec3 l = normalize(frame.lightDir.xyz);
     float hemi = 0.5 + 0.5 * n.z;
     vec3 sky = mix(vec3(0.42, 0.40, 0.38), vec3(0.62, 0.68, 0.78), hemi);

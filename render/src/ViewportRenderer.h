@@ -71,6 +71,17 @@ private:
     std::unique_ptr<QRhiRenderPassDescriptor> m_shadowPass;
     std::unique_ptr<QRhiGraphicsPipeline> m_shadowPipeline;
     std::unique_ptr<QRhiSampler> m_shadowSampler;
+
+    // Texturile materialelor: array RGBA8 cu mipmap-uri, câte un strat pe textură (redimensionate la kTextureSize).
+    static constexpr int kTextureSize = 1024;
+    std::unique_ptr<QRhiTexture> m_textureArray;
+    std::unique_ptr<QRhiSampler> m_textureSampler;
+    int m_textureLayers = 0;
+    std::size_t m_uploadedTextureSignature = ~std::size_t { 0 };
+    bool m_texturesInitialized = false;
+    void createTextureArray(int layers);
+    void updateBindings();
+    void uploadTextures(QRhiResourceUpdateBatch* batch);
     glm::dmat4 m_lightViewProj { 1.0 };
 
     // Conturul selecției: masca fețelor selectate vizibile, apoi un contur în screen-space.

@@ -20,6 +20,7 @@ add_executable(aion_tests
     core/OffsetTests.cpp
     core/ModelTests.cpp
     core/ModelingTests.cpp
+    core/TexturingTests.cpp
     core/IoTests.cpp
     core/QuantitiesTests.cpp
     core/InteractionTests.cpp

@@ -87,6 +87,7 @@ QRhiVertexInputLayout meshLayout()
         { 0, 3, QRhiVertexInputAttribute::Float4, offsetof(MeshVertex, color) },
         { 0, 4, QRhiVertexInputAttribute::Float2, offsetof(MeshVertex, material) },
         { 0, 5, QRhiVertexInputAttribute::Float4, offsetof(MeshVertex, backColor) },
+        { 0, 6, QRhiVertexInputAttribute::Float3, offsetof(MeshVertex, uv) },
     });
     return layout;
 }
@@ -152,14 +153,16 @@ void ViewportRenderer::createStaticResources()
         QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
     m_shadowSampler->create();
 
+    // Texturile materialelor: un array (câte un strat pe textură), la început un singur strat alb.
+    m_textureSampler.reset(m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::Linear,
+        QRhiSampler::Repeat, QRhiSampler::Repeat));
+    m_textureSampler->create();
+    m_textureLayers = 0;
+    m_uploadedTextureSignature = ~std::size_t { 0 };
+    createTextureArray(1);
+
     m_bindings.reset(m_rhi->newShaderResourceBindings());
-    m_bindings->setBindings({
-        QRhiShaderResourceBinding::uniformBuffer(0,
-            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_uniforms.get()),
-        QRhiShaderResourceBinding::sampledTexture(
-            1, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
-    });
-    m_bindings->create();
+    updateBindings();
 
     m_shadowPipeline.reset(m_rhi->newGraphicsPipeline());
     m_shadowPipeline->setShaderStages({
@@ -180,6 +183,59 @@ void ViewportRenderer::createStaticResources()
     m_pointCorners->create();
     // Se încarcă odată cu primul cadru, în render().
     m_cornersUploaded = false;
+}
+
+void ViewportRenderer::createTextureArray(int layers)
+{
+    m_textureLayers = std::max(layers, 1);
+    m_textureArray.reset(m_rhi->newTextureArray(QRhiTexture::RGBA8, m_textureLayers, QSize(kTextureSize, kTextureSize),
+        1, QRhiTexture::MipMapped | QRhiTexture::UsedWithGenerateMips));
+    m_textureArray->create();
+    m_texturesInitialized = false;
+}
+
+void ViewportRenderer::updateBindings()
+{
+    m_bindings->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_uniforms.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            1, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            2, QRhiShaderResourceBinding::FragmentStage, m_textureArray.get(), m_textureSampler.get()),
+    });
+    m_bindings->create();
+}
+
+void ViewportRenderer::uploadTextures(QRhiResourceUpdateBatch* batch)
+{
+    if (m_frame.textureSignature == m_uploadedTextureSignature && m_texturesInitialized) {
+        return;
+    }
+    const int count = static_cast<int>(m_frame.textures.size());
+    if (count > m_textureLayers) {
+        // Mai multe straturi: array nou (cu rezervă), iar legăturile shaderelor îl primesc (același layout).
+        createTextureArray(count + 4);
+        updateBindings();
+    }
+    QRhiTextureUploadDescription upload;
+    QList<QRhiTextureUploadEntry> entries;
+    for (int layer = 0; layer < m_textureLayers; ++layer) {
+        QImage image = layer < count ? m_frame.textures[static_cast<std::size_t>(layer)] : QImage();
+        if (image.isNull()) {
+            image = QImage(kTextureSize, kTextureSize, QImage::Format_RGBA8888);
+            image.fill(Qt::white);
+        } else {
+            image = image.convertToFormat(QImage::Format_RGBA8888)
+                        .scaled(kTextureSize, kTextureSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        }
+        entries.append(QRhiTextureUploadEntry(layer, 0, QRhiTextureSubresourceUploadDescription(image)));
+    }
+    upload.setEntries(entries.begin(), entries.end());
+    batch->uploadTexture(m_textureArray.get(), upload);
+    batch->generateMips(m_textureArray.get());
+    m_uploadedTextureSignature = m_frame.textureSignature;
+    m_texturesInitialized = true;
 }
 
 std::unique_ptr<QRhiGraphicsPipeline> ViewportRenderer::makePipeline(const QString& vertexShader,
@@ -418,6 +474,7 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
 
     updateUniforms(batch);
+    uploadTextures(batch);
 
     // Instanțele „de deasupra” stau în același buffer, după cele obișnuite.
     const auto lineCount = static_cast<quint32>(m_frame.lines.size());

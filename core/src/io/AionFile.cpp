@@ -64,7 +64,7 @@ json meshToJson(const geom::Mesh& mesh)
         for (const geom::Loop& h : f.inner) {
             inner.push_back(loopToJson(h));
         }
-        faces.push_back({
+        json face {
             { "id", mesh.faces().keys()[i].value },
             { "material", f.material.value },
             { "backMaterial", f.backMaterial.value },
@@ -72,7 +72,12 @@ json meshToJson(const geom::Mesh& mesh)
             { "plane", { f.plane.normal.x, f.plane.normal.y, f.plane.normal.z, f.plane.d } },
             { "outer", loopToJson(f.outer) },
             { "inner", inner },
-        });
+        };
+        if (!f.texture.isIdentity()) {
+            // [deplasare X, deplasare Y, rotație, scară X, scară Y]
+            face["uv"] = { f.texture.offset.x, f.texture.offset.y, f.texture.rotation, f.texture.scale.x, f.texture.scale.y };
+        }
+        faces.push_back(std::move(face));
     }
     return { { "vertices", vertices }, { "edges", edges }, { "faces", faces } };
 }
@@ -117,6 +122,11 @@ geom::ChangeSet meshFromJson(const json& j)
         face.material = model::MaterialId { f.value("material", std::uint64_t { 0 }) };
         face.backMaterial = model::MaterialId { f.value("backMaterial", std::uint64_t { 0 }) };
         face.tag = model::TagId { f.value("tag", std::uint64_t { 0 }) };
+        if (const auto uv = f.find("uv"); uv != f.end() && uv->is_array() && uv->size() == 5) {
+            face.texture.offset = { uv->at(0).get<double>(), uv->at(1).get<double>() };
+            face.texture.rotation = uv->at(2).get<double>();
+            face.texture.scale = { uv->at(3).get<double>(), uv->at(4).get<double>() };
+        }
         for (const json& h : f.at("inner")) {
             face.inner.push_back(loopFromJson(h));
         }
@@ -148,6 +158,13 @@ geom::ChangeSet meshFromJson(const json& j)
         changes.faces[id].after = std::move(f);
     }
     return changes;
+}
+
+// Numele fișierului unei texturi în arhivă, cu extensia după semnătura imaginii.
+std::string textureEntry(std::uint64_t id, const model::Texture& t)
+{
+    const bool jpeg = t.data.size() > 2 && t.data[0] == 0xFF && t.data[1] == 0xD8;
+    return "textures/" + std::to_string(id) + (jpeg ? ".jpg" : ".png");
 }
 
 json colorToJson(const model::Color& c)
@@ -412,7 +429,16 @@ std::string toJson(const model::Model& model)
             { "color", colorToJson(m.color) },
             { "roughness", m.roughness },
             { "metallic", m.metallic },
+            { "texture", m.texture.value },
+            { "textureSize", { m.textureSize.x, m.textureSize.y } },
         });
+    }
+    // Texturile: doar numele și fișierul din arhivă (imaginile le scrie writeArchive).
+    json textures = json::array();
+    for (std::size_t i : sortedIndices(model.textures())) {
+        const model::Texture& t = model.textures().values()[i];
+        const std::uint64_t id = model.textures().keys()[i].value;
+        textures.push_back({ { "id", id }, { "name", t.name }, { "source", t.source }, { "file", textureEntry(id, t) } });
     }
     const auto vec = [](const math::Vec3d& v) { return json { v.x, v.y, v.z }; };
     json guides = json::array();
@@ -479,6 +505,7 @@ std::string toJson(const model::Model& model)
         { "animations", animationsToJson(model) },
         { "cameras", camerasToJson(model) },
         { "lights", lightsToJson(model) },
+        { "textures", textures },
     };
     return doc.dump(1);
 }
@@ -561,12 +588,22 @@ LoadResult fromJson(std::string_view text)
                 t.value("visible", true) };
             changes.tags[model::TagId { t.at("id").get<std::uint64_t>() }].after = std::move(tag);
         }
+        for (const json& tj : doc.value("textures", json::array())) {
+            model::Texture texture;
+            texture.name = tj.value("name", std::string());
+            texture.source = tj.value("source", std::string());
+            changes.textures[model::TextureId { tj.at("id").get<std::uint64_t>() }].after = std::move(texture);
+        }
         for (const json& mj : doc.value("materials", json::array())) {
             const json& c = mj.at("color");
             model::Material material { mj.at("name").get<std::string>(),
                 { c.at(0).get<std::uint8_t>(), c.at(1).get<std::uint8_t>(), c.at(2).get<std::uint8_t>(),
                     c.at(3).get<std::uint8_t>() },
                 mj.value("roughness", 0.8f), mj.value("metallic", 0.0f) };
+            material.texture = model::TextureId { mj.value("texture", std::uint64_t { 0 }) };
+            if (const auto ts = mj.find("textureSize"); ts != mj.end() && ts->is_array() && ts->size() == 2) {
+                material.textureSize = { ts->at(0).get<double>(), ts->at(1).get<double>() };
+            }
             changes.materials[model::MaterialId { mj.at("id").get<std::uint64_t>() }].after = std::move(material);
         }
         const auto vec = [](const json& v) {
@@ -646,6 +683,13 @@ std::vector<std::uint8_t> writeArchive(const model::Model& model, std::span<cons
     if (ok && !thumbnailPng.empty()) {
         ok = mz_zip_writer_add_mem(&zip, kThumbnailEntry, thumbnailPng.data(), thumbnailPng.size(), MZ_NO_COMPRESSION);
     }
+    for (std::size_t i = 0; ok && i < model.textures().size(); ++i) {
+        const model::Texture& t = model.textures().values()[i];
+        if (!t.data.empty()) {
+            const std::string entry = textureEntry(model.textures().keys()[i].value, t);
+            ok = mz_zip_writer_add_mem(&zip, entry.c_str(), t.data.data(), t.data.size(), MZ_NO_COMPRESSION);
+        }
+    }
     void* buffer = nullptr;
     std::size_t size = 0;
     ok = ok && mz_zip_writer_finalize_heap_archive(&zip, &buffer, &size);
@@ -688,7 +732,24 @@ LoadResult readArchive(std::span<const std::uint8_t> bytes)
         r.error = "Fișierul nu e o arhivă Aion (lipsește model.json).";
         return r;
     }
-    return fromJson(std::string_view(reinterpret_cast<const char*>(text->data()), text->size()));
+    LoadResult result = fromJson(std::string_view(reinterpret_cast<const char*>(text->data()), text->size()));
+    if (result.model) {
+        // Imaginile texturilor, din fișierele arhivei.
+        model::Model& m = *result.model;
+        for (std::size_t i = 0; i < m.textures().size(); ++i) {
+            const model::TextureId id = m.textures().keys()[i];
+            model::Texture t = m.textures().values()[i];
+            for (const char* ext : { ".png", ".jpg" }) {
+                const std::string entry = "textures/" + std::to_string(id.value) + ext;
+                if (auto data = extract(bytes, entry.c_str())) {
+                    t.data = std::move(*data);
+                    m.setTexture(id, std::move(t));
+                    break;
+                }
+            }
+        }
+    }
+    return result;
 }
 
 std::vector<std::uint8_t> readThumbnail(std::span<const std::uint8_t> bytes)

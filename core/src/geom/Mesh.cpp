@@ -319,6 +319,15 @@ void Mesh::setFaceTag(FaceId id, model::TagId tag)
     m_faces.at(id).tag = tag;
 }
 
+void Mesh::setFaceTexture(FaceId id, const TextureTransform& texture)
+{
+    if (m_faces.at(id).texture == texture) {
+        return;
+    }
+    touch(id);
+    m_faces.at(id).texture = texture;
+}
+
 void Mesh::setEdgeTag(EdgeId id, model::TagId tag)
 {
     if (m_edges.at(id).tag == tag) {

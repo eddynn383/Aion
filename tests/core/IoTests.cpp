@@ -10,6 +10,8 @@
 
 #include <cmath>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <numbers>
 
 using namespace aion;
@@ -80,6 +82,17 @@ Model sampleModel()
     const model::MaterialId brick = m.addMaterial({ "Cărămidă", { 168, 82, 58, 255 }, 0.9f, 0.0f });
     const model::MaterialId glass = m.addMaterial({ "Sticlă", { 170, 205, 225, 90 }, 0.05f, 0.0f });
     root.setFaceMaterial(faceAt(root, { 0, 1000, 1000 }), brick);
+    // O textură (octeții unei imagini) pe cărămidă, cu poziționarea ei pe față.
+    const model::TextureId texture = m.addTexture({ "Cărămidă", "procedural:brick", { 0x89, 'P', 'N', 'G', 9, 8, 7 } });
+    model::Material textured = m.material(brick);
+    textured.texture = texture;
+    textured.textureSize = { 600, 300 };
+    m.setMaterial(brick, textured);
+    geom::TextureTransform placed;
+    placed.offset = { 120, -40 };
+    placed.rotation = 15;
+    placed.scale = { 2, 0.5 };
+    root.setFaceTexture(faceAt(root, { 0, 1000, 1000 }), placed);
     inst = m.instance(stool);
     inst.material = glass;
     m.setInstance(stool, inst);
@@ -176,7 +189,7 @@ TEST_CASE("OBJ: export și import înapoi păstrează forma (fețele coplanare s
 
     const std::string obj = io::exportObj(m);
     CHECK(obj.find("mtllib model.mtl") != std::string::npos);
-    CHECK(io::exportMtl().find("newmtl aion_default") != std::string::npos);
+    CHECK(io::exportMtl(m).find("newmtl aion_default") != std::string::npos);
 
     Model back;
     const io::ImportResult r = io::importObj(back, back.root(), obj, "Cutie");
@@ -195,7 +208,18 @@ TEST_CASE("OBJ: export și import înapoi păstrează forma (fețele coplanare s
 
 TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân legate", "[core][io]")
 {
-    const Model original = sampleModel();
+    Model original = sampleModel();
+    // Copiile unui obiect rămân un singur mesh doar dacă au același material (materialul obiectului se exportă
+    // în mesh): le dăm taburetelor același material.
+    model::MaterialId glass;
+    for (const model::Instance& inst : original.instances().values()) {
+        glass = inst.material ? inst.material : glass;
+    }
+    for (model::InstanceId id : original.instances().keys()) {
+        model::Instance inst = original.instance(id);
+        inst.material = glass;
+        original.setInstance(id, inst);
+    }
     // Diacriticele din cale trebuie să meargă și pe Windows (căile nu trec prin codepage-ul local).
     const auto path = tempPath("aion-export-ăîșț.glb");
     std::string error;
@@ -221,4 +245,15 @@ TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân lega
     }
     CHECK(sharedFound);
     std::filesystem::remove(path);
+
+    // glTF text: materialele modelului, UV-urile și imaginea texturii (inclusă în buffer).
+    const auto text = tempPath("aion-export-texturi.gltf");
+    REQUIRE(io::exportGltf(original, text, false, {}, &error));
+    std::ifstream in(text);
+    const std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(json.find("TEXCOORD_0") != std::string::npos);
+    CHECK(json.find("image/png") != std::string::npos);
+    CHECK(json.find("Cărămidă") != std::string::npos);
+    CHECK(json.find("baseColorTexture") != std::string::npos);
+    std::filesystem::remove(text);
 }

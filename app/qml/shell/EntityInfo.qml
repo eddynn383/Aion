@@ -285,6 +285,44 @@ Column {
         }
     }
 
+    // Poziționarea texturii pe fețele selectate (Position Texture): deplasare, rotație, scară.
+    Column {
+        id: textureBox
+        visible: root.info.kind === "faces" && root.info.texture !== undefined
+        readonly property var t: root.info.texture ?? ({})
+        readonly property real half: (width - Theme.space1) / 2
+        width: parent.width
+        spacing: Theme.space2
+        Item {
+            width: parent.width
+            height: Theme.controlHeightSm
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Poziția texturii"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            IconButton {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: 24; height: 24; iconSize: Theme.iconSizeSm
+                iconName: "rotate-ccw"
+                tooltip: "Resetează poziția texturii"
+                onClicked: root.document.setFaceTexture({ reset: true })
+            }
+        }
+        Row {
+            spacing: Theme.space1
+            NumberField { width: textureBox.half; compact: true; label: "X"; unit: "mm"; step: 10; value: textureBox.t.ox ?? 0; onValueModified: (v) => root.document.setFaceTexture({ ox: v }) }
+            NumberField { width: textureBox.half; compact: true; label: "Y"; unit: "mm"; step: 10; value: textureBox.t.oy ?? 0; onValueModified: (v) => root.document.setFaceTexture({ oy: v }) }
+        }
+        Row {
+            spacing: Theme.space1
+            NumberField { width: textureBox.half; compact: true; label: "Rot."; unit: "°"; decimals: 1; step: 5; value: textureBox.t.rotation ?? 0; onValueModified: (v) => root.document.setFaceTexture({ rotation: v }) }
+            NumberField { width: textureBox.half; compact: true; label: "Scară"; unit: "×"; decimals: 2; step: 0.1; from: 0.01; value: textureBox.t.sx ?? 1; onValueModified: (v) => root.document.setFaceTexture({ sx: v, sy: v }) }
+        }
+    }
+
     // Tag-ul: „pastile” cu tag-urile modelului (pentru obiecte, grupuri, fețe și muchii).
     Column {
         visible: root.isInstance || root.info.kind === "faces" || root.info.kind === "edges"

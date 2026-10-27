@@ -3,6 +3,7 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Texturing.h"
 #include "aion/core/units/Length.h"
 
 #include "ViewportFrame.h"
@@ -434,6 +435,13 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         if (const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr) {
             backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f, back->color.a / 255.0f };
         }
+        // Textura: stratul ei în array și mărimea reală (UV-ul se calculează în coordonatele definiției).
+        float layer = -1.0f;
+        if (material != nullptr && material->texture && !style.colorOverride) {
+            if (const auto it = m_textureLayers.find(material->texture.value); it != m_textureLayers.end()) {
+                layer = static_cast<float>(it->second);
+            }
+        }
         const bool transparent = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
         std::vector<MeshVertex>& target = transparent ? f.transparent : f.triangles;
         // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
@@ -444,8 +452,14 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         }
         for (std::uint32_t i : tri.indices) {
             const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
+            glm::vec3 uv { 0.0f, 0.0f, -1.0f };
+            if (layer >= 0.0f) {
+                const math::Vec2d t = model::textureCoordinates(face->plane.normal, tri.points[i], face->texture,
+                    material->textureSize);
+                uv = { static_cast<float>(t.x), static_cast<float>(-t.y), layer };
+            }
             target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
-                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor });
+                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor, uv });
         }
     }
 
@@ -1376,6 +1390,29 @@ void Viewport::sceneBounds(view::Vec3d& min, view::Vec3d& max) const
     }
 }
 
+void Viewport::collectTextures(ViewportFrame& f, const Document& doc) const
+{
+    // Imaginile decodate se păstrează între cadre; se decodează din nou doar când octeții se schimbă.
+    const model::Model& model = doc.model();
+    m_textureLayers.clear();
+    std::size_t signature = model.textures().size();
+    for (std::size_t i = 0; i < model.textures().size(); ++i) {
+        const std::uint64_t id = model.textures().keys()[i].value;
+        const model::Texture& t = model.textures().values()[i];
+        const std::size_t key = std::hash<std::string_view> {}(
+            std::string_view(reinterpret_cast<const char*>(t.data.data()), std::min<std::size_t>(t.data.size(), 4096)))
+            ^ t.data.size();
+        auto& cached = m_textureCache[id];
+        if (cached.first != key || cached.second.isNull()) {
+            cached = { key, QImage::fromData(t.data.data(), static_cast<int>(t.data.size())) };
+        }
+        m_textureLayers[id] = static_cast<int>(f.textures.size());
+        f.textures.push_back(cached.second);
+        signature = signature * 1000003u ^ (id * 31u + key);
+    }
+    f.textureSignature = signature;
+}
+
 ViewportFrame Viewport::frameForRendering() const
 {
     ViewportFrame f;
@@ -1428,6 +1465,7 @@ ViewportFrame Viewport::frameForRendering() const
                 f.section = glm::dvec4(n, glm::dot(n, s.point));
             }
         }
+        collectTextures(f, *m_document);
         appendDocument(f);
         appendModelExtras(f, *m_document);
     }
@@ -1436,7 +1474,8 @@ ViewportFrame Viewport::frameForRendering() const
         appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
     f.meshRevision = ((m_document ? m_document->revision() + m_document->interactionRevision() * 7919u : 0u)) * 2u
-        + (m_demoVisible ? 1u : 0u) + (m_cleanCapture ? 0x40000000u : 0u);
+        + (m_demoVisible ? 1u : 0u) + (m_cleanCapture ? 0x40000000u : 0u)
+        + static_cast<unsigned>(f.textureSignature & 0xFFFFu) * 2654435761u;
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     // Pivotul orbitei, cât timp se orbitează în jurul lui.

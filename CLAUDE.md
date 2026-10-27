@@ -139,6 +139,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `previewSoften` / `commitOperation` / `cancelOperation`). Comenzi: `edit.mirrorX|Y|Z`, `edit.array`, `edit.soften`.
   Atenție în QML: un Popover nu poate avea proprietăți proprii numite `opacity` sau `spacing` (FINAL în Popup).
 
+- **Faza 24** (ADR 0024): `model::Texture` (octeții imaginii, în arhivă), `Material::texture` / `textureSize`,
+  `geom::TextureTransform` pe fețe, `model/Texturing.h` (UV), array de texturi pe binding 2 în `mesh.frag`,
+  texturi procedurale în `render/src/ProceduralTextures.cpp`, export glTF / OBJ cu UV și imagini.
+  Acțiune de script: `material:front,24` (24–28 = materialele texturate din bibliotecă).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

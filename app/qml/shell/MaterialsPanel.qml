@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Aion
 
 // Materialele din model și biblioteca inclusă. Click pe un material îl alege și activează Paint Bucket; „+” din antet
@@ -8,6 +9,12 @@ Item {
 
     property var document
     signal paintRequested()
+    // Editorul cere o imagine pentru textură; răspunsul vine prin textureChosen(path).
+    signal pickTextureImage()
+    function textureChosen(path) {
+        editor.texture = "file:" + path
+        editor.textureThumbnail = "file://" + path
+    }
 
     // Editorul: un material nou (materialId 0) sau unul din model.
     function newMaterial() { editor.edit(0) }
@@ -49,6 +56,28 @@ Item {
                     GradientStop { position: 0.55; color: Qt.rgba(1, 1, 1, 0) }
                     GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.28) }
                 }
+            }
+            // Textura (miniatura), decupată în cerc.
+            Image {
+                id: thumb
+                visible: false
+                anchors.fill: parent
+                source: swatch.material.thumbnail ?? ""
+                fillMode: Image.PreserveAspectCrop
+            }
+            Rectangle {
+                id: thumbMask
+                anchors.fill: parent
+                radius: width / 2
+                visible: false
+                layer.enabled: true
+            }
+            MultiEffect {
+                visible: (swatch.material.thumbnail ?? "").length > 0
+                anchors.fill: parent
+                source: thumb
+                maskEnabled: true
+                maskSource: thumbMask
             }
             Text {
                 visible: swatch.material.color.a === 0
@@ -155,6 +184,15 @@ Item {
         property real alpha: 1
         property real roughness: 0.6
         property real metallic: 0
+        // Textura: "" = fără, „procedural:brick”…, „file:/cale”; mărimea unei repetiții, în mm.
+        property string texture: ""
+        property string textureThumbnail: ""
+        property real textureWidth: 1000
+        property real textureHeight: 1000
+        readonly property var textures: [
+            { value: "", label: "Fără" }, { value: "procedural:brick", label: "Cărămidă" },
+            { value: "procedural:parquet", label: "Parchet" }, { value: "procedural:wood", label: "Lemn" },
+            { value: "procedural:concrete", label: "Beton" }, { value: "procedural:tiles", label: "Gresie" } ]
         readonly property var presets: ["#F5F5F4", "#A8A29E", "#44403C", "#1C1917", "#B45309", "#92400E", "#DC2626",
             "#EA580C", "#CA8A04", "#16A34A", "#0891B2", "#2563EB", "#7C3AED", "#DB2777"]
 
@@ -166,12 +204,17 @@ Item {
             alpha = m ? m.color.a : 1
             roughness = m ? m.roughness : 0.6
             metallic = m ? m.metallic : 0
+            texture = m && m.textureSource ? (m.textureSource.startsWith("procedural:") ? m.textureSource : "file:" + m.textureSource) : ""
+            textureThumbnail = m ? (m.thumbnail ?? "") : ""
+            textureWidth = m ? (m.textureWidth ?? 1000) : 1000
+            textureHeight = m ? (m.textureHeight ?? 1000) : 1000
             hex.text = color.toString().toUpperCase()
             open()
         }
         function properties() {
             return { name: editor.name, color: editor.color.toString(), opacity: editor.alpha,
-                     roughness: editor.roughness, metallic: editor.metallic }
+                     roughness: editor.roughness, metallic: editor.metallic, texture: editor.texture,
+                     textureWidth: editor.textureWidth, textureHeight: editor.textureHeight }
         }
         function save() {
             if (materialId > 0)
@@ -251,6 +294,86 @@ Item {
                 width: parent.width
                 placeholderText: "#RRGGBB"
                 onTextChanged: if (/^#[0-9a-fA-F]{6}$/.test(text)) editor.color = text
+            }
+            // Textura.
+            Text {
+                text: "Textură"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            Flow {
+                width: parent.width
+                spacing: 4
+                Repeater {
+                    model: editor.textures.concat([{ value: "file", label: "Imagine…" }])
+                    delegate: Rectangle {
+                        id: chip
+                        required property var modelData
+                        readonly property bool current: modelData.value === "file" ? editor.texture.startsWith("file:")
+                                                                                   : editor.texture === modelData.value
+                        width: chipText.implicitWidth + Theme.space3 * 2
+                        height: 24
+                        radius: 12
+                        color: current ? Theme.accentSubtle : chipArea.containsMouse ? Theme.bgHover : "transparent"
+                        border.color: current ? Theme.accent : Theme.borderStrong
+                        Text {
+                            id: chipText
+                            anchors.centerIn: parent
+                            text: chip.modelData.label
+                            color: chip.current ? Theme.textPrimary : Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        MouseArea {
+                            id: chipArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                if (chip.modelData.value === "file") {
+                                    root.pickTextureImage()
+                                } else {
+                                    editor.texture = chip.modelData.value
+                                    editor.textureThumbnail = ""
+                                    // Materialele cu textură pornesc de la alb (textura neschimbată).
+                                    if (editor.texture.length > 0 && editor.materialId === 0) {
+                                        editor.color = "#FFFFFF"
+                                        hex.text = "#FFFFFF"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Row {
+                visible: editor.texture.length > 0
+                width: parent.width
+                spacing: Theme.space1
+                NumberField {
+                    width: (parent.width - Theme.space1) / 2
+                    label: "L"
+                    unit: "mm"
+                    from: 1
+                    step: 50
+                    value: editor.textureWidth
+                    onValueModified: (v) => editor.textureWidth = v
+                }
+                NumberField {
+                    width: (parent.width - Theme.space1) / 2
+                    label: "H"
+                    unit: "mm"
+                    from: 1
+                    step: 50
+                    value: editor.textureHeight
+                    onValueModified: (v) => editor.textureHeight = v
+                }
+            }
+            Text {
+                visible: editor.texture.length > 0
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: "Mărimea reală a unei repetiții. Culoarea nuanțează textura (alb = neschimbată)."
+                color: Theme.textTertiary
+                font.pixelSize: Theme.fontSizeXs
             }
             Slider {
                 width: parent.width

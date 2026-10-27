@@ -8,6 +8,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/io/Exchange.h"
+#include "aion/core/model/Texturing.h"
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -159,14 +160,6 @@ bool exportGltf(const model::Model& model, const std::filesystem::path& path, bo
     gltf.buffers.emplace_back();
     std::vector<unsigned char>& data = gltf.buffers[0].data;
 
-    tinygltf::Material material;
-    material.name = "aion_default";
-    material.pbrMetallicRoughness.baseColorFactor = { 0.85, 0.84, 0.82, 1.0 };
-    material.pbrMetallicRoughness.metallicFactor = 0.0;
-    material.pbrMetallicRoughness.roughnessFactor = 0.8;
-    material.doubleSided = true;
-    gltf.materials.push_back(material);
-
     const auto addView = [&](const void* bytes, std::size_t size, int target) {
         tinygltf::BufferView view;
         view.buffer = 0;
@@ -174,83 +167,163 @@ bool exportGltf(const model::Model& model, const std::filesystem::path& path, bo
         view.byteLength = size;
         view.target = target;
         appendBytes(data, bytes, size);
+        // Datele următoare încep la un multiplu de 4 octeți (cerința glTF pentru accesori).
+        while (data.size() % 4 != 0) {
+            data.push_back(0);
+        }
         gltf.bufferViews.push_back(view);
         return static_cast<int>(gltf.bufferViews.size() - 1);
     };
 
-    // Un mesh glTF pentru fiecare definiție cu fețe (geometria în metri, în coordonatele definiției).
-    std::map<model::DefinitionId, int> meshes;
-    for (model::DefinitionId def : model.definitions().keys()) {
+    // Materialele: cel implicit (0), apoi câte unul pentru fiecare material al modelului folosit, cu textura lui.
+    {
+        tinygltf::Material fallback;
+        fallback.name = "aion_default";
+        fallback.pbrMetallicRoughness.baseColorFactor = { 0.85, 0.84, 0.82, 1.0 };
+        fallback.pbrMetallicRoughness.metallicFactor = 0.0;
+        fallback.pbrMetallicRoughness.roughnessFactor = 0.8;
+        fallback.doubleSided = true;
+        gltf.materials.push_back(fallback);
+    }
+    std::map<model::MaterialId, int> materials;
+    std::map<model::TextureId, int> textures;
+    const auto materialIndex = [&](model::MaterialId id) {
+        const model::Material* m = id ? model.materials().find(id) : nullptr;
+        if (m == nullptr) {
+            return 0;
+        }
+        if (const auto it = materials.find(id); it != materials.end()) {
+            return it->second;
+        }
+        tinygltf::Material out;
+        out.name = m->name;
+        // Culorile din model sunt sRGB; baseColorFactor e liniar.
+        const auto linear = [](std::uint8_t c) { return std::pow(c / 255.0, 2.2); };
+        out.pbrMetallicRoughness.baseColorFactor = { linear(m->color.r), linear(m->color.g), linear(m->color.b),
+            m->color.a / 255.0 };
+        out.pbrMetallicRoughness.metallicFactor = m->metallic;
+        out.pbrMetallicRoughness.roughnessFactor = m->roughness;
+        out.doubleSided = true;
+        if (m->color.a < 255) {
+            out.alphaMode = "BLEND";
+        }
+        const model::Texture* t = m->texture ? model.textures().find(m->texture) : nullptr;
+        if (t != nullptr && !t->data.empty()) {
+            auto ti = textures.find(m->texture);
+            if (ti == textures.end()) {
+                tinygltf::Image image;
+                image.name = t->name;
+                const bool jpeg = t->data.size() > 2 && t->data[0] == 0xFF && t->data[1] == 0xD8;
+                image.mimeType = jpeg ? "image/jpeg" : "image/png";
+                image.bufferView = addView(t->data.data(), t->data.size(), 0);
+                gltf.images.push_back(image);
+                tinygltf::Texture texture;
+                texture.source = static_cast<int>(gltf.images.size() - 1);
+                gltf.textures.push_back(texture);
+                ti = textures.emplace(m->texture, static_cast<int>(gltf.textures.size() - 1)).first;
+            }
+            out.pbrMetallicRoughness.baseColorTexture.index = ti->second;
+        }
+        gltf.materials.push_back(out);
+        return materials[id] = static_cast<int>(gltf.materials.size() - 1);
+    };
+
+    // Un mesh glTF pentru fiecare definiție cu fețe și materialul moștenit de la obiect (geometria în metri, în
+    // coordonatele definiției), cu câte o primitivă pe material și UV-uri pentru texturi.
+    std::map<std::pair<model::DefinitionId, model::MaterialId>, int> meshes;
+    const auto meshFor = [&](model::DefinitionId def, model::MaterialId inherited) -> int {
         const geom::Mesh& mesh = model.mesh(def);
         if (mesh.faces().empty()) {
-            continue;
+            return -1;
         }
-        std::vector<float> positions;
-        std::vector<float> normals;
-        std::vector<std::uint32_t> indices;
-        math::Vec3d lo { 1e300 };
-        math::Vec3d hi { -1e300 };
+        const auto key = std::pair { def, inherited };
+        if (const auto it = meshes.find(key); it != meshes.end()) {
+            return it->second;
+        }
+        struct Part {
+            std::vector<float> positions;
+            std::vector<float> normals;
+            std::vector<float> uvs;
+            std::vector<std::uint32_t> indices;
+            math::Vec3d lo { 1e300 };
+            math::Vec3d hi { -1e300 };
+        };
+        std::map<model::MaterialId, Part> parts;
         for (geom::FaceId f : mesh.faces().keys()) {
+            const geom::Face& face = mesh.face(f);
+            const model::MaterialId mid = face.material ? face.material : inherited;
+            const model::Material* m = mid ? model.materials().find(mid) : nullptr;
+            Part& part = parts[m != nullptr ? mid : model::MaterialId {}];
             const geom::FaceTriangles tri = geom::triangulateFace(mesh, f);
-            const auto base = static_cast<std::uint32_t>(positions.size() / 3);
-            const math::Vec3d n = mesh.face(f).plane.normal;
+            const auto base = static_cast<std::uint32_t>(part.positions.size() / 3);
+            const math::Vec3d n = face.plane.normal;
             for (const math::Vec3d& p : tri.points) {
                 const math::Vec3d q = p * options.scale;
-                lo = glm::min(lo, q);
-                hi = glm::max(hi, q);
-                positions.insert(positions.end(), { float(q.x), float(q.y), float(q.z) });
-                normals.insert(normals.end(), { float(n.x), float(n.y), float(n.z) });
+                part.lo = glm::min(part.lo, q);
+                part.hi = glm::max(part.hi, q);
+                part.positions.insert(part.positions.end(), { float(q.x), float(q.y), float(q.z) });
+                part.normals.insert(part.normals.end(), { float(n.x), float(n.y), float(n.z) });
+                const math::Vec2d uv = m != nullptr
+                    ? model::textureCoordinates(n, p, face.texture, m->textureSize) : math::Vec2d { 0.0 };
+                part.uvs.insert(part.uvs.end(), { float(uv.x), float(-uv.y) });
             }
             for (std::uint32_t i : tri.indices) {
-                indices.push_back(base + i);
+                part.indices.push_back(base + i);
             }
         }
-        const int pv = addView(positions.data(), positions.size() * sizeof(float), TINYGLTF_TARGET_ARRAY_BUFFER);
-        const int nv = addView(normals.data(), normals.size() * sizeof(float), TINYGLTF_TARGET_ARRAY_BUFFER);
-        const int iv = addView(indices.data(), indices.size() * sizeof(std::uint32_t), TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER);
+        tinygltf::Mesh out;
+        out.name = model.definition(def).name;
+        for (auto& [mid, part] : parts) {
+            const int pv = addView(part.positions.data(), part.positions.size() * sizeof(float), TINYGLTF_TARGET_ARRAY_BUFFER);
+            const int nv = addView(part.normals.data(), part.normals.size() * sizeof(float), TINYGLTF_TARGET_ARRAY_BUFFER);
+            const int uv = addView(part.uvs.data(), part.uvs.size() * sizeof(float), TINYGLTF_TARGET_ARRAY_BUFFER);
+            const int iv = addView(part.indices.data(), part.indices.size() * sizeof(std::uint32_t),
+                TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER);
+            tinygltf::Accessor pa;
+            pa.bufferView = pv;
+            pa.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+            pa.count = part.positions.size() / 3;
+            pa.type = TINYGLTF_TYPE_VEC3;
+            pa.minValues = { part.lo.x, part.lo.y, part.lo.z };
+            pa.maxValues = { part.hi.x, part.hi.y, part.hi.z };
+            gltf.accessors.push_back(pa);
+            tinygltf::Accessor na = pa;
+            na.bufferView = nv;
+            na.minValues.clear();
+            na.maxValues.clear();
+            gltf.accessors.push_back(na);
+            tinygltf::Accessor ua = na;
+            ua.bufferView = uv;
+            ua.type = TINYGLTF_TYPE_VEC2;
+            gltf.accessors.push_back(ua);
+            tinygltf::Accessor ia;
+            ia.bufferView = iv;
+            ia.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
+            ia.count = part.indices.size();
+            ia.type = TINYGLTF_TYPE_SCALAR;
+            gltf.accessors.push_back(ia);
 
-        tinygltf::Accessor pa;
-        pa.bufferView = pv;
-        pa.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-        pa.count = positions.size() / 3;
-        pa.type = TINYGLTF_TYPE_VEC3;
-        pa.minValues = { lo.x, lo.y, lo.z };
-        pa.maxValues = { hi.x, hi.y, hi.z };
-        gltf.accessors.push_back(pa);
-        tinygltf::Accessor na = pa;
-        na.bufferView = nv;
-        na.minValues.clear();
-        na.maxValues.clear();
-        gltf.accessors.push_back(na);
-        tinygltf::Accessor ia;
-        ia.bufferView = iv;
-        ia.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
-        ia.count = indices.size();
-        ia.type = TINYGLTF_TYPE_SCALAR;
-        gltf.accessors.push_back(ia);
-
-        tinygltf::Primitive prim;
-        prim.attributes["POSITION"] = static_cast<int>(gltf.accessors.size() - 3);
-        prim.attributes["NORMAL"] = static_cast<int>(gltf.accessors.size() - 2);
-        prim.indices = static_cast<int>(gltf.accessors.size() - 1);
-        prim.material = 0;
-        prim.mode = TINYGLTF_MODE_TRIANGLES;
-        tinygltf::Mesh m;
-        m.name = model.definition(def).name;
-        m.primitives.push_back(prim);
-        gltf.meshes.push_back(m);
-        meshes[def] = static_cast<int>(gltf.meshes.size() - 1);
-    }
+            tinygltf::Primitive prim;
+            prim.attributes["POSITION"] = static_cast<int>(gltf.accessors.size() - 4);
+            prim.attributes["NORMAL"] = static_cast<int>(gltf.accessors.size() - 3);
+            prim.attributes["TEXCOORD_0"] = static_cast<int>(gltf.accessors.size() - 2);
+            prim.indices = static_cast<int>(gltf.accessors.size() - 1);
+            prim.material = materialIndex(mid);
+            prim.mode = TINYGLTF_MODE_TRIANGLES;
+            out.primitives.push_back(prim);
+        }
+        gltf.meshes.push_back(out);
+        return meshes[key] = static_cast<int>(gltf.meshes.size() - 1);
+    };
 
     // Nodurile: rădăcina (cu rotația spre Y-sus), apoi instanțele, recursiv.
-    std::function<int(model::DefinitionId, const std::string&, const std::vector<double>&)> addNode;
-    addNode = [&](model::DefinitionId def, const std::string& name, const std::vector<double>& matrix) {
+    std::function<int(model::DefinitionId, const std::string&, const std::vector<double>&, model::MaterialId)> addNode;
+    addNode = [&](model::DefinitionId def, const std::string& name, const std::vector<double>& matrix,
+                  model::MaterialId inherited) {
         tinygltf::Node node;
         node.name = name;
         node.matrix = matrix;
-        if (const auto it = meshes.find(def); it != meshes.end()) {
-            node.mesh = it->second;
-        }
+        node.mesh = meshFor(def, inherited);
         const int index = static_cast<int>(gltf.nodes.size());
         gltf.nodes.push_back(node);
         std::vector<int> children;
@@ -261,13 +334,13 @@ bool exportGltf(const model::Model& model, const std::filesystem::path& path, bo
             const model::Instance& inst = model.instance(child);
             children.push_back(addNode(inst.definition,
                 inst.name.empty() ? model.definition(inst.definition).name : inst.name,
-                nodeMatrix(inst.transform.matrix(), options.scale)));
+                nodeMatrix(inst.transform.matrix(), options.scale), inst.material ? inst.material : inherited));
         }
         gltf.nodes[static_cast<std::size_t>(index)].children = children;
         return index;
     };
     const math::Mat4d rootMatrix = options.yUp ? zUpToYUp() : math::Mat4d(1.0);
-    const int root = addNode(model.root(), "Aion", nodeMatrix(rootMatrix, 1.0));
+    const int root = addNode(model.root(), "Aion", nodeMatrix(rootMatrix, 1.0), {});
     tinygltf::Scene scene;
     scene.name = "Aion";
     scene.nodes.push_back(root);
