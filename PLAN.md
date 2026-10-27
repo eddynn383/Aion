@@ -503,11 +503,11 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 - [x] Redarea și exportul animației scenelor se mută în Timeline (Faza 17); scenele nu mai au legătură cu animațiile
 
 ### Faza 17 – Timeline și keyframe-uri (animații salvate)
-- [ ] Core: `Animation` (nume, durată, fps) cu piste pe obiecte (poziție, rotație, scară, culoarea materialului) și
+- [x] Core: `Animation` (nume, durată, fps) cu piste pe obiecte (poziție, rotație, scară, culoarea materialului) și
       o pistă a camerei; keyframe-uri cu easing; evaluare la un moment dat (cu teste)
-- [ ] Bara de timeline (ca în Figma/Blender): riglă, playhead, play/pauză/buclă, pistele selecției cu romburi,
+- [x] Bara de timeline (ca în Figma/Blender): riglă, playhead, play/pauză/buclă, pistele selecției cu romburi,
       „◆ Keyframe” și auto-key, mutarea keyframe-urilor prin tragere
-- [ ] Animații multiple, salvate în `.aion`; exportul video (MP4) din timeline
+- [x] Animații multiple, salvate în `.aion`; exportul video (MP4) din timeline
 - [ ] O animație poate fi pornită dintr-o interacțiune (Faza 18)
 
 ### Faza 18 – Interacțiuni cu blocuri (puzzle) și Modul Interacțiune

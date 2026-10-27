@@ -93,6 +93,7 @@ qt_add_qml_module(aion_app
         qml/shell/ToolGuides.js
         qml/shell/AppMenuBar.qml
         qml/shell/ViewportControls.qml
+        qml/shell/Timeline.qml
         qml/storybook/Storybook.qml
         qml/storybook/DemoGallery.qml
 )

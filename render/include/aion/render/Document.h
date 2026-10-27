@@ -79,6 +79,13 @@ class Document : public QObject, private model::ModelObserver {
     // --- Faza 9 ---
     // Scenele: { id, name, style } (poziția camerei o citește QML prin sceneCamera).
     Q_PROPERTY(QVariantList scenes READ scenes NOTIFY outlineChanged)
+    // Timeline-ul: animațiile modelului, cea activă, momentul curent, previzualizarea și redarea.
+    Q_PROPERTY(QVariantList animations READ animations NOTIFY outlineChanged)
+    Q_PROPERTY(double activeAnimation READ activeAnimation WRITE setActiveAnimation NOTIFY timelineChanged)
+    Q_PROPERTY(QVariantMap timeline READ timeline NOTIFY timelineChanged)
+    Q_PROPERTY(double timelineTime READ timelineTime WRITE setTimelineTime NOTIFY timelineTimeChanged)
+    Q_PROPERTY(bool previewing READ previewing NOTIFY timelineChanged)
+    Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
     // Planurile de secțiune: { id, name, active }.
     Q_PROPERTY(QVariantList sections READ sections NOTIFY outlineChanged)
     Q_PROPERTY(int guideCount READ guideCount NOTIFY outlineChanged)
@@ -279,6 +286,39 @@ public:
     unsigned interactionRevision() const { return m_interactionRevision; }
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
+    // --- Timeline ---
+    QVariantList animations() const;
+    double activeAnimation() const { return static_cast<double>(m_activeAnimation.value); }
+    void setActiveAnimation(double id);
+    // Pistele animației active: { name, duration, fps, loop, tracks: [{ instance, name, transform: [t…], color: [t…] }],
+    // camera: [t…] }.
+    QVariantMap timeline() const;
+    double timelineTime() const { return m_timelineTime; }
+    void setTimelineTime(double seconds); // mută playhead-ul și pornește previzualizarea
+    bool previewing() const { return m_previewing; }
+    bool playing() const { return m_playing; }
+    Q_INVOKABLE void createAnimation();
+    Q_INVOKABLE void renameAnimation(double id, const QString& name);
+    Q_INVOKABLE void removeAnimation(double id);
+    Q_INVOKABLE void setAnimationSettings(double duration, int fps, bool loop);
+    // Keyframe-uri la momentul curent: transformarea / culoarea obiectelor selectate, camera dată (cameraState()).
+    Q_INVOKABLE void keySelection();
+    Q_INVOKABLE void keySelectionColor();
+    Q_INVOKABLE void keyCamera(const QVariantMap& camera);
+    // kind: "transform", "color", "camera"; instance 0 pentru cameră.
+    Q_INVOKABLE void removeKey(const QString& kind, double instance, double time);
+    Q_INVOKABLE void moveKey(const QString& kind, double instance, double time, double newTime);
+    Q_INVOKABLE void setKeyEasing(const QString& kind, double instance, double time, int easing);
+    Q_INVOKABLE void play();
+    Q_INVOKABLE void pause();
+    Q_INVOKABLE void endPreview(); // înapoi la model (editare)
+    // Camera animației la momentul curent ({} dacă nu are pistă de cameră), ca cameraState().
+    Q_INVOKABLE QVariantMap animationCamera() const;
+    // Culoarea animată a unei instanțe (pentru randare), dacă există.
+    std::optional<model::Color> displayColor(model::InstanceId instance) const;
+    const model::Animation* currentAnimation() const;
+    double animationDuration() const;
+
     // Aplică starea unei scene (pozițiile obiectelor, ascunderile, tag-urile), cu o tranziție de `seconds`.
     Q_INVOKABLE void applyScene(double sceneId, double seconds);
     bool animating() const { return m_sceneTransition.has_value() || !m_interactions.empty(); }
@@ -310,6 +350,8 @@ signals:
     void autosaveSettingsChanged();
     // A pornit o animație a modelului (tranziția unei scene): viewport-ul cere cadre.
     void animationStarted();
+    void timelineChanged();
+    void timelineTimeChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
@@ -330,6 +372,12 @@ private:
         double duration = 1.0;
     };
     std::optional<SceneTransition> m_sceneTransition;
+    model::AnimationId m_activeAnimation;
+    double m_timelineTime = 0.0;
+    bool m_previewing = false;
+    bool m_playing = false;
+    template <class Fn>
+    void editAnimation(const char* name, Fn&& fn);
     void finishSceneTransition();
     unsigned m_interactionRevision = 0;
 

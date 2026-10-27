@@ -155,6 +155,79 @@ json colorToJson(const model::Color& c)
     return { c.r, c.g, c.b, c.a };
 }
 
+
+// Animațiile: cheile ca liste compacte [timp, easing, valori…].
+json animationsToJson(const model::Model& model)
+{
+    json out = json::array();
+    for (std::size_t i = 0; i < model.animations().size(); ++i) {
+        const model::Animation& a = model.animations().values()[i];
+        json tracks = json::array();
+        for (const model::ObjectTrack& t : a.tracks) {
+            json transform = json::array();
+            for (const model::TransformKey& k : t.transform) {
+                json entry = json::array({ k.time, static_cast<int>(k.easing) });
+                for (int c = 0; c < 4; ++c) {
+                    for (int r = 0; r < 4; ++r) {
+                        entry.push_back(k.value.matrix()[c][r]);
+                    }
+                }
+                transform.push_back(std::move(entry));
+            }
+            json color = json::array();
+            for (const model::ColorKey& k : t.color) {
+                color.push_back({ k.time, static_cast<int>(k.easing), k.value.r, k.value.g, k.value.b, k.value.a });
+            }
+            tracks.push_back({ { "instance", t.instance.value }, { "transform", transform }, { "color", color } });
+        }
+        json camera = json::array();
+        for (const model::CameraKey& k : a.camera) {
+            camera.push_back({ k.time, static_cast<int>(k.easing), k.target.x, k.target.y, k.target.z, k.yaw, k.pitch,
+                k.distance });
+        }
+        out.push_back({ { "id", model.animations().keys()[i].value }, { "name", a.name }, { "duration", a.duration },
+            { "fps", a.fps }, { "loop", a.loop }, { "tracks", tracks }, { "camera", camera } });
+    }
+    return out;
+}
+
+void animationsFromJson(const json& list, model::ChangeSet& changes)
+{
+    const auto easing = [](const json& v) { return static_cast<model::Easing>(std::clamp(v.get<int>(), 0, 4)); };
+    for (const json& j : list) {
+        model::Animation a;
+        a.name = j.value("name", std::string());
+        a.duration = j.value("duration", 5.0);
+        a.fps = j.value("fps", 30);
+        a.loop = j.value("loop", false);
+        for (const json& t : j.at("tracks")) {
+            model::ObjectTrack track;
+            track.instance = model::InstanceId { t.at("instance").get<std::uint64_t>() };
+            for (const json& k : t.at("transform")) {
+                math::Mat4d m(1.0);
+                for (int c = 0; c < 4; ++c) {
+                    for (int r = 0; r < 4; ++r) {
+                        m[c][r] = k.at(static_cast<std::size_t>(2 + c * 4 + r)).get<double>();
+                    }
+                }
+                track.transform.push_back({ k.at(0).get<double>(), math::Transform(m), easing(k.at(1)) });
+            }
+            for (const json& k : t.at("color")) {
+                track.color.push_back({ k.at(0).get<double>(),
+                    model::Color { k.at(2).get<std::uint8_t>(), k.at(3).get<std::uint8_t>(), k.at(4).get<std::uint8_t>(),
+                        k.at(5).get<std::uint8_t>() },
+                    easing(k.at(1)) });
+            }
+            a.tracks.push_back(std::move(track));
+        }
+        for (const json& k : j.at("camera")) {
+            a.camera.push_back({ k.at(0).get<double>(), { k.at(2).get<double>(), k.at(3).get<double>(), k.at(4).get<double>() },
+                k.at(5).get<double>(), k.at(6).get<double>(), k.at(7).get<double>(), easing(k.at(1)) });
+        }
+        changes.animations[model::AnimationId { j.at("id").get<std::uint64_t>() }].after = std::move(a);
+    }
+}
+
 } // namespace
 
 std::string toJson(const model::Model& model)
@@ -284,6 +357,7 @@ std::string toJson(const model::Model& model)
         { "annotations", annotations },
         { "sections", sections },
         { "scenes", scenes },
+        { "animations", animationsToJson(model) },
     };
     return doc.dump(1);
 }
@@ -386,6 +460,7 @@ LoadResult fromJson(std::string_view text)
             changes.sections[model::SectionId { s.at("id").get<std::uint64_t>() }].after = model::SectionPlane {
                 s.value("name", std::string()), vec(s.at("point")), vec(s.at("normal")), s.value("active", true) };
         }
+        animationsFromJson(doc.value("animations", json::array()), changes);
         for (const json& s : doc.value("scenes", json::array())) {
             model::Scene scene;
             scene.name = s.value("name", std::string());

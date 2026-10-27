@@ -101,6 +101,51 @@ struct Scene {
     bool operator==(const Scene&) const = default;
 };
 
+// Animațiile (timeline-ul): keyframe-uri cu valori absolute pe obiecte (transformare, culoare) și pe cameră.
+enum class Easing { Linear, EaseInOut, EaseIn, EaseOut, Step };
+
+struct TransformKey {
+    double time = 0.0;
+    math::Transform value;
+    Easing easing = Easing::EaseInOut;
+    bool operator==(const TransformKey&) const = default;
+};
+
+struct ColorKey {
+    double time = 0.0;
+    Color value;
+    Easing easing = Easing::EaseInOut;
+    bool operator==(const ColorKey&) const = default;
+};
+
+struct CameraKey {
+    double time = 0.0;
+    math::Vec3d target { 0.0 };
+    double yaw = 0.0;
+    double pitch = 0.0;
+    double distance = 10000.0;
+    Easing easing = Easing::EaseInOut;
+    bool operator==(const CameraKey&) const = default;
+};
+
+// Pista unui obiect; cheile sunt sortate după timp.
+struct ObjectTrack {
+    InstanceId instance;
+    std::vector<TransformKey> transform;
+    std::vector<ColorKey> color;
+    bool operator==(const ObjectTrack&) const = default;
+};
+
+struct Animation {
+    std::string name;
+    double duration = 5.0; // secunde
+    int fps = 30;
+    bool loop = false;
+    std::vector<ObjectTrack> tracks;
+    std::vector<CameraKey> camera;
+    bool operator==(const Animation&) const = default;
+};
+
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
@@ -154,6 +199,7 @@ struct ChangeSet {
     std::map<AnnotationId, geom::EntityChange<Annotation>> annotations;
     std::map<SectionId, geom::EntityChange<SectionPlane>> sections;
     std::map<SceneId, geom::EntityChange<Scene>> scenes;
+    std::map<AnimationId, geom::EntityChange<Animation>> animations;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -191,6 +237,7 @@ public:
     [[nodiscard]] const geom::SlotMap<AnnotationId, Annotation>& annotations() const { return m_annotations; }
     [[nodiscard]] const geom::SlotMap<SectionId, SectionPlane>& sections() const { return m_sections; }
     [[nodiscard]] const geom::SlotMap<SceneId, Scene>& scenes() const { return m_scenes; }
+    [[nodiscard]] const geom::SlotMap<AnimationId, Animation>& animations() const { return m_animations; }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -227,6 +274,9 @@ public:
     SceneId addScene(Scene scene);
     void removeScene(SceneId id);
     void setScene(SceneId id, Scene scene);
+    AnimationId addAnimation(Animation animation);
+    void removeAnimation(AnimationId id);
+    void setAnimation(AnimationId id, Animation animation);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -267,6 +317,7 @@ private:
     geom::SlotMap<AnnotationId, Annotation> m_annotations;
     geom::SlotMap<SectionId, SectionPlane> m_sections;
     geom::SlotMap<SceneId, Scene> m_scenes;
+    geom::SlotMap<AnimationId, Animation> m_animations;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;
     // Geometria (goală) a definițiilor șterse, păstrată ca undo să le refacă fără să refolosească ID-uri.
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_graveyard;
