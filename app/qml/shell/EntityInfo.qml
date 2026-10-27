@@ -329,6 +329,72 @@ Column {
         }
     }
 
+    // Forma selectată: linie (lungime), arc (rază, segmente), cerc / poligon (rază, segmente / laturi), dreptunghi
+    // (lățime, înălțime). Mărimile se schimbă direct; un pas de undo fiecare.
+    Column {
+        id: shapeBox
+        readonly property var shape: root.info.shape ?? null
+        readonly property string kind: shape ? shape.kind : ""
+        readonly property real half: (width - Theme.space1) / 2
+        visible: shape !== null
+        width: parent.width
+        spacing: Theme.space2
+        NumberField {
+            visible: shapeBox.kind === "line"
+            width: parent.width
+            label: "Lungime"
+            unit: "mm"
+            from: 0.01
+            step: 10
+            value: shapeBox.shape ? shapeBox.shape.length : 0
+            onValueModified: (v) => root.document.setShapeValue("length", v)
+        }
+        Row {
+            visible: shapeBox.kind === "rectangle"
+            spacing: Theme.space1
+            NumberField { width: shapeBox.half; compact: true; label: "Lățime"; unit: "mm"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.width : 0; onValueModified: (v) => root.document.setShapeValue("width", v) }
+            NumberField { width: shapeBox.half; compact: true; label: "Înălț."; unit: "mm"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.height : 0; onValueModified: (v) => root.document.setShapeValue("height", v) }
+        }
+        Row {
+            visible: shapeBox.kind === "arc" || shapeBox.kind === "circle" || shapeBox.kind === "polygon"
+            spacing: Theme.space1
+            NumberField { width: shapeBox.half; compact: true; label: "Rază"; unit: "mm"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.radius : 0; onValueModified: (v) => root.document.setShapeValue("radius", v) }
+            NumberField {
+                width: shapeBox.half
+                compact: true
+                label: shapeBox.kind === "polygon" ? "Laturi" : "Segm."
+                from: shapeBox.kind === "arc" ? 1 : 3
+                to: 720
+                enabled: shapeBox.shape ? shapeBox.shape.segmentsEditable : false
+                opacity: enabled ? 1 : 0.55
+                value: shapeBox.shape ? shapeBox.shape.segments : 0
+                onValueModified: (v) => root.document.setShapeValue("segments", v)
+            }
+        }
+        Text {
+            visible: shapeBox.kind === "arc"
+            text: "Unghi: " + (shapeBox.shape ? shapeBox.shape.angle.toFixed(1) : 0) + "°"
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+        Text {
+            visible: shapeBox.shape !== null && shapeBox.kind !== "line" && shapeBox.kind !== "rectangle"
+                     && !shapeBox.shape.segmentsEditable
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Segmentele se pot schimba doar înainte de Push/Pull (când forma nu face parte dintr-un volum)."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+    Toggle {
+        visible: root.info.edgesSoft !== undefined
+        width: parent.width
+        text: root.info.edgesSoft === -1 ? "Netedă (soft) — mixt" : "Netedă (soft): ascunsă, umbrire lină"
+        checked: root.info.edgesSoft === 1
+        onToggled: root.document.setSelectedEdgesSoft(checked)
+    }
+
     // Poziționarea texturii pe fețele selectate (Position Texture): deplasare, rotație, scară.
     Column {
         id: textureBox

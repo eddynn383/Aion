@@ -307,6 +307,10 @@ public:
     // --- Modelare pe selecție (ADR 0023) ---
     // Oglindește selecția față de centrul ei, pe axa 0 (X), 1 (Y) sau 2 (Z).
     Q_INVOKABLE void mirrorSelection(int axis);
+    // Forma selectată (linie, arc, cerc, poligon, dreptunghi): key = "length", "radius", "segments", "width", "height".
+    Q_INVOKABLE void setShapeValue(const QString& key, double value);
+    // Muchiile selectate devin soft (ascunse, umbrire netedă) sau vizibile.
+    Q_INVOKABLE void setSelectedEdgesSoft(bool soft);
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
     Q_INVOKABLE double createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);
