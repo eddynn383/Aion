@@ -1,9 +1,11 @@
 add_library(aion_render STATIC
     include/aion/render/Document.h
     include/aion/render/GraphicsApi.h
+    include/aion/render/ScriptEngine.h
     include/aion/render/Viewport.h
     src/Document.cpp
     src/ProceduralTextures.cpp
+    src/ScriptEngine.cpp
     src/GraphicsApi.cpp
     src/Viewport.cpp
     src/ViewportFrame.h

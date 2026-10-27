@@ -1,0 +1,9 @@
+{
+    "name": "Gard",
+    "version": "1.0",
+    "description": "Un gard din stâlpi și scânduri, în fața obiectelor selectate sau în origine.",
+    "commands": [
+        { "title": "Gard de 6 m", "function": "gard6" },
+        { "title": "Gard în jurul selecției", "function": "gardSelectie" }
+    ]
+}

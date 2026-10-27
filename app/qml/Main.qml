@@ -130,12 +130,25 @@ Window {
             list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.demos", title: "Galeria animațiilor din ghiduri", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
+        list.push({ id: "script.console", title: "Consola de scripturi (JavaScript)…", category: "Scripturi", shortcut: "Ctrl+Alt+J", icon: "code" })
+        for (const p of scripts.plugins)
+            for (const c of p.commands)
+                list.push({ id: "plugin:" + c.id, title: p.name + ": " + c.title, category: "Plugin-uri", shortcut: "", icon: "code" })
         for (const g of doc.generators)
             list.push({ id: "object.parametric:" + g.id, title: "Obiect dinamic: " + g.name, category: "Obiecte", shortcut: "", icon: "sliders-horizontal" })
         return list
     }
 
     function runCommand(id) {
+        if (id.startsWith("plugin:")) {
+            const r = scripts.runPluginCommand(id.slice(7))
+            if (!r.ok) toast.show("Plugin: " + r.error)
+            return
+        }
+        if (id === "script.console") {
+            scriptConsole.open()
+            return
+        }
         if (id.startsWith("object.parametric:")) {
             const c = viewport.cameraState()
             doc.createParametric(id.slice(18), Qt.vector3d(c.tx, c.ty, 0))
@@ -381,6 +394,14 @@ Window {
                     // Click în coordonatele ferestrei (butoane, câmpuri).
                     const cs = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
+                } else if (action.startsWith("scriptjs:")) {
+                    // Cod JavaScript direct (pentru teste): „scriptjs:aion.box(0,0,0,100,100,100)”.
+                    const r = scripts.run(action.slice(9), "Script")
+                    console.info("scriptjs:", r.ok, r.output, r.error)
+                } else if (action.startsWith("script:")) {
+                    // „script:0” rulează exemplul 0 din consolă.
+                    const r = scripts.run(scripts.examples[parseInt(action.slice(7))].code, "Script")
+                    console.info("script:", r.ok, r.output, r.error)
                 } else if (action.startsWith("drags:")) {
                     // Tragere în coordonatele ferestrei: „drags:x1,y1,x2,y2”.
                     const dg = action.slice(6).split(",").map(Number)
@@ -713,6 +734,17 @@ Window {
         x: Theme.space3
         y: 56
         document: doc
+    }
+    ScriptEngine {
+        id: scripts
+        document: doc
+        onMessageRequested: (text) => toast.show(text)
+        onCommandRequested: (id) => window.runCommand(id)
+    }
+    ScriptConsole {
+        id: scriptConsole
+        parent: window.contentItem
+        engine: scripts
     }
     RulesEditor {
         id: rulesEditor

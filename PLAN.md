@@ -593,11 +593,11 @@ scripturile, care expun tot ce există deja.
 - [x] „Salvează în bibliotecă” pentru obiectul selectat
 
 ### Faza 27 – Plugin-uri și scripturi
-- [ ] JavaScript (QJSEngine, merge și pe Web): API peste model (`aion.model`), selecție, comenzi, geometrie
-      (`drawLine`, `pushPull`, `addBox`…), interfață simplă (mesaje, întrebări)
-- [ ] Consolă de scripturi (editor + rezultat); fiecare rulare e un singur pas de undo
-- [ ] Plugin-uri: dosar cu `manifest.json` + `main.js`; comenzile lor apar în palette și în meniu
-- [ ] Exemple incluse (scară în spirală, gard, rafturi) și documentația API
+- [x] JavaScript (QJSEngine, merge și pe Web): API peste model, selecție, comenzi, geometrie (`box`, `object`,
+      `line`, `face`, `move`, `rotate`, `material`…), mesaje _(ADR 0027; fără dialoguri interactive)_
+- [x] Consolă de scripturi (editor + rezultat); fiecare rulare e un singur pas de undo, o eroare anulează tot
+- [x] Plugin-uri: dosar cu `manifest.json` + `main.js`; comenzile lor apar în palette
+- [x] Exemple incluse (scară în spirală, gard, biblioteci, grilă) și documentația API (`docs/scripting.md`)
 
 ## 7. Riscuri principale și cum le reducem
 

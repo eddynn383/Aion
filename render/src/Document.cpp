@@ -4,6 +4,7 @@
 #include "aion/core/inference/Inference.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Interaction.h"
@@ -1259,7 +1260,12 @@ template <class Fn>
 void Document::runOnModel(const std::string& name, Fn&& fn)
 {
     const geom::Selection before = m_selection;
-    m_stack.run(name, [&](model::Model& model) { fn(model); });
+    if (m_macro) {
+        // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo).
+        fn(m_model);
+    } else {
+        m_stack.run(name, [&](model::Model& model) { fn(model); });
+    }
     afterInteraction(before);
     // Entity Info arată și proprietăți ale obiectelor (tag, nume, blocare), nu doar ce e selectat.
     emit selectionChanged();
@@ -3363,11 +3369,11 @@ QVariantList Document::generators() const
     return out;
 }
 
-void Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
+double Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
 {
     const model::GeneratorInfo* info = model::findGenerator(generator.toStdString());
     if (info == nullptr) {
-        return;
+        return 0.0;
     }
     std::map<std::string, double> given;
     for (auto it = parameters.begin(); it != parameters.end(); ++it) {
@@ -3385,6 +3391,206 @@ void Document::createParametric(const QString& generator, const QVector3D& at, c
         m_selection.instances.insert(created);
         afterInteraction(before);
     }
+    return static_cast<double>(created.value);
+}
+
+void Document::beginMacro(const std::string& name)
+{
+    if (m_macro || m_stack.inTransaction()) {
+        return;
+    }
+    m_stack.beginTransaction(name);
+    m_macro = true;
+}
+
+void Document::endMacro(bool keep)
+{
+    if (!m_macro) {
+        return;
+    }
+    m_macro = false;
+    const geom::Selection before = m_selection;
+    if (keep) {
+        m_stack.commit();
+    } else {
+        m_stack.abort();
+    }
+    dropStaleReferences();
+    afterInteraction(before);
+    emit selectionChanged();
+    emit outlineChanged();
+}
+
+namespace {
+
+model::InstanceId instanceIdOf(double id)
+{
+    return model::InstanceId { static_cast<std::uint64_t>(id) };
+}
+
+} // namespace
+
+double Document::createPrimitive(const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name)
+{
+    static const QStringList kinds { QStringLiteral("box"), QStringLiteral("cylinder"), QStringLiteral("cone"),
+        QStringLiteral("sphere") };
+    static const char* const kNames[] = { "Cutie", "Cilindru", "Con", "Sferă" };
+    const auto index = kinds.indexOf(kind);
+    const math::Vec3d s { std::abs(size.x()), std::abs(size.y()), std::abs(size.z()) };
+    if (index < 0 || s.x < 0.01 || s.y < 0.01 || s.z < 0.01) {
+        return 0.0;
+    }
+    const math::Vec3d c = contextTransform().inverse().applyToPoint({ corner.x(), corner.y(), corner.z() });
+    model::InstanceId created;
+    runOnModel("Primitivă", [&](model::Model& model) {
+        model::Definition def { name.isEmpty() ? std::string(kNames[index]) : name.toStdString(), true };
+        def.shape = kind.toStdString();
+        const model::DefinitionId d = model.addDefinition(def);
+        geom::buildPrimitive(model.mesh(d), static_cast<geom::Primitive>(index), s, 24);
+        model::Instance inst;
+        inst.parent = activeDefinition();
+        inst.definition = d;
+        // Primitivele au baza centrată în origine: colțul minim ajunge în `corner`.
+        inst.transform = math::Transform::translation(c + math::Vec3d { s.x / 2, s.y / 2, 0.0 });
+        inst.name = def.name;
+        created = model.addInstance(inst);
+    });
+    return static_cast<double>(created.value);
+}
+
+bool Document::setInstancePlacement(double instanceId, const QVariantMap& placement)
+{
+    const model::InstanceId id = instanceIdOf(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return false;
+    }
+    model::Placement p = model::placementOf(m_model, id);
+    const auto value = [&](const char* key, double fallback) {
+        return placement.value(QLatin1String(key), fallback).toDouble();
+    };
+    p.position = { value("x", p.position.x), value("y", p.position.y), value("z", p.position.z) };
+    p.rotation = { value("rx", p.rotation.x), value("ry", p.rotation.y), value("rz", p.rotation.z) };
+    p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
+    p.size = { value("width", 0.0), value("depth", 0.0), value("height", 0.0) };
+    runOnModel("Plasare", [&](model::Model& model) { model::setPlacement(model, id, p); });
+    return true;
+}
+
+bool Document::transformInstance(double instanceId, const math::Transform& delta)
+{
+    const model::InstanceId id = instanceIdOf(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return false;
+    }
+    runOnModel("Transformare", [&](model::Model& model) { model::transformInstances(model, { id }, delta); });
+    return true;
+}
+
+bool Document::removeInstanceById(double instanceId)
+{
+    const model::InstanceId id = instanceIdOf(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return false;
+    }
+    geom::Selection before = m_selection;
+    m_selection.clear();
+    m_selection.instances.insert(id);
+    deleteSelection();
+    before.instances.erase(id);
+    m_selection = before;
+    return true;
+}
+
+bool Document::setInstanceMaterialByName(double instanceId, const QString& nameOrColor)
+{
+    const model::InstanceId id = instanceIdOf(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return false;
+    }
+    runOnModel("Material", [&](model::Model& model) {
+        model::MaterialId material;
+        for (std::size_t i = 0; i < model.materials().size(); ++i) {
+            if (QString::fromStdString(model.materials().values()[i].name) == nameOrColor) {
+                material = model.materials().keys()[i];
+            }
+        }
+        if (!material) {
+            const auto library = model::builtinMaterials();
+            for (std::size_t i = 0; i < library.size(); ++i) {
+                if (QString::fromStdString(library[i].name) == nameOrColor) {
+                    material = libraryMaterialIn(model, i);
+                }
+            }
+        }
+        if (!material && QColor::isValidColorName(nameOrColor)) {
+            const QColor c = QColor::fromString(nameOrColor);
+            model::Material m;
+            m.name = nameOrColor.toStdString();
+            m.color = { static_cast<std::uint8_t>(c.red()), static_cast<std::uint8_t>(c.green()),
+                static_cast<std::uint8_t>(c.blue()), static_cast<std::uint8_t>(c.alpha()) };
+            material = model.addMaterial(m);
+        }
+        model::Instance inst = model.instance(id);
+        inst.material = material;
+        model.setInstance(id, inst);
+    });
+    return true;
+}
+
+bool Document::drawLineSegment(const QVector3D& a, const QVector3D& b)
+{
+    const math::Transform toLocal = contextTransform().inverse();
+    const math::Vec3d p = toLocal.applyToPoint({ a.x(), a.y(), a.z() });
+    const math::Vec3d q = toLocal.applyToPoint({ b.x(), b.y(), b.z() });
+    if (glm::length(p - q) < 1e-6) {
+        return false;
+    }
+    runOnModel("Linie", [&](model::Model& model) { geom::drawLine(model.mesh(activeDefinition()), p, q); });
+    return true;
+}
+
+bool Document::drawFace(const QVariantList& points)
+{
+    const math::Transform toLocal = contextTransform().inverse();
+    std::vector<math::Vec3d> polygon;
+    for (const QVariant& v : points) {
+        const QVariantList xyz = v.toList();
+        if (xyz.size() >= 3) {
+            polygon.push_back(toLocal.applyToPoint({ xyz[0].toDouble(), xyz[1].toDouble(), xyz[2].toDouble() }));
+        }
+    }
+    if (polygon.size() < 3) {
+        return false;
+    }
+    runOnModel("Față", [&](model::Model& model) { geom::drawPolygon(model.mesh(activeDefinition()), polygon); });
+    return true;
+}
+
+QVariantList Document::objectList() const
+{
+    QVariantList out;
+    for (model::InstanceId id : m_model.childrenOf(activeDefinition())) {
+        const model::Instance& inst = m_model.instance(id);
+        const model::Placement p = model::placementOf(m_model, id);
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(id.value) },
+            { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? m_model.definition(inst.definition).name : inst.name) },
+            { QStringLiteral("x"), p.position.x }, { QStringLiteral("y"), p.position.y }, { QStringLiteral("z"), p.position.z },
+            { QStringLiteral("width"), p.size.x }, { QStringLiteral("depth"), p.size.y }, { QStringLiteral("height"), p.size.z } });
+    }
+    return out;
+}
+
+void Document::selectInstances(const QVariantList& ids)
+{
+    const geom::Selection before = m_selection;
+    m_selection.clear();
+    for (const QVariant& v : ids) {
+        const model::InstanceId id = instanceIdOf(v.toDouble());
+        if (m_model.instances().contains(id) && m_model.instance(id).parent == activeDefinition()) {
+            m_selection.instances.insert(id);
+        }
+    }
+    afterInteraction(before);
 }
 
 QString Document::libraryFolder() const
