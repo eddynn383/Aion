@@ -307,9 +307,9 @@ Column {
             }
         Row {
             spacing: Theme.space1
-            PlacementField { label: "X"; lockBit: 9; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sx ?? 1); onValueModified: (v) => root.document.setPlacement({ sx: v }) }
-            PlacementField { label: "Y"; lockBit: 10; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sy ?? 1); onValueModified: (v) => root.document.setPlacement({ sy: v }) }
-            PlacementField { label: "Z"; lockBit: 11; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sz ?? 1); onValueModified: (v) => root.document.setPlacement({ sz: v }) }
+            PlacementField { label: "X"; lockBit: 9; decimals: 2; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sx ?? 1); onValueModified: (v) => root.document.setPlacement({ sx: v }) }
+            PlacementField { label: "Y"; lockBit: 10; decimals: 2; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sy ?? 1); onValueModified: (v) => root.document.setPlacement({ sy: v }) }
+            PlacementField { label: "Z"; lockBit: 11; decimals: 2; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sz ?? 1); onValueModified: (v) => root.document.setPlacement({ sz: v }) }
         }
         }
     }
@@ -418,60 +418,26 @@ Column {
         }
         }
         PropertyGroup {
-        title: "Rotește cu (°)"
+        title: "Rotație (°)"
         Row {
             spacing: Theme.space1
-            Repeater {
-                model: ["X", "Y", "Z"]
-                delegate: NumberField {
-                    required property string modelData
-                    width: geometryBox.third
-                    compact: true
-                    label: modelData
-                    decimals: 1
-                    step: 15
-                    from: -360
-                    to: 360
-                    resetValue: 0
-                    value: 0
-                    onValueModified: (v) => {
-                        const c = {}
-                        c["r" + modelData.toLowerCase()] = v
-                        root.document.setGeometryPlacement(c)
-                    }
-                }
-            }
+            NumberField { width: geometryBox.third; compact: true; label: "X"; decimals: 1; step: 15; from: -360; to: 360; value: geometryBox.g ? geometryBox.g.rx : 0; onValueModified: (v) => root.document.setGeometryPlacement({ rx: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Y"; decimals: 1; step: 15; from: -360; to: 360; value: geometryBox.g ? geometryBox.g.ry : 0; onValueModified: (v) => root.document.setGeometryPlacement({ ry: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Z"; decimals: 1; step: 15; from: -360; to: 360; value: geometryBox.g ? geometryBox.g.rz : 0; onValueModified: (v) => root.document.setGeometryPlacement({ rz: v }) }
         }
         }
         PropertyGroup {
-        title: "Scalează cu (×)"
+        title: "Scară (×)"
         Row {
             spacing: Theme.space1
-            Repeater {
-                model: ["X", "Y", "Z"]
-                delegate: NumberField {
-                    required property string modelData
-                    width: geometryBox.third
-                    compact: true
-                    label: modelData
-                    decimals: 3
-                    step: 0.1
-                    from: -100
-                    to: 100
-                    resetValue: 1
-                    value: 1
-                    onValueModified: (v) => {
-                        const c = {}
-                        c["s" + modelData.toLowerCase()] = v
-                        root.document.setGeometryPlacement(c)
-                    }
-                }
-            }
+            NumberField { width: geometryBox.third; compact: true; label: "X"; decimals: 2; step: 0.1; from: -100; to: 100; value: geometryBox.g ? geometryBox.g.sx : 1; onValueModified: (v) => root.document.setGeometryPlacement({ sx: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Y"; decimals: 2; step: 0.1; from: -100; to: 100; value: geometryBox.g ? geometryBox.g.sy : 1; onValueModified: (v) => root.document.setGeometryPlacement({ sy: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Z"; decimals: 2; step: 0.1; from: -100; to: 100; value: geometryBox.g ? geometryBox.g.sz : 1; onValueModified: (v) => root.document.setGeometryPlacement({ sz: v }) }
         }
         Text {
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Rotirea (în jurul centrului) și scara (față de colțul minim) se aplică la Enter, apoi câmpul revine la 0° / 1×."
+            text: "Rotația (în jurul centrului) și scara (față de colțul minim) pornesc de la 0° / 1 pentru fiecare selecție nouă."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }

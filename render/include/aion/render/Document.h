@@ -310,7 +310,9 @@ public:
     // Forma selectată (linie, arc, cerc, poligon, dreptunghi): key = "length", "radius", "segments", "width", "height".
     Q_INVOKABLE void setShapeValue(const QString& key, double value);
     // Geometria liberă selectată (fețe, muchii): px/py/pz = colțul minim nou, dx/dy/dz = mărimea nouă (scară pe axă
-    // față de colțul minim), rx/ry/rz = rotire relativă în grade (în jurul centrului), sx/sy/sz = scară relativă.
+    // față de colțul minim), rx/ry/rz = rotirea în grade (în jurul centrului), sx/sy/sz = scara (față de colțul minim).
+    // Geometria nu are o orientare salvată: rotirea și scara sunt cele aplicate selecției curente din Inspector (se
+    // pornește de la 0° / 1 când se schimbă selecția sau după undo); o valoare nouă aplică diferența.
     Q_INVOKABLE void setGeometryPlacement(const QVariantMap& changes);
     // Muchiile selectate devin soft (ascunse, umbrire netedă) sau vizibile.
     Q_INVOKABLE void setSelectedEdgesSoft(bool soft);
@@ -501,6 +503,11 @@ private:
     bool m_previewApplied = false;
     bool m_macro = false;
     bool m_keepPreview = false; // editAnimation: keyframe-urile nu ies din previzualizare
+    // Rotirea și scara aplicate din Inspector geometriei libere selectate (cheia = muchiile și fețele selecției).
+    std::vector<std::uint64_t> m_geometryKey;
+    math::Vec3d m_geometryRotation { 0.0 };
+    math::Vec3d m_geometryScale { 1.0 };
+    [[nodiscard]] std::vector<std::uint64_t> geometrySelectionKey() const;
     geom::Selection m_previewSelection;
     model::CameraId m_selectedCamera;
     model::LightId m_selectedLight;

@@ -989,9 +989,14 @@ QVariantMap Document::entityInfo() const
                 lo = glm::min(lo, mesh.position(v));
                 hi = glm::max(hi, mesh.position(v));
             }
+            const bool same = geometrySelectionKey() == m_geometryKey;
+            const math::Vec3d r = same ? m_geometryRotation : math::Vec3d { 0.0 };
+            const math::Vec3d k = same ? m_geometryScale : math::Vec3d { 1.0 };
             info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), lo.x }, { QStringLiteral("py"), lo.y },
                 { QStringLiteral("pz"), lo.z }, { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
-                { QStringLiteral("dz"), hi.z - lo.z } };
+                { QStringLiteral("dz"), hi.z - lo.z }, { QStringLiteral("rx"), r.x }, { QStringLiteral("ry"), r.y },
+                { QStringLiteral("rz"), r.z }, { QStringLiteral("sx"), k.x }, { QStringLiteral("sy"), k.y },
+                { QStringLiteral("sz"), k.z } };
         }
     }
     // Forma recunoscută (linie, arc, cerc, poligon, dreptunghi), cu mărimile ei editabile.
@@ -1246,6 +1251,7 @@ bool Document::applyMeasurement(const QString& text)
 void Document::undo()
 {
     const geom::Selection before = m_selection;
+    m_geometryKey.clear(); // rotirea / scara afișate pentru geometria liberă pornesc din nou de la 0° / 1
     m_stack.undo();
     afterInteraction(before);
 }
@@ -1253,6 +1259,7 @@ void Document::undo()
 void Document::redo()
 {
     const geom::Selection before = m_selection;
+    m_geometryKey.clear();
     m_stack.redo();
     afterInteraction(before);
 }
@@ -3814,8 +3821,28 @@ void Document::setShapeValue(const QString& key, double value)
     }
 }
 
+std::vector<std::uint64_t> Document::geometrySelectionKey() const
+{
+    std::vector<std::uint64_t> key;
+    for (geom::EdgeId e : m_selection.edges) {
+        key.push_back(e.value);
+    }
+    key.push_back(0); // separă muchiile de fețe
+    for (geom::FaceId f : m_selection.faces) {
+        key.push_back(f.value);
+    }
+    key.push_back(activeDefinition().value);
+    return key;
+}
+
 void Document::setGeometryPlacement(const QVariantMap& changes)
 {
+    // Rotirea / scara de până acum ale acestei selecții (alta = de la 0° / 1).
+    if (geometrySelectionKey() != m_geometryKey) {
+        m_geometryKey = geometrySelectionKey();
+        m_geometryRotation = math::Vec3d { 0.0 };
+        m_geometryScale = math::Vec3d { 1.0 };
+    }
     if (!m_selection.instances.empty()) {
         return;
     }
@@ -3849,18 +3876,25 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
         t = math::Transform::scaling(lo, k);
         name = "Dimensiuni";
     } else if (has("rx") || has("ry") || has("rz")) {
+        // Valoarea nouă e totalul dorit: se rotește cu diferența față de cât s-a aplicat deja.
+        const math::Vec3d wanted { has("rx") ? value("rx") : m_geometryRotation.x,
+            has("ry") ? value("ry") : m_geometryRotation.y, has("rz") ? value("rz") : m_geometryRotation.z };
+        const math::Vec3d delta = wanted - m_geometryRotation;
         const math::Vec3d center = (lo + hi) * 0.5;
-        t = math::Transform::rotation(center, { 0, 0, 1 }, glm::radians(value("rz")))
-            * math::Transform::rotation(center, { 0, 1, 0 }, glm::radians(value("ry")))
-            * math::Transform::rotation(center, { 1, 0, 0 }, glm::radians(value("rx")));
+        t = math::Transform::rotation(center, { 0, 0, 1 }, glm::radians(delta.z))
+            * math::Transform::rotation(center, { 0, 1, 0 }, glm::radians(delta.y))
+            * math::Transform::rotation(center, { 1, 0, 0 }, glm::radians(delta.x));
         name = "Rotește";
+        m_geometryRotation = wanted;
     } else if (has("sx") || has("sy") || has("sz")) {
-        const math::Vec3d k { has("sx") ? value("sx") : 1.0, has("sy") ? value("sy") : 1.0, has("sz") ? value("sz") : 1.0 };
-        if (std::abs(k.x) < 1e-6 || std::abs(k.y) < 1e-6 || std::abs(k.z) < 1e-6) {
+        const math::Vec3d wanted { has("sx") ? value("sx") : m_geometryScale.x, has("sy") ? value("sy") : m_geometryScale.y,
+            has("sz") ? value("sz") : m_geometryScale.z };
+        if (std::abs(wanted.x) < 1e-6 || std::abs(wanted.y) < 1e-6 || std::abs(wanted.z) < 1e-6) {
             return;
         }
-        t = math::Transform::scaling(lo, k);
+        t = math::Transform::scaling(lo, wanted / m_geometryScale);
         name = "Scalează";
+        m_geometryScale = wanted;
     }
     if (t.isIdentity()) {
         return;
@@ -3869,7 +3903,11 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
     runOnModel(name, [&](model::Model& model) { ok = geom::transformVertices(model.mesh(activeDefinition()), vertices, t); });
     if (!ok) {
         setError(QStringLiteral("Transformarea ar strânge o muchie într-un punct."));
+        m_geometryKey.clear();
+    } else {
+        m_geometryKey = geometrySelectionKey(); // fețele pot primi ID-uri noi: rotirea rămâne a acestei selecții
     }
+    emit selectionChanged();
 }
 
 void Document::setSelectedEdgesSoft(bool soft)
