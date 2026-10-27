@@ -68,7 +68,7 @@ TEST_CASE("Model: structura și geometria au undo/redo împreună", "[core][mode
     REQUIRE(doc.stack.run("Setup", [&](Model& m) {
         def = m.addDefinition({ "Scaun", false });
         box(m.mesh(def), { 0, 0, 0 }, 400, 400, 450);
-        m.addInstance({ m.root(), def, Transform::translation({ 1000, 0, 0 }), "", {}, false, false, {}, {} });
+        m.addInstance({ m.root(), def, Transform::translation({ 1000, 0, 0 }), "", {}, false, false, {}, {}, {} });
         m.addTag({ "Mobilier", { 200, 120, 40, 255 }, true });
     }));
     const Model full = doc.model;
@@ -100,9 +100,9 @@ TEST_CASE("Model: un ciclu (definiție care se conține pe sine) e semnalat", "[
     Model m;
     const DefinitionId a = m.addDefinition({ "A", false });
     const DefinitionId b = m.addDefinition({ "B", false });
-    m.addInstance({ a, b, {}, "", {}, false, false, {}, {} });
+    m.addInstance({ a, b, {}, "", {}, false, false, {}, {}, {} });
     CHECK(m.validate().ok());
-    m.addInstance({ b, a, {}, "", {}, false, false, {}, {} });
+    m.addInstance({ b, a, {}, "", {}, false, false, {}, {}, {} });
     CHECK_FALSE(m.validate().ok());
 }
 

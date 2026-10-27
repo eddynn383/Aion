@@ -84,6 +84,9 @@ qt_add_qml_module(aion_app
         qml/overlays/AboutDialog.qml
         qml/overlays/ToolTour.qml
         qml/overlays/QuantitiesDialog.qml
+        qml/overlays/RulesEditor.qml
+        qml/overlays/RulesActionBlock.qml
+        qml/overlays/RulesActionList.qml
         qml/components/DataTable.qml
         qml/components/MaterialSwatch.qml
         qml/components/AccordionSection.qml

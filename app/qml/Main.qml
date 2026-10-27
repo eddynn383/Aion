@@ -40,6 +40,8 @@ Window {
             { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
             { id: "ui.timeline", title: window.timelineVisible ? "Ascunde timeline-ul" : "Timeline (animații)", category: "Interfață", shortcut: "Alt+T", icon: "film" },
             { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "film" },
+            { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
+            { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
             { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
@@ -135,6 +137,8 @@ Window {
         case "file.exportGltf": fileDialog.ask("exportGltf"); break
         case "file.exportPng": fileDialog.ask("exportPng"); break
         case "file.quantities": quantitiesDialog.open(); break
+        case "mode.interaction": doc.interactionMode = !doc.interactionMode; break
+        case "rules.edit": window.openRulesEditor(); break
         case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
         case "file.exportVideo":
             if (doc.activeAnimation > 0) fileDialog.ask("exportVideo")
@@ -310,8 +314,21 @@ Window {
                     // „behavior:rotate,0,90” pe instanța selectată.
                     const bh = action.slice(9).split(",")
                     doc.setBehavior({ kind: bh[0], anchor: parseInt(bh[1]), amount: parseFloat(bh[2]), duration: 0.6 })
+                } else if (action.startsWith("rule:")) {
+                    // „rule:click,moveBy,0,0,500” adaugă o regulă instanței selectate.
+                    const ru = action.slice(5).split(",")
+                    const target = doc.entityInfo.instanceId
+                    const rules = doc.rulesOf(target)
+                    rules.push({ trigger: ru[0], key: "", actions: [{ kind: ru[1], target: 0, x: parseFloat(ru[2] || 0),
+                        y: parseFloat(ru[3] || 0), z: parseFloat(ru[4] || 0), duration: 0.4, material: 0, animation: 0,
+                        scene: 0, first: [], second: [] }] })
+                    doc.setRules(target, rules)
                 } else if (action.startsWith("exportvideo:")) {
                     window.exportVideo(action.slice(12))
+                } else if (action.startsWith("drags:")) {
+                    // Tragere în coordonatele ferestrei: „drags:x1,y1,x2,y2”.
+                    const dg = action.slice(6).split(",").map(Number)
+                    AppInfo.simulateDrag(window.contentItem, Qt.point(dg[0], dg[1]), Qt.point(dg[2], dg[3]))
                 } else if (action.startsWith("moves:")) {
                     // Hover în coordonatele ferestrei (de exemplu pe un buton din toolbar).
                     const ms = action.slice(6).split(",").map(Number)
@@ -377,8 +394,19 @@ Window {
         }
     }
 
+    function openRulesEditor() {
+        const info = doc.entityInfo
+        if (info.kind !== "instance") {
+            toast.show("Selectează un grup sau o componentă ca să-i adaugi interacțiuni.")
+            return
+        }
+        rulesEditor.openFor(info.instanceId, info.name)
+    }
+
     function escapePressed() {
-        if (vcbText.length > 0)
+        if (doc.interactionMode)
+            doc.interactionMode = false
+        else if (vcbText.length > 0)
             vcbText = ""
         else
             doc.escape()
@@ -548,6 +576,11 @@ Window {
     AboutDialog {
         id: aboutDialog
         parent: window.contentItem
+    }
+    RulesEditor {
+        id: rulesEditor
+        parent: window.contentItem
+        document: doc
     }
     QuantitiesDialog {
         id: quantitiesDialog
@@ -1082,6 +1115,33 @@ Window {
             onTriggered: (id) => window.runCommand(id)
         }
 
+        // Bannerul modului interacțiune.
+        Rectangle {
+            visible: doc.interactionMode
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.space3
+            anchors.top: parent.top
+            anchors.topMargin: Theme.space3
+            z: 5
+            width: bannerRow.implicitWidth + Theme.space4 * 2
+            height: 32
+            radius: 16
+            color: Theme.accent
+            Row {
+                id: bannerRow
+                anchors.centerIn: parent
+                spacing: Theme.space2
+                Icon { anchors.verticalCenter: parent.verticalCenter; name: "play"; size: 14; color: Theme.accentText }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Modul interacțiune · Esc pentru ieșire"
+                    color: Theme.accentText
+                    font.pixelSize: Theme.fontSizeSm
+                    font.weight: Font.Medium
+                }
+            }
+        }
+
         ViewportControls {
             anchors.top: parent.top
             anchors.topMargin: Theme.space3
@@ -1131,6 +1191,7 @@ Window {
             EntityInfo {
                 width: parent.width
                 document: doc
+                onEditRules: window.openRulesEditor()
             }
 
             // Fără selecție, Inspector-ul descrie modelul întreg.

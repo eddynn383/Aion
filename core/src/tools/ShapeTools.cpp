@@ -763,7 +763,7 @@ private:
         ctx.stack.run(name, [&](model::Model& model) {
             const model::DefinitionId def = model.addDefinition({ name, true });
             geom::buildPrimitive(model.mesh(def), kind, size, 24);
-            created = model.addInstance({ ctx.context, def, math::Transform(m), name, {}, false, false, {}, {} });
+            created = model.addInstance({ ctx.context, def, math::Transform(m), name, {}, false, false, {}, {}, {} });
         });
         if (created) {
             ctx.selection.clear();

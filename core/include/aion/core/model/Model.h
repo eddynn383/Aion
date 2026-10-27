@@ -173,6 +173,45 @@ struct Behavior {
     bool operator==(const Behavior&) const = default;
 };
 
+// Interacțiunile cu blocuri (ca Scratch / Sketchware): „Când [eveniment] → acțiuni”, rulate în Modul interacțiune.
+enum class Trigger { Click, RightClick, DoubleClick, HoverEnter, HoverLeave, LongPress, Drag, Key };
+enum class ActionKind {
+    MoveBy, // vector (mm), în `duration` secunde
+    MoveTo, // poziția colțului minim (ca în Inspector)
+    RotateBy, // vector.z grade, în jurul centrului, pe axa Z
+    ScaleTo, // vector.x = factorul (față de mărimea inițială a definiției), în jurul centrului
+    Show,
+    Hide,
+    ToggleVisible,
+    SetMaterial,
+    PlayAnimation,
+    GoToScene,
+    Wait, // duration
+    Alternate, // prima dată `first`, a doua oară `second`, apoi iar `first`…
+};
+
+struct Action {
+    ActionKind kind = ActionKind::MoveBy;
+    InstanceId target; // nul = obiectul care a primit evenimentul
+    math::Vec3d vector { 0.0 };
+    double duration = 0.5;
+    MaterialId material;
+    AnimationId animation;
+    SceneId scene;
+    std::vector<Action> first;
+    std::vector<Action> second;
+
+    bool operator==(const Action&) const = default;
+};
+
+struct Rule {
+    Trigger trigger = Trigger::Click;
+    std::string key; // pentru Trigger::Key (de exemplu „Space”, „A”)
+    std::vector<Action> actions;
+
+    bool operator==(const Rule&) const = default;
+};
+
 // O plasare a unei definiții în altă definiție (`parent`), cu transformarea local → părinte.
 struct Instance {
     DefinitionId parent;
@@ -185,6 +224,7 @@ struct Instance {
     // Materialul cu care se văd fețele fără material din interior (ca „vopsirea” unui grup în SketchUp).
     MaterialId material;
     Behavior behavior;
+    std::vector<Rule> rules; // interacțiunile obiectului
 
     bool operator==(const Instance&) const = default;
 };

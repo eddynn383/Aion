@@ -228,6 +228,43 @@ void animationsFromJson(const json& list, model::ChangeSet& changes)
     }
 }
 
+
+json actionToJson(const model::Action& a)
+{
+    json first = json::array();
+    for (const model::Action& c : a.first) {
+        first.push_back(actionToJson(c));
+    }
+    json second = json::array();
+    for (const model::Action& c : a.second) {
+        second.push_back(actionToJson(c));
+    }
+    return { { "kind", static_cast<int>(a.kind) }, { "target", a.target.value },
+        { "vector", { a.vector.x, a.vector.y, a.vector.z } }, { "duration", a.duration },
+        { "material", a.material.value }, { "animation", a.animation.value }, { "scene", a.scene.value },
+        { "first", first }, { "second", second } };
+}
+
+model::Action actionFromJson(const json& j)
+{
+    model::Action a;
+    a.kind = static_cast<model::ActionKind>(std::clamp(j.value("kind", 0), 0, 11));
+    a.target = model::InstanceId { j.value("target", std::uint64_t { 0 }) };
+    const json& v = j.at("vector");
+    a.vector = { v.at(0).get<double>(), v.at(1).get<double>(), v.at(2).get<double>() };
+    a.duration = j.value("duration", 0.5);
+    a.material = model::MaterialId { j.value("material", std::uint64_t { 0 }) };
+    a.animation = model::AnimationId { j.value("animation", std::uint64_t { 0 }) };
+    a.scene = model::SceneId { j.value("scene", std::uint64_t { 0 }) };
+    for (const json& c : j.value("first", json::array())) {
+        a.first.push_back(actionFromJson(c));
+    }
+    for (const json& c : j.value("second", json::array())) {
+        a.second.push_back(actionFromJson(c));
+    }
+    return a;
+}
+
 } // namespace
 
 std::string toJson(const model::Model& model)
@@ -264,6 +301,17 @@ std::string toJson(const model::Model& model)
             { "locked", inst.locked },
             { "material", inst.material.value },
         });
+        if (!inst.rules.empty()) {
+            json rules = json::array();
+            for (const model::Rule& r : inst.rules) {
+                json actions = json::array();
+                for (const model::Action& a : r.actions) {
+                    actions.push_back(actionToJson(a));
+                }
+                rules.push_back({ { "trigger", static_cast<int>(r.trigger) }, { "key", r.key }, { "actions", actions } });
+            }
+            instances.back()["rules"] = rules;
+        }
         if (inst.behavior.kind != model::Behavior::Kind::None) {
             instances.back()["behavior"] = {
                 { "kind", static_cast<int>(inst.behavior.kind) },
@@ -413,6 +461,15 @@ LoadResult fromJson(std::string_view text)
             inst.hidden = i.value("hidden", false);
             inst.locked = i.value("locked", false);
             inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
+            for (const json& r : i.value("rules", json::array())) {
+                model::Rule rule;
+                rule.trigger = static_cast<model::Trigger>(std::clamp(r.value("trigger", 0), 0, 7));
+                rule.key = r.value("key", std::string());
+                for (const json& a : r.at("actions")) {
+                    rule.actions.push_back(actionFromJson(a));
+                }
+                inst.rules.push_back(std::move(rule));
+            }
             if (const auto b = i.find("behavior"); b != i.end()) {
                 inst.behavior.kind = static_cast<model::Behavior::Kind>(std::clamp(b->value("kind", 0), 0, 2));
                 inst.behavior.anchor = static_cast<model::Behavior::Anchor>(std::clamp(b->value("anchor", 0), 0, 5));

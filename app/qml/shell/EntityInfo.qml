@@ -7,6 +7,8 @@ Column {
     id: root
 
     property var document
+    signal editRules()
+
     readonly property var info: document ? document.entityInfo : ({ kind: "none" })
     readonly property bool isInstance: info.kind === "instance"
 
@@ -374,6 +376,12 @@ Column {
             text: "Cu unealta Interact (mâna din toolbar), un click pe obiect îl deschide sau îl închide. Unghi negativ = sens invers."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
+        }
+        Button {
+            width: parent.width
+            text: root.isInstance && (root.info.ruleCount ?? 0) > 0 ? "Interacțiuni cu blocuri (" + root.info.ruleCount + ")…"
+                                                                    : "Interacțiuni cu blocuri…"
+            onClicked: root.editRules()
         }
     }
 

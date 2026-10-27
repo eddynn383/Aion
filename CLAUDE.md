@@ -119,6 +119,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Faza 12** (Web, ADR 0015): preset `wasm-app` (Qt 6.10 wasm + Emscripten 4.0.7, excepții JS, triplet
   `wasm32-emscripten-qt`); CI produce artefactul `aion-web`, care pornește în Chromium (verificat cu Playwright).
 
+- **Faza 18** (ADR 0021): `model/Rules.h` (`Rule`, `Action`, `RuleRuntime`), Modul Interacțiune pe o copie a
+  modelului (`Document::interactionMode`, F5, Esc), editorul `overlays/RulesEditor.qml` (+ `RulesActionBlock`,
+  `RulesActionList`). Acțiuni de script: `rule:click,moveBy,0,0,800`, `rules.edit`, `mode.interaction`,
+  `drags:x1,y1,x2,y2` (tragere în coordonatele ferestrei).
+
 ## Următorii pași
 1. Fazele 11 (Windows) și 12 (Web).
 
