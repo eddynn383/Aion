@@ -297,17 +297,17 @@ TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni ed
 
     model::Placement p = model::placementOf(m, id);
     CHECK(glm::length(p.position - math::Vec3d { 100, 200, 0 }) < 1e-6);
-    CHECK(p.rotationZ == Catch::Approx(0.0).margin(1e-9));
+    CHECK(p.rotation.z == Catch::Approx(0.0).margin(1e-9));
     CHECK(glm::length(p.size - math::Vec3d { 600, 400, 0 }) < 1e-6);
 
     // Mută, rotește 90° și dublează lățimea (prin dimensiune).
     p.position = { 1000, 1000, 50 };
-    p.rotationZ = 90.0;
+    p.rotation.z = 90.0;
     p.size = { 600, 800, 0 };
     model::setPlacement(m, id, p);
     const model::Placement q = model::placementOf(m, id);
     CHECK(glm::length(q.position - math::Vec3d { 1000, 1000, 50 }) < 1e-6);
-    CHECK(q.rotationZ == Catch::Approx(90.0));
+    CHECK(q.rotation.z == Catch::Approx(90.0));
     CHECK(q.size.x == Catch::Approx(600.0));
     CHECK(q.size.y == Catch::Approx(800.0));
     CHECK(q.scale.y == Catch::Approx(2.0));
@@ -315,6 +315,37 @@ TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni ed
     const auto [lo, hi] = model::bounds(m, m.instance(id).definition);
     CHECK(glm::length(m.instance(id).transform.applyToPoint({ hi.x, lo.y, lo.z }) - math::Vec3d { 1000, 1600, 50 }) < 1e-6);
     CHECK(m.validate().ok());
+
+    // Rotații pe toate axele (Euler XYZ): se citesc înapoi la fel, iar poziția și dimensiunile rămân.
+    model::Placement r = model::placementOf(m, id);
+    r.rotation = { 30.0, -20.0, 45.0 };
+    model::setPlacement(m, id, r);
+    const model::Placement t = model::placementOf(m, id);
+    CHECK(t.rotation.x == Catch::Approx(30.0));
+    CHECK(t.rotation.y == Catch::Approx(-20.0));
+    CHECK(t.rotation.z == Catch::Approx(45.0));
+    CHECK(glm::length(t.position - r.position) < 1e-6);
+    CHECK(t.size.x == Catch::Approx(600.0));
+    // Lacătele: o mutare și o rotație nu schimbă valorile blocate (Z-ul poziției și rotația pe Z).
+    model::Instance locked = m.instance(id);
+    locked.placementLocks = model::LockPositionZ | model::LockRotationZ;
+    m.setInstance(id, locked);
+    const model::Placement beforeMove = model::placementOf(m, id);
+    model::transformInstances(m, { id }, Transform::translation({ 100, 0, 500 }));
+    const model::Placement moved = model::placementOf(m, id);
+    CHECK(moved.position.x == Catch::Approx(beforeMove.position.x + 100));
+    CHECK(moved.position.z == Catch::Approx(beforeMove.position.z));
+    model::transformInstances(m, { id }, Transform::rotation(moved.position, { 0, 0, 1 }, 0.5));
+    CHECK(model::placementOf(m, id).rotation.z == Catch::Approx(45.0));
+    locked.placementLocks = 0;
+    m.setInstance(id, locked);
+    const model::Placement t2 = model::placementOf(m, id);
+    model::setPlacement(m, id, t2);
+
+    // Aceeași rotație cerută din nou nu schimbă deloc transformarea.
+    const math::Transform before = m.instance(id).transform;
+    model::setPlacement(m, id, t2);
+    CHECK(m.instance(id).transform == before);
 }
 
 TEST_CASE("Grupuri (colecții): gruparea obiectelor și mutarea între grupuri păstrează poziția", "[core][model]")

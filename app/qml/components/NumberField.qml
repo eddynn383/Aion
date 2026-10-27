@@ -14,6 +14,12 @@ T.TextField {
     property int decimals: 0
     property string label: ""
     property string unit: ""
+    // Eticheta poate fi înlocuită de un alt control (de exemplu butonul de keyframe), păstrând spațiul ei.
+    property bool labelVisible: true
+    // Spațiu în plus la dreapta, pentru un buton pus peste câmp (de exemplu lacătul).
+    property real extraRightPadding: 0
+    // Varianta îngustă (trei câmpuri pe un rând în Inspector): margini și font mai mici.
+    property bool compact: false
 
     signal valueModified(real value)
 
@@ -28,15 +34,16 @@ T.TextField {
 
     implicitWidth: 120
     implicitHeight: Theme.controlHeight
-    leftPadding: label.length > 0 ? Theme.space2 + labelText.implicitWidth + Theme.space2 : Theme.space3
-    rightPadding: unit.length > 0 ? Theme.space2 + unitText.implicitWidth + Theme.space2 : Theme.space3
+    readonly property real gap: compact ? Theme.space1 : Theme.space2
+    leftPadding: label.length > 0 ? gap + 2 + labelText.implicitWidth + gap : (compact ? Theme.space2 : Theme.space3)
+    rightPadding: (unit.length > 0 ? gap + unitText.implicitWidth + gap : (compact ? Theme.space1 : Theme.space3)) + extraRightPadding
     verticalAlignment: TextInput.AlignVCenter
     horizontalAlignment: TextInput.AlignLeft
     color: Theme.textPrimary
     selectionColor: Theme.accentSubtle
     selectedTextColor: Theme.textPrimary
     font.family: Theme.fontMono
-    font.pixelSize: Theme.fontSizeMd
+    font.pixelSize: compact ? Theme.fontSizeSm : Theme.fontSizeMd
     inputMethodHints: Qt.ImhFormattedNumbersOnly
     validator: DoubleValidator { bottom: root.from; top: root.to; decimals: root.decimals }
 
@@ -58,12 +65,13 @@ T.TextField {
     Text {
         id: labelText
         anchors.left: parent.left
-        anchors.leftMargin: Theme.space2 + 2
+        anchors.leftMargin: root.gap + 2
         anchors.verticalCenter: parent.verticalCenter
         visible: root.label.length > 0
+        opacity: root.labelVisible ? 1 : 0
         text: root.label
         color: Theme.textTertiary
-        font.pixelSize: Theme.fontSizeSm
+        font.pixelSize: root.compact ? Theme.fontSizeXs : Theme.fontSizeSm
 
         // Tras orizontal pe etichetă = modificare continuă a valorii.
         DragHandler {
@@ -82,7 +90,7 @@ T.TextField {
     Text {
         id: unitText
         anchors.right: parent.right
-        anchors.rightMargin: Theme.space2 + 2
+        anchors.rightMargin: Theme.space2 + 2 + root.extraRightPadding
         anchors.verticalCenter: parent.verticalCenter
         visible: root.unit.length > 0
         text: root.unit

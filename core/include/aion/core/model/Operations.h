@@ -4,6 +4,7 @@
 #include "aion/core/math/Transform.h"
 #include "aion/core/model/Model.h"
 
+#include <cstdint>
 #include <set>
 
 #include <string>
@@ -59,15 +60,27 @@ BooleanResult booleanOperation(Model& model, InstanceId a, InstanceId b, Boolean
 // jurul axei Z (grade), scara pe axele proprii și dimensiunile rezultate (mm).
 struct Placement {
     math::Vec3d position { 0.0 };
-    double rotationZ = 0.0;
+    // Unghiurile Euler în grade: întâi în jurul lui X, apoi Y, apoi Z (axele lumii), ca în Blender (XYZ).
+    math::Vec3d rotation { 0.0 };
     math::Vec3d scale { 1.0 };
     math::Vec3d size { 0.0 };
 };
 
 [[nodiscard]] Placement placementOf(const Model& model, InstanceId instance);
 
-// Aplică poziția, rotația și scara cerute; rotațiile în jurul altor axe se păstrează. `size`, dacă e nenul pe o axă,
-// are prioritate față de `scale` pe acea axă (scara se calculează din dimensiunea dorită).
+// Biții din Instance::placementLocks.
+enum PlacementLock : std::uint16_t {
+    LockPositionX = 1 << 0, LockPositionY = 1 << 1, LockPositionZ = 1 << 2,
+    LockSizeX = 1 << 3, LockSizeY = 1 << 4, LockSizeZ = 1 << 5,
+    LockRotationX = 1 << 6, LockRotationY = 1 << 7, LockRotationZ = 1 << 8,
+    LockScaleX = 1 << 9, LockScaleY = 1 << 10, LockScaleZ = 1 << 11,
+};
+
+// După o transformare, readuce valorile blocate ale instanței la cele din `before`.
+void restoreLockedPlacement(Model& model, InstanceId instance, const Placement& before);
+
+// Aplică poziția, rotația și scara cerute. `size`, dacă e nenul pe o axă, are prioritate față de `scale` pe acea axă
+// (scara se calculează din dimensiunea dorită). O rotație egală cu cea curentă păstrează exact matricea existentă.
 void setPlacement(Model& model, InstanceId instance, const Placement& wanted);
 
 // Organizarea ca în Blender: un grup (colecție) din obiectele date, în `context`. Transformările lumii nu se schimbă.

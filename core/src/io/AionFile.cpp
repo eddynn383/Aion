@@ -370,6 +370,7 @@ std::string toJson(const model::Model& model)
             { "hidden", inst.hidden },
             { "locked", inst.locked },
             { "material", inst.material.value },
+            { "locks", inst.placementLocks },
         });
         if (!inst.rules.empty()) {
             json rules = json::array();
@@ -532,6 +533,7 @@ LoadResult fromJson(std::string_view text)
             inst.tag = model::TagId { i.value("tag", std::uint64_t { 0 }) };
             inst.hidden = i.value("hidden", false);
             inst.locked = i.value("locked", false);
+            inst.placementLocks = i.value("locks", std::uint16_t { 0 });
             inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
             for (const json& r : i.value("rules", json::array())) {
                 model::Rule rule;
