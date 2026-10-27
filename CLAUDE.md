@@ -170,6 +170,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Inspector-ul** își grupează setările cu `components/PropertyGroup.qml` (titlu + acțiuni + câmpuri): titlu → câmpuri
   `space1 + 2`, între categorii `space4`. Orice categorie nouă folosește PropertyGroup, ca regula să rămână aceeași.
 
+- **Bevel / chamfer** (Faza 32, ADR 0029): `geom/Bevel.h` (`bevelEdges`, `bevelFace`), `overlays/BevelPanel.qml`,
+  `Document::previewBevel`. Comenzi: `edit.chamfer`, `edit.bevel`. În scripturi, `clicks:` pe geometrie are nevoie de
+  `AION_SCREENSHOT_DELAY_MS` mai mare (altfel captura se face înainte de acțiuni).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

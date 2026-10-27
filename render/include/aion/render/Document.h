@@ -357,6 +357,9 @@ public:
     Q_INVOKABLE void previewArray(const QVariantMap& options);
     // Soften / Smooth cu previzualizare: muchiile selecției (sau toate muchiile obiectelor selectate).
     Q_INVOKABLE void previewSoften(double maxAngleDegrees, bool includeCoplanar);
+    // Bevel / chamfer cu previzualizare: muchiile selectate sau toate laturile feței selectate. segments = 1 e chamfer
+    // (o teșitură plată), mai multe = o rotunjire. Un caz nepermis lasă modelul neschimbat și arată motivul.
+    Q_INVOKABLE void previewBevel(double distance, int segments);
     Q_INVOKABLE void commitOperation();
     Q_INVOKABLE void cancelOperation();
     // Mijlocul selecției (pentru panoul Array): { x, y, z, dx, dy, dz } (centrul și mărimea cutiei).
