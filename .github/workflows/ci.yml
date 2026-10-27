@@ -141,6 +141,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pe WebGL un bloc de uniforme declarat diferit în două shadere strică tot viewport-ul.
+      - name: Blocul Frame identic în toate shaderele
+        run: python3 tools/check_shader_blocks.py
+
       - name: Instalează Ninja
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
