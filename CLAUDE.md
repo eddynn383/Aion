@@ -125,7 +125,7 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `drags:x1,y1,x2,y2` (tragere în coordonatele ferestrei).
 
 ## Următorii pași
-1. Fazele 11 (Windows) și 12 (Web).
+1. Faza 19 (camere și lumini), apoi Faza 20 (import `.skp`, după ce descarci SDK-ul).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,
