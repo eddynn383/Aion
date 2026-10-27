@@ -144,6 +144,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   texturi procedurale în `render/src/ProceduralTextures.cpp`, export glTF / OBJ cu UV și imagini.
   Acțiune de script: `material:front,24` (24–28 = materialele texturate din bibliotecă).
 
+- **Fazele 25–26** (ADR 0025, 0026): `model/Parametric.h` (generatoare, părți ca subgrupuri), `model/Transfer.h`
+  (`insertModel` / `extractInstance`), `shell/LibraryPanel.qml`, drop în viewport (`Viewport::dropPointAt`).
+  Comenzi: `object.parametric:door|window|table|shelf|cabinet|stairs`, `library.save`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

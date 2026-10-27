@@ -2,6 +2,7 @@
 #include "aion/core/io/AionFile.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Parametric.h"
+#include "aion/core/model/Transfer.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -71,4 +72,41 @@ TEST_CASE("Obiecte dinamice: toate generatoarele construiesc geometrie validă",
             }
         }
     }
+}
+
+TEST_CASE("Biblioteca: un obiect extras și inserat în alt model rămâne la fel (și dinamic)", "[core][parametric][library]")
+{
+    Model a;
+    const model::InstanceId table = model::createParametric(a, a.root(), "table", { { "width", 1400 } },
+        Transform::translation({ 3000, 2000, 0 }));
+    const model::Placement original = model::placementOf(a, table);
+
+    // Extras: în originea modelului nou, cu generatorul păstrat.
+    const Model extracted = model::extractInstance(a, table);
+    CHECK(extracted.definition(extracted.root()).generator == "table");
+    const auto [lo, hi] = model::bounds(extracted, extracted.root());
+    CHECK(lo.x == Approx(0.0).margin(1e-6));
+    CHECK(hi.x - lo.x == Approx(1400.0));
+    CHECK(extracted.validate().ok());
+
+    // Inserat într-un model care are deja un material cu același nume: îl refolosește.
+    Model b;
+    commands::CommandStack stack(b);
+    stack.setValidation(true, geom::ValidationLevel::Full);
+    stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+    b.addMaterial({ "Lemn de stejar", { 1, 2, 3, 255 }, 0.5f, 0.0f });
+    model::InstanceId inserted;
+    REQUIRE(stack.run("Inserează", [&](Model& m) {
+        inserted = model::insertModel(m, m.root(), extracted, "Masă", Transform::translation({ -500, 0, 0 }));
+    }));
+    CHECK(model::placementOf(b, inserted).size.x == Approx(original.size.x));
+    CHECK(model::placementOf(b, inserted).size.z == Approx(original.size.z));
+    CHECK(b.materials().size() == 1);
+    CHECK(b.definition(b.instance(inserted).definition).generator == "table");
+    // Încă dinamic: parametrii schimbă obiectul inserat.
+    REQUIRE(stack.run("Lățime", [&](Model& m) { model::setParameter(m, m.instance(inserted).definition, "width", 1000); }));
+    CHECK(model::placementOf(b, inserted).size.x == Approx(1000.0));
+    REQUIRE(stack.undo());
+    REQUIRE(stack.undo());
+    CHECK(b.instances().empty());
 }

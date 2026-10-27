@@ -175,6 +175,8 @@ public:
     Q_INVOKABLE void startTurntable(double seconds);
     // Poziția pe ecran (în coordonatele item-ului) a unui punct 3D; pentru scripturile de verificare.
     Q_INVOKABLE QPointF projectToScreen(const QVector3D& world) const;
+    // Punctul din lume sub poziția dată: pe suprafața atinsă sau pe sol (Z = 0); altfel ținta camerei.
+    Q_INVOKABLE QVector3D dropPointAt(const QPointF& position) const;
 
     // Apelat de renderer (pe firul de randare, cu firul GUI blocat).
     ViewportFrame frameForRendering() const;

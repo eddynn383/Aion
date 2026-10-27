@@ -580,17 +580,17 @@ scripturile, care expun tot ce există deja.
 - [ ] Mânere de poziționare a texturii direct pe față, în viewport
 
 ### Faza 25 – Obiecte dinamice (parametrice)
-- [ ] Core: o definiție poate avea un generator (`door`, `window`, `table`, `shelf`, `stairs`…) și parametri
-      numerici; schimbarea unui parametru regenerează geometria (undo), copiile legate se schimbă împreună
-- [ ] Inspector: secțiunea „Parametri” cu câmpurile generatorului (lățime, înălțime, grosime, număr de trepte…)
-- [ ] Salvate în `.aion` (generatorul și parametrii); „Explodează” le transformă în geometrie obișnuită
+- [x] Core: o definiție poate avea un generator (`door`, `window`, `table`, `shelf`, `cabinet`, `stairs`) și parametri
+      numerici; schimbarea unui parametru regenerează geometria (undo), copiile legate se schimbă împreună _(ADR 0025)_
+- [x] Inspector: secțiunea „Parametri” cu câmpurile generatorului (lățime, înălțime, grosime, număr de trepte…)
+- [x] Salvate în `.aion` (generatorul și parametrii); „Desface” le transformă în geometrie obișnuită
 
 ### Faza 26 – Bibliotecă de obiecte
-- [ ] Panou (secțiune nouă în stânga sau fereastră) cu categorii (uși, ferestre, mobilier, scări, plante, oameni),
-      căutare și miniaturi
-- [ ] Conținut: obiectele dinamice din Faza 25 + fișiere `.aion` din dosarul bibliotecii utilizatorului
-- [ ] Drag & drop în viewport (obiectul urmează cursorul cu inferență, se așază pe fețe) sau click → unealta de plasare
-- [ ] „Salvează în bibliotecă” pentru obiectul selectat
+- [x] Secțiune nouă în stânga cu categorii, căutare și miniaturi _(ADR 0026; plante și oameni nu sunt încă)_
+- [x] Conținut: obiectele dinamice din Faza 25 + fișiere `.aion` din dosarul bibliotecii utilizatorului
+- [x] Drag & drop în viewport (se așază pe suprafața de sub cursor sau pe sol) sau click → în centrul vederii
+- [ ] Previzualizarea obiectului care urmează cursorul în timpul tragerii (cu inferență)
+- [x] „Salvează în bibliotecă” pentru obiectul selectat
 
 ### Faza 27 – Plugin-uri și scripturi
 - [ ] JavaScript (QJSEngine, merge și pe Web): API peste model (`aion.model`), selecție, comenzi, geometrie

@@ -160,3 +160,9 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Salvare / deschidere `.aion`: texturile rămân (și pe alt calculator, fără fișierele originale)
 - [ ] Export GLB / glTF: în Blender sau https://gltf-viewer.donmccurdy.com texturile apar; OBJ + MTL + imaginile alături
 - [ ] Web: texturile se văd în browser
+## Obiecte dinamice și bibliotecă (Fazele 25–26)
+- [ ] Bibliotecă → trage Ușă în viewport: apare pe sol sau pe fața de sub cursor; click pe o plăcuță = în centrul vederii
+- [ ] Inspector → Parametri: lățimea / înălțimea / numărul de polițe schimbă obiectul; ⌘Z revine; copiile legate se schimbă împreună
+- [ ] Obiecte: părțile (Toc, Foaie, Clanță…) apar ca subgrupuri
+- [ ] + din antetul Bibliotecii salvează obiectul selectat („Ale mele”, cu miniatură); click dreapta îl scoate
+- [ ] Un obiect din „Ale mele” se inserează cu materialele lui (cele cu același nume se refolosesc)

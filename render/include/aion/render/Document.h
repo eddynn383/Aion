@@ -307,6 +307,18 @@ public:
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
     Q_INVOKABLE void createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);
+
+    // --- Biblioteca de obiecte (ADR 0026) ---
+    // Elementele: { id ("gen:door" | "file:/cale.aion"), name, category, thumbnail (data URL, opțional), user }.
+    Q_PROPERTY(QVariantList libraryItems READ libraryItems NOTIFY libraryChanged)
+    QVariantList libraryItems() const;
+    // Dosarul bibliotecii utilizatorului (fișiere .aion).
+    Q_INVOKABLE QString libraryFolder() const;
+    // Pune elementul în punctul dat (pe sol sau pe o suprafață), selectat.
+    Q_INVOKABLE void placeLibraryItem(const QString& id, const QVector3D& at);
+    // Salvează obiectul selectat în bibliotecă (cu miniatura dată, PNG). Întoarce false dacă nu se poate.
+    Q_INVOKABLE bool saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng);
+    Q_INVOKABLE void removeLibraryItem(const QString& id);
     // Poziționarea texturii pe fețele selectate: { ox, oy (mm), rotation (°), sx, sy } sau { reset: true }.
     Q_INVOKABLE void setFaceTexture(const QVariantMap& changes);
     // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până la
@@ -433,6 +445,7 @@ signals:
     void animationStarted();
     void timelineChanged();
     void interactionModeChanged();
+    void libraryChanged();
     // O regulă cere o vedere (mergi la scenă): viewport-ul mută camera.
     void cameraRequested(const QVariantMap& camera);
     void timelineTimeChanged();

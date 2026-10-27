@@ -86,6 +86,7 @@ qt_add_qml_module(aion_app
         qml/overlays/QuantitiesDialog.qml
         qml/shell/ObjectInfo.qml
         qml/shell/TagsPanel.qml
+        qml/shell/LibraryPanel.qml
         qml/shell/InteractionsPanel.qml
         qml/overlays/ArrayPanel.qml
         qml/overlays/SoftenPanel.qml
