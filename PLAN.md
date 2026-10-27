@@ -600,6 +600,32 @@ scripturile, care expun tot ce există deja.
 - [x] Plugin-uri: dosar cu `manifest.json` + `main.js`; comenzile lor apar în palette
 - [x] Exemple incluse (scară în spirală, gard, biblioteci, grilă) și documentația API (`docs/scripting.md`)
 
+## 6d. Etapa 4 – terminarea funcțiilor începute (cerința din 2026-10-27)
+
+Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Windows reală (installer, scalare 125% / 150%)
+și build-ul Universal + semnarea pe macOS (un Qt universal și un certificat Apple Developer).
+
+### Faza 28 – Lumini: mutare din marcaj și umbre pentru spot
+- [ ] Cu Select, marcajul unei lumini sau camere se trage: pe orizontală la înălțimea lui, cu Shift pe verticală;
+      un pas de undo
+- [ ] Umbre pentru luminile spot cu „Aruncă umbre” (o a doua hartă de umbre, proiecție perspectivă din spot)
+
+### Faza 29 – Scale neuniform cu mânere
+- [ ] Unealta Scale arată cutia selecției cu mânere: colțuri (uniform), mijlocul muchiilor (două axe), mijlocul
+      fețelor (o axă); Ctrl / Option = față de centru
+- [ ] VCB: „2” (uniform) sau „2,1,1.5” (pe axe); scările negative oglindesc; teste în core
+
+### Faza 30 – Materiale trase pe fețe
+- [ ] Un material din panou (bibliotecă sau model) se trage peste viewport: fața de sub cursor e evidențiată și îl
+      primește la drop (versoul dacă e văzut din spate; un obiect întreg dacă e sub cursor)
+
+### Faza 31 – Grafică: mediu, umbrire ambientală, antialiasing
+- [ ] Iluminare din mediu: medii procedurale (Studio, Exterior, Înnorat) ca lumină ambientală (armonice sferice) și
+      reflexii după rugozitate; alese în bara de vizualizare
+- [ ] SSAO (umbrire ambientală în screen-space) cu filtrare care păstrează muchiile
+- [ ] Antialiasing progresiv când camera stă pe loc (cadre cu jitter acumulate)
+- [ ] Preset-uri de calitate în Preferințe: Performanță, Echilibrat, Calitate
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |
