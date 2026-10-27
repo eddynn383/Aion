@@ -332,8 +332,9 @@ void Viewport::afterToolEvent()
 void Viewport::appendDocument(ViewportFrame& f) const
 {
     const Document& doc = *m_document;
-    const view::PickResult hover = doc.tool() ? doc.tool()->hover() : view::PickResult {};
-    const tools::Overlay overlay = doc.tool() ? doc.tool()->overlay() : tools::Overlay {};
+    // Imaginile și videoclipurile exportate nu arată hover-ul, selecția sau ce desenează unealta.
+    const view::PickResult hover = doc.tool() && !m_cleanCapture ? doc.tool()->hover() : view::PickResult {};
+    const tools::Overlay overlay = doc.tool() && !m_cleanCapture ? doc.tool()->overlay() : tools::Overlay {};
     appendDefinition(f, doc, doc.model().root(), math::Transform {}, 0, {}, hover, overlay);
 
     // Overlay-ul uneltei e în coordonatele contextului editat.
@@ -394,7 +395,8 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
     const bool ancestor = pathIndex >= 0 && !active;
     // Geometria proprie a unei definiții de pe calea contextului (dar nu a contextului) e estompată.
     const bool dim = style.dim || ancestor;
-    const geom::Selection& selection = doc.selection();
+    static const geom::Selection kNoSelection;
+    const geom::Selection& selection = m_cleanCapture ? kNoSelection : doc.selection();
 
     const auto stateOf = [&](geom::FaceId faceId) {
         if (active) {
@@ -839,7 +841,7 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         }
     }
 
-    // Camerele și luminile: gizmo-uri (mărime constantă pe ecran) și luminile pentru shader.
+    // Camerele și luminile: gizmo-uri (mărime constantă pe ecran; nu și în exporturi) și luminile pentru shader.
     const glm::vec4 gizmoColor = withAlpha(m_preview, 0.9f);
     const glm::vec4 selectedColor = toVec4(m_accent);
     const auto screenScale = [&](const glm::dvec3& p) {
@@ -858,7 +860,7 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
     for (std::size_t i = 0; i < model.cameras().size(); ++i) {
         const model::CameraObject& c = model.cameras().values()[i];
         const bool selected = model.cameras().keys()[i] == doc.selectedCamera();
-        if (!c.visible && !selected) {
+        if ((!c.visible && !selected) || m_cleanCapture) {
             continue;
         }
         const glm::vec4 color = selected ? selectedColor : gizmoColor;
@@ -902,7 +904,7 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
             d.size = static_cast<float>((l.width + l.height) * 0.5);
             f.lights.push_back(d);
         }
-        if (!l.visible && !selected) {
+        if ((!l.visible && !selected) || m_cleanCapture) {
             continue;
         }
         const glm::vec4 color = selected ? selectedColor : withAlpha(qc, l.enabled ? 0.95f : 0.4f);
@@ -1215,7 +1217,12 @@ QImage Viewport::renderImage()
             hidden.append(child);
         }
     }
+    // grabWindow sincronizează doar elementele marcate pentru actualizare: cerem un cadru nou în ambele stări.
+    m_cleanCapture = true;
+    update();
     const QImage frame = window()->grabWindow();
+    m_cleanCapture = false;
+    update();
     for (QQuickItem* child : hidden) {
         child->setVisible(true);
     }
@@ -1429,7 +1436,7 @@ ViewportFrame Viewport::frameForRendering() const
         appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
     f.meshRevision = ((m_document ? m_document->revision() + m_document->interactionRevision() * 7919u : 0u)) * 2u
-        + (m_demoVisible ? 1u : 0u);
+        + (m_demoVisible ? 1u : 0u) + (m_cleanCapture ? 0x40000000u : 0u);
 
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     // Pivotul orbitei, cât timp se orbitează în jurul lui.

@@ -235,6 +235,8 @@ private:
     double m_sceneTime = 0.0;
     bool m_loopScenes = false;
     int m_playingScene = -1;
+    // Cât se captează o imagine (PNG, cadrele unui video): fără selecție, hover și marcaje.
+    bool m_cleanCapture = false;
     bool m_exporting = false;
     double m_exportProgress = 0.0;
     int m_exportFrame = 0;
