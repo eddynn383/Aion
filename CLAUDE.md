@@ -180,6 +180,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Versiunea web publică**: <https://eddynn383.github.io/Aion/> (GitHub Pages). `pages.yml` publică automat
   artefactul `aion-web` după fiecare CI verde pe `main` (sau manual, cu ID-ul unei rulări CI).
 
+- **Pivot** (Faza 33, ADR 0030): `Instance::pivot`, `model::pivotLocal` / `pivotPoint`, `Placement::pivot`;
+  `Document::selectionPivot` (marcajul din viewport), cheile `vx/vy/vz` și `pivot: center|base|corner` în
+  `setPlacement` / `setGeometryPlacement`. Acțiune de script: `placement:vx=0,vy=0,vz=0`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

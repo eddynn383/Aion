@@ -49,6 +49,21 @@ namespace aion::render {
 
 namespace {
 
+// Pivotul unei presetări, ca distanță de la colțul minim al cutiei de mărime `size`.
+math::Vec3d pivotPreset(const QString& preset, const math::Vec3d& size, const math::Vec3d& fallback)
+{
+    if (preset == QLatin1String("center")) {
+        return size * 0.5;
+    }
+    if (preset == QLatin1String("base")) {
+        return { size.x * 0.5, size.y * 0.5, 0.0 };
+    }
+    if (preset == QLatin1String("corner")) {
+        return math::Vec3d { 0.0 };
+    }
+    return fallback;
+}
+
 // Căile vin din Qt ca UTF-16; pe Windows, std::string ar fi interpretat în codepage-ul local (diacriticele s-ar pierde).
 std::filesystem::path toPath(const QString& path)
 {
@@ -874,6 +889,10 @@ QVariantMap Document::entityInfo() const
             { QStringLiteral("dx"), placement.size.x },
             { QStringLiteral("dy"), placement.size.y },
             { QStringLiteral("dz"), placement.size.z },
+            { QStringLiteral("vx"), placement.pivot ? placement.pivot->x : 0.0 },
+            { QStringLiteral("vy"), placement.pivot ? placement.pivot->y : 0.0 },
+            { QStringLiteral("vz"), placement.pivot ? placement.pivot->z : 0.0 },
+            { QStringLiteral("customPivot"), m_model.instance(id).pivot.has_value() },
         };
         info[QStringLiteral("material")] = materialInfo(inst.material);
         const model::Behavior& b = inst.behavior;
@@ -993,11 +1012,13 @@ QVariantMap Document::entityInfo() const
             const bool same = geometrySelectionKey() == m_geometryKey;
             const math::Vec3d r = same ? m_geometryRotation : math::Vec3d { 0.0 };
             const math::Vec3d k = same ? m_geometryScale : math::Vec3d { 1.0 };
+            const math::Vec3d pivot = (same && m_geometryPivot ? *m_geometryPivot : (lo + hi) * 0.5) - lo;
             info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), lo.x }, { QStringLiteral("py"), lo.y },
                 { QStringLiteral("pz"), lo.z }, { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
                 { QStringLiteral("dz"), hi.z - lo.z }, { QStringLiteral("rx"), r.x }, { QStringLiteral("ry"), r.y },
                 { QStringLiteral("rz"), r.z }, { QStringLiteral("sx"), k.x }, { QStringLiteral("sy"), k.y },
-                { QStringLiteral("sz"), k.z } };
+                { QStringLiteral("sz"), k.z }, { QStringLiteral("vx"), pivot.x }, { QStringLiteral("vy"), pivot.y },
+                { QStringLiteral("vz"), pivot.z } };
         }
     }
     // Forma recunoscută (linie, arc, cerc, poligon, dreptunghi), cu mărimile ei editabile.
@@ -2876,7 +2897,18 @@ void Document::setPlacement(const QVariantMap& placement)
     p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
     // Dimensiunile se aplică doar dacă au fost cerute explicit (altfel ar anula o scară tocmai schimbată).
     p.size = { value("dx", 0.0), value("dy", 0.0), value("dz", 0.0) };
-    runOnModel("Transformare", [&](model::Model& model) { model::setPlacement(model, id, p); });
+    // Pivotul: vx, vy, vz (mm de la colțul minim, pe axele obiectului) sau o presetare.
+    if (p.pivot) {
+        math::Vec3d v = *p.pivot;
+        if (placement.contains(QStringLiteral("pivot"))) {
+            const model::Placement current = model::placementOf(m_model, id);
+            v = pivotPreset(placement.value(QStringLiteral("pivot")).toString(), current.size, v);
+        }
+        p.pivot = math::Vec3d { value("vx", v.x), value("vy", v.y), value("vz", v.z) };
+    }
+    const bool onlyPivot = placement.contains(QStringLiteral("pivot")) || placement.contains(QStringLiteral("vx"))
+        || placement.contains(QStringLiteral("vy")) || placement.contains(QStringLiteral("vz"));
+    runOnModel(onlyPivot ? "Pivot" : "Transformare", [&](model::Model& model) { model::setPlacement(model, id, p); });
 }
 
 namespace {
@@ -3843,6 +3875,38 @@ std::vector<std::uint64_t> Document::geometrySelectionKey() const
     return key;
 }
 
+std::optional<math::Vec3d> Document::selectionPivot() const
+{
+    if (m_runtime) { // Modul interacțiune
+        return std::nullopt;
+    }
+    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        if (!m_model.instances().contains(id)) {
+            return std::nullopt;
+        }
+        return model::pivotPoint(m_model, id);
+    }
+    if (!m_selection.instances.empty()) {
+        return std::nullopt;
+    }
+    const geom::Mesh& mesh = m_model.mesh(activeDefinition());
+    const std::set<geom::VertexId> vertices = geom::verticesOf(mesh, m_selection);
+    if (vertices.empty()) {
+        return std::nullopt;
+    }
+    if (m_geometryPivot && geometrySelectionKey() == m_geometryKey) {
+        return *m_geometryPivot;
+    }
+    math::Vec3d lo { std::numeric_limits<double>::infinity() };
+    math::Vec3d hi { -std::numeric_limits<double>::infinity() };
+    for (geom::VertexId v : vertices) {
+        lo = glm::min(lo, mesh.position(v));
+        hi = glm::max(hi, mesh.position(v));
+    }
+    return (lo + hi) * 0.5;
+}
+
 void Document::setGeometryPlacement(const QVariantMap& changes)
 {
     // Rotirea / scara de până acum ale acestei selecții (alta = de la 0° / 1).
@@ -3850,6 +3914,7 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
         m_geometryKey = geometrySelectionKey();
         m_geometryRotation = math::Vec3d { 0.0 };
         m_geometryScale = math::Vec3d { 1.0 };
+        m_geometryPivot.reset();
     }
     if (!m_selection.instances.empty()) {
         return;
@@ -3867,11 +3932,27 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
     }
     const auto has = [&](const char* key) { return changes.contains(QLatin1String(key)); };
     const auto value = [&](const char* key) { return changes.value(QLatin1String(key)).toDouble(); };
+    // Pivotul: ales (vx, vy, vz = distanța de la colțul minim, sau o presetare) sau centrul cutiei.
+    if (has("vx") || has("vy") || has("vz") || has("pivot")) {
+        math::Vec3d v = (m_geometryPivot ? *m_geometryPivot : (lo + hi) * 0.5) - lo;
+        if (has("pivot")) {
+            v = pivotPreset(changes.value(QStringLiteral("pivot")).toString(), hi - lo, v);
+        }
+        v = { has("vx") ? value("vx") : v.x, has("vy") ? value("vy") : v.y, has("vz") ? value("vz") : v.z };
+        m_geometryPivot = lo + v;
+        emit selectionChanged(); // Inspector-ul și marcajul pivotului
+        touch();
+        return;
+    }
+    const math::Vec3d pivot = m_geometryPivot ? *m_geometryPivot : (lo + hi) * 0.5;
     math::Transform t;
     std::string name = "Mută";
     if (has("px") || has("py") || has("pz")) {
         const math::Vec3d to { has("px") ? value("px") : lo.x, has("py") ? value("py") : lo.y, has("pz") ? value("pz") : lo.z };
         t = math::Transform::translation(to - lo);
+        if (m_geometryPivot) {
+            *m_geometryPivot += to - lo; // pivotul vine cu geometria
+        }
     } else if (has("dx") || has("dy") || has("dz")) {
         math::Vec3d k { 1.0 };
         const char* const keys[] = { "dx", "dy", "dz" };
@@ -3881,17 +3962,16 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
                 k[a] = value(keys[a]) / size;
             }
         }
-        t = math::Transform::scaling(lo, k);
+        t = math::Transform::scaling(pivot, k);
         name = "Dimensiuni";
     } else if (has("rx") || has("ry") || has("rz")) {
         // Valoarea nouă e totalul dorit: se rotește cu diferența față de cât s-a aplicat deja.
         const math::Vec3d wanted { has("rx") ? value("rx") : m_geometryRotation.x,
             has("ry") ? value("ry") : m_geometryRotation.y, has("rz") ? value("rz") : m_geometryRotation.z };
         const math::Vec3d delta = wanted - m_geometryRotation;
-        const math::Vec3d center = (lo + hi) * 0.5;
-        t = math::Transform::rotation(center, { 0, 0, 1 }, glm::radians(delta.z))
-            * math::Transform::rotation(center, { 0, 1, 0 }, glm::radians(delta.y))
-            * math::Transform::rotation(center, { 1, 0, 0 }, glm::radians(delta.x));
+        t = math::Transform::rotation(pivot, { 0, 0, 1 }, glm::radians(delta.z))
+            * math::Transform::rotation(pivot, { 0, 1, 0 }, glm::radians(delta.y))
+            * math::Transform::rotation(pivot, { 1, 0, 0 }, glm::radians(delta.x));
         name = "Rotește";
         m_geometryRotation = wanted;
     } else if (has("sx") || has("sy") || has("sz")) {
@@ -3900,7 +3980,7 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
         if (std::abs(wanted.x) < 1e-6 || std::abs(wanted.y) < 1e-6 || std::abs(wanted.z) < 1e-6) {
             return;
         }
-        t = math::Transform::scaling(lo, wanted / m_geometryScale);
+        t = math::Transform::scaling(pivot, wanted / m_geometryScale);
         name = "Scalează";
         m_geometryScale = wanted;
     }

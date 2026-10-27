@@ -142,10 +142,8 @@ bool ScriptApi::rotate(double id, double degrees, const QString& axis, const QVa
     if (!m_document->model().instances().contains(instance)) {
         return false;
     }
-    // În jurul centrului obiectului.
-    const model::Instance& inst = m_document->model().instance(instance);
-    const auto [lo, hi] = model::bounds(m_document->model(), inst.definition);
-    math::Vec3d center = inst.transform.applyToPoint(lo.x <= hi.x ? (lo + hi) * 0.5 : math::Vec3d { 0.0 });
+    // În jurul pivotului obiectului (implicit centrul lui).
+    math::Vec3d center = model::pivotPoint(m_document->model(), instance);
     if (pivot.size() >= 3) {
         center = { pivot[0].toDouble(), pivot[1].toDouble(), pivot[2].toDouble() };
     }

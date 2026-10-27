@@ -638,6 +638,13 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
       „Creează fețe din muchii” (palette, meniul contextual) și Line care retrasează o muchie existentă
 - [x] Unealta Eraser are cursorul cu guma (ca găleata la Paint Bucket)
 
+### Faza 33 – Pivot (cerința din 2026-10-27)
+- [x] `Instance::pivot` (implicit centrul cutiei), salvat în `.aion`; rotația / scara / dimensiunile din Inspector țin
+      pivotul pe loc, poziția rămâne colțul minim _(ADR 0030)_
+- [x] Inspector → Pivot (mm de la colț) cu presetările Centru / Bază / Colț, pentru obiecte și geometrie liberă
+- [x] Marcajul pivotului în viewport; `aion.rotate` folosește pivotul
+- [ ] Pivotul tras direct din viewport
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |

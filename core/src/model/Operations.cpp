@@ -275,20 +275,47 @@ Placement placementOf(const Model& model, InstanceId instance)
     p.rotation = eulerDegrees(d.rotation);
     p.scale = d.scale;
     p.size = glm::abs(extent * d.scale);
+    p.pivot = (pivotLocal(model, instance) - corner) * glm::abs(d.scale);
     return p;
+}
+
+math::Vec3d pivotLocal(const Model& model, InstanceId instance)
+{
+    const Instance& inst = model.instance(instance);
+    if (inst.pivot) {
+        return *inst.pivot;
+    }
+    const auto [lo, hi] = bounds(model, inst.definition);
+    return lo.x <= hi.x ? (lo + hi) * 0.5 : math::Vec3d { 0.0 };
+}
+
+math::Vec3d pivotPoint(const Model& model, InstanceId instance)
+{
+    return model.instance(instance).transform.applyToPoint(pivotLocal(model, instance));
 }
 
 void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
 {
+    const Placement current = placementOf(model, instance);
     Instance inst = model.instance(instance);
     const auto [lo, hi] = bounds(model, inst.definition);
     const math::Vec3d corner = lo.x <= hi.x ? lo : math::Vec3d { 0.0 };
     const math::Vec3d extent = lo.x <= hi.x ? hi - lo : math::Vec3d { 0.0 };
     Decomposed d = decompose(inst.transform);
 
+    // Pivotul nou, din distanța față de colț (mm pe axele obiectului) în coordonatele definiției.
+    if (wanted.pivot && current.pivot && glm::length(*wanted.pivot - *current.pivot) > 1e-7) {
+        math::Vec3d local = corner;
+        for (int i = 0; i < 3; ++i) {
+            local[i] += (*wanted.pivot)[i] / std::max(std::abs(d.scale[i]), 1e-9);
+        }
+        inst.pivot = local;
+    }
+    const math::Vec3d pivot = inst.pivot ? *inst.pivot : (lo.x <= hi.x ? (lo + hi) * 0.5 : math::Vec3d { 0.0 });
+    const math::Vec3d pivotWorld = inst.transform.applyToPoint(pivot);
+
     // Rotația: refăcută din unghiuri doar dacă s-a schimbat (altfel rămâne exact cea existentă, fără erori de rotunjire).
-    const math::Vec3d current = eulerDegrees(d.rotation);
-    if (glm::length(wanted.rotation - current) > 1e-7) {
+    if (glm::length(wanted.rotation - current.rotation) > 1e-7) {
         d.rotation = rotationFromEuler(wanted.rotation);
     }
 
@@ -305,9 +332,14 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
     for (int i = 0; i < 3; ++i) {
         rs[i] *= scale[i];
     }
-    // Colțul minim (local) ajunge în poziția cerută.
     glm::dmat4 m(rs);
-    m[3] = glm::dvec4(wanted.position - rs * corner, 1.0);
+    if (glm::length(wanted.position - current.position) > 1e-6) {
+        // O mutare: colțul minim (local) ajunge în poziția cerută.
+        m[3] = glm::dvec4(wanted.position - rs * corner, 1.0);
+    } else {
+        // Rotație / scară / dimensiuni: pivotul rămâne unde era.
+        m[3] = glm::dvec4(pivotWorld - rs * pivot, 1.0);
+    }
     inst.transform = math::Transform(m);
     model.setInstance(instance, inst);
 }

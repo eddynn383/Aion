@@ -873,6 +873,18 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         }
     }
 
+    // Pivotul selecției: un punct cu trei axe scurte, deasupra geometriei (se vede și în interiorul obiectului).
+    if (const auto pivot = doc.selectionPivot()) {
+        const glm::dvec3 p = definitionToWorld(doc, doc.activeDefinition()).applyToPoint(*pivot);
+        const double len = std::max(glm::length(p - f.eye), 1.0) * 0.035;
+        const glm::vec3 pf(p);
+        f.topLines.push_back({ pf, glm::vec3(p + glm::dvec3(len, 0, 0)), toVec4(m_axisX), { 2.0f, 0.0f } });
+        f.topLines.push_back({ pf, glm::vec3(p + glm::dvec3(0, len, 0)), toVec4(m_axisY), { 2.0f, 0.0f } });
+        f.topLines.push_back({ pf, glm::vec3(p + glm::dvec3(0, 0, len)), toVec4(m_axisZ), { 2.0f, 0.0f } });
+        f.topPoints.push_back({ pf, glm::vec4(1.0f), 11.0f });
+        f.topPoints.push_back({ pf, toVec4(m_accent), 7.0f });
+    }
+
     // Planurile de secțiune: un dreptunghi în plan, plin pentru cel activ.
     const glm::dvec3 center = (f.sceneMin + f.sceneMax) * 0.5;
     const double size = std::max(glm::length(f.sceneMax - f.sceneMin) * 0.6, 1000.0);

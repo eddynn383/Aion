@@ -18,7 +18,7 @@ Aion rulează JavaScript (motorul QJSEngine din Qt, la fel pe macOS, Windows și
 | `sphere(x, y, z, diametru, nume?)` | Sferă. |
 | `object(generator, parametri, x, y, z)` | Obiect dinamic: `"door"`, `"window"`, `"table"`, `"shelf"`, `"cabinet"`, `"stairs"` cu parametrii lor (de exemplu `{ width: 900, height: 2100 }`). |
 | `move(id, dx, dy, dz)` | Mută obiectul. |
-| `rotate(id, grade, axa = "z", pivot?)` | Rotește în jurul centrului obiectului sau al punctului `[x, y, z]`. |
+| `rotate(id, grade, axa = "z", pivot?)` | Rotește în jurul pivotului obiectului (implicit centrul) sau al punctului `[x, y, z]`. |
 | `place(id, { x, y, z, rx, ry, rz, sx, sy, sz, width, depth, height })` | Plasarea ca în Inspector (oricare chei). |
 | `material(id, nume sau culoare)` | Material din model / bibliotecă după nume („Lemn de stejar”) sau o culoare (`"#c0392b"`). |
 | `remove(id)` | Șterge obiectul. |
