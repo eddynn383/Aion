@@ -27,7 +27,7 @@ Item {
                 width: tagsBox.width
                 height: Theme.controlHeightSm
                 radius: Theme.radiusSm
-                color: tagArea.containsMouse ? Theme.bgHover : "transparent"
+                color: tagHover.hovered ? Theme.bgHover : "transparent"
 
                 MouseArea {
                     id: tagArea
@@ -73,34 +73,34 @@ Item {
                         }
                     }
                 }
+                // Acțiunile (RowAction: locuri fixe): șterge, atribuie, selectează, apoi ochiul.
+                HoverHandler { id: tagHover }
                 Row {
                     id: tagActions
                     anchors.right: parent.right
                     anchors.rightMargin: 2
                     anchors.verticalCenter: parent.verticalCenter
-                    IconButton {
-                        visible: tagArea.containsMouse || hovered
-                        width: 22; height: 22; iconSize: 13
-                        iconName: "tag"
-                        tooltip: "Atribuie selecției"
-                        onClicked: root.document.assignTag(tagRow.modelData.id)
-                    }
-                    IconButton {
-                        visible: tagArea.containsMouse || hovered
-                        width: 22; height: 22; iconSize: 13
-                        iconName: "mouse-pointer-2"
-                        tooltip: "Selectează ce are tag-ul"
-                        onClicked: root.document.selectByTag(tagRow.modelData.id)
-                    }
-                    IconButton {
-                        visible: tagArea.containsMouse || hovered
-                        width: 22; height: 22; iconSize: 13
+                    RowAction {
+                        shown: tagHover.hovered
                         iconName: "trash-2"
                         tooltip: "Șterge tag-ul"
                         onClicked: root.document.removeTag(tagRow.modelData.id)
                     }
-                    IconButton {
-                        width: 22; height: 22; iconSize: 13
+                    RowAction {
+                        shown: tagHover.hovered
+                        iconName: "tag"
+                        tooltip: "Atribuie selecției"
+                        onClicked: root.document.assignTag(tagRow.modelData.id)
+                    }
+                    RowAction {
+                        shown: tagHover.hovered
+                        iconName: "mouse-pointer-2"
+                        tooltip: "Selectează ce are tag-ul"
+                        onClicked: root.document.selectByTag(tagRow.modelData.id)
+                    }
+                    RowAction {
+                        shown: tagHover.hovered
+                        active: !tagRow.modelData.visible
                         iconName: tagRow.modelData.visible ? "eye" : "eye-off"
                         tooltip: tagRow.modelData.visible ? "Ascunde tot ce are tag-ul" : "Arată"
                         onClicked: root.document.setTagVisible(tagRow.modelData.id, !tagRow.modelData.visible)

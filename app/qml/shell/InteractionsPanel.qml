@@ -37,7 +37,31 @@ Item {
             width: ListView.view.width
             height: content.implicitHeight + Theme.space2
             radius: Theme.radiusSm
-            color: itemArea.containsMouse ? Theme.bgHover : "transparent"
+            color: itemHover.hovered ? Theme.bgHover : "transparent"
+
+            // Acțiunile (RowAction: locuri fixe, ca în celelalte secțiuni): șterge regulile, deschide editorul.
+            HoverHandler { id: itemHover }
+            Row {
+                id: itemActions
+                anchors.right: parent.right
+                anchors.rightMargin: 2
+                y: Theme.space1 - 1
+                RowAction {
+                    shown: itemHover.hovered
+                    iconName: "trash-2"
+                    tooltip: "Șterge interacțiunile obiectului"
+                    onClicked: root.document.setRules(item.modelData.id, [])
+                }
+                RowAction {
+                    shown: itemHover.hovered
+                    iconName: "pencil"
+                    tooltip: "Editează cu blocuri"
+                    onClicked: {
+                        root.document.selectInstance(item.modelData.id)
+                        root.editRequested(item.modelData.id, item.modelData.name)
+                    }
+                }
+            }
 
             MouseArea {
                 id: itemArea
@@ -52,7 +76,7 @@ Item {
                 id: content
                 x: Theme.space2
                 y: Theme.space1
-                width: parent.width - Theme.space2 * 2
+                width: parent.width - Theme.space2 * 2 - itemActions.width
                 spacing: 2
                 Row {
                     spacing: Theme.space2

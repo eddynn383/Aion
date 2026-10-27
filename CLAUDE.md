@@ -163,6 +163,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   la cameră oprită, preset-uri de calitate. Acțiuni de script: `view.environment:studio`, `view.ambientOcclusion`
   (comută și salvează în profilul de test!), `draglight:dx,dy`, `debug.materialsOnly`.
 
+- **Acțiunile de pe rândurile listelor** (Obiecte, Tag-uri, Scene, Interacțiuni) folosesc `components/RowAction.qml`:
+  locuri fixe (doar se estompează, fără să mute rândul), hover detectat cu `HoverHandler` pe rând; ordinea: ștergere,
+  comenzi, stări (lacăt, aprins / stins), ochiul ultimul; o stare neobișnuită (ascuns, blocat, stins) se vede mereu.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 
