@@ -91,6 +91,12 @@ struct Scene {
     double distance = 10000.0;
     bool orthographic = false;
     std::string style;
+    // Starea modelului (scenele noi o capturează; cele vechi nu au stare și schimbă doar camera):
+    // pozițiile obiectelor, obiectele ascunse și tag-urile ascunse.
+    bool hasState = false;
+    std::map<InstanceId, math::Transform> transforms;
+    std::set<InstanceId> hiddenInstances;
+    std::set<TagId> hiddenTags;
 
     bool operator==(const Scene&) const = default;
 };

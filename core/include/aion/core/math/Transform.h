@@ -37,4 +37,8 @@ private:
     Mat4d m_matrix { 1.0 };
 };
 
+// Interpolarea între două transformări (mutare liniară, rotație pe cel mai scurt drum, scară liniară), pentru
+// tranzițiile scenelor și animații. Forfecarea nu se păstrează.
+[[nodiscard]] Transform interpolate(const Transform& a, const Transform& b, double t);
+
 } // namespace aion::math

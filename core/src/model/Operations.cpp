@@ -342,4 +342,53 @@ bool moveToParent(Model& model, InstanceId instance, DefinitionId target)
     return true;
 }
 
+void captureSceneState(const Model& model, Scene& scene)
+{
+    scene.hasState = true;
+    scene.transforms.clear();
+    scene.hiddenInstances.clear();
+    scene.hiddenTags.clear();
+    for (std::size_t i = 0; i < model.instances().size(); ++i) {
+        const InstanceId id = model.instances().keys()[i];
+        const Instance& inst = model.instances().values()[i];
+        scene.transforms[id] = inst.transform;
+        if (inst.hidden) {
+            scene.hiddenInstances.insert(id);
+        }
+    }
+    for (std::size_t i = 0; i < model.tags().size(); ++i) {
+        if (!model.tags().values()[i].visible) {
+            scene.hiddenTags.insert(model.tags().keys()[i]);
+        }
+    }
+}
+
+void applySceneState(Model& model, const Scene& scene)
+{
+    if (!scene.hasState) {
+        return;
+    }
+    for (const auto& [id, transform] : scene.transforms) {
+        if (!model.instances().contains(id)) {
+            continue;
+        }
+        Instance inst = model.instance(id);
+        const bool hidden = scene.hiddenInstances.contains(id);
+        if (inst.transform != transform || inst.hidden != hidden) {
+            inst.transform = transform;
+            inst.hidden = hidden;
+            model.setInstance(id, inst);
+        }
+    }
+    for (std::size_t i = 0; i < model.tags().size(); ++i) {
+        const TagId id = model.tags().keys()[i];
+        Tag tag = model.tags().values()[i];
+        const bool visible = !scene.hiddenTags.contains(id);
+        if (tag.visible != visible) {
+            tag.visible = visible;
+            model.setTag(id, tag);
+        }
+    }
+}
+
 } // namespace aion::model

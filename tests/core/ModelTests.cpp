@@ -1,5 +1,6 @@
 #include "aion/core/commands/CommandStack.h"
 #include "aion/core/geom/Operations.h"
+#include "aion/core/io/AionFile.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Operations.h"
 
@@ -7,6 +8,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <glm/geometric.hpp>
+
+#include <cmath>
+#include <numbers>
 
 using namespace aion;
 using Catch::Approx;
@@ -345,4 +349,48 @@ TEST_CASE("Grupuri (colecții): gruparea obiectelor și mutarea între grupuri p
     // Un grup nu poate intra în el însuși.
     CHECK_FALSE(model::moveToParent(m, room, m.instance(room).definition));
     CHECK(m.validate().ok());
+}
+
+TEST_CASE("Scene ca stări: pozițiile obiectelor, ascunderile și tag-urile se capturează și se aplică", "[core][model][scenes]")
+{
+    Model m;
+    geom::Mesh& root = m.mesh(m.root());
+    geom::drawPolygon(root, { { 0, 0, 0 }, { 100, 0, 0 }, { 100, 100, 0 }, { 0, 100, 0 } });
+    geom::Selection s;
+    s.faces.insert(root.faces().keys().front());
+    const model::InstanceId chair = model::makeGroup(m, m.root(), s, false, "Scaun");
+    const model::TagId walls = m.addTag({ "Pereți", { 200, 0, 0, 255 }, true });
+
+    model::Scene closed;
+    model::captureSceneState(m, closed);
+
+    // Mută scaunul, ascunde pereții; scena „deschis” reține starea nouă.
+    model::Instance inst = m.instance(chair);
+    inst.transform = math::Transform::translation({ 500, 0, 0 });
+    m.setInstance(chair, inst);
+    model::Tag tag = m.tag(walls);
+    tag.visible = false;
+    m.setTag(walls, tag);
+    model::Scene moved;
+    model::captureSceneState(m, moved);
+
+    model::applySceneState(m, closed);
+    CHECK(m.instance(chair).transform.isIdentity());
+    CHECK(m.tag(walls).visible);
+    model::applySceneState(m, moved);
+    CHECK(glm::length(m.instance(chair).transform.applyToPoint({ 0, 0, 0 }) - math::Vec3d { 500, 0, 0 }) < 1e-9);
+    CHECK_FALSE(m.tag(walls).visible);
+
+    // Interpolarea (tranziția) trece pe la jumătate.
+    const math::Transform half = math::interpolate(math::Transform {}, math::Transform::translation({ 500, 0, 0 }), 0.5);
+    CHECK(glm::length(half.applyToPoint({ 0, 0, 0 }) - math::Vec3d { 250, 0, 0 }) < 1e-9);
+    const math::Transform rot = math::interpolate(math::Transform {},
+        math::Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, std::numbers::pi / 2), 0.5);
+    CHECK(glm::length(rot.applyToPoint({ 1, 0, 0 }) - math::Vec3d { std::sqrt(0.5), std::sqrt(0.5), 0 }) < 1e-9);
+
+    // Salvare și încărcare păstrează starea scenei.
+    m.addScene(moved);
+    const io::LoadResult loaded = io::readArchive(io::writeArchive(m, {}));
+    REQUIRE(loaded.model);
+    CHECK(loaded.model->sameAs(m));
 }
