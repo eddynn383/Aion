@@ -148,6 +148,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   (`insertModel` / `extractInstance`), `shell/LibraryPanel.qml`, drop în viewport (`Viewport::dropPointAt`).
   Comenzi: `object.parametric:door|window|table|shelf|cabinet|stairs`, `library.save`.
 
+- **Faza 27** (ADR 0027): `render/ScriptEngine.h` (QJSEngine, API `aion`, plugin-uri din `Plugins/`),
+  `overlays/ScriptConsole.qml`, `Document::beginMacro` / `endMacro` (un pas de undo pe rulare). Documentație:
+  `docs/scripting.md`; exemplu: `examples/plugins/gard/`. Acțiuni de script: `script:N` (exemplul N),
+  `scriptjs:cod` (fără `;` — separă acțiunile), `plugin:dosar/funcție`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

@@ -305,7 +305,7 @@ public:
     // Oglindește selecția față de centrul ei, pe axa 0 (X), 1 (Y) sau 2 (Z).
     Q_INVOKABLE void mirrorSelection(int axis);
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
-    Q_INVOKABLE void createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
+    Q_INVOKABLE double createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);
 
     // --- Biblioteca de obiecte (ADR 0026) ---
@@ -319,6 +319,22 @@ public:
     // Salvează obiectul selectat în bibliotecă (cu miniatura dată, PNG). Întoarce false dacă nu se poate.
     Q_INVOKABLE bool saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng);
     Q_INVOKABLE void removeLibraryItem(const QString& id);
+
+    // --- Scripturi (ADR 0027) ---
+    // Tot ce face un script între beginMacro și endMacro e un singur pas de undo (endMacro(false) îl anulează).
+    void beginMacro(const std::string& name);
+    void endMacro(bool keep);
+    [[nodiscard]] bool inMacro() const { return m_macro; }
+    // Operații pe obiecte după id (în contextul editat), folosite de API-ul scripturilor. Întorc id-ul creat (0 = eșec).
+    double createPrimitive(const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name);
+    bool setInstancePlacement(double instanceId, const QVariantMap& placement);
+    bool transformInstance(double instanceId, const math::Transform& delta);
+    bool removeInstanceById(double instanceId);
+    bool setInstanceMaterialByName(double instanceId, const QString& nameOrColor);
+    bool drawLineSegment(const QVector3D& a, const QVector3D& b);
+    bool drawFace(const QVariantList& points);
+    [[nodiscard]] QVariantList objectList() const;
+    void selectInstances(const QVariantList& ids);
     // Poziționarea texturii pe fețele selectate: { ox, oy (mm), rotation (°), sx, sy } sau { reset: true }.
     Q_INVOKABLE void setFaceTexture(const QVariantMap& changes);
     // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până la
@@ -471,6 +487,7 @@ private:
     std::optional<SceneTransition> m_sceneTransition;
     // Operația cu previzualizare în curs (array, soften): selecția de dinainte și dacă e un pas de anulat.
     bool m_previewApplied = false;
+    bool m_macro = false;
     geom::Selection m_previewSelection;
     model::CameraId m_selectedCamera;
     model::LightId m_selectedLight;

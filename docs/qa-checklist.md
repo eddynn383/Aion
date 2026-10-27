@@ -166,3 +166,9 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Obiecte: părțile (Toc, Foaie, Clanță…) apar ca subgrupuri
 - [ ] + din antetul Bibliotecii salvează obiectul selectat („Ale mele”, cu miniatură); click dreapta îl scoate
 - [ ] Un obiect din „Ale mele” se inserează cu materialele lui (cele cu același nume se refolosesc)
+## Scripturi și plugin-uri (Faza 27)
+- [ ] ⌘K → Consola de scripturi; fiecare exemplu rulează (⌘↵) și se anulează cu un singur ⌘Z
+- [ ] Un script cu eroare (de exemplu `aion.box(0,0,0,100,100,100); nuExista()`) arată linia și nu lasă nimic în model
+- [ ] `while (true) {}` se oprește după 15 s, fără să blocheze aplicația definitiv
+- [ ] Copiază `examples/plugins/gard` în dosarul plugin-urilor (📁), ↻ → „Gard: Gard de 6 m” apare în palette și merge
+- [ ] Web: consola și exemplele merg în browser
