@@ -31,6 +31,8 @@ struct CameraPose {
 };
 
 [[nodiscard]] CameraPose standardViewPose(StandardView view, const CameraPose& current);
+// Poza care privește din `eye` spre `target` (camerele-obiect din model).
+[[nodiscard]] CameraPose poseLookingAt(const Vec3d& eye, const Vec3d& target);
 
 class Camera {
 public:
@@ -50,6 +52,8 @@ public:
     void setProjection(Projection projection) { m_projection = projection; }
 
     [[nodiscard]] double fovY() const { return m_fovY; }
+    // Unghiul de vedere vertical, în radiani (limitat la 5°–150°).
+    void setFovY(double radians);
 
     // Baza camerei în coordonate globale. `right` rămâne orizontal, chiar și privind vertical.
     [[nodiscard]] Vec3d forward() const;

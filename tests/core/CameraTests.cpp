@@ -349,3 +349,20 @@ TEST_CASE("Animația scenelor: pauze, tranziții, buclă", "[core][view][animati
     CHECK(single.duration() == Catch::Approx(1.0));
     CHECK(samePoint(single.poseAt(0.4).target, a.target));
 }
+
+TEST_CASE("Camerele-obiect: poza care privește din ochi spre țintă", "[core][view][camera]")
+{
+    const Vec3d eye { -6000.0, -4000.0, 3000.0 };
+    const Vec3d target { 500.0, 200.0, 800.0 };
+    Camera camera;
+    camera.setPose(poseLookingAt(eye, target));
+    CHECK(samePoint(camera.eye(), eye));
+    CHECK(samePoint(camera.pose().target, target));
+    CHECK(glm::dot(camera.forward(), glm::normalize(target - eye)) == Catch::Approx(1.0));
+
+    // Unghiul de vedere e limitat.
+    camera.setFovY(0.0);
+    CHECK(camera.fovY() > 0.08);
+    camera.setFovY(0.8);
+    CHECK(camera.fovY() == Catch::Approx(0.8));
+}

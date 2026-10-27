@@ -94,6 +94,25 @@ Vec3d Camera::toLocalVector(const Vec3d& v) const
     return m_context ? glm::normalize(m_context->toLocal.applyToVector(v)) : v;
 }
 
+CameraPose poseLookingAt(const Vec3d& eye, const Vec3d& target)
+{
+    const Vec3d d = target - eye;
+    const double length = glm::length(d);
+    CameraPose pose;
+    pose.target = target;
+    pose.distance = std::max(length, Camera::kMinDistance);
+    if (length > 0.0) {
+        pose.yaw = std::atan2(d.y, d.x);
+        pose.pitch = std::asin(std::clamp(d.z / length, -1.0, 1.0));
+    }
+    return pose;
+}
+
+void Camera::setFovY(double radians)
+{
+    m_fovY = std::clamp(radians, 0.0872664626, 2.6179938780);
+}
+
 Vec3d Camera::forward() const
 {
     return toLocalVector(worldForward());

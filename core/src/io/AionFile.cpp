@@ -155,6 +155,75 @@ json colorToJson(const model::Color& c)
     return { c.r, c.g, c.b, c.a };
 }
 
+// Camerele și luminile.
+json camerasToJson(const model::Model& model)
+{
+    const auto vec = [](const math::Vec3d& v) { return json { v.x, v.y, v.z }; };
+    json out = json::array();
+    for (std::size_t i = 0; i < model.cameras().size(); ++i) {
+        const model::CameraObject& c = model.cameras().values()[i];
+        out.push_back({ { "id", model.cameras().keys()[i].value }, { "name", c.name }, { "position", vec(c.position) },
+            { "target", vec(c.target) }, { "fov", c.fov }, { "orthographic", c.orthographic },
+            { "near", c.nearClip }, { "far", c.farClip }, { "visible", c.visible } });
+    }
+    return out;
+}
+
+json lightsToJson(const model::Model& model)
+{
+    const auto vec = [](const math::Vec3d& v) { return json { v.x, v.y, v.z }; };
+    json out = json::array();
+    for (std::size_t i = 0; i < model.lights().size(); ++i) {
+        const model::Light& l = model.lights().values()[i];
+        out.push_back({ { "id", model.lights().keys()[i].value }, { "name", l.name },
+            { "kind", static_cast<int>(l.kind) }, { "position", vec(l.position) }, { "direction", vec(l.direction) },
+            { "color", colorToJson(l.color) }, { "intensity", l.intensity }, { "range", l.range }, { "cone", l.cone },
+            { "softness", l.softness }, { "width", l.width }, { "height", l.height },
+            { "castShadows", l.castShadows }, { "enabled", l.enabled }, { "visible", l.visible } });
+    }
+    return out;
+}
+
+void camerasAndLightsFromJson(const json& doc, model::ChangeSet& changes)
+{
+    const auto vec = [](const json& v, math::Vec3d fallback) {
+        return v.is_array() && v.size() == 3 ? math::Vec3d { v.at(0).get<double>(), v.at(1).get<double>(), v.at(2).get<double>() }
+                                             : fallback;
+    };
+    for (const json& j : doc.value("cameras", json::array())) {
+        model::CameraObject c;
+        c.name = j.value("name", std::string());
+        c.position = vec(j.value("position", json()), c.position);
+        c.target = vec(j.value("target", json()), c.target);
+        c.fov = j.value("fov", c.fov);
+        c.orthographic = j.value("orthographic", false);
+        c.nearClip = j.value("near", 0.0);
+        c.farClip = j.value("far", 0.0);
+        c.visible = j.value("visible", true);
+        changes.cameras[model::CameraId { j.at("id").get<std::uint64_t>() }].after = std::move(c);
+    }
+    for (const json& j : doc.value("lights", json::array())) {
+        model::Light l;
+        l.name = j.value("name", std::string());
+        l.kind = static_cast<model::Light::Kind>(std::clamp(j.value("kind", 0), 0, 3));
+        l.position = vec(j.value("position", json()), l.position);
+        l.direction = vec(j.value("direction", json()), l.direction);
+        if (const auto c = j.find("color"); c != j.end() && c->is_array() && c->size() == 4) {
+            l.color = { c->at(0).get<std::uint8_t>(), c->at(1).get<std::uint8_t>(), c->at(2).get<std::uint8_t>(),
+                c->at(3).get<std::uint8_t>() };
+        }
+        l.intensity = j.value("intensity", l.intensity);
+        l.range = j.value("range", l.range);
+        l.cone = j.value("cone", l.cone);
+        l.softness = j.value("softness", l.softness);
+        l.width = j.value("width", l.width);
+        l.height = j.value("height", l.height);
+        l.castShadows = j.value("castShadows", false);
+        l.enabled = j.value("enabled", true);
+        l.visible = j.value("visible", true);
+        changes.lights[model::LightId { j.at("id").get<std::uint64_t>() }].after = std::move(l);
+    }
+}
 
 // Animațiile: cheile ca liste compacte [timp, easing, valori…].
 json animationsToJson(const model::Model& model)
@@ -406,6 +475,8 @@ std::string toJson(const model::Model& model)
         { "sections", sections },
         { "scenes", scenes },
         { "animations", animationsToJson(model) },
+        { "cameras", camerasToJson(model) },
+        { "lights", lightsToJson(model) },
     };
     return doc.dump(1);
 }
@@ -518,6 +589,7 @@ LoadResult fromJson(std::string_view text)
                 s.value("name", std::string()), vec(s.at("point")), vec(s.at("normal")), s.value("active", true) };
         }
         animationsFromJson(doc.value("animations", json::array()), changes);
+        camerasAndLightsFromJson(doc, changes);
         for (const json& s : doc.value("scenes", json::array())) {
             model::Scene scene;
             scene.name = s.value("name", std::string());
