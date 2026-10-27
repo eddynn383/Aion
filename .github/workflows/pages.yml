@@ -1,8 +1,13 @@
 name: Publică versiunea web
 
-# Pornit manual (Actions → „Publică versiunea web” → Run workflow), după ce un build CI a trecut.
+# Automat: după fiecare rulare CI reușită pe main, versiunea web (artefactul aion-web) se publică pe GitHub Pages.
+# Manual: Actions → „Publică versiunea web” → Run workflow, cu ID-ul unei rulări CI (de exemplu pentru o revenire).
 # Necesită GitHub Pages activat cu sursa „GitHub Actions” (Settings → Pages).
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       run_id:
@@ -15,8 +20,14 @@ permissions:
   id-token: write
   actions: read
 
+# O singură publicare odată; una nouă o înlocuiește pe cea în așteptare.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -26,7 +37,7 @@ jobs:
         with:
           name: aion-web
           path: web
-          run-id: ${{ inputs.run_id }}
+          run-id: ${{ inputs.run_id || github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-pages-artifact@v3
         with:
