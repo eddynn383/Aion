@@ -45,6 +45,9 @@ struct FrameUniforms {
     float lightColor[8][4]; // rgb = culoarea liniară × intensitatea, w = raza
     float lightDirection[8][4]; // xyz = direcția, w = cos(jumătatea conului)
     float lightExtra[8][4]; // x = cos(începutul marginii), y = mărimea (suprafață)
+    float spotViewProj[16]; // harta de umbre a spotului (proiecție perspectivă din spot)
+    float spotShadow[4]; // x = 1 dacă e activă, y = indexul luminii, z = 1 / mărimea hărții, w = bias (mm)
+    float spotRange[4]; // x = planul apropiat, y = cel îndepărtat (mm), pentru adâncimea liniară
 };
 
 
@@ -154,6 +157,24 @@ void ViewportRenderer::createStaticResources()
         QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
     m_shadowSampler->create();
 
+    // Harta de umbre a unui spot: aceleași formate, mărimea pe jumătate (con mai îngust decât scena soarelui).
+    const QSize spotSize = m_shadowsSupported ? QSize(m_shadowMapSize / 2, m_shadowMapSize / 2) : QSize(4, 4);
+    m_spotShadowTexture.reset(m_rhi->newTexture(m_shadowsSupported ? QRhiTexture::R32F : QRhiTexture::RGBA8, spotSize, 1,
+        QRhiTexture::RenderTarget));
+    m_spotShadowTexture->create();
+    m_spotShadowDepth.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, spotSize, 1));
+    m_spotShadowDepth->create();
+    QRhiTextureRenderTargetDescription spotDesc { QRhiColorAttachment(m_spotShadowTexture.get()) };
+    spotDesc.setDepthStencilBuffer(m_spotShadowDepth.get());
+    m_spotShadowTarget.reset(m_rhi->newTextureRenderTarget(spotDesc));
+    m_spotShadowPass.reset(m_spotShadowTarget->newCompatibleRenderPassDescriptor());
+    m_spotShadowTarget->setRenderPassDescriptor(m_spotShadowPass.get());
+    m_spotShadowTarget->create();
+    // Trecerea spotului folosește aceleași shadere ca a soarelui, cu o copie a uniformelor în care matricea luminii
+    // e a spotului.
+    m_spotUniforms.reset(m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, sizeof(FrameUniforms)));
+    m_spotUniforms->create();
+
     // Texturile materialelor: un array (câte un strat pe textură), la început un singur strat alb.
     m_textureSampler.reset(m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::Linear,
         QRhiSampler::Repeat, QRhiSampler::Repeat));
@@ -163,6 +184,7 @@ void ViewportRenderer::createStaticResources()
     createTextureArray(1);
 
     m_bindings.reset(m_rhi->newShaderResourceBindings());
+    m_spotBindings.reset(m_rhi->newShaderResourceBindings());
     updateBindings();
 
     m_shadowPipeline.reset(m_rhi->newGraphicsPipeline());
@@ -177,6 +199,19 @@ void ViewportRenderer::createStaticResources()
     m_shadowPipeline->setDepthWrite(true);
     m_shadowPipeline->setDepthOp(QRhiGraphicsPipeline::LessOrEqual);
     m_shadowPipeline->create();
+
+    m_spotShadowPipeline.reset(m_rhi->newGraphicsPipeline());
+    m_spotShadowPipeline->setShaderStages({
+        { QRhiShaderStage::Vertex, loadShader(QStringLiteral("shadow.vert")) },
+        { QRhiShaderStage::Fragment, loadShader(QStringLiteral("shadow.frag")) },
+    });
+    m_spotShadowPipeline->setVertexInputLayout(meshLayout());
+    m_spotShadowPipeline->setShaderResourceBindings(m_spotBindings.get());
+    m_spotShadowPipeline->setRenderPassDescriptor(m_spotShadowPass.get());
+    m_spotShadowPipeline->setDepthTest(true);
+    m_spotShadowPipeline->setDepthWrite(true);
+    m_spotShadowPipeline->setDepthOp(QRhiGraphicsPipeline::LessOrEqual);
+    m_spotShadowPipeline->create();
 
     m_quadCorners.reset(m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(kLineCorners)));
     m_quadCorners->create();
@@ -204,8 +239,22 @@ void ViewportRenderer::updateBindings()
             1, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
         QRhiShaderResourceBinding::sampledTexture(
             2, QRhiShaderResourceBinding::FragmentStage, m_textureArray.get(), m_textureSampler.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            3, QRhiShaderResourceBinding::FragmentStage, m_spotShadowTexture.get(), m_shadowSampler.get()),
     });
     m_bindings->create();
+    // Pentru trecerea spotului: uniformele cu matricea spotului; în locul hărții spotului (în care se scrie), a soarelui.
+    m_spotBindings->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_spotUniforms.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            1, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            2, QRhiShaderResourceBinding::FragmentStage, m_textureArray.get(), m_textureSampler.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            3, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
+    });
+    m_spotBindings->create();
 }
 
 void ViewportRenderer::uploadTextures(QRhiResourceUpdateBatch* batch)
@@ -452,7 +501,37 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
         copy4(u.lightExtra[i], glm::vec4(l.cosInner, l.size, 0.0f, 0.0f));
     }
 
+    // Umbrele spotului: proiecție perspectivă din spot, pe direcția lui, cu unghiul conului (plus o margine).
+    if (m_frame.shadowSpot >= 0 && m_frame.shadowSpot < lightCount && m_shadowsSupported) {
+        const LightData& spot = m_frame.lights[static_cast<std::size_t>(m_frame.shadowSpot)];
+        const glm::dvec3 spotEye(spot.position);
+        const glm::dvec3 spotDir = glm::normalize(glm::dvec3(spot.direction));
+        const glm::dvec3 spotUp = std::abs(spotDir.z) > 0.99 ? glm::dvec3(0, 1, 0) : glm::dvec3(0, 0, 1);
+        const double fov = std::clamp(2.0 * std::acos(std::clamp(double(spot.cosOuter), -1.0, 1.0)) + 0.1, 0.2, 2.9);
+        const double range = std::max(double(spot.range), 100.0);
+        const glm::dmat4 spotView = glm::lookAt(spotEye, spotEye + spotDir, spotUp);
+        const double near = std::max(range * 0.005, 10.0);
+        const double far = range * 1.5;
+        const glm::dmat4 spotProj = glm::perspective(fov, 1.0, near, far);
+        u.spotRange[0] = static_cast<float>(near);
+        u.spotRange[1] = static_cast<float>(far);
+        m_spotViewProj = glm::dmat4(corrF) * spotProj * spotView;
+        copyMatrix(u.spotViewProj, m_spotViewProj);
+        u.spotShadow[0] = 1.0f;
+        u.spotShadow[1] = static_cast<float>(m_frame.shadowSpot);
+        u.spotShadow[2] = 2.0f / static_cast<float>(m_shadowMapSize);
+        u.spotShadow[3] = static_cast<float>(std::max(20.0, range * 0.004)); // mm, în adâncimea liniară
+        m_spotShadowActive = true;
+    } else {
+        m_spotShadowActive = false;
+    }
+
     batch->updateDynamicBuffer(m_uniforms.get(), 0, sizeof(u), &u);
+    if (m_spotShadowActive) {
+        FrameUniforms spotU = u;
+        std::memcpy(spotU.lightViewProj, u.spotViewProj, sizeof(spotU.lightViewProj));
+        batch->updateDynamicBuffer(m_spotUniforms.get(), 0, sizeof(spotU), &spotU);
+    }
 }
 
 void ViewportRenderer::render(QRhiCommandBuffer* cb)
@@ -528,6 +607,21 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         if (m_mesh && m_meshVertexCount > 0) {
             cb->setViewport({ 0, 0, float(m_shadowMapSize), float(m_shadowMapSize) });
             cb->setGraphicsPipeline(m_shadowPipeline.get());
+            cb->setShaderResources();
+            const QRhiCommandBuffer::VertexInput input(m_mesh.get(), 0);
+            cb->setVertexInput(0, 1, &input);
+            cb->draw(m_meshVertexCount);
+        }
+        cb->endPass();
+    }
+
+    if (m_spotShadowActive) {
+        cb->beginPass(m_spotShadowTarget.get(), QColor::fromRgbF(1, 1, 1, 1), { 1.0f, 0 }, batch);
+        batch = nullptr;
+        if (m_mesh && m_meshVertexCount > 0) {
+            const QSize spotSize = m_spotShadowTexture->pixelSize();
+            cb->setViewport({ 0, 0, float(spotSize.width()), float(spotSize.height()) });
+            cb->setGraphicsPipeline(m_spotShadowPipeline.get());
             cb->setShaderResources();
             const QRhiCommandBuffer::VertexInput input(m_mesh.get(), 0);
             cb->setVertexInput(0, 1, &input);

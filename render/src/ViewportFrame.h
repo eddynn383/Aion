@@ -102,6 +102,8 @@ struct ViewportFrame {
     glm::dvec3 sceneMax { 5000.0, 5000.0, 3000.0 };
     // Luminile modelului (în afară de soare).
     std::vector<LightData> lights;
+    // Spotul care aruncă umbre (primul cu „Aruncă umbre”): indexul lui în `lights`; -1 = niciunul.
+    int shadowSpot = -1;
     // Planul de secțiune activ (n, d cu n·x = d); geometria de partea normalei se ascunde.
     std::optional<glm::dvec4> section;
 };

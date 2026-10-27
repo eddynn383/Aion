@@ -525,7 +525,7 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
       pe timeline _(2026-10-27, ADR 0022: scenele / cheile se iau din vederea prin cameră)_
 - [x] Lumini: punctuală, spot, direcțională, de suprafață; culoare, intensitate, rază, con
 - [x] Randare: mai multe lumini în shader (până la 8); gizmo-uri în viewport, în Outliner și Inspector, salvate în `.aion`
-- [ ] Umbre pentru o lumină spot (a doua hartă de umbre); mutarea luminilor trăgând de gizmo
+- [x] Umbre pentru o lumină spot (a doua hartă de umbre); mutarea luminilor trăgând de gizmo _(Faza 28)_
 
 ### Faza 20 – Import `.skp` (Faza 7b)
 - [ ] SDK-ul SketchUp (Trimble) se descarcă de pe developer.sketchup.com cu un cont și acceptarea licenței — pasul
@@ -606,9 +606,10 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 și build-ul Universal + semnarea pe macOS (un Qt universal și un certificat Apple Developer).
 
 ### Faza 28 – Lumini: mutare din marcaj și umbre pentru spot
-- [ ] Cu Select, marcajul unei lumini sau camere se trage: pe orizontală la înălțimea lui, cu Shift pe verticală;
+- [x] Cu Select, marcajul unei lumini sau camere se trage: pe orizontală la înălțimea lui, cu Shift pe verticală;
       un pas de undo
-- [ ] Umbre pentru luminile spot cu „Aruncă umbre” (o a doua hartă de umbre, proiecție perspectivă din spot)
+- [x] Umbre pentru luminile spot cu „Aruncă umbre” (o a doua hartă de umbre, proiecție perspectivă din spot; adâncimea
+      comparată liniar, în mm) _(un singur spot cu umbre odată)_
 
 ### Faza 29 – Scale neuniform cu mânere
 - [ ] Unealta Scale arată cutia selecției cu mânere: colțuri (uniform), mijlocul muchiilor (două axe), mijlocul

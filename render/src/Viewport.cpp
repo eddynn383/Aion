@@ -928,6 +928,9 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
             d.cosOuter = static_cast<float>(std::cos(half));
             d.cosInner = static_cast<float>(std::cos(half * (1.0 - std::clamp(l.softness, 0.0, 1.0))));
             d.size = static_cast<float>((l.width + l.height) * 0.5);
+            if (l.kind == model::Light::Kind::Spot && l.castShadows && f.shadowSpot < 0 && f.style != 3) {
+                f.shadowSpot = static_cast<int>(f.lights.size());
+            }
             f.lights.push_back(d);
         }
         if ((!l.visible && !selected) || m_cleanCapture) {

@@ -84,6 +84,17 @@ private:
     void uploadTextures(QRhiResourceUpdateBatch* batch);
     glm::dmat4 m_lightViewProj { 1.0 };
 
+    // Umbrele unui spot: a doua hartă (perspectivă din spot), desenată cu o copie a uniformelor (matricea spotului).
+    std::unique_ptr<QRhiTexture> m_spotShadowTexture;
+    std::unique_ptr<QRhiRenderBuffer> m_spotShadowDepth;
+    std::unique_ptr<QRhiTextureRenderTarget> m_spotShadowTarget;
+    std::unique_ptr<QRhiRenderPassDescriptor> m_spotShadowPass;
+    std::unique_ptr<QRhiGraphicsPipeline> m_spotShadowPipeline;
+    std::unique_ptr<QRhiBuffer> m_spotUniforms;
+    std::unique_ptr<QRhiShaderResourceBindings> m_spotBindings;
+    glm::dmat4 m_spotViewProj { 1.0 };
+    bool m_spotShadowActive = false;
+
     // Conturul selecției: masca fețelor selectate vizibile, apoi un contur în screen-space.
     QSize m_maskSize;
     std::unique_ptr<QRhiTexture> m_maskTexture;

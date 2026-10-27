@@ -37,10 +37,14 @@ layout(std140, binding = 0) uniform Frame {
     vec4 lightColor[8]; // rgb = culoarea liniară × intensitatea, w = raza
     vec4 lightDirection[8]; // xyz = încotro bate lumina, w = cos(jumătatea conului)
     vec4 lightExtra[8]; // x = cos(începutul marginii conului), y = mărimea (suprafață)
+    mat4 spotViewProj;  // harta de umbre a spotului
+    vec4 spotShadow;    // x = 1 dacă e activă, y = indexul luminii, z = pasul de filtrare, w = bias (mm)
+    vec4 spotRange;     // x = planul apropiat, y = cel îndepărtat (mm)
 } frame;
 
 layout(binding = 1) uniform sampler2D shadowMap;
 layout(binding = 2) uniform sampler2DArray materialTextures;
+layout(binding = 3) uniform sampler2D spotShadowMap;
 
 vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
 vec3 toSrgb(vec3 c) { return pow(c, vec3(1.0 / 2.2)); }
@@ -72,6 +76,37 @@ float shadowFactor(vec3 world, vec3 n)
         }
     }
     return mix(1.0, lit / 9.0, frame.shadow.w);
+}
+
+// Adâncimea liniară (mm de la spot) din adâncimea perspectivă [0, 1]: în perspectivă valorile se strâng lângă 1,
+// iar un bias în [0, 1] ar acoperi metri întregi.
+float spotLinear(float d)
+{
+    float n = frame.spotRange.x;
+    float f = frame.spotRange.y;
+    return n * f / (f - d * (f - n));
+}
+
+// Cât din punct vede spotul (1 = luminat), cu filtrare PCF 3 × 3.
+float spotShadowFactor(vec3 world, vec3 n)
+{
+    vec4 lp = frame.spotViewProj * vec4(world + n * 2.0, 1.0);
+    if (lp.w <= 0.0)
+        return 1.0;
+    vec3 ndc = lp.xyz / lp.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    if (frame.params.y < 0.5)
+        uv.y = 1.0 - uv.y;
+    if (uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0)
+        return 1.0;
+    float depth = spotLinear(frame.viewport.w > 0.5 ? ndc.z : ndc.z * 0.5 + 0.5);
+    float lit = 0.0;
+    for (int x = -1; x <= 1; ++x)
+        for (int y = -1; y <= 1; ++y) {
+            float stored = texture(spotShadowMap, uv + vec2(x, y) * frame.spotShadow.z * 0.5).r;
+            lit += depth - frame.spotShadow.w <= spotLinear(stored) ? 1.0 : 0.0;
+        }
+    return lit / 9.0;
 }
 
 void main()
@@ -148,6 +183,8 @@ void main()
             }
         }
         float ndl = max(dot(n, toLight), 0.0) * att;
+        if (frame.spotShadow.x > 0.5 && i == int(frame.spotShadow.y + 0.5) && ndl > 0.0)
+            ndl *= spotShadowFactor(v_world, n);
         if (ndl <= 0.0)
             continue;
         vec3 lc = frame.lightColor[i].rgb;
