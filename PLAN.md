@@ -546,6 +546,57 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 
 ---
 
+## 6c. Etapa 3 – modelare avansată, conținut și extensibilitate (cerințele din 2026-10-27)
+
+Din `docs/feature-ideas.md`: array liniar și polar, mirror / flip, soften / smooth, bibliotecă de obiecte, obiecte
+dinamice, texturi și UV, plugin-uri / scripturi. Ordinea: întâi operațiile simple pe geometrie (de care depind
+celelalte), apoi texturile (le folosesc obiectele din bibliotecă), obiectele dinamice, biblioteca și la final
+scripturile, care expun tot ce există deja.
+
+### Faza 21 – Mirror / Flip
+- [ ] Core: oglindirea selecției (instanțe și geometrie liberă) față de planul care trece prin centrul selecției,
+      perpendicular pe axa roșie / verde / albastră; fețele rămân orientate corect (normalele inversate la nevoie)
+- [ ] Comenzi „Oglindește pe X / Y / Z” (meniul contextual, palette, Inspector), cu undo; teste
+
+### Faza 22 – Array liniar și polar
+- [ ] Core: copii ale selecției (instanțe legate sau grupuri) pe o direcție cu pas sau distanță totală, ori în jurul
+      unei axe (centru, unghi total sau pas, rotirea copiilor da/nu)
+- [ ] Panou „Array” cu previzualizare în viewport (număr, distanță / unghi, axă), aplicat ca un singur pas de undo
+- [ ] `x3` / `/3` după Move rămân ca scurtătură
+
+### Faza 23 – Soften / Smooth
+- [ ] Core: muchiile dintre fețe cu unghi sub prag devin soft (și netede); invers pentru unghiuri peste prag
+- [ ] Panou cu slider de unghi (0–180°), „Netezește normalele”, „Soft pentru coplanare”, aplicat pe selecție, cu undo
+
+### Faza 24 – Texturi și UV
+- [ ] Materialul poate avea o imagine (PNG / JPG, salvată în arhiva `.aion`), cu mărime reală (mm pe repetiție)
+- [ ] UV implicit: proiecție plană pe fiecare față (după normală), la scara texturii; transformare pe față
+      (deplasare, rotație, scară) pentru „Position Texture”
+- [ ] Shader: eșantionare din texturi (atlas sau array de texturi), cu mipmap-uri
+- [ ] Biblioteca de materiale primește texturi procedurale generate la pornire (lemn, cărămidă, parchet, beton,
+      gresie) — fără imagini binare în repo; import de imagine proprie din editorul de material
+- [ ] Unealta „Poziționează textura” (mutare / rotire / scalare pe față); export glTF / OBJ cu UV și imagini
+
+### Faza 25 – Obiecte dinamice (parametrice)
+- [ ] Core: o definiție poate avea un generator (`door`, `window`, `table`, `shelf`, `stairs`…) și parametri
+      numerici; schimbarea unui parametru regenerează geometria (undo), copiile legate se schimbă împreună
+- [ ] Inspector: secțiunea „Parametri” cu câmpurile generatorului (lățime, înălțime, grosime, număr de trepte…)
+- [ ] Salvate în `.aion` (generatorul și parametrii); „Explodează” le transformă în geometrie obișnuită
+
+### Faza 26 – Bibliotecă de obiecte
+- [ ] Panou (secțiune nouă în stânga sau fereastră) cu categorii (uși, ferestre, mobilier, scări, plante, oameni),
+      căutare și miniaturi
+- [ ] Conținut: obiectele dinamice din Faza 25 + fișiere `.aion` din dosarul bibliotecii utilizatorului
+- [ ] Drag & drop în viewport (obiectul urmează cursorul cu inferență, se așază pe fețe) sau click → unealta de plasare
+- [ ] „Salvează în bibliotecă” pentru obiectul selectat
+
+### Faza 27 – Plugin-uri și scripturi
+- [ ] JavaScript (QJSEngine, merge și pe Web): API peste model (`aion.model`), selecție, comenzi, geometrie
+      (`drawLine`, `pushPull`, `addBox`…), interfață simplă (mesaje, întrebări)
+- [ ] Consolă de scripturi (editor + rezultat); fiecare rulare e un singur pas de undo
+- [ ] Plugin-uri: dosar cu `manifest.json` + `main.js`; comenzile lor apar în palette și în meniu
+- [ ] Exemple incluse (scară în spirală, gard, rafturi) și documentația API
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |
