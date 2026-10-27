@@ -96,6 +96,7 @@ Window {
             { id: "org.unhideAll", title: "Arată tot", category: "Organizare", shortcut: "", icon: "eye" },
             { id: "org.lock", title: "Blochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
             { id: "org.unlock", title: "Deblochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
+            { id: "edit.createFaces", title: "Creează fețe din muchiile selectate", category: "Modelare", shortcut: "", icon: "square" },
             { id: "edit.selectConnected", title: "Selectează ce e conectat", category: "Editare", shortcut: "", icon: "square-dashed-mouse-pointer" },
             { id: "edit.reverseFaces", title: "Inversează fețele selectate", category: "Editare", shortcut: "", icon: "rotate-ccw" },
             { id: "view.zoomSelection", title: "Zoom la selecție", category: "Vedere", shortcut: "", icon: "scan" },
@@ -258,6 +259,7 @@ Window {
         case "org.lock": doc.setSelectionLocked(true); break
         case "org.unlock": doc.setSelectionLocked(false); break
         case "edit.selectConnected": doc.selectConnected(); break
+        case "edit.createFaces": doc.createFacesFromSelection(); break
         case "edit.reverseFaces": doc.reverseSelectedFaces(); break
         case "view.zoomSelection": viewport.zoomToSelection(); break
         case "edit.intersectModel": doc.intersectSelection(true); break

@@ -237,6 +237,12 @@ void Viewport::setPaintCursor(const QCursor& paint)
     updateCursor();
 }
 
+void Viewport::setEraserCursor(const QCursor& eraser)
+{
+    m_eraserCursor = eraser;
+    updateCursor();
+}
+
 void Viewport::showTransientCursor(const QCursor& cursor)
 {
     m_transientCursor = cursor;
@@ -271,6 +277,8 @@ void Viewport::updateCursor()
         setCursor(Qt::PointingHandCursor);
     } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("paint")) {
         setCursor(m_paintCursor);
+    } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("eraser")) {
+        setCursor(m_eraserCursor);
     } else {
         unsetCursor();
     }

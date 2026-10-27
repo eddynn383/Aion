@@ -31,6 +31,11 @@ DrawLineResult drawPolygon(Mesh& mesh, const std::vector<Vec3d>& points);
 // ca să se selecteze și să se șteargă împreună. `smooth`: cerc sau arc (extrudat, are laturile soft).
 DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth);
 
+// Închide fețe în buclele plane formate de muchiile date (de exemplu după ce fața a fost ștearsă și muchiile au rămas),
+// ca la redesenarea unei muchii în SketchUp. O față nouă lângă alte fețe ia sensul lor (normala spre exterior la un
+// volum). Întoarce fețele create.
+DrawLineResult createFaces(Mesh& mesh, const std::vector<EdgeId>& edges);
+
 // Muchiile curbei din care face parte muchia (doar ea, dacă nu e pe o curbă).
 [[nodiscard]] std::vector<EdgeId> curveEdges(const Mesh& mesh, EdgeId edge);
 

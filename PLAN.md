@@ -633,6 +633,11 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 - [x] Panoul Chamfer / Bevel cu distanță și segmente, previzualizare, Gata / Anulează / Esc; comenzi în palette și în
       meniul contextual
 
+### Mici completări (cerința din 2026-10-27)
+- [x] Fețe refăcute peste muchii rămase fără față: `geom::createFaces` (sensul ia după fețele vecine), comanda
+      „Creează fețe din muchii” (palette, meniul contextual) și Line care retrasează o muchie existentă
+- [x] Unealta Eraser are cursorul cu guma (ca găleata la Paint Bucket)
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |

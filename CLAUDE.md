@@ -174,6 +174,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `Document::previewBevel`. Comenzi: `edit.chamfer`, `edit.bevel`. În scripturi, `clicks:` pe geometrie are nevoie de
   `AION_SCREENSHOT_DELAY_MS` mai mare (altfel captura se face înainte de acțiuni).
 
+- **Fețe din muchii**: `geom::createFaces` (comanda `edit.createFaces`; Line o apelează când retrasează o muchie).
+  Cursoarele uneltelor se fac în `app/src/bridge/NavigationCursors.cpp` (găleata, guma).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

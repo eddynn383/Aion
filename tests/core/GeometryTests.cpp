@@ -5,6 +5,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -314,4 +315,35 @@ TEST_CASE("O gaură rămâne goală când desenezi în altă parte a planului", 
     for (FaceId f : mesh.faces().keys()) {
         CHECK_FALSE(faceContainsPoint(mesh, f, { 1500, 1500, 0 }));
     }
+}
+
+TEST_CASE("createFaces: fața lipsă a unei cutii se reface, orientată spre exterior", "[core][geom]")
+{
+    Mesh mesh;
+    drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
+    pushPull(mesh, mesh.faces().keys().front(), -1000);
+    REQUIRE(mesh.faces().size() == 6);
+    FaceId top;
+    for (FaceId f : mesh.faces().keys()) {
+        if (mesh.face(f).plane.normal.z > 0.5) {
+            top = f;
+        }
+    }
+    REQUIRE(top);
+    std::vector<EdgeId> rim;
+    for (const EdgeUse& u : mesh.face(top).outer.uses) {
+        rim.push_back(u.edge);
+    }
+    eraseFace(mesh, top);
+    REQUIRE(mesh.faces().size() == 5);
+    // Muchiile fără legătură cu o buclă închisă nu creează nimic.
+    CHECK(createFaces(mesh, {}).createdFaces.empty());
+    const DrawLineResult r = createFaces(mesh, rim);
+    REQUIRE(r.createdFaces.size() == 1);
+    CHECK(mesh.faces().size() == 6);
+    CHECK(mesh.face(r.createdFaces.front()).plane.normal.z == Catch::Approx(1.0));
+    CHECK(mesh.validate().ok());
+    // O a doua oară nu dublează fața.
+    CHECK(createFaces(mesh, rim).createdFaces.empty());
+    CHECK(mesh.faces().size() == 6);
 }

@@ -146,6 +146,7 @@ public:
     // Cursoarele pentru orbit și zoom (desenate de aplicație din iconițe).
     void setNavigationCursors(const QCursor& orbit, const QCursor& zoom);
     void setPaintCursor(const QCursor& paint);
+    void setEraserCursor(const QCursor& eraser);
 
     QVector3D cameraRight() const;
     QVector3D cameraUp() const;
@@ -368,6 +369,7 @@ private:
 
     QCursor m_orbitCursor { Qt::SizeAllCursor };
     QCursor m_paintCursor { Qt::CrossCursor };
+    QCursor m_eraserCursor { Qt::CrossCursor };
     QCursor m_zoomCursor { Qt::SizeVerCursor };
     // La rotiță și gesturile de trackpad, cursorul acțiunii rămâne vizibil puțin după ultimul eveniment.
     QTimer m_transientCursorTimer;
