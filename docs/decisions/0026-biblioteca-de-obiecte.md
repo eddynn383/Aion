@@ -16,7 +16,11 @@
   separat, cu colțul minim în origine. „Salvează în bibliotecă” (+ din antet) scrie un `.aion` cu miniatura vederii.
 - Click dreapta pe un obiect propriu îl scoate din bibliotecă.
 
+- **Previzualizare la tragere**: peste viewport, cutia obiectului (la mărimea reală, calculată o dată într-un model
+  temporar — `Document::libraryItemSize`) urmează cursorul pe suprafața sau solul de sub el.
+- Plante (copac, brad, tufă) și oameni (stilizați, cu înălțime) sunt obiecte dinamice ca celelalte (ADR 0025).
+
 ## Limite
 
-- Obiectul nu urmărește cursorul (cu inferență) în timpul tragerii; se așază doar la drop.
+- Previzualizarea e cutia obiectului, nu geometria lui; fără inferență la puncte (se așază pe suprafață sau pe sol).
 - Interacțiunile (regulile) nu se copiază din bibliotecă (țintesc obiecte din modelul sursă).

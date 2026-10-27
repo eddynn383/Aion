@@ -20,8 +20,12 @@
 - **Export**: glTF cu materiale PBR, `TEXCOORD_0` și imaginile în buffer (mesh separat pe material moștenit de la
   obiect); OBJ cu `vt`, `usemtl` pe material, MTL cu `map_Kd` și imaginile scrise lângă fișier.
 
+- **Versoul** cu material propriu are și el textura lui: vârful poartă UV-uri și straturi separate pentru față și
+  verso (versoul proiectat după normala inversă, ca textura să nu apară în oglindă).
+- **Unealta „Poziționează textura”** (`tools/TextureTool.cpp`): tras pe o față mută textura cu cursorul; Shift
+  rotește și ⌘ scalează, ambele în jurul punctului apăsat (care rămâne pe loc). O tragere = un pas de undo.
+
 ## Limite
 
-- Textura se aplică doar pe fața (nu și pe un verso cu material propriu, care rămâne doar cu culoare).
-- Fără unealtă de poziționare direct în viewport (mânere pe față); deocamdată câmpurile din Inspector.
+- Unealta lucrează pe fețele din contextul editat (pentru un grup, intri în el).
 - Toate texturile se redimensionează la 1024² în array (raportul laturilor se păstrează prin `textureSize`).

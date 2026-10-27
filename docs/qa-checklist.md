@@ -172,3 +172,8 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] `while (true) {}` se oprește după 15 s, fără să blocheze aplicația definitiv
 - [ ] Copiază `examples/plugins/gard` în dosarul plugin-urilor (📁), ↻ → „Gard: Gard de 6 m” apare în palette și merge
 - [ ] Web: consola și exemplele merg în browser
+## Restanțe din Fazele 24–26
+- [ ] Un verso cu material texturat (Paint Bucket pe partea din spate) își arată textura
+- [ ] Unealta Poziționează textura (Inspector → Poziția texturii → 🖼 sau palette): trage = mută; Shift = rotește; ⌘ = scalează; ⌘Z
+- [ ] Trage un obiect din bibliotecă peste viewport: cutia lui urmărește cursorul; ieși din viewport → dispare
+- [ ] Plante (copac, brad, tufă) și Om (cu înălțime) din bibliotecă, cu parametri în Inspector

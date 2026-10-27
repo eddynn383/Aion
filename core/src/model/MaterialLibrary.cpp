@@ -6,7 +6,7 @@ namespace aion::model {
 
 std::span<const Material> builtinMaterials()
 {
-    static const std::array<Material, 29> kMaterials { {
+    static const std::array<Material, 30> kMaterials { {
         { "Alb mat", { 242, 241, 236, 255 }, 0.9f, 0.0f },
         { "Gips", { 228, 225, 216, 255 }, 0.95f, 0.0f },
         { "Gri deschis", { 190, 192, 196, 255 }, 0.85f, 0.0f },
@@ -37,6 +37,8 @@ std::span<const Material> builtinMaterials()
         { "Lemn (fibră)", { 255, 255, 255, 255 }, 0.6f, 0.0f, {}, { 800.0, 800.0 } },
         { "Beton turnat", { 255, 255, 255, 255 }, 0.95f, 0.0f, {}, { 2000.0, 2000.0 } },
         { "Gresie 30 × 30", { 255, 255, 255, 255 }, 0.4f, 0.0f, {}, { 1200.0, 1200.0 } },
+        // Adăugate după cele texturate (indicii de mai sus rămân aceiași în fișierele și scripturile existente).
+        { "Verde brad", { 46, 96, 58, 255 }, 0.9f, 0.0f },
     } };
     return kMaterials;
 }
