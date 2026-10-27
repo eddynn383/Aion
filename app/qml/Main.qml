@@ -40,6 +40,12 @@ Window {
             { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
             { id: "ui.timeline", title: window.timelineVisible ? "Ascunde timeline-ul" : "Timeline (animații)", category: "Interfață", shortcut: "Alt+T", icon: "film" },
             { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "film" },
+            { id: "object.camera", title: "Adaugă o cameră (din vederea curentă)", category: "Obiecte", shortcut: "", icon: "camera" },
+            { id: "object.light.point", title: "Adaugă o lumină punctuală (bec)", category: "Obiecte", shortcut: "", icon: "lightbulb" },
+            { id: "object.light.spot", title: "Adaugă un spot", category: "Obiecte", shortcut: "", icon: "light-spot" },
+            { id: "object.light.directional", title: "Adaugă o lumină direcțională", category: "Obiecte", shortcut: "", icon: "sun" },
+            { id: "object.light.area", title: "Adaugă un panou luminos", category: "Obiecte", shortcut: "", icon: "light-area" },
+            { id: "camera.look", title: "Privește prin camera selectată", category: "Vizualizare", shortcut: "", icon: "video" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
@@ -137,6 +143,19 @@ Window {
         case "file.exportGltf": fileDialog.ask("exportGltf"); break
         case "file.exportPng": fileDialog.ask("exportPng"); break
         case "file.quantities": quantitiesDialog.open(); break
+        case "object.camera": doc.addCamera(viewport.cameraState(), 0); break
+        case "object.light.point":
+        case "object.light.spot":
+        case "object.light.directional":
+        case "object.light.area": {
+            const c = viewport.cameraState()
+            doc.addLight(id.slice(13), Qt.vector3d(c.tx, c.ty, c.tz))
+            break
+        }
+        case "camera.look":
+            if (doc.selectedObject.kind === "camera") viewport.animateToCamera(doc.cameraView(doc.selectedObject.id), 0.8)
+            else toast.show("Selectează o cameră (în Outliner, la Camere și lumini).")
+            break
         case "mode.interaction": doc.interactionMode = !doc.interactionMode; break
         case "rules.edit": window.openRulesEditor(); break
         case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
@@ -325,6 +344,14 @@ Window {
                     doc.setRules(target, rules)
                 } else if (action.startsWith("exportvideo:")) {
                     window.exportVideo(action.slice(12))
+                } else if (action.startsWith("object:")) {
+                    // „object:intensity=3,color=#FF0000” pe camera / lumina selectată (valori numerice sau text).
+                    const props = {}
+                    for (const kv of action.slice(7).split(",")) {
+                        const parts = kv.split("=")
+                        props[parts[0]] = isNaN(parseFloat(parts[1])) ? parts[1] : parseFloat(parts[1])
+                    }
+                    doc.setObjectProperties(props)
                 } else if (action.startsWith("drags:")) {
                     // Tragere în coordonatele ferestrei: „drags:x1,y1,x2,y2”.
                     const dg = action.slice(6).split(",").map(Number)
@@ -821,6 +848,7 @@ Window {
                     Outliner {
                         anchors.fill: parent
                         document: doc
+                        viewport: viewport
                     }
                 }
                 AccordionSection {
@@ -1188,7 +1216,13 @@ Window {
             width: parent.width
             spacing: Theme.space6
 
+            ObjectInfo {
+                width: parent.width
+                document: doc
+                viewport: viewport
+            }
             EntityInfo {
+                visible: doc.selectedObject.kind === "none"
                 width: parent.width
                 document: doc
                 onEditRules: window.openRulesEditor()
@@ -1196,7 +1230,7 @@ Window {
 
             // Fără selecție, Inspector-ul descrie modelul întreg.
             Section {
-                visible: doc.entityInfo.kind === "none"
+                visible: doc.entityInfo.kind === "none" && doc.selectedObject.kind === "none"
                 width: parent.width
                 title: "Model"
                 Text {

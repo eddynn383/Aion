@@ -20,6 +20,8 @@
 #include <QStyleHints>
 
 #include <glm/geometric.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/trigonometric.hpp>
 
 #include <algorithm>
 #include <array>
@@ -836,6 +838,154 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
                 { s.active ? 1.5f : 1.0f, s.active ? 0.0f : 5.0f } });
         }
     }
+
+    // Camerele și luminile: gizmo-uri (mărime constantă pe ecran) și luminile pentru shader.
+    const glm::vec4 gizmoColor = withAlpha(m_preview, 0.9f);
+    const glm::vec4 selectedColor = toVec4(m_accent);
+    const auto screenScale = [&](const glm::dvec3& p) {
+        // ~1 px în mm la adâncimea punctului.
+        const double depth = isOrthographic() ? m_camera.pose().distance
+                                              : std::max(glm::dot(p - m_camera.eye(), m_camera.forward()), 1.0);
+        return m_camera.worldPerPixelAtTarget() * depth / std::max(m_camera.pose().distance, 1e-6);
+    };
+    const auto basis = [](const glm::dvec3& dir) {
+        const glm::dvec3 f = glm::normalize(dir);
+        const glm::dvec3 r = glm::normalize(glm::cross(f, std::abs(f.z) > 0.99 ? glm::dvec3(1, 0, 0) : glm::dvec3(0, 0, 1)));
+        return std::array<glm::dvec3, 3> { f, r, glm::cross(r, f) };
+    };
+    const auto line = [&](const glm::dvec3& a, const glm::dvec3& b, const glm::vec4& color, float width = 1.25f,
+                          float dash = 0.0f) { f.lines.push_back({ glm::vec3(a), glm::vec3(b), color, { width, dash } }); };
+    for (std::size_t i = 0; i < model.cameras().size(); ++i) {
+        const model::CameraObject& c = model.cameras().values()[i];
+        const bool selected = model.cameras().keys()[i] == doc.selectedCamera();
+        if (!c.visible && !selected) {
+            continue;
+        }
+        const glm::vec4 color = selected ? selectedColor : gizmoColor;
+        const glm::dvec3 eye = c.position;
+        const double k = screenScale(eye) * 36.0;
+        const auto [fw, r, u] = basis(c.target - c.position);
+        const double h = std::tan(glm::radians(c.fov) * 0.5) * k;
+        const double w = h * 1.5;
+        const glm::dvec3 center = eye + fw * k;
+        const std::array<glm::dvec3, 4> q { center + r * w + u * h, center - r * w + u * h, center - r * w - u * h,
+            center + r * w - u * h };
+        for (std::size_t j = 0; j < 4; ++j) {
+            line(eye, q[j], color);
+            line(q[j], q[(j + 1) % 4], color);
+        }
+        // Triunghiul de sus arată unde e „sus”.
+        line(center - r * w * 0.4 + u * h * 1.15, center + u * h * 1.6, color);
+        line(center + r * w * 0.4 + u * h * 1.15, center + u * h * 1.6, color);
+        line(center - r * w * 0.4 + u * h * 1.15, center + r * w * 0.4 + u * h * 1.15, color);
+        if (selected) {
+            line(eye, c.target, withAlpha(m_accent, 0.6f), 1.0f, 6.0f);
+            f.topPoints.push_back({ glm::vec3(c.target), withAlpha(m_accent, 0.8f), 6.0f });
+        }
+        f.topPoints.push_back({ glm::vec3(eye), color, selected ? 9.0f : 7.0f });
+    }
+    for (std::size_t i = 0; i < model.lights().size(); ++i) {
+        const model::Light& l = model.lights().values()[i];
+        const bool selected = model.lights().keys()[i] == doc.selectedLight();
+        const QColor qc(l.color.r, l.color.g, l.color.b);
+        if (l.enabled && static_cast<int>(f.lights.size()) < kMaxLights) {
+            LightData d;
+            d.kind = static_cast<int>(l.kind);
+            d.position = glm::vec3(l.position);
+            d.direction = glm::vec3(glm::normalize(l.direction));
+            const auto lin = [](double c) { return static_cast<float>(std::pow(c, 2.2)); };
+            d.color = glm::vec3(lin(qc.redF()), lin(qc.greenF()), lin(qc.blueF())) * static_cast<float>(l.intensity);
+            d.range = static_cast<float>(l.range);
+            const double half = glm::radians(l.cone) * 0.5;
+            d.cosOuter = static_cast<float>(std::cos(half));
+            d.cosInner = static_cast<float>(std::cos(half * (1.0 - std::clamp(l.softness, 0.0, 1.0))));
+            d.size = static_cast<float>((l.width + l.height) * 0.5);
+            f.lights.push_back(d);
+        }
+        if (!l.visible && !selected) {
+            continue;
+        }
+        const glm::vec4 color = selected ? selectedColor : withAlpha(qc, l.enabled ? 0.95f : 0.4f);
+        const glm::dvec3 p = l.position;
+        const double k = screenScale(p);
+        const auto [fw, r, u] = basis(l.direction);
+        switch (l.kind) {
+        case model::Light::Kind::Point:
+            for (const glm::dvec3& axis : { glm::dvec3(1, 0, 0), glm::dvec3(0, 1, 0), glm::dvec3(0, 0, 1),
+                     glm::normalize(glm::dvec3(1, 1, 1)), glm::normalize(glm::dvec3(1, -1, 1)) }) {
+                line(p - axis * k * 14.0, p + axis * k * 14.0, color);
+            }
+            break;
+        case model::Light::Kind::Spot: {
+            const double length = k * 60.0;
+            const double radius = std::tan(glm::radians(l.cone) * 0.5) * length;
+            glm::dvec3 previous {};
+            for (int j = 0; j <= 16; ++j) {
+                const double a = j * glm::two_pi<double>() / 16.0;
+                const glm::dvec3 q = p + fw * length + (r * std::cos(a) + u * std::sin(a)) * radius;
+                if (j > 0) {
+                    line(previous, q, color);
+                }
+                if (j % 4 == 0 && j < 16) {
+                    line(p, q, color);
+                }
+                previous = q;
+            }
+            break;
+        }
+        case model::Light::Kind::Directional:
+            for (int j = -1; j <= 1; ++j) {
+                const glm::dvec3 a = p + r * (j * k * 14.0);
+                line(a, a + fw * k * 50.0, color);
+                line(a + fw * k * 50.0, a + fw * k * 40.0 + r * k * 5.0, color);
+                line(a + fw * k * 50.0, a + fw * k * 40.0 - r * k * 5.0, color);
+            }
+            break;
+        case model::Light::Kind::Area: {
+            const std::array<glm::dvec3, 4> q { p + r * l.width * 0.5 + u * l.height * 0.5,
+                p - r * l.width * 0.5 + u * l.height * 0.5, p - r * l.width * 0.5 - u * l.height * 0.5,
+                p + r * l.width * 0.5 - u * l.height * 0.5 };
+            for (std::size_t j = 0; j < 4; ++j) {
+                line(q[j], q[(j + 1) % 4], color, 1.5f);
+            }
+            line(p, p + fw * k * 40.0, color, 1.0f, 4.0f);
+            break;
+        }
+        }
+        f.topPoints.push_back({ glm::vec3(p), color, selected ? 11.0f : 9.0f });
+    }
+}
+
+std::optional<std::pair<QString, double>> Viewport::objectHandleAt(QPointF position) const
+{
+    if (!m_document) {
+        return std::nullopt;
+    }
+    const model::Model& model = m_document->model();
+    std::optional<std::pair<QString, double>> best;
+    double bestDistance = 12.0;
+    const auto consider = [&](const math::Vec3d& p, const QString& kind, double id) {
+        if (const auto screen = m_camera.project(p)) {
+            const double d = glm::length(*screen - toVec2(position));
+            if (d < bestDistance) {
+                bestDistance = d;
+                best = std::pair { kind, id };
+            }
+        }
+    };
+    for (std::size_t i = 0; i < model.cameras().size(); ++i) {
+        if (model.cameras().values()[i].visible) {
+            consider(model.cameras().values()[i].position, QStringLiteral("camera"),
+                static_cast<double>(model.cameras().keys()[i].value));
+        }
+    }
+    for (std::size_t i = 0; i < model.lights().size(); ++i) {
+        if (model.lights().values()[i].visible) {
+            consider(model.lights().values()[i].position, QStringLiteral("light"),
+                static_cast<double>(model.lights().keys()[i].value));
+        }
+    }
+    return best;
 }
 
 QVariantMap Viewport::cameraState() const
@@ -843,7 +993,8 @@ QVariantMap Viewport::cameraState() const
     const view::CameraPose& p = m_camera.pose();
     return QVariantMap { { QStringLiteral("tx"), p.target.x }, { QStringLiteral("ty"), p.target.y },
         { QStringLiteral("tz"), p.target.z }, { QStringLiteral("yaw"), p.yaw }, { QStringLiteral("pitch"), p.pitch },
-        { QStringLiteral("distance"), p.distance }, { QStringLiteral("ortho"), isOrthographic() } };
+        { QStringLiteral("distance"), p.distance }, { QStringLiteral("ortho"), isOrthographic() },
+        { QStringLiteral("fov"), glm::degrees(m_camera.fovY()) } };
 }
 
 namespace {
@@ -876,6 +1027,9 @@ void Viewport::animateToCamera(const QVariantMap& state, double seconds)
         return;
     }
     setOrthographic(state.value(QStringLiteral("ortho")).toBool());
+    // Vederea prin cameră folosește unghiul ei; celelalte (scene, vederi standard) pe cel implicit.
+    m_camera.setFovY(state.contains(QStringLiteral("fov")) ? glm::radians(state.value(QStringLiteral("fov")).toDouble())
+                                                           : view::Camera::kDefaultFovY);
     if (seconds >= 0.0) {
         m_motion.animateTo(m_camera, poseFromState(state), seconds);
     } else {
@@ -1150,6 +1304,18 @@ void Viewport::updateSceneBounds()
     view::Vec3d lo;
     view::Vec3d hi;
     sceneBounds(lo, hi);
+    // Marcajele camerelor și ale luminilor nu trebuie tăiate de planul îndepărtat (doar pentru tăiere; umbrele
+    // folosesc cutia geometriei).
+    if (m_document) {
+        for (const model::CameraObject& c : m_document->model().cameras().values()) {
+            lo = glm::min(lo, c.position);
+            hi = glm::max(hi, c.position);
+        }
+        for (const model::Light& l : m_document->model().lights().values()) {
+            lo = glm::min(lo, l.position);
+            hi = glm::max(hi, l.position);
+        }
+    }
     m_camera.setSceneBounds(lo, hi);
 }
 
@@ -1464,6 +1630,15 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             if (m_document && m_document->interactAt(m_camera, toVec2(event->position()))) {
                 requestAnimationFrame();
             }
+            event->accept();
+            return;
+        }
+    }
+    // Click pe o cameră sau o lumină (cu unealta Select): o selectează.
+    if (drag == Drag::None && event->button() == Qt::LeftButton && m_document
+        && m_document->activeTool() == QLatin1String("select")) {
+        if (const auto handle = objectHandleAt(event->position())) {
+            m_document->selectObject(handle->first, handle->second);
             event->accept();
             return;
         }

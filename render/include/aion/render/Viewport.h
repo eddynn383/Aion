@@ -25,6 +25,7 @@
 #include <atomic>
 #include <deque>
 #include <optional>
+#include <utility>
 
 namespace aion::render {
 
@@ -292,6 +293,8 @@ private:
     // Transformarea (în model) a unei definiții: prin calea editată, dacă e pe ea, altfel prin prima ei instanță.
     math::Transform definitionToWorld(const Document& doc, model::DefinitionId definition) const;
     void appendModelExtras(ViewportFrame& f, const Document& doc) const;
+    // Camera sau lumina al cărei marcaj e sub cursor: ("camera" | "light", id).
+    std::optional<std::pair<QString, double>> objectHandleAt(QPointF position) const;
 
     view::Camera m_camera;
     view::CameraMotion m_motion;

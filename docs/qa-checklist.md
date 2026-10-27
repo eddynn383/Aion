@@ -124,3 +124,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] F5 (sau ▶): bannerul apare, hover pe obiect → cursor mână; click → obiectul se mută; Esc → totul revine
 - [ ] În Modul Interacțiune nu se poate selecta, desena sau șterge nimic
 - [ ] Salvează / deschide `.aion`: regulile rămân
+## Camere și lumini (Faza 19)
+- [ ] Outliner → Camere și lumini → + : cameră din vederea curentă, bec, spot, soare, panou; apar în listă și în viewport
+- [ ] Click pe marcajul unei lumini (Select) → Inspector-ul ei; culoare, intensitate, rază, con se văd imediat pe model
+- [ ] Bec roșu lângă un perete alb → pată roșie care se stinge spre rază; spot → con cu margine estompată
+- [ ] Stinge / aprinde din Outliner; ochiul ascunde doar marcajul
+- [ ] „Privește prin cameră” (Inspector, dublu-click în Outliner, palette) → vederea și unghiul camerei; o vedere
+      standard revine la 35°
+- [ ] ⌘Z / ⇧⌘Z pe adăugare, proprietăți, ștergere; salvare și redeschidere `.aion` păstrează tot
