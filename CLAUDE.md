@@ -167,6 +167,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   locuri fixe (doar se estompează, fără să mute rândul), hover detectat cu `HoverHandler` pe rând; ordinea: ștergere,
   comenzi, stări (lacăt, aprins / stins), ochiul ultimul; o stare neobișnuită (ascuns, blocat, stins) se vede mereu.
 
+- **Inspector-ul** își grupează setările cu `components/PropertyGroup.qml` (titlu + acțiuni + câmpuri): titlu → câmpuri
+  `space1 + 2`, între categorii `space4`. Orice categorie nouă folosește PropertyGroup, ca regula să rămână aceeași.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

@@ -15,8 +15,13 @@ Column {
     readonly property var info: document ? document.entityInfo : ({ kind: "none" })
     readonly property bool isInstance: info.kind === "instance"
 
-    spacing: Theme.space3
+    // Spațierea: între categorii Theme.space4; în interiorul unei categorii (PropertyGroup) titlu → câmpuri mai puțin.
+    spacing: Theme.space4
 
+    // Titlul selecției și numele (pentru obiecte), împreună.
+    Column {
+        width: parent.width
+        spacing: Theme.space2
     Text {
         width: parent.width
         wrapMode: Text.Wrap
@@ -33,9 +38,13 @@ Column {
         text: root.isInstance ? root.info.name : ""
         onEditingFinished: if (root.isInstance && text !== root.info.name) root.document.renameInstance(root.info.instanceId, text)
     }
+    }
 
     // Detaliile: eticheta în stânga și valoarea în dreapta; dacă nu încap pe un rând, valoarea trece dedesubt.
     // Pozițiile sunt calculate direct (nu prin ancore schimbate din mers, care pot rămâne agățate).
+    Column {
+        visible: (root.info.details || []).length > 0
+        width: parent.width
     Repeater {
         model: root.info.details || []
         delegate: Item {
@@ -75,6 +84,7 @@ Column {
             }
         }
     }
+    }
 
     // Materialul grupului sau al obiectului (fețele fără material proprii îl preiau).
     MaterialSwatch {
@@ -108,22 +118,11 @@ Column {
     }
 
     // Obiect dinamic: parametrii generatorului (lățime, înălțime, număr de polițe…). Copiile legate se schimbă împreună.
-    Column {
+    PropertyGroup {
         id: parametersBox
         readonly property var parametric: root.isInstance ? (root.info.parametric ?? null) : null
         visible: parametric !== null
-        width: parent.width
-        spacing: Theme.space2
-        Row {
-            spacing: Theme.space2
-            Icon { anchors.verticalCenter: parent.verticalCenter; name: "sliders-horizontal"; size: Theme.iconSizeSm; color: Theme.accent }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Parametri · " + (parametersBox.parametric ? parametersBox.parametric.name : "")
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSm
-            }
-        }
+        title: "Parametri · " + (parametric ? parametric.name : "")
         Repeater {
             model: parametersBox.parametric ? parametersBox.parametric.parameters : []
             delegate: NumberField {
@@ -156,7 +155,7 @@ Column {
         id: transformBox
         visible: root.isInstance
         width: parent.width
-        spacing: Theme.space2
+        spacing: Theme.space4
 
         readonly property var p: root.isInstance && root.info.placement ? root.info.placement : ({})
         readonly property int locks: root.isInstance ? (root.info.locks ?? 0) : 0
@@ -252,94 +251,78 @@ Column {
             }
         }
 
-        component Caption: Item {
-            property alias text: captionText.text
-            default property alias trailing: trailingRow.data
-            width: parent ? parent.width : 0
-            height: Theme.controlHeightSm
-            Text {
-                id: captionText
-                anchors.verticalCenter: parent.verticalCenter
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSm
-            }
-            Row {
-                id: trailingRow
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-            }
-        }
-
-        Caption { text: "Poziție (mm)" }
+        PropertyGroup {
+        title: "Poziție (mm)"
         Row {
             spacing: Theme.space1
             PlacementField { label: "X"; lockBit: 0; value: transformBox.p.px ?? 0; onValueModified: (v) => root.document.setPlacement({ px: v }) }
             PlacementField { label: "Y"; lockBit: 1; value: transformBox.p.py ?? 0; onValueModified: (v) => root.document.setPlacement({ py: v }) }
             PlacementField { label: "Z"; lockBit: 2; value: transformBox.p.pz ?? 0; onValueModified: (v) => root.document.setPlacement({ pz: v }) }
         }
+        }
 
-        Caption {
-            text: "Dimensiuni (mm)"
-            IconButton {
-                width: 24; height: 24; iconSize: Theme.iconSizeSm
+        PropertyGroup {
+            title: "Dimensiuni (mm)"
+            actions: IconButton {
+                width: 20; height: 20; iconSize: 13
                 iconName: "link"
                 tooltip: transformBox.linkProportions ? "Proporții legate" : "Leagă proporțiile"
                 checked: transformBox.linkProportions
                 solidChecked: false
                 onClicked: transformBox.linkProportions = !transformBox.linkProportions
             }
-        }
         Row {
             spacing: Theme.space1
             PlacementField { label: "X"; lockBit: 3; from: 0.01; value: transformBox.p.dx ?? 0; onValueModified: (v) => transformBox.setSize("dx", v) }
             PlacementField { label: "Y"; lockBit: 4; from: 0.01; value: transformBox.p.dy ?? 0; onValueModified: (v) => transformBox.setSize("dy", v) }
             PlacementField { label: "Z"; lockBit: 5; from: 0.01; value: transformBox.p.dz ?? 0; onValueModified: (v) => transformBox.setSize("dz", v) }
         }
+        }
 
-        Caption { text: "Rotație (°)" }
+        PropertyGroup {
+        title: "Rotație (°)"
         Row {
             spacing: Theme.space1
             PlacementField { label: "X"; lockBit: 6; decimals: 1; from: -360; to: 360; value: transformBox.p.rx ?? 0; onValueModified: (v) => root.document.setPlacement({ rx: v }) }
             PlacementField { label: "Y"; lockBit: 7; decimals: 1; from: -360; to: 360; value: transformBox.p.ry ?? 0; onValueModified: (v) => root.document.setPlacement({ ry: v }) }
             PlacementField { label: "Z"; lockBit: 8; decimals: 1; from: -360; to: 360; value: transformBox.p.rz ?? 0; onValueModified: (v) => root.document.setPlacement({ rz: v }) }
         }
+        }
 
-        Caption {
-            text: "Scară (×)"
-            Repeater {
+        PropertyGroup {
+            title: "Scară (×)"
+            actions: Repeater {
                 model: [{ icon: "flip-horizontal", tip: "Oglindește pe X (roșu)" },
                         { icon: "flip-horizontal", tip: "Oglindește pe Y (verde)" },
                         { icon: "flip-vertical", tip: "Oglindește pe Z (albastru)" }]
                 delegate: IconButton {
                     required property var modelData
                     required property int index
-                    width: 24; height: 24; iconSize: Theme.iconSizeSm
+                    width: 20; height: 20; iconSize: 13
                     iconName: modelData.icon
                     rotation: index === 1 ? 90 : 0
                     tooltip: modelData.tip
                     onClicked: root.document.mirrorSelection(index)
                 }
             }
-        }
         Row {
             spacing: Theme.space1
             PlacementField { label: "X"; lockBit: 9; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sx ?? 1); onValueModified: (v) => root.document.setPlacement({ sx: v }) }
             PlacementField { label: "Y"; lockBit: 10; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sy ?? 1); onValueModified: (v) => root.document.setPlacement({ sy: v }) }
             PlacementField { label: "Z"; lockBit: 11; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sz ?? 1); onValueModified: (v) => root.document.setPlacement({ sz: v }) }
         }
+        }
     }
 
     // Forma selectată: linie (lungime), arc (rază, segmente), cerc / poligon (rază, segmente / laturi), dreptunghi
     // (lățime, înălțime). Mărimile se schimbă direct; un pas de undo fiecare.
-    Column {
+    PropertyGroup {
         id: shapeBox
         readonly property var shape: root.info.shape ?? null
         readonly property string kind: shape ? shape.kind : ""
         readonly property real half: (width - Theme.space1) / 2
         visible: shape !== null
-        width: parent.width
-        spacing: Theme.space2
-        Caption { text: shapeBox.kind === "line" ? "Lungime (mm)" : shapeBox.kind === "rectangle" ? "Laturi (mm)" : "Mărime" }
+        title: kind === "line" ? "Lungime (mm)" : kind === "rectangle" ? "Laturi (mm)" : "Mărime"
         NumberField {
             visible: shapeBox.kind === "line"
             width: parent.width
@@ -397,15 +380,18 @@ Column {
         readonly property real third: (width - Theme.space1 * 2) / 3
         visible: g !== null
         width: parent.width
-        spacing: Theme.space2
-        Caption { text: "Poziție (mm)" }
+        spacing: Theme.space4
+        PropertyGroup {
+        title: "Poziție (mm)"
         Row {
             spacing: Theme.space1
             NumberField { width: geometryBox.third; compact: true; label: "X"; step: 10; value: geometryBox.g ? geometryBox.g.px : 0; onValueModified: (v) => root.document.setGeometryPlacement({ px: v }) }
             NumberField { width: geometryBox.third; compact: true; label: "Y"; step: 10; value: geometryBox.g ? geometryBox.g.py : 0; onValueModified: (v) => root.document.setGeometryPlacement({ py: v }) }
             NumberField { width: geometryBox.third; compact: true; label: "Z"; step: 10; value: geometryBox.g ? geometryBox.g.pz : 0; onValueModified: (v) => root.document.setGeometryPlacement({ pz: v }) }
         }
-        Caption { text: "Dimensiuni (mm)" }
+        }
+        PropertyGroup {
+        title: "Dimensiuni (mm)"
         Row {
             spacing: Theme.space1
             Repeater {
@@ -430,7 +416,9 @@ Column {
                 }
             }
         }
-        Caption { text: "Rotește cu (°)" }
+        }
+        PropertyGroup {
+        title: "Rotește cu (°)"
         Row {
             spacing: Theme.space1
             Repeater {
@@ -454,7 +442,9 @@ Column {
                 }
             }
         }
-        Caption { text: "Scalează cu (×)" }
+        }
+        PropertyGroup {
+        title: "Scalează cu (×)"
         Row {
             spacing: Theme.space1
             Repeater {
@@ -485,6 +475,7 @@ Column {
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
+        }
     }
 
     Toggle {
@@ -496,39 +487,26 @@ Column {
     }
 
     // Poziționarea texturii pe fețele selectate (Position Texture): deplasare, rotație, scară.
-    Column {
+    PropertyGroup {
         id: textureBox
         visible: root.info.kind === "faces" && root.info.texture !== undefined
         readonly property var t: root.info.texture ?? ({})
         readonly property real half: (width - Theme.space1) / 2
-        width: parent.width
-        spacing: Theme.space2
-        Item {
-            width: parent.width
-            height: Theme.controlHeightSm
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Poziția texturii"
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSm
+        title: "Poziția texturii"
+        actions: [
+            IconButton {
+                width: 20; height: 20; iconSize: 13
+                iconName: "image"
+                tooltip: "Poziționează cu mouse-ul (trage; Shift rotește, ⌘ scalează)"
+                onClicked: root.toolRequested("texture")
+            },
+            IconButton {
+                width: 20; height: 20; iconSize: 13
+                iconName: "rotate-ccw"
+                tooltip: "Resetează poziția texturii"
+                onClicked: root.document.setFaceTexture({ reset: true })
             }
-            Row {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                IconButton {
-                    width: 24; height: 24; iconSize: Theme.iconSizeSm
-                    iconName: "image"
-                    tooltip: "Poziționează cu mouse-ul (trage; Shift rotește, ⌘ scalează)"
-                    onClicked: root.toolRequested("texture")
-                }
-                IconButton {
-                    width: 24; height: 24; iconSize: Theme.iconSizeSm
-                    iconName: "rotate-ccw"
-                    tooltip: "Resetează poziția texturii"
-                    onClicked: root.document.setFaceTexture({ reset: true })
-                }
-            }
-        }
+        ]
         Row {
             spacing: Theme.space1
             NumberField { width: textureBox.half; compact: true; label: "X"; unit: "mm"; step: 10; value: textureBox.t.ox ?? 0; onValueModified: (v) => root.document.setFaceTexture({ ox: v }) }
@@ -542,16 +520,9 @@ Column {
     }
 
     // Tag-ul: „pastile” cu tag-urile modelului (pentru obiecte, grupuri, fețe și muchii).
-    Column {
+    PropertyGroup {
         visible: root.isInstance || root.info.kind === "faces" || root.info.kind === "edges"
-        width: parent.width
-        spacing: Theme.space2
-
-        Text {
-            text: "Tag"
-            color: Theme.textSecondary
-            font.pixelSize: Theme.fontSizeSm
-        }
+        title: "Tag"
         Flow {
             width: parent.width
             spacing: Theme.space1 + 2
@@ -599,11 +570,10 @@ Column {
     }
 
     // Interacțiunea (unealta Interact): ușă pe balama sau sertar care glisează.
-    Column {
+    PropertyGroup {
         id: behaviorBox
         visible: root.isInstance
-        width: parent.width
-        spacing: Theme.space2
+        title: "Interacțiune"
 
         readonly property var behavior: root.isInstance && root.info.behavior ? root.info.behavior : ({ kind: "none" })
         readonly property int kindIndex: behavior.kind === "rotate" ? 1 : behavior.kind === "slide" ? 2 : 0
@@ -617,11 +587,6 @@ Column {
             root.document.setBehavior(b)
         }
 
-        Text {
-            text: "Interacțiune"
-            color: Theme.textSecondary
-            font.pixelSize: Theme.fontSizeSm
-        }
         Tabs {
             width: parent.width
             model: ["Niciuna", "Balama", "Glisare"]
