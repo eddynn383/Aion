@@ -263,6 +263,21 @@ Column {
         }
     }
     Toggle {
+        visible: root.isLight && root.lightKind === "spot"
+        width: parent.width
+        text: "Aruncă umbre"
+        checked: root.info.castShadows ?? false
+        onToggled: root.set({ castShadows: checked })
+    }
+    Text {
+        visible: root.isLight && root.lightKind === "spot" && (root.info.castShadows ?? false)
+        width: parent.width
+        wrapMode: Text.Wrap
+        text: "Un singur spot cu umbre la un moment dat (primul din listă). Marcajul se trage în viewport (Shift = pe verticală)."
+        color: Theme.textTertiary
+        font.pixelSize: Theme.fontSizeXs
+    }
+    Toggle {
         width: parent.width
         text: "Marcaj în viewport"
         checked: root.info.visible ?? true

@@ -8,6 +8,8 @@ Rectangle {
     id: root
 
     property var document
+    // Preferințele salvate ale aplicației (Settings din Main): grafica se scrie acolo, viewport-ul le urmează.
+    property var settings
     property var viewport
     property var commands: []
     property int category: 0
@@ -360,14 +362,55 @@ Rectangle {
                 visible: root.category === 4
                 width: parent.width
                 spacing: Theme.space4
+                // Preset-urile: aceleași setări de mai jos, alese dintr-un click.
+                Section {
+                    id: qualitySection
+                    width: parent.width
+                    title: "Calitate"
+                    readonly property var presets: [
+                        { name: "Performanță", msaa: 2, shadows: 1024, ao: false, aa: false },
+                        { name: "Echilibrat", msaa: 4, shadows: 2048, ao: true, aa: true },
+                        { name: "Calitate", msaa: 8, shadows: 4096, ao: true, aa: true } ]
+                    readonly property int current: root.settings ? presets.findIndex(p => p.msaa === root.settings.msaa
+                        && p.shadows === root.settings.shadowQuality && p.ao === root.settings.ambientOcclusion
+                        && p.aa === root.settings.progressiveAA) : -1
+                    Tabs {
+                        width: parent.width
+                        model: qualitySection.presets.map(p => p.name)
+                        currentIndex: qualitySection.current
+                        onCurrentIndexChanged: {
+                            const p = qualitySection.presets[currentIndex]
+                            if (!p || !root.settings || currentIndex === qualitySection.current)
+                                return
+                            root.settings.msaa = p.msaa
+                            root.settings.shadowQuality = p.shadows
+                            root.settings.ambientOcclusion = p.ao
+                            root.settings.progressiveAA = p.aa
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: qualitySection.current < 0 ? "Personalizat (setările de mai jos)." : "Performanță: pentru modele mari sau calculatoare "
+                              + "mai slabe. Calitate: cele mai fine margini și umbre."
+                        color: Theme.textTertiary
+                        font.pixelSize: Theme.fontSizeXs
+                    }
+                }
                 Section {
                     width: parent.width
                     title: "Anti-aliasing (MSAA)"
                     Tabs {
                         width: parent.width
                         model: ["Fără", "2×", "4×", "8×"]
-                        currentIndex: root.viewport ? [1, 2, 4, 8].indexOf(root.viewport.antialiasing) : 2
-                        onCurrentIndexChanged: if (root.viewport && currentIndex >= 0) root.viewport.antialiasing = [1, 2, 4, 8][currentIndex]
+                        currentIndex: root.settings ? [1, 2, 4, 8].indexOf(root.settings.msaa) : 2
+                        onCurrentIndexChanged: if (root.settings && currentIndex >= 0) root.settings.msaa = [1, 2, 4, 8][currentIndex]
+                    }
+                    Toggle {
+                        width: parent.width
+                        text: "Margini mai fine cât camera stă pe loc (8×)"
+                        checked: root.settings ? root.settings.progressiveAA : true
+                        onToggled: root.settings.progressiveAA = checked
                     }
                 }
                 Section {
@@ -376,8 +419,32 @@ Rectangle {
                     Tabs {
                         width: parent.width
                         model: ["Scăzută", "Medie", "Înaltă"]
-                        currentIndex: root.viewport ? Math.max(0, [1024, 2048, 4096].indexOf(root.viewport.shadowQuality)) : 1
-                        onCurrentIndexChanged: if (root.viewport) root.viewport.shadowQuality = [1024, 2048, 4096][currentIndex]
+                        currentIndex: root.settings ? Math.max(0, [1024, 2048, 4096].indexOf(root.settings.shadowQuality)) : 1
+                        onCurrentIndexChanged: if (root.settings) root.settings.shadowQuality = [1024, 2048, 4096][currentIndex]
+                    }
+                    Toggle {
+                        width: parent.width
+                        text: "Umbrire ambientală (SSAO): colțurile și contactele mai întunecate"
+                        checked: root.settings ? root.settings.ambientOcclusion : true
+                        onToggled: root.settings.ambientOcclusion = checked
+                    }
+                }
+                Section {
+                    width: parent.width
+                    title: "Mediu de iluminare"
+                    Tabs {
+                        width: parent.width
+                        readonly property var keys: ["simplu", "studio", "exterior", "innorat"]
+                        model: ["Simplu", "Studio", "Exterior", "Înnorat"]
+                        currentIndex: root.settings ? Math.max(0, keys.indexOf(root.settings.environment)) : 0
+                        onCurrentIndexChanged: if (root.settings) root.settings.environment = keys[currentIndex]
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: "Culoarea luminii ambientale și reflexiile pe suprafețele netede (sticlă, metal, lac)."
+                        color: Theme.textTertiary
+                        font.pixelSize: Theme.fontSizeXs
                     }
                 }
                 Section {

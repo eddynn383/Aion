@@ -52,6 +52,12 @@ Window {
             { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
             { id: "edit.soften", title: "Soften / Smooth (muchii netede după unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
             { id: "library.save", title: "Salvează obiectul selectat în bibliotecă", category: "Obiecte", shortcut: "", icon: "book-open" },
+            { id: "view.environment:simplu", title: "Mediu: simplu", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:studio", title: "Mediu: studio", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:exterior", title: "Mediu: exterior", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:innorat", title: "Mediu: înnorat", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.ambientOcclusion", title: "Umbrire ambientală (SSAO)", category: "Vizualizare", shortcut: "", icon: "circle" },
+            { id: "view.progressiveAA", title: "Antialiasing progresiv (cât camera stă pe loc)", category: "Vizualizare", shortcut: "", icon: "circle" },
             { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
@@ -145,6 +151,10 @@ Window {
             if (!r.ok) toast.show("Plugin: " + r.error)
             return
         }
+        if (id.startsWith("view.environment:")) {
+            preferences.environment = id.slice(17)
+            return
+        }
         if (id === "script.console") {
             scriptConsole.open()
             return
@@ -202,6 +212,13 @@ Window {
         case "edit.array": arrayPanel.start(); break
         case "edit.soften": softenPanel.start(); break
         case "library.save": window.saveToLibrary(); break
+        case "debug.materialsOnly":
+            preferences.leftOutliner = preferences.leftLibrary = preferences.leftTags = false
+            preferences.leftScenes = preferences.leftInteractions = false
+            preferences.leftMaterials = true
+            break
+        case "view.ambientOcclusion": preferences.ambientOcclusion = !preferences.ambientOcclusion; break
+        case "view.progressiveAA": preferences.progressiveAA = !preferences.progressiveAA; break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
@@ -394,6 +411,15 @@ Window {
                     // Click în coordonatele ferestrei (butoane, câmpuri).
                     const cs = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
+                } else if (action.startsWith("draglight:")) {
+                    // „draglight:dx,dy,shift”: trage marcajul primei lumini cu (dx, dy) pixeli; afișează poziția.
+                    const dl = action.slice(10).split(",").map(Number)
+                    doc.selectObject("light", doc.lights[0].id)
+                    const p = doc.selectedObject.position
+                    const screen = viewport.mapToItem(window.contentItem, viewport.projectToScreen(Qt.vector3d(p[0], p[1], p[2])))
+                    const before = JSON.stringify(p) // înainte de tragere (p e o referință vie)
+                    AppInfo.simulateDrag(window.contentItem, screen, Qt.point(screen.x + dl[0], screen.y + dl[1]))
+                    console.info("light:", before, "→", JSON.stringify(doc.selectedObject.position), "undo:", doc.undoName)
                 } else if (action.startsWith("droppreview:")) {
                     // „droppreview:gen:table,700,450”: cutia de previzualizare a obiectului la poziția din viewport.
                     const dp = action.slice(12).split(",")
@@ -651,6 +677,11 @@ Window {
         property bool leftInteractions: false
         // Înălțimile secțiunilor din stânga (JSON: cheie → px), schimbate trăgând de marginea lor.
         property string leftSectionHeights: "{}"
+        property string environment: "simplu"
+        property bool ambientOcclusion: true
+        property bool progressiveAA: true
+        property int msaa: 4
+        property int shadowQuality: 2048
         property real gridStep: 0
     }
     Component.onCompleted: {
@@ -711,6 +742,7 @@ Window {
         sourceComponent: PreferencesPage {
             document: doc
             viewport: viewport
+            settings: preferences
             commands: window.commands
             onCloseRequested: preferencesPage.active = false
         }
@@ -724,17 +756,38 @@ Window {
         parent: viewport
         anchors.fill: parent
         keys: ["aion-library"]
+        // Un material tras: Paint Bucket e activ cât timp e deasupra (fața de sub cursor se evidențiază).
+        property string toolBeforeMaterial: ""
+        readonly property bool material: libraryGhost.itemId.startsWith("mat:")
+        onEntered: if (material) { toolBeforeMaterial = window.activeTool; window.selectTool("paint") }
         // Cutia obiectului urmează cursorul (pe suprafața sau solul de sub el).
         onPositionChanged: (drag) => {
+            if (material) {
+                viewport.toolHoverAt(Qt.point(drag.x, drag.y))
+                return
+            }
             const size = doc.libraryItemSize(libraryGhost.itemId)
             if (size.dx === undefined)
                 return
             viewport.setDropPreview(viewport.dropPointAt(Qt.point(drag.x, drag.y)), Qt.vector3d(size.dx, size.dy, size.dz))
         }
-        onExited: viewport.clearDropPreview()
+        onExited: {
+            viewport.clearDropPreview()
+            if (material && toolBeforeMaterial.length > 0) window.selectTool(toolBeforeMaterial)
+        }
         onDropped: (drop) => {
             viewport.clearDropPreview()
-            doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
+            if (material) {
+                // „mat:model:ID” / „mat:lib:INDEX”: îl alegem ca material curent și vopsim fața (sau obiectul) de sub cursor.
+                const parts = libraryGhost.itemId.split(":")
+                if (parts[1] === "model") doc.selectModelMaterial(parseFloat(parts[2]))
+                else doc.selectLibraryMaterial(parseInt(parts[2]))
+                viewport.toolClickAt(Qt.point(drop.x, drop.y))
+                if (toolBeforeMaterial.length > 0) window.selectTool(toolBeforeMaterial)
+                toolBeforeMaterial = ""
+            } else {
+                doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
+            }
             drop.accept()
         }
     }
@@ -1179,6 +1232,13 @@ Window {
                         anchors.fill: parent
                         document: doc
                         onPaintRequested: window.selectTool("paint")
+                        onDragStarted: (id, label) => {
+                            libraryGhost.itemId = id
+                            libraryGhost.label = label
+                            libraryGhost.icon = "paint-bucket"
+                        }
+                        onDragMoved: (p) => libraryGhost.position = p
+                        onDragEnded: libraryGhost.finish()
                         onPickTextureImage: {
                             fileDialog.textureCallback = (path) => materialsPanel.textureChosen(path)
                             fileDialog.ask("textureImage")
@@ -1295,6 +1355,11 @@ Window {
 
     Viewport {
         id: viewport
+        environment: preferences.environment
+        ambientOcclusion: preferences.ambientOcclusion
+        progressiveAntialiasing: preferences.progressiveAA
+        antialiasing: preferences.msaa
+        shadowQuality: preferences.shadowQuality
         onFramesPerSecondChanged: if (AppInfo.startupActions.length > 0) console.info("fps:", framesPerSecond)
         anchors.top: titleBar.bottom
         anchors.bottom: timeline.visible ? timeline.top : statusBar.top
@@ -1575,6 +1640,7 @@ Window {
             anchors.rightMargin: Theme.space1
             viewport: viewport
             document: doc
+            onEnvironmentChosen: (key) => preferences.environment = key
         }
 
         NavigationGizmo {

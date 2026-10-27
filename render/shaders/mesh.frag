@@ -37,10 +37,44 @@ layout(std140, binding = 0) uniform Frame {
     vec4 lightColor[8]; // rgb = culoarea liniară × intensitatea, w = raza
     vec4 lightDirection[8]; // xyz = încotro bate lumina, w = cos(jumătatea conului)
     vec4 lightExtra[8]; // x = cos(începutul marginii conului), y = mărimea (suprafață)
+    mat4 spotViewProj;  // harta de umbre a spotului
+    vec4 spotShadow;    // x = 1 dacă e activă, y = indexul luminii, z = pasul de filtrare, w = bias (mm)
+    vec4 spotRange;     // x = planul apropiat, y = cel îndepărtat (mm)
+    vec4 envZenith;     // mediul: rgb liniar, a = intensitatea luminii ambientale
+    vec4 envHorizon;
+    vec4 envGround;
+    vec4 envParams;     // x = tăria reflexiilor, y = 1 dacă SSAO e activă
+    mat4 view;
+    mat4 projection;
+    mat4 invProjection;
 } frame;
 
 layout(binding = 1) uniform sampler2D shadowMap;
 layout(binding = 2) uniform sampler2DArray materialTextures;
+layout(binding = 3) uniform sampler2D spotShadowMap;
+layout(binding = 4) uniform sampler2D ssaoMap;
+
+// Culoarea mediului pe direcția dată: spre zenit cerul, spre nadir solul, cu orizontul între ele.
+vec3 environment(vec3 d)
+{
+    return d.z >= 0.0 ? mix(frame.envHorizon.rgb, frame.envZenith.rgb, d.z)
+                      : mix(frame.envHorizon.rgb, frame.envGround.rgb, min(1.0, -d.z));
+}
+
+// Umbrirea ambientală de la pixelul curent (filtrată 2 × 2 peste harta SSAO).
+float ambientOcclusion()
+{
+    if (frame.envParams.y < 0.5)
+        return 1.0;
+    // Netezire 4 × 4 (cu pas de 1,5 pixeli, eșantioane biliniare): zgomotul rotației pe pixel dispare.
+    vec2 texel = 1.0 / frame.viewport.xy;
+    vec2 uv = gl_FragCoord.xy * texel;
+    float ao = 0.0;
+    for (int x = -2; x < 2; ++x)
+        for (int y = -2; y < 2; ++y)
+            ao += texture(ssaoMap, uv + (vec2(x, y) + 0.5) * texel * 1.5).r;
+    return ao / 16.0;
+}
 
 vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
 vec3 toSrgb(vec3 c) { return pow(c, vec3(1.0 / 2.2)); }
@@ -72,6 +106,37 @@ float shadowFactor(vec3 world, vec3 n)
         }
     }
     return mix(1.0, lit / 9.0, frame.shadow.w);
+}
+
+// Adâncimea liniară (mm de la spot) din adâncimea perspectivă [0, 1]: în perspectivă valorile se strâng lângă 1,
+// iar un bias în [0, 1] ar acoperi metri întregi.
+float spotLinear(float d)
+{
+    float n = frame.spotRange.x;
+    float f = frame.spotRange.y;
+    return n * f / (f - d * (f - n));
+}
+
+// Cât din punct vede spotul (1 = luminat), cu filtrare PCF 3 × 3.
+float spotShadowFactor(vec3 world, vec3 n)
+{
+    vec4 lp = frame.spotViewProj * vec4(world + n * 2.0, 1.0);
+    if (lp.w <= 0.0)
+        return 1.0;
+    vec3 ndc = lp.xyz / lp.w;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    if (frame.params.y < 0.5)
+        uv.y = 1.0 - uv.y;
+    if (uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0)
+        return 1.0;
+    float depth = spotLinear(frame.viewport.w > 0.5 ? ndc.z : ndc.z * 0.5 + 0.5);
+    float lit = 0.0;
+    for (int x = -1; x <= 1; ++x)
+        for (int y = -1; y <= 1; ++y) {
+            float stored = texture(spotShadowMap, uv + vec2(x, y) * frame.spotShadow.z * 0.5).r;
+            lit += depth - frame.spotShadow.w <= spotLinear(stored) ? 1.0 : 0.0;
+        }
+    return lit / 9.0;
 }
 
 void main()
@@ -108,10 +173,12 @@ void main()
     if (layer > -0.5 && style != 1)
         albedo *= toLinear(texture(materialTextures, vec3(backMaterial ? v_uv.zw : v_uv.xy, layer)).rgb);
     vec3 l = normalize(frame.lightDir.xyz);
-    float hemi = 0.5 + 0.5 * n.z;
-    vec3 sky = mix(vec3(0.42, 0.40, 0.38), vec3(0.62, 0.68, 0.78), hemi);
+    // Lumina ambientală din mediu (după normală), atenuată de SSAO.
+    float ao = ambientOcclusion();
+    vec3 sky = environment(n) * (frame.envZenith.a / 0.55) * ao;
     float sun = max(dot(n, l), 0.0) * frame.lightDir.w * shadowFactor(v_world, n);
-    vec3 diffuse = albedo * (sky * 0.55 + vec3(1.0, 0.97, 0.92) * sun * 0.95) * (1.0 - metallic * 0.6);
+    // Umbrirea ambientală întunecă și puțin lumina directă (colțurile și contactele se citesc mai bine).
+    vec3 diffuse = albedo * (sky * 0.55 + vec3(1.0, 0.97, 0.92) * sun * 0.95 * mix(1.0, ao, 0.45)) * (1.0 - metallic * 0.6);
 
     // Strălucire (Blinn-Phong) mai îngustă pentru suprafețe netede; metalele o colorează.
     vec3 h = normalize(l + toEye);
@@ -119,6 +186,14 @@ void main()
     float spec = pow(max(dot(n, h), 0.0), shininess) * (1.0 - roughness) * sun;
     vec3 specColor = mix(vec3(0.04), albedo, metallic);
     vec3 color = diffuse + specColor * spec * 2.0;
+
+    // Reflexiile mediului (Fresnel Schlick), estompate spre lumina ambientală cu cât suprafața e mai aspră.
+    if (frame.envParams.x > 0.0) {
+        vec3 r = reflect(-toEye, n);
+        vec3 env = mix(environment(r), environment(n), roughness);
+        vec3 fresnel = specColor + (1.0 - specColor) * pow(1.0 - max(dot(n, toEye), 0.0), 5.0);
+        color += env * fresnel * (1.0 - roughness * 0.75) * frame.envParams.x * frame.envZenith.a * ao;
+    }
 
     // Luminile modelului: atenuare netedă până la rază, con pentru spot, o singură față pentru suprafață.
     int count = int(frame.lightCount.x + 0.5);
@@ -148,6 +223,8 @@ void main()
             }
         }
         float ndl = max(dot(n, toLight), 0.0) * att;
+        if (frame.spotShadow.x > 0.5 && i == int(frame.spotShadow.y + 0.5) && ndl > 0.0)
+            ndl *= spotShadowFactor(v_world, n);
         if (ndl <= 0.0)
             continue;
         vec3 lc = frame.lightColor[i].rgb;

@@ -102,9 +102,10 @@ const guides = {
     },
     scale: {
         title: "Scale",
-        summary: "Mărește sau micșorează selecția uniform.",
-        steps: ["Click pe un mâner (punct verde)", "Mișcă mouse-ul și dă click", "Sau tastează factorul (2 sau 0.5)"],
-        tip: "Punctul opus mânerului rămâne pe loc"
+        summary: "Mărește sau micșorează selecția: uniform, pe două axe sau pe una.",
+        steps: ["Click pe un mâner: colț = uniform, mijlocul unei muchii = două axe, centrul unei fețe = o axă",
+                "Mișcă mouse-ul și dă click", "Sau tastează factorul: 2, 0.5 ori 2,1,1.5 (X, Y, Z)"],
+        tip: "Punctul opus mânerului rămâne pe loc; cu Option scalezi din centru, iar un factor negativ oglindește"
     },
     tape: {
         title: "Tape Measure",

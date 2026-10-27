@@ -185,7 +185,22 @@ std::pair<glm::dvec3, double> sunPosition(double hour, int month, double latitud
 Viewport::Viewport(QQuickItem* parent)
     : QQuickRhiItem(parent)
 {
-    setSampleCount(4);
+    setSampleCount(m_preferredSamples);
+    m_stillTimer.setSingleShot(true);
+    m_stillTimer.setInterval(400);
+    connect(&m_stillTimer, &QTimer::timeout, this, [this] {
+        if (m_progressiveAA && sampleCount() < kStillSamples) {
+            setSampleCount(kStillSamples);
+            update();
+        }
+    });
+    connect(this, &Viewport::appearanceChanged, this, [this] {
+        if (!m_progressiveAA && sampleCount() != m_preferredSamples) {
+            setSampleCount(m_preferredSamples);
+        } else if (m_progressiveAA) {
+            m_stillTimer.start();
+        }
+    });
     setAcceptedMouseButtons(Qt::LeftButton | Qt::MiddleButton | Qt::RightButton);
     setAcceptHoverEvents(true);
     setFlag(ItemIsFocusScope, false);
@@ -928,6 +943,9 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
             d.cosOuter = static_cast<float>(std::cos(half));
             d.cosInner = static_cast<float>(std::cos(half * (1.0 - std::clamp(l.softness, 0.0, 1.0))));
             d.size = static_cast<float>((l.width + l.height) * 0.5);
+            if (l.kind == model::Light::Kind::Spot && l.castShadows && f.shadowSpot < 0 && f.style != 3) {
+                f.shadowSpot = static_cast<int>(f.lights.size());
+            }
             f.lights.push_back(d);
         }
         if ((!l.visible && !selected) || m_cleanCapture) {
@@ -1325,6 +1343,24 @@ void Viewport::setDropPreview(const QVector3D& corner, const QVector3D& size)
     update();
 }
 
+void Viewport::toolHoverAt(const QPointF& position)
+{
+    if (m_document && m_document->hasTool()) {
+        m_document->pointerMove(m_camera, toolEvent(position, {}, 0));
+        afterToolEvent();
+    }
+}
+
+void Viewport::toolClickAt(const QPointF& position)
+{
+    if (m_document && m_document->hasTool()) {
+        m_document->pointerMove(m_camera, toolEvent(position, {}, 0));
+        m_document->pointerDown(m_camera, toolEvent(position, {}, 1));
+        m_document->pointerUp(m_camera, toolEvent(position, {}, 1));
+        afterToolEvent();
+    }
+}
+
 void Viewport::clearDropPreview()
 {
     m_dropPreview.reset();
@@ -1496,9 +1532,33 @@ ViewportFrame Viewport::frameForRendering() const
     f.colors.accent = toVec4(m_accent);
     f.style = styleIndex(m_displayStyle);
     f.fog = m_fog;
+    // Mediul de iluminare (culorile cerului și ale solului ca lumină ambientală, plus reflexii).
+    if (m_environment == QLatin1String("studio")) {
+        f.envZenith = { 0.92f, 0.92f, 0.95f, 0.62f };
+        f.envHorizon = { 0.80f, 0.80f, 0.83f, 0.62f };
+        f.envGround = { 0.34f, 0.34f, 0.36f, 0.62f };
+        f.envReflection = 0.65f;
+    } else if (m_environment == QLatin1String("exterior")) {
+        f.envZenith = { 0.36f, 0.56f, 0.95f, 0.62f };
+        f.envHorizon = { 0.82f, 0.86f, 0.92f, 0.62f };
+        f.envGround = { 0.42f, 0.37f, 0.30f, 0.62f };
+        f.envReflection = 0.5f;
+    } else if (m_environment == QLatin1String("innorat")) {
+        f.envZenith = { 0.74f, 0.76f, 0.79f, 0.82f };
+        f.envHorizon = { 0.80f, 0.81f, 0.82f, 0.82f };
+        f.envGround = { 0.46f, 0.46f, 0.46f, 0.82f };
+        f.envReflection = 0.35f;
+    } else {
+        // „simplu”: lumina de cer de până acum (fără reflexii).
+        f.envZenith = { 0.62f, 0.68f, 0.78f, 0.55f };
+        f.envGround = { 0.42f, 0.40f, 0.38f, 0.55f };
+        f.envHorizon = (f.envZenith + f.envGround) * 0.5f;
+        f.envReflection = 0.0f;
+    }
+    f.ambientOcclusion = m_ambientOcclusion;
     const auto [sunDir, sunIntensity] = sunPosition(m_sunHour, m_sunMonth, m_latitude);
     f.sunDirection = m_shadows ? sunDir : glm::normalize(glm::dvec3(-0.4, -0.6, 0.7));
-    f.sunIntensity = m_shadows ? sunIntensity : 1.0;
+    f.sunIntensity = (m_shadows ? sunIntensity : 1.0) * (m_environment == QLatin1String("innorat") ? 0.35 : 1.0);
     f.shadows = m_shadows && sunIntensity > 0.0 && f.style != 3;
     sceneBounds(f.sceneMin, f.sceneMax);
     if (m_document) {
@@ -1544,8 +1604,31 @@ ViewportFrame Viewport::frameForRendering() const
     return f;
 }
 
+void Viewport::setPreferredSamples(int samples)
+{
+    if (samples == m_preferredSamples) {
+        return;
+    }
+    m_preferredSamples = samples;
+    setSampleCount(samples);
+    emit preferredSamplesChanged();
+    markMotion();
+}
+
+void Viewport::markMotion()
+{
+    if (!m_progressiveAA) {
+        return;
+    }
+    if (sampleCount() != m_preferredSamples) {
+        setSampleCount(m_preferredSamples);
+    }
+    m_stillTimer.start();
+}
+
 void Viewport::onCameraMoved()
 {
+    markMotion();
     updateAnnotations();
     emit cameraChanged();
     update();
@@ -1744,6 +1827,14 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         && m_document->activeTool() == QLatin1String("select")) {
         if (const auto handle = objectHandleAt(event->position())) {
             m_document->selectObject(handle->first, handle->second);
+            // Se poate și trage: mutarea întreagă e un singur pas de undo.
+            if (const auto start = m_document->selectedObjectPosition()) {
+                m_objectDrag = ObjectDrag { *start, *start, event->position(), false };
+                if (const auto grab = objectDragPoint(event->position(), event->modifiers().testFlag(Qt::ShiftModifier))) {
+                    m_objectDrag->grab = *grab;
+                }
+                m_document->beginMacro("Mută");
+            }
             event->accept();
             return;
         }
@@ -1805,10 +1896,58 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
     } else if (m_drag == Drag::Zoom) {
         m_camera.zoomAbout(std::exp(delta.y() * kDragZoomPerPixel), m_zoomDragAnchor);
         onCameraMoved();
+    } else if (m_objectDrag && m_document) {
+        const bool vertical = event->modifiers().testFlag(Qt::ShiftModifier);
+        if (!m_objectDrag->moved && QLineF(event->position(), m_objectDrag->press).length() <= kMultiClickDistancePx) {
+            return;
+        }
+        if (!m_objectDrag->moved || vertical != m_objectDrag->vertical) {
+            // La prima mișcare și la schimbarea planului (Shift), mutarea pornește din poziția curentă.
+            m_objectDrag->start = m_document->selectedObjectPosition().value_or(m_objectDrag->start);
+            m_objectDrag->vertical = vertical;
+            if (const auto grab = objectDragPoint(event->position(), vertical)) {
+                m_objectDrag->grab = *grab;
+            }
+        }
+        m_objectDrag->moved = true;
+        if (const auto point = objectDragPoint(event->position(), vertical)) {
+            math::Vec3d p = m_objectDrag->start + (*point - m_objectDrag->grab);
+            if (vertical) {
+                p.x = m_objectDrag->start.x;
+                p.y = m_objectDrag->start.y;
+            } else {
+                p.z = m_objectDrag->start.z;
+            }
+            m_document->moveSelectedObjectTo(p);
+            update();
+        }
     } else if (m_toolPressed && m_document) {
         m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
         afterToolEvent();
     }
+}
+
+std::optional<math::Vec3d> Viewport::objectDragPoint(QPointF position, bool vertical) const
+{
+    if (!m_objectDrag) {
+        return std::nullopt;
+    }
+    // Orizontal: planul Z = înălțimea obiectului. Vertical: planul vertical prin obiect, cu fața spre cameră.
+    const math::Ray ray = m_camera.rayAt(toVec2(position));
+    math::Vec3d normal { 0, 0, 1 };
+    if (vertical) {
+        const math::Vec3d f = m_camera.forward();
+        normal = glm::length(math::Vec2d(f.x, f.y)) > 1e-6 ? glm::normalize(math::Vec3d(f.x, f.y, 0.0)) : math::Vec3d { 0, 1, 0 };
+    }
+    const double denom = glm::dot(normal, ray.direction);
+    if (std::abs(denom) < 1e-9) {
+        return std::nullopt;
+    }
+    const double t = glm::dot(normal, m_objectDrag->start - ray.origin) / denom;
+    if (t <= 0.0) {
+        return std::nullopt;
+    }
+    return ray.at(t);
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
@@ -1837,6 +1976,14 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
             emit contextMenuRequested(event->position());
         }
         m_rightPress.reset();
+        event->accept();
+        return;
+    }
+    if (m_objectDrag && event->button() == Qt::LeftButton) {
+        if (m_document) {
+            m_document->endMacro(m_objectDrag->moved);
+        }
+        m_objectDrag.reset();
         event->accept();
         return;
     }

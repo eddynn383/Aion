@@ -157,6 +157,12 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   înălțimea ei (`bodyHeight`), trasă de marginea de jos (`resizeRequested` / `resetRequested`) și păstrată în
   `preferences.leftSectionHeights` (JSON cheie → px).
 
+- **Etapa 4** (Fazele 28–31, ADR 0028): marcajele luminilor / camerelor se trag (`Viewport::m_objectDrag`), umbre
+  pentru un spot (a doua hartă, adâncime liniară), Scale cu mânere (`ScaleTool`, 26 de mânere, VCB pe axe),
+  materiale trase pe fețe (Paint Bucket temporar), medii procedurale + SSAO (`gbuffer.frag`, `ssao.frag`) + MSAA 8×
+  la cameră oprită, preset-uri de calitate. Acțiuni de script: `view.environment:studio`, `view.ambientOcclusion`
+  (comută și salvează în profilul de test!), `draglight:dx,dy`, `debug.materialsOnly`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

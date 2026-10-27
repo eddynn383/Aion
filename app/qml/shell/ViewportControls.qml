@@ -9,6 +9,8 @@ Row {
 
     property var viewport
     property var document
+    // Mediul ales din meniul soarelui (Main îl salvează în preferințe, iar viewport-ul îl urmează).
+    signal environmentChosen(string key)
 
     spacing: Theme.space2
 
@@ -164,7 +166,7 @@ Row {
         }
         Chevron {
             popup: sunPopup
-            tooltip: "Ora, luna"
+            tooltip: "Ora, luna, mediul"
             Popover {
                 id: sunPopup
                 y: parent.height + Theme.space2
@@ -200,9 +202,22 @@ Row {
                         onMoved: root.viewport.sunMonth = Math.round(value)
                     }
                     Text {
+                        text: "Mediu"
+                        color: Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeSm
+                    }
+                    Tabs {
+                        width: 228
+                        readonly property var keys: ["simplu", "studio", "exterior", "innorat"]
+                        model: ["Simplu", "Studio", "Ext.", "Înnorat"]
+                        currentIndex: root.viewport ? Math.max(0, keys.indexOf(root.viewport.environment)) : 0
+                        onCurrentIndexChanged: if (root.viewport && keys[currentIndex] !== root.viewport.environment)
+                            root.environmentChosen(keys[currentIndex])
+                    }
+                    Text {
                         width: 228
                         wrapMode: Text.Wrap
-                        text: "Latitudinea se schimbă din Preferințe (⌘,)."
+                        text: "Latitudinea, umbrirea ambientală și calitatea se schimbă din Preferințe (⌘,)."
                         color: Theme.textTertiary
                         font.pixelSize: Theme.fontSizeXs
                     }

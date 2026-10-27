@@ -102,6 +102,16 @@ struct ViewportFrame {
     glm::dvec3 sceneMax { 5000.0, 5000.0, 3000.0 };
     // Luminile modelului (în afară de soare).
     std::vector<LightData> lights;
+    // Mediul: culorile cerului (zenit, orizont) și ale solului (rgb liniar, a = intensitatea); reflexiile (x).
+    glm::vec4 envZenith { 0.62f, 0.68f, 0.78f, 0.55f };
+    glm::vec4 envHorizon { 0.52f, 0.54f, 0.58f, 0.55f };
+    glm::vec4 envGround { 0.42f, 0.40f, 0.38f, 0.55f };
+    float envReflection = 0.0f;
+    bool ambientOcclusion = false;
+    // Antialiasing progresiv: indexul cadrului acumulat (0 = cadru nou, scena s-a schimbat); -1 = oprit.
+    int accumulateIndex = -1;
+    // Spotul care aruncă umbre (primul cu „Aruncă umbre”): indexul lui în `lights`; -1 = niciunul.
+    int shadowSpot = -1;
     // Planul de secțiune activ (n, d cu n·x = d); geometria de partea normalei se ascunde.
     std::optional<glm::dvec4> section;
 };

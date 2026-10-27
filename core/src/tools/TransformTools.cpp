@@ -702,6 +702,10 @@ private:
 
 // Scalare uniformă: punctul fix, un punct de referință, apoi factorul (raportul distanțelor față de punctul fix).
 // Option: punctul fix devine centrul entităților scalate.
+// Scale (S), ca în SketchUp: în jurul selecției apare cutia ei cu mânere — colțurile scalează uniform, mijloacele
+// muchiilor pe două axe, centrele fețelor pe o singură axă. Click pe un mâner, mișcă, click din nou (sau tastează
+// factorul: „2”, ori „2,1,1.5” pe axele X, Y, Z). Punctul fix e mânerul opus; cu Option, centrul cutiei.
+// Fără selecție, primul click alege entitatea de sub cursor. Scările negative oglindesc.
 class ScaleTool final : public Tool {
 public:
     std::string_view id() const override { return "scale"; }
@@ -709,27 +713,21 @@ public:
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
         track(ctx, e);
-        switch (m_phase) {
-        case Phase::Anchor:
-            m_target = targetAt(ctx, e.screen);
-            if (m_target.empty() || !m_inference.valid()) {
-                return;
-            }
-            m_anchor = m_inference.point;
-            m_center = centerOf(ctx, m_target);
-            m_preview = previewEdges(ctx, m_target);
-            m_reference = m_anchor;
-            m_phase = Phase::Reference;
-            return;
-        case Phase::Reference:
-            if (glm::length(m_reference - m_anchor) > tol::kLength) {
-                m_phase = Phase::Factor;
-                m_factor = 1.0;
-            }
-            return;
-        case Phase::Factor:
+        if (m_dragging) {
             commit(ctx);
             return;
+        }
+        if (m_hoverHandle >= 0) {
+            startDrag(ctx, e);
+            return;
+        }
+        // Fără mâner sub cursor: alege entitatea (dacă nu e nimic selectat), ca să-i apară mânerele.
+        if (ctx.selection.empty()) {
+            const Target t = targetAt(ctx, e.screen);
+            if (!t.selection.empty()) {
+                ctx.selection = t.selection;
+                refreshBox(ctx);
+            }
         }
     }
 
@@ -739,135 +737,275 @@ public:
 
     void cancel(ToolContext& /*ctx*/) override
     {
-        m_phase = Phase::Anchor;
-        m_engine.reset();
+        m_dragging = false;
+        m_factors = Vec3d { 1.0 };
     }
 
     Overlay overlay() const override
     {
         Overlay o;
-        if (m_phase != Phase::Anchor) {
-            o.points.push_back(pivot());
-            o.lines.push_back({ m_anchor, m_reference, true, inference::Tint::Neutral, true });
+        if (!m_hasBox) {
+            return o;
         }
-        if (m_phase == Phase::Factor) {
-            appendPreview(o, m_preview, scaling());
-            const Vec3d end = m_anchor + (m_reference - m_anchor) * m_factor;
-            o.lines.push_back({ m_anchor, end, false, inference::Tint::Neutral, true });
-            o.dimensions.push_back({ m_anchor, end, "×" + formatFactor(m_factor) });
-        } else {
-            appendInference(o, m_inference);
+        const Transform t = m_dragging ? scaling() : Transform {};
+        // Cutia (scalată în timpul tragerii) și mânerele ei.
+        std::array<Vec3d, 8> c {};
+        for (std::size_t k = 0; k < 8; ++k) {
+            c[k] = t.applyToPoint({ (k & 1) ? m_hi.x : m_lo.x, (k & 2) ? m_hi.y : m_lo.y, (k & 4) ? m_hi.z : m_lo.z });
+        }
+        constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
+            { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+        for (const auto& [a, b] : kEdges) {
+            o.lines.push_back({ c[std::size_t(a)], c[std::size_t(b)], true, inference::Tint::Neutral, true });
+        }
+        for (int i = 0; i < 27; ++i) {
+            if (i != 13) {
+                o.points.push_back(t.applyToPoint(handlePoint(i)));
+            }
+        }
+        if (m_dragging) {
+            appendPreview(o, m_preview, t);
+            o.points.push_back(pivot());
+            const Vec3d handle = t.applyToPoint(handlePoint(m_handle));
+            o.dimensions.push_back({ pivot(), handle, describe() });
+        }
+        const int marked = m_dragging ? m_handle : m_hoverHandle;
+        if (marked >= 0) {
+            InferenceMarker marker;
+            marker.point = t.applyToPoint(handlePoint(marked));
+            marker.kind = inference::Kind::Endpoint;
+            marker.label = handleName(marked);
+            o.marker = marker;
         }
         return o;
     }
 
-    view::PickResult hover() const override { return m_phase == Phase::Anchor ? m_hover : view::PickResult {}; }
+    view::PickResult hover() const override { return m_hasBox ? view::PickResult {} : m_hover; }
 
     std::string status() const override
     {
-        switch (m_phase) {
-        case Phase::Anchor:
-            return "Alege punctul fix al scalării (pe selecție sau pe entitatea de scalat)";
-        case Phase::Reference:
-            return "Alege punctul de referință";
-        case Phase::Factor:
-            return "Alege mărimea nouă sau tastează factorul (2, 0.5) · Option: din centru · Esc anulează";
+        if (m_dragging) {
+            return "Mișcă pentru mărimea nouă, click ca să confirmi, sau tastează factorul (2 · 2,1,1.5) · "
+                   "Option: din centru · Esc anulează";
         }
-        return {};
+        if (m_hasBox) {
+            return "Alege un mâner: colțurile scalează uniform, muchiile pe două axe, fețele pe una";
+        }
+        return "Selectează ce vrei să scalezi (sau click pe o entitate)";
     }
 
     std::optional<Measurement> measurement() const override
     {
-        return Measurement { "Scară", m_phase == Phase::Factor ? formatFactor(m_factor) : "" };
+        return Measurement { "Scară", m_dragging ? describe() : "" };
     }
 
     bool applyMeasurement(ToolContext& ctx, std::string_view text) override
     {
-        const auto factor = parseNumber(text);
-        if (m_phase != Phase::Factor || !factor || std::abs(*factor) < 1e-6) {
+        if (!m_dragging) {
             return false;
         }
-        m_factor = *factor;
+        // „2” = factorul pe axele mânerului; „2,1,1.5” (sau cu ;) = factorii pe X, Y, Z.
+        std::vector<double> values;
+        std::string token;
+        const std::string all(text);
+        for (std::size_t i = 0; i <= all.size(); ++i) {
+            if (i == all.size() || all[i] == ',' || all[i] == ';') {
+                const auto v = parseNumber(token);
+                if (!v || std::abs(*v) < 1e-6) {
+                    return false;
+                }
+                values.push_back(*v);
+                token.clear();
+            } else {
+                token += all[i];
+            }
+        }
+        if (values.size() == 1) {
+            m_factors = factorsFor(values[0]);
+        } else if (values.size() == 3) {
+            m_factors = { values[0], values[1], values[2] };
+        } else {
+            return false;
+        }
         commit(ctx);
         return true;
     }
 
 private:
-    enum class Phase { Anchor, Reference, Factor };
+    // Mânerul i: coordonatele (ix, iy, iz) ∈ {0, 1, 2}³ (min, mijloc, max); 13 = centrul (nu e mâner).
+    static std::array<int, 3> handleIndex(int i) { return { i % 3, (i / 3) % 3, i / 9 }; }
 
-    static Vec3d centerOf(const ToolContext& ctx, const Target& target)
+    [[nodiscard]] Vec3d handlePoint(int i) const
     {
+        const auto idx = handleIndex(i);
+        Vec3d p;
+        for (int a = 0; a < 3; ++a) {
+            p[a] = idx[std::size_t(a)] == 0 ? m_lo[a] : idx[std::size_t(a)] == 2 ? m_hi[a] : (m_lo[a] + m_hi[a]) * 0.5;
+        }
+        return p;
+    }
+
+    [[nodiscard]] static std::string handleName(int i)
+    {
+        const auto idx = handleIndex(i);
+        const int active = (idx[0] != 1) + (idx[1] != 1) + (idx[2] != 1);
+        return active == 3 ? "Colț: uniform" : active == 2 ? "Muchie: două axe" : "Față: o axă";
+    }
+
+    // Axele pe care lucrează mânerul tras.
+    [[nodiscard]] std::array<bool, 3> activeAxes() const
+    {
+        const auto idx = handleIndex(m_handle);
+        return { idx[0] != 1, idx[1] != 1, idx[2] != 1 };
+    }
+
+    [[nodiscard]] Vec3d factorsFor(double f) const
+    {
+        const auto axes = activeAxes();
+        return { axes[0] ? f : 1.0, axes[1] ? f : 1.0, axes[2] ? f : 1.0 };
+    }
+
+    [[nodiscard]] Vec3d pivot() const
+    {
+        if (m_fromCenter) {
+            return (m_lo + m_hi) * 0.5;
+        }
+        const auto idx = handleIndex(m_handle);
+        return handlePoint(int(2 - idx[0]) + 3 * int(2 - idx[1]) + 9 * int(2 - idx[2]));
+    }
+
+    [[nodiscard]] Transform scaling() const { return Transform::scaling(pivot(), m_factors); }
+
+    [[nodiscard]] std::string describe() const
+    {
+        const auto axes = activeAxes();
+        if (axes[0] + axes[1] + axes[2] > 1 && m_factors.x == m_factors.y && m_factors.y == m_factors.z) {
+            return formatFactor(m_factors.x);
+        }
+        std::string out;
+        for (int a = 0; a < 3; ++a) {
+            out += (a > 0 ? ", " : "") + formatFactor(m_factors[a]);
+        }
+        return out;
+    }
+
+    void refreshBox(const ToolContext& ctx)
+    {
+        m_hasBox = false;
+        if (ctx.selection.empty()) {
+            return;
+        }
+        Target t;
+        t.selection = ctx.selection;
+        t.vertices = geom::verticesOf(ctx.mesh, t.selection);
         Vec3d lo { 1e300 };
         Vec3d hi { -1e300 };
-        for (geom::VertexId v : target.vertices) {
+        for (geom::VertexId v : t.vertices) {
             lo = glm::min(lo, ctx.mesh.position(v));
             hi = glm::max(hi, ctx.mesh.position(v));
         }
-        for (const PreviewEdge& e : previewEdges(ctx, Target { target.selection, {} })) {
+        for (const PreviewEdge& e : previewEdges(ctx, Target { t.selection, {} })) {
             lo = glm::min(lo, glm::min(e.a, e.b));
             hi = glm::max(hi, glm::max(e.a, e.b));
         }
-        return (lo + hi) * 0.5;
+        if (lo.x > hi.x) {
+            return;
+        }
+        // O cutie turtită (o față plană) primește o grosime mică, ca mânerele să nu se suprapună.
+        for (int a = 0; a < 3; ++a) {
+            if (hi[a] - lo[a] < tol::kLength) {
+                lo[a] -= 0.5;
+                hi[a] += 0.5;
+            }
+        }
+        m_lo = lo;
+        m_hi = hi;
+        m_hasBox = true;
     }
 
-    [[nodiscard]] Vec3d pivot() const { return m_fromCenter ? m_center : m_anchor; }
-
-    [[nodiscard]] Transform scaling() const { return Transform::scaling(pivot(), Vec3d { m_factor }); }
+    void startDrag(ToolContext& ctx, const PointerEvent& e)
+    {
+        m_target = targetAt(ctx, e.screen);
+        if (m_target.empty()) {
+            return;
+        }
+        m_handle = m_hoverHandle;
+        m_preview = previewEdges(ctx, m_target);
+        m_factors = Vec3d { 1.0 };
+        m_dragging = true;
+    }
 
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         m_fromCenter = e.modifiers.alt;
-        const std::optional<Vec3d> from = m_phase == Phase::Anchor ? std::nullopt : std::optional(m_anchor);
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
-        switch (m_phase) {
-        case Phase::Anchor:
+        if (!m_dragging) {
+            refreshBox(ctx);
             m_hover = targetHover(ctx, e.screen);
-            return;
-        case Phase::Reference:
-            if (m_inference.valid()) {
-                m_reference = m_inference.point;
+            m_hoverHandle = -1;
+            if (!m_hasBox) {
+                return;
             }
-            return;
-        case Phase::Factor: {
-            const Vec3d dir = glm::normalize(m_reference - m_anchor);
-            const double base = glm::length(m_reference - m_anchor);
-            std::optional<Vec3d> p;
-            if (m_inference.isPoint()) {
-                p = m_anchor + dir * glm::dot(m_inference.point - m_anchor, dir);
-            } else {
-                p = inference::pointOnLineUnderCursor(ctx.camera, e.screen, m_anchor, dir);
-            }
-            if (p && base > tol::kLength) {
-                const double factor = glm::dot(*p - m_anchor, dir) / base;
-                if (std::abs(factor) > 1e-3) {
-                    m_factor = factor;
+            double best = 12.0; // px
+            for (int i = 0; i < 27; ++i) {
+                if (i == 13) {
+                    continue;
+                }
+                if (const auto s = ctx.camera.project(handlePoint(i))) {
+                    const double d = glm::length(*s - e.screen);
+                    if (d < best) {
+                        best = d;
+                        m_hoverHandle = i;
+                    }
                 }
             }
             return;
         }
+        // Factorul: proiecția cursorului pe dreapta pivot → mâner (pe axele mânerului).
+        const Vec3d from = pivot();
+        Vec3d d = handlePoint(m_handle) - from;
+        const auto axes = activeAxes();
+        for (int a = 0; a < 3; ++a) {
+            d[a] = axes[std::size_t(a)] ? d[a] : 0.0;
+        }
+        const double len2 = glm::dot(d, d);
+        if (len2 < 1e-12) {
+            return;
+        }
+        if (const auto p = inference::pointOnLineUnderCursor(ctx.camera, e.screen, from, glm::normalize(d))) {
+            double f = glm::dot(*p - from, d) / len2;
+            if (std::abs(f) < 1e-3) {
+                f = f < 0.0 ? -1e-3 : 1e-3;
+            }
+            // Pași de 0,05 când cursorul e aproape de un multiplu (prinderi plăcute, ca la unghiuri).
+            const double snapped = std::round(f * 20.0) / 20.0;
+            if (std::abs(f - snapped) < 0.01) {
+                f = snapped;
+            }
+            m_factors = factorsFor(f);
         }
     }
 
     void commit(ToolContext& ctx)
     {
-        if (std::abs(m_factor - 1.0) > 1e-9) {
+        if (glm::length(m_factors - Vec3d { 1.0 }) > 1e-9) {
             transformTarget(ctx, "Scale", m_target, scaling());
             ctx.selection.prune(ctx.mesh);
         }
-        m_phase = Phase::Anchor;
-        m_engine.resetLock();
+        m_dragging = false;
+        m_factors = Vec3d { 1.0 };
+        refreshBox(ctx);
     }
 
-    Phase m_phase = Phase::Anchor;
-    Target m_target;
-    Vec3d m_anchor { 0.0 };
-    Vec3d m_center { 0.0 };
-    Vec3d m_reference { 0.0 };
-    double m_factor = 1.0;
+    bool m_hasBox = false;
+    Vec3d m_lo { 0.0 };
+    Vec3d m_hi { 0.0 };
+    int m_hoverHandle = -1;
+    int m_handle = -1;
+    bool m_dragging = false;
     bool m_fromCenter = false;
+    Vec3d m_factors { 1.0 };
+    Target m_target;
     std::vector<PreviewEdge> m_preview;
-    inference::Engine m_engine;
-    inference::Inference m_inference;
     view::PickResult m_hover;
 };
 

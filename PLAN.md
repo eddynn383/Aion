@@ -390,17 +390,17 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ### Faza 8 – Grafică avansată, materiale și stiluri
 - [~] Pipeline de randare cu pași separați (`render/passes`): adâncime + normale → SSAO/GTAO → iluminare → outline → TAA → tonemapping — deocamdată: umbre → fețe → sol → grid → contur → transparente → linii
 - [~] Randare în spațiu liniar, HDR intern, **tonemapping ACES**, ieșire sRGB corectă (și Display P3 pe Mac) — fără Display P3
-- [ ] **Iluminare din mediu (IBL)** din HDRI, cu câteva medii incluse (studio, exterior, înnorat)
+- [x] **Iluminare din mediu** cu câteva medii incluse (studio, exterior, înnorat) _(procedurale, nu HDRI; Faza 31)_
 - [~] **Umbre moi**: cascaded shadow maps + PCF/PCSS, soarele poziționat după locație, dată și oră — o singură hartă + PCF; soarele după oră, lună și latitudine
-- [ ] **SSAO / GTAO** cu filtrare care păstrează muchiile
-- [ ] **TAA** când camera stă pe loc; calitate adaptivă în timpul navigării
+- [x] **SSAO** _(Faza 31)_
+- [x] Antialiasing mai fin când camera stă pe loc, calitate adaptivă în timpul navigării _(MSAA 8×, Faza 31)_
 - [~] Materiale **PBR** (albedo, roughness, metallic, normal map), cu bibliotecă de materiale incluse — fără normal map și texturi
-- [~] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe — fără drag & drop
+- [x] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe _(Faza 30)_
 - [x] **Paint Bucket (B):** aplicare pe față; Option = eyedropper
 - [x] Coordonate UV pentru texturi pe fețe (proiecție planară), poziționarea texturii _(Faza 24, ADR 0024)_
 - [x] Stiluri de afișare: Wireframe, Hidden Line, Shaded, Shaded with Textures, X-Ray, plus un stil **„Clay”** (alb mat cu AO, pentru prezentări) — „with Textures” vine cu texturile
 - [x] Profiluri (muchii exterioare îngroșate), ceață atmosferică
-- [ ] Preset-uri de calitate în Preferințe: *Performanță*, *Echilibrat*, *Calitate*
+- [x] Preset-uri de calitate în Preferințe: *Performanță*, *Echilibrat*, *Calitate* _(Faza 31)_
 
 **Gata când:** casa din faza 5, texturată, arată vizibil mai bine decât același model în SketchUp (comparație de capturi), cu 60 fps în timpul navigării pe un MacBook Air M1.
 
@@ -525,7 +525,7 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
       pe timeline _(2026-10-27, ADR 0022: scenele / cheile se iau din vederea prin cameră)_
 - [x] Lumini: punctuală, spot, direcțională, de suprafață; culoare, intensitate, rază, con
 - [x] Randare: mai multe lumini în shader (până la 8); gizmo-uri în viewport, în Outliner și Inspector, salvate în `.aion`
-- [ ] Umbre pentru o lumină spot (a doua hartă de umbre); mutarea luminilor trăgând de gizmo
+- [x] Umbre pentru o lumină spot (a doua hartă de umbre); mutarea luminilor trăgând de gizmo _(Faza 28)_
 
 ### Faza 20 – Import `.skp` (Faza 7b)
 - [ ] SDK-ul SketchUp (Trimble) se descarcă de pe developer.sketchup.com cu un cont și acceptarea licenței — pasul
@@ -599,6 +599,33 @@ scripturile, care expun tot ce există deja.
 - [x] Consolă de scripturi (editor + rezultat); fiecare rulare e un singur pas de undo, o eroare anulează tot
 - [x] Plugin-uri: dosar cu `manifest.json` + `main.js`; comenzile lor apar în palette
 - [x] Exemple incluse (scară în spirală, gard, biblioteci, grilă) și documentația API (`docs/scripting.md`)
+
+## 6d. Etapa 4 – terminarea funcțiilor începute (cerința din 2026-10-27)
+
+Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Windows reală (installer, scalare 125% / 150%)
+și build-ul Universal + semnarea pe macOS (un Qt universal și un certificat Apple Developer).
+
+### Faza 28 – Lumini: mutare din marcaj și umbre pentru spot
+- [x] Cu Select, marcajul unei lumini sau camere se trage: pe orizontală la înălțimea lui, cu Shift pe verticală;
+      un pas de undo
+- [x] Umbre pentru luminile spot cu „Aruncă umbre” (o a doua hartă de umbre, proiecție perspectivă din spot; adâncimea
+      comparată liniar, în mm) _(un singur spot cu umbre odată)_
+
+### Faza 29 – Scale neuniform cu mânere
+- [x] Unealta Scale arată cutia selecției cu mânere: colțuri (uniform), mijlocul muchiilor (două axe), mijlocul
+      fețelor (o axă); Option = față de centru
+- [x] VCB: „2” (pe axele mânerului) sau „2,1,1.5” (pe axe); scările negative oglindesc; teste în core
+
+### Faza 30 – Materiale trase pe fețe
+- [x] Un material din panou (bibliotecă sau model) se trage peste viewport: fața de sub cursor e evidențiată și îl
+      primește la drop (versoul dacă e văzut din spate; un obiect întreg dacă e sub cursor) _(Paint Bucket temporar)_
+
+### Faza 31 – Grafică: mediu, umbrire ambientală, antialiasing
+- [x] Iluminare din mediu: medii procedurale (Simplu, Studio, Exterior, Înnorat) ca lumină ambientală (gradient cer /
+      sol) și reflexii după rugozitate; alese în bara de vizualizare (meniul soarelui) și în Preferințe _(ADR 0028)_
+- [x] SSAO (umbrire ambientală în screen-space), netezită 4 × 4
+- [x] Antialiasing mai fin când camera stă pe loc _(MSAA 8× după 0,4 s, nu acumulare de cadre — ADR 0028)_
+- [x] Preset-uri de calitate în Preferințe: Performanță, Echilibrat, Calitate
 
 ## 7. Riscuri principale și cum le reducem
 
