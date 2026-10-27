@@ -255,7 +255,7 @@ Column {
         component Caption: Item {
             property alias text: captionText.text
             default property alias trailing: trailingRow.data
-            width: transformBox.width
+            width: parent ? parent.width : 0
             height: Theme.controlHeightSm
             Text {
                 id: captionText
@@ -339,11 +339,12 @@ Column {
         visible: shape !== null
         width: parent.width
         spacing: Theme.space2
+        Caption { text: shapeBox.kind === "line" ? "Lungime (mm)" : shapeBox.kind === "rectangle" ? "Laturi (mm)" : "Mărime" }
         NumberField {
             visible: shapeBox.kind === "line"
             width: parent.width
-            label: "Lungime"
-            unit: "mm"
+            compact: true
+            label: "L"
             from: 0.01
             step: 10
             value: shapeBox.shape ? shapeBox.shape.length : 0
@@ -352,8 +353,8 @@ Column {
         Row {
             visible: shapeBox.kind === "rectangle"
             spacing: Theme.space1
-            NumberField { width: shapeBox.half; compact: true; label: "Lățime"; unit: "mm"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.width : 0; onValueModified: (v) => root.document.setShapeValue("width", v) }
-            NumberField { width: shapeBox.half; compact: true; label: "Înălț."; unit: "mm"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.height : 0; onValueModified: (v) => root.document.setShapeValue("height", v) }
+            NumberField { width: shapeBox.half; compact: true; label: "Lățime"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.width : 0; onValueModified: (v) => root.document.setShapeValue("width", v) }
+            NumberField { width: shapeBox.half; compact: true; label: "Înălțime"; from: 0.01; step: 10; value: shapeBox.shape ? shapeBox.shape.height : 0; onValueModified: (v) => root.document.setShapeValue("height", v) }
         }
         Row {
             visible: shapeBox.kind === "arc" || shapeBox.kind === "circle" || shapeBox.kind === "polygon"
@@ -362,7 +363,7 @@ Column {
             NumberField {
                 width: shapeBox.half
                 compact: true
-                label: shapeBox.kind === "polygon" ? "Laturi" : "Segm."
+                label: shapeBox.kind === "polygon" ? "Laturi" : "Segmente"
                 from: shapeBox.kind === "arc" ? 1 : 3
                 to: 720
                 enabled: shapeBox.shape ? shapeBox.shape.segmentsEditable : false
@@ -387,13 +388,6 @@ Column {
             font.pixelSize: Theme.fontSizeXs
         }
     }
-    Toggle {
-        visible: root.info.edgesSoft !== undefined
-        width: parent.width
-        text: root.info.edgesSoft === -1 ? "Netedă (soft) — mixt" : "Netedă (soft): ascunsă, umbrire lină"
-        checked: root.info.edgesSoft === 1
-        onToggled: root.document.setSelectedEdgesSoft(checked)
-    }
 
     // Geometria liberă (fețe, muchii, forme): poziția (colțul minim) și dimensiunile cutiei ei; rotirea și scara sunt
     // relative (geometria nu are o orientare salvată): valoarea tastată se aplică, apoi câmpul revine la 0° / 1×.
@@ -404,18 +398,14 @@ Column {
         visible: g !== null
         width: parent.width
         spacing: Theme.space2
-        component GeoCaption: Text {
-            color: Theme.textSecondary
-            font.pixelSize: Theme.fontSizeSm
-        }
-        GeoCaption { text: "Poziție (mm)" }
+        Caption { text: "Poziție (mm)" }
         Row {
             spacing: Theme.space1
             NumberField { width: geometryBox.third; compact: true; label: "X"; step: 10; value: geometryBox.g ? geometryBox.g.px : 0; onValueModified: (v) => root.document.setGeometryPlacement({ px: v }) }
             NumberField { width: geometryBox.third; compact: true; label: "Y"; step: 10; value: geometryBox.g ? geometryBox.g.py : 0; onValueModified: (v) => root.document.setGeometryPlacement({ py: v }) }
             NumberField { width: geometryBox.third; compact: true; label: "Z"; step: 10; value: geometryBox.g ? geometryBox.g.pz : 0; onValueModified: (v) => root.document.setGeometryPlacement({ pz: v }) }
         }
-        GeoCaption { text: "Dimensiuni (mm)" }
+        Caption { text: "Dimensiuni (mm)" }
         Row {
             spacing: Theme.space1
             Repeater {
@@ -440,7 +430,7 @@ Column {
                 }
             }
         }
-        GeoCaption { text: "Rotește cu (°), în jurul centrului" }
+        Caption { text: "Rotește cu (°)" }
         Row {
             spacing: Theme.space1
             Repeater {
@@ -464,7 +454,7 @@ Column {
                 }
             }
         }
-        GeoCaption { text: "Scalează cu (×), față de colțul minim" }
+        Caption { text: "Scalează cu (×)" }
         Row {
             spacing: Theme.space1
             Repeater {
@@ -488,6 +478,21 @@ Column {
                 }
             }
         }
+        Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Rotirea (în jurul centrului) și scara (față de colțul minim) se aplică la Enter, apoi câmpul revine la 0° / 1×."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
+    Toggle {
+        visible: root.info.edgesSoft !== undefined
+        width: parent.width
+        text: root.info.edgesSoft === -1 ? "Muchii netede (mixt)" : "Muchii netede (soft)"
+        checked: root.info.edgesSoft === 1
+        onToggled: root.document.setSelectedEdgesSoft(checked)
     }
 
     // Poziționarea texturii pe fețele selectate (Position Texture): deplasare, rotație, scară.
