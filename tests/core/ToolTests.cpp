@@ -441,13 +441,23 @@ TEST_CASE("Unelte: Rotate cu unghiul tastat și Scale cu factorul tastat", "[cor
     CHECK(maxCoord(s.mesh, 1) == Approx(2000));
     CHECK(maxCoord(s.mesh, 0) == Approx(0).margin(1e-6));
 
+    // Scale: mânerul feței +Y (centrul ei), apoi factorul 2 → doar Y se dublează, față de fața opusă (y = 0).
     auto scale = tools::makeTool("scale");
-    s.click(*scale, { 0, 0, 1000 });
-    s.click(*scale, { 0, 2000, 1000 });
-    scale->pointerMove(s.ctx, Scene::at(s.screen({ 0, 2500, 1000 })));
+    scale->pointerMove(s.ctx, Scene::at(s.screen({ -500, 2000, 500 })));
+    s.click(*scale, { -500, 2000, 500 });
+    scale->pointerMove(s.ctx, Scene::at(s.screen({ -500, 2600, 500 })));
     REQUIRE(scale->applyMeasurement(s.ctx, "2"));
     CHECK(maxCoord(s.mesh, 1) == Approx(4000));
+    CHECK(maxCoord(s.mesh, 0) == Approx(0).margin(1e-6));
     CHECK(maxCoord(s.mesh, 2) == Approx(1000));
+    REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
+
+    // Pe axe: mânerul de colț (0, 4000, 1000) și „1,1,1.5” → doar înălțimea crește, față de colțul opus.
+    scale->pointerMove(s.ctx, Scene::at(s.screen({ 0, 4000, 1000 })));
+    s.click(*scale, { 0, 4000, 1000 });
+    REQUIRE(scale->applyMeasurement(s.ctx, "1,1,1.5"));
+    CHECK(maxCoord(s.mesh, 2) == Approx(1500));
+    CHECK(maxCoord(s.mesh, 1) == Approx(4000));
     REQUIRE(s.mesh.validate(geom::ValidationLevel::Full).ok());
 }
 

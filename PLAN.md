@@ -612,9 +612,9 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
       comparată liniar, în mm) _(un singur spot cu umbre odată)_
 
 ### Faza 29 – Scale neuniform cu mânere
-- [ ] Unealta Scale arată cutia selecției cu mânere: colțuri (uniform), mijlocul muchiilor (două axe), mijlocul
-      fețelor (o axă); Ctrl / Option = față de centru
-- [ ] VCB: „2” (uniform) sau „2,1,1.5” (pe axe); scările negative oglindesc; teste în core
+- [x] Unealta Scale arată cutia selecției cu mânere: colțuri (uniform), mijlocul muchiilor (două axe), mijlocul
+      fețelor (o axă); Option = față de centru
+- [x] VCB: „2” (pe axele mânerului) sau „2,1,1.5” (pe axe); scările negative oglindesc; teste în core
 
 ### Faza 30 – Materiale trase pe fețe
 - [ ] Un material din panou (bibliotecă sau model) se trage peste viewport: fața de sub cursor e evidențiată și îl
