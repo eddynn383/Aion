@@ -280,4 +280,66 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
     model.setInstance(instance, inst);
 }
 
+InstanceId groupInstances(Model& model, DefinitionId context, const std::set<InstanceId>& instances, std::string name)
+{
+    if (instances.empty()) {
+        return {};
+    }
+    geom::Selection selection;
+    selection.instances = instances;
+    const InstanceId group = makeGroup(model, context, selection, false, std::move(name));
+    if (group) {
+        const DefinitionId def = model.instance(group).definition;
+        Definition d = model.definition(def);
+        d.collection = true;
+        if (d.name.empty()) {
+            d.name = "Grup";
+        }
+        model.setDefinition(def, d);
+    }
+    return group;
+}
+
+math::Transform definitionWorldTransform(const Model& model, DefinitionId definition)
+{
+    math::Transform world;
+    while (definition != model.root()) {
+        const auto owners = model.instancesOf(definition);
+        if (owners.empty()) {
+            break;
+        }
+        const Instance& inst = model.instance(owners.front());
+        world = inst.transform * world;
+        definition = inst.parent;
+    }
+    return world;
+}
+
+bool moveToParent(Model& model, InstanceId instance, DefinitionId target)
+{
+    Instance inst = model.instance(instance);
+    if (inst.parent == target || !model.definitions().contains(target)) {
+        return false;
+    }
+    if (target != model.root() && model.instancesOf(target).size() != 1) {
+        return false; // un obiect cu copii: nu e clar în care copie
+    }
+    // Ținta nu poate fi instanța însăși sau ceva din interiorul ei (ar face un ciclu).
+    for (DefinitionId d = target; d != model.root();) {
+        if (d == inst.definition) {
+            return false;
+        }
+        const auto owners = model.instancesOf(d);
+        if (owners.empty()) {
+            break;
+        }
+        d = model.instance(owners.front()).parent;
+    }
+    const math::Transform world = definitionWorldTransform(model, inst.parent) * inst.transform;
+    inst.transform = definitionWorldTransform(model, target).inverse() * world;
+    inst.parent = target;
+    model.setInstance(instance, inst);
+    return true;
+}
+
 } // namespace aion::model

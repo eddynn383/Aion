@@ -210,7 +210,7 @@ void Mesh::removeVertex(VertexId id)
 EdgeId Mesh::addEdge(VertexId a, VertexId b)
 {
     assert(a != b && !findEdge(a, b));
-    const EdgeId id = m_edges.insert(Edge { a, b, {} });
+    const EdgeId id = m_edges.insert(Edge { a, b, {}, false, 0, false, {} });
     if (m_recording) {
         m_recording->edges[id];
     }
@@ -259,7 +259,7 @@ void Mesh::detachFace(FaceId id, const Face& face)
 FaceId Mesh::addFace(const math::Plane& plane, Loop outer, std::vector<Loop> inner, model::MaterialId material,
     model::MaterialId backMaterial)
 {
-    const FaceId id = m_faces.insert(Face { plane, std::move(outer), std::move(inner), material, backMaterial });
+    const FaceId id = m_faces.insert(Face { plane, std::move(outer), std::move(inner), material, backMaterial, {} });
     if (m_recording) {
         m_recording->faces[id];
     }
@@ -310,6 +310,24 @@ void Mesh::setFaceMaterial(FaceId id, model::MaterialId material)
     m_faces.at(id).material = material;
 }
 
+void Mesh::setFaceTag(FaceId id, model::TagId tag)
+{
+    if (m_faces.at(id).tag == tag) {
+        return;
+    }
+    touch(id);
+    m_faces.at(id).tag = tag;
+}
+
+void Mesh::setEdgeTag(EdgeId id, model::TagId tag)
+{
+    if (m_edges.at(id).tag == tag) {
+        return;
+    }
+    touch(id);
+    m_edges.at(id).tag = tag;
+}
+
 void Mesh::setFaceBackMaterial(FaceId id, model::MaterialId material)
 {
     if (m_faces.at(id).backMaterial == material) {
@@ -351,6 +369,7 @@ std::pair<EdgeId, EdgeId> Mesh::splitEdge(EdgeId id, VertexId at)
         e.soft = original.soft;
         e.curve = original.curve;
         e.smoothCurve = original.smoothCurve;
+        e.tag = original.tag;
     }
 
     for (FaceId f : original.faces) {

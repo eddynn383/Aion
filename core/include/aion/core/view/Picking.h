@@ -3,7 +3,11 @@
 #include "aion/core/geom/Id.h"
 #include "aion/core/geom/Selection.h"
 #include "aion/core/math/Vec.h"
+#include "aion/core/geom/Topology.h"
+#include "aion/core/model/Ids.h"
 #include "aion/core/view/Camera.h"
+
+#include <set>
 
 namespace aion::geom {
 class Mesh;
@@ -29,6 +33,14 @@ struct PickOptions {
     double vertexRadiusPx = 7.0;
     double edgeRadiusPx = 5.0;
 };
+
+// Tag-urile ascunse (le setează aplicația când se schimbă vizibilitatea): fețele și muchiile cu un tag ascuns nu se
+// aleg, nu se ating prin snap și nu se desenează. Un vârf e ascuns dacă toate muchiile lui sunt ascunse.
+void setHiddenTags(std::set<model::TagId> tags);
+[[nodiscard]] const std::set<model::TagId>& hiddenTags();
+[[nodiscard]] bool isHidden(const geom::Face& face);
+[[nodiscard]] bool isHidden(const geom::Edge& edge);
+[[nodiscard]] bool isHidden(const geom::Mesh& mesh, geom::VertexId vertex);
 
 // Raza atinge cutia aliniată cu axele (cu o margine)? Testul rapid de dinaintea triangulării unei fețe.
 [[nodiscard]] bool rayHitsBox(const math::Ray& ray, const math::Vec3d& lo, const math::Vec3d& hi, double margin = 0.0);

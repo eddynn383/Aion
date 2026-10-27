@@ -30,6 +30,8 @@ struct Edge {
     std::uint32_t curve = 0;
     // Curbă netedă (cerc, arc): extrudată, are laturile soft. Laturile unui poligon rămân muchii vizibile.
     bool smoothCurve = false;
+    // Tag-ul muchiei (opțional): ascunde, afișează și selectează elemente din grupuri diferite.
+    model::TagId tag;
 
     [[nodiscard]] VertexId other(VertexId v) const { return v == v0 ? v1 : v0; }
     [[nodiscard]] bool hasVertex(VertexId v) const { return v == v0 || v == v1; }
@@ -59,6 +61,7 @@ struct Face {
     std::vector<Loop> inner;
     model::MaterialId material; // nul = materialul implicit (sau al grupului din care face parte)
     model::MaterialId backMaterial; // materialul de pe verso; nul = ca fața (sau culoarea implicită a versoului)
+    model::TagId tag; // tag-ul feței (opțional)
 
     bool operator==(const Face&) const = default;
 };

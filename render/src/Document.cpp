@@ -393,6 +393,7 @@ void Document::replaceModel(const model::Model& model)
     for (model::DefinitionId d : m_model.definitions().keys()) {
         retriangulate(d);
     }
+    updateHiddenTags();
     emit contextChanged();
     emit selectionChanged();
     emit outlineChanged();
@@ -742,7 +743,14 @@ QVariantList Document::outline() const
                 { QStringLiteral("id"), static_cast<double>(id.value) },
                 { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
                 { QStringLiteral("definition"), QString::fromStdString(def.name) },
-                { QStringLiteral("kind"), def.group ? QStringLiteral("group") : QStringLiteral("component") },
+                { QStringLiteral("kind"), def.collection ? QStringLiteral("group") : QStringLiteral("object") },
+                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("parentDefinition"), static_cast<double>(inst.parent.value) },
+                { QStringLiteral("hasChildren"), !m_model.childrenOf(inst.definition).empty() },
+                { QStringLiteral("tagColor"), inst.tag && m_model.tags().contains(inst.tag)
+                        ? QVariant(QColor(m_model.tag(inst.tag).color.r, m_model.tag(inst.tag).color.g,
+                              m_model.tag(inst.tag).color.b))
+                        : QVariant() },
                 { QStringLiteral("depth"), depth },
                 { QStringLiteral("hidden"), inst.hidden },
                 { QStringLiteral("locked"), inst.locked },
@@ -765,6 +773,15 @@ QVariantList Document::tags() const
         int count = 0;
         for (const model::Instance& inst : m_model.instances().values()) {
             count += inst.tag == id ? 1 : 0;
+        }
+        for (model::DefinitionId d : m_model.definitions().keys()) {
+            const geom::Mesh& mesh = m_model.mesh(d);
+            for (const geom::Face& f : mesh.faces().values()) {
+                count += f.tag == id ? 1 : 0;
+            }
+            for (const geom::Edge& e : mesh.edges().values()) {
+                count += e.tag == id ? 1 : 0;
+            }
         }
         out.append(QVariantMap {
             { QStringLiteral("id"), static_cast<double>(id.value) },
@@ -809,7 +826,7 @@ QVariantMap Document::entityInfo() const
         const model::Instance& inst = m_model.instance(id);
         const model::Definition& def = m_model.definition(inst.definition);
         info[QStringLiteral("kind")] = QStringLiteral("instance");
-        info[QStringLiteral("title")] = def.group ? QStringLiteral("Grup") : QStringLiteral("Obiect");
+        info[QStringLiteral("title")] = def.collection ? QStringLiteral("Grup") : QStringLiteral("Obiect");
         info[QStringLiteral("instanceId")] = static_cast<double>(id.value);
         info[QStringLiteral("name")] = QString::fromStdString(def.group ? inst.name : def.name);
         info[QStringLiteral("tagId")] = static_cast<double>(inst.tag.value);
@@ -873,6 +890,13 @@ QVariantMap Document::entityInfo() const
             }
             return QVariantMap { { QStringLiteral("id"), -1.0 }, { QStringLiteral("name"), QStringLiteral("Mixt") } };
         };
+        std::set<model::TagId> faceTags;
+        for (geom::FaceId f : m_selection.faces) {
+            if (const geom::Face* face = mesh.faces().find(f)) {
+                faceTags.insert(face->tag);
+            }
+        }
+        info[QStringLiteral("tagId")] = faceTags.size() == 1 ? static_cast<double>(faceTags.begin()->value) : -1.0;
         info[QStringLiteral("frontMaterial")] = sideInfo(fronts);
         info[QStringLiteral("backMaterial")] = sideInfo(backs);
         info[QStringLiteral("kind")] = QStringLiteral("faces");
@@ -881,11 +905,14 @@ QVariantMap Document::entityInfo() const
         details << detail(QStringLiteral("Arie"), formatArea(area));
     } else if (m_selection.instances.empty() && m_selection.faces.empty()) {
         double length = 0.0;
+        std::set<model::TagId> edgeTags;
         for (geom::EdgeId e : m_selection.edges) {
             if (const geom::Edge* edge = mesh.edges().find(e)) {
                 length += glm::length(mesh.position(edge->v1) - mesh.position(edge->v0));
+                edgeTags.insert(edge->tag);
             }
         }
+        info[QStringLiteral("tagId")] = edgeTags.size() == 1 ? static_cast<double>(edgeTags.begin()->value) : -1.0;
         info[QStringLiteral("kind")] = QStringLiteral("edges");
         info[QStringLiteral("title")] = m_selection.edges.size() == 1
             ? QStringLiteral("Muchie")
@@ -988,6 +1015,17 @@ void Document::repairContext()
         const model::Instance* inst = m_model.instances().find(id);
         return inst == nullptr || inst->parent != active;
     });
+}
+
+void Document::updateHiddenTags()
+{
+    std::set<model::TagId> hidden;
+    for (std::size_t i = 0; i < m_model.tags().size(); ++i) {
+        if (!m_model.tags().values()[i].visible) {
+            hidden.insert(m_model.tags().keys()[i]);
+        }
+    }
+    view::setHiddenTags(std::move(hidden));
 }
 
 void Document::dropStaleReferences()
@@ -1162,11 +1200,97 @@ void Document::makeGroup()
     if (m_selection.empty()) {
         return;
     }
-    runOnModel("Creează grup", [&](model::Model& model) {
-        const model::InstanceId id = model::makeGroup(model, activeDefinition(), m_selection, false);
+    if (m_selection.faces.empty() && m_selection.edges.empty()) {
+        groupSelection(); // doar obiecte selectate: le grupăm
+        return;
+    }
+    runOnModel("Creează obiect", [&](model::Model& model) {
+        const model::InstanceId id = model::makeGroup(model, activeDefinition(), m_selection, false, "Obiect");
         m_selection.clear();
         m_selection.instances.insert(id);
     });
+}
+
+void Document::groupSelection()
+{
+    if (m_selection.instances.empty()) {
+        setError(QStringLiteral("Selectează unul sau mai multe obiecte ca să le grupezi (formele devin întâi obiect, cu ⌘G)."));
+        return;
+    }
+    runOnModel("Grupează", [&](model::Model& model) {
+        const model::InstanceId id = model::groupInstances(model, activeDefinition(), m_selection.instances, "Grup");
+        m_selection.clear();
+        m_selection.instances.insert(id);
+    });
+}
+
+void Document::duplicateLinked()
+{
+    if (m_selection.instances.empty()) {
+        return;
+    }
+    runOnModel("Duplicare legată", [&](model::Model& model) {
+        std::set<model::InstanceId> copies;
+        for (model::InstanceId id : m_selection.instances) {
+            const model::DefinitionId def = model.instance(id).definition;
+            // Geometria devine partajată: copia și originalul se editează împreună.
+            model::Definition d = model.definition(def);
+            if (d.group && !d.collection) {
+                d.group = false;
+                model.setDefinition(def, d);
+            }
+            const auto [lo, hi] = model::bounds(model, def);
+            const double offset = lo.x <= hi.x ? (hi.x - lo.x) * 1.2 : 1000.0;
+            copies.insert(model::copyInstance(model, id, math::Transform::translation({ offset, 0.0, 0.0 })));
+        }
+        m_selection.clear();
+        m_selection.instances = copies;
+    });
+}
+
+void Document::moveInstanceTo(double instanceId, double targetInstance)
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return;
+    }
+    model::DefinitionId target = m_model.root();
+    if (targetInstance > 0) {
+        const model::InstanceId t = toInstanceId(targetInstance);
+        if (!m_model.instances().contains(t)) {
+            return;
+        }
+        target = m_model.instance(t).definition;
+    }
+    bool moved = false;
+    runOnModel("Mută în grup", [&](model::Model& model) { moved = model::moveToParent(model, id, target); });
+    if (!moved) {
+        setError(QStringLiteral("Obiectul nu poate fi mutat acolo (ar intra în el însuși sau ținta are copii)."));
+    }
+}
+
+void Document::selectByTag(double tagId)
+{
+    const model::TagId tag = toTagId(tagId);
+    const geom::Selection before = m_selection;
+    m_selection.clear();
+    for (model::InstanceId id : m_model.childrenOf(activeDefinition())) {
+        if (m_model.instance(id).tag == tag) {
+            m_selection.instances.insert(id);
+        }
+    }
+    const geom::Mesh& mesh = m_model.mesh(activeDefinition());
+    for (std::size_t i = 0; i < mesh.faces().size(); ++i) {
+        if (mesh.faces().values()[i].tag == tag) {
+            m_selection.faces.insert(mesh.faces().keys()[i]);
+        }
+    }
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        if (mesh.edges().values()[i].tag == tag) {
+            m_selection.edges.insert(mesh.edges().keys()[i]);
+        }
+    }
+    afterInteraction(before);
 }
 
 void Document::makeComponent(const QString& name)
@@ -1353,6 +1477,19 @@ void Document::setInstanceHidden(double instanceId, bool hidden)
     });
 }
 
+void Document::setInstanceLocked(double instanceId, bool locked)
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return;
+    }
+    runOnModel(locked ? "Blochează" : "Deblochează", [&](model::Model& model) {
+        model::Instance inst = model.instance(id);
+        inst.locked = locked;
+        model.setInstance(id, inst);
+    });
+}
+
 void Document::addTag(const QString& name)
 {
     runOnModel("Tag nou", [&](model::Model& model) {
@@ -1399,7 +1536,7 @@ void Document::removeTag(double tagId)
 void Document::assignTag(double tagId)
 {
     const model::TagId id = toTagId(tagId);
-    if (m_selection.instances.empty() || (id && !m_model.tags().contains(id))) {
+    if (m_selection.empty() || (id && !m_model.tags().contains(id))) {
         return;
     }
     runOnModel("Schimbă tag-ul", [&](model::Model& model) {
@@ -1407,6 +1544,18 @@ void Document::assignTag(double tagId)
             model::Instance inst = model.instance(i);
             inst.tag = id;
             model.setInstance(i, inst);
+        }
+        // Formele (fețe, muchii) pot avea și ele tag: de exemplu pereții din camere diferite.
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        for (geom::FaceId f : m_selection.faces) {
+            if (mesh.faces().contains(f)) {
+                mesh.setFaceTag(f, id);
+            }
+        }
+        for (geom::EdgeId e : m_selection.edges) {
+            if (mesh.edges().contains(e)) {
+                mesh.setEdgeTag(e, id);
+            }
         }
     });
 }
@@ -1624,10 +1773,15 @@ QVariantList Document::contextMenuItems() const
         if (!group && m_model.instancesOf(inst.definition).size() > 1) {
             item(QStringLiteral("org.makeUnique"), QStringLiteral("Fă unic"));
         }
-        item(QStringLiteral("org.makeGroup"), QStringLiteral("Creează grup"), QStringLiteral("Ctrl+G"));
+        item(QStringLiteral("org.group"), QStringLiteral("Grupează"), QStringLiteral("Ctrl+Alt+G"));
+        item(QStringLiteral("org.duplicateLinked"), QStringLiteral("Duplicare legată"), QStringLiteral("Alt+D"));
     } else {
-        item(QStringLiteral("org.makeGroup"), QStringLiteral("Creează grup"), QStringLiteral("Ctrl+G"));
-        item(QStringLiteral("org.makeComponent"), QStringLiteral("Creează obiect"), QStringLiteral("Ctrl+Shift+G"));
+        if (geometry) {
+            item(QStringLiteral("org.makeGroup"), QStringLiteral("Creează obiect"), QStringLiteral("Ctrl+G"));
+        }
+        if (instances) {
+            item(QStringLiteral("org.group"), QStringLiteral("Grupează"), QStringLiteral("Ctrl+Alt+G"));
+        }
         if (instances) {
             item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !allLocked);
         }
@@ -2172,6 +2326,7 @@ void Document::structureChanged(const model::Model& model)
     // Înainte ca interfața să citească selecția (selectionSummary, Entity Info): după un undo, instanțele selectate
     // sau cele din calea contextului pot să nu mai existe.
     dropStaleReferences();
+    updateHiddenTags();
     emit outlineChanged();
     emit selectionChanged(); // Entity Info (de exemplu un tag schimbat prin undo)
     emit modelChanged();

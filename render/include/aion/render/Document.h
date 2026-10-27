@@ -168,8 +168,15 @@ public:
     Q_INVOKABLE bool applyMeasurement(const QString& text);
 
     // --- Organizare (Faza 6). ID-urile vin din QML ca numere. ---
-    Q_INVOKABLE void makeGroup();
+    // Organizarea (ca în Blender): obiect = geometrie încapsulată; grup = colecție de obiecte (folder în Outliner).
+    Q_INVOKABLE void makeGroup(); // ⌘G: Creează obiect din formele selectate (cu doar obiecte selectate: Grupează)
     Q_INVOKABLE void makeComponent(const QString& name = {});
+    Q_INVOKABLE void groupSelection(); // ⌥⌘G: Grupează obiectele selectate
+    Q_INVOKABLE void duplicateLinked(); // ⌥D: copie legată (aceeași geometrie, editată împreună)
+    // Drag & drop în Outliner: mută obiectul în grupul `targetInstance` (0 = în model), cu poziția păstrată.
+    Q_INVOKABLE void moveInstanceTo(double instanceId, double targetInstance);
+    // Selectează ce are tag-ul în contextul editat (obiecte, fețe, muchii).
+    Q_INVOKABLE void selectByTag(double tagId);
     Q_INVOKABLE void explodeSelection();
     Q_INVOKABLE void makeUniqueSelection();
     Q_INVOKABLE void hideSelection();
@@ -182,6 +189,7 @@ public:
     Q_INVOKABLE void selectInstance(double instanceId);
     Q_INVOKABLE void renameInstance(double instanceId, const QString& name);
     Q_INVOKABLE void setInstanceHidden(double instanceId, bool hidden);
+    Q_INVOKABLE void setInstanceLocked(double instanceId, bool locked);
     // Tag-uri.
     Q_INVOKABLE void addTag(const QString& name);
     Q_INVOKABLE void renameTag(double tagId, const QString& name);
@@ -324,6 +332,7 @@ private:
     void repairContext();
     // Varianta sigură în mijlocul unei notificări de la model (fără să anuleze unealta).
     void dropStaleReferences();
+    void updateHiddenTags();
     QVariantMap materialInfo(model::MaterialId id) const;
     std::size_t validPathLength() const;
     bool m_contextLost = false;
