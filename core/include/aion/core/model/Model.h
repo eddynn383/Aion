@@ -283,6 +283,8 @@ struct Instance {
     // Valorile de plasare blocate (lacătele din Inspector), câte un bit: poziția X/Y/Z (0–2), dimensiunile (3–5),
     // rotația (6–8), scara (9–11). Uneltele de transformare nu le schimbă.
     std::uint16_t placementLocks = 0;
+    // Pivotul (punctul fix la rotire și scalare din Inspector), în coordonatele definiției. Gol = centrul cutiei.
+    std::optional<math::Vec3d> pivot {};
 
     bool operator==(const Instance&) const = default;
 };

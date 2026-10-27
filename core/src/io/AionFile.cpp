@@ -391,6 +391,9 @@ std::string toJson(const model::Model& model)
             { "material", inst.material.value },
             { "locks", inst.placementLocks },
         });
+        if (inst.pivot) {
+            instances.back()["pivot"] = { inst.pivot->x, inst.pivot->y, inst.pivot->z };
+        }
         if (!inst.rules.empty()) {
             json rules = json::array();
             for (const model::Rule& r : inst.rules) {
@@ -564,6 +567,9 @@ LoadResult fromJson(std::string_view text)
             inst.hidden = i.value("hidden", false);
             inst.locked = i.value("locked", false);
             inst.placementLocks = i.value("locks", std::uint16_t { 0 });
+            if (const auto pv = i.find("pivot"); pv != i.end() && pv->is_array() && pv->size() == 3) {
+                inst.pivot = math::Vec3d { (*pv)[0].get<double>(), (*pv)[1].get<double>(), (*pv)[2].get<double>() };
+            }
             inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
             for (const json& r : i.value("rules", json::array())) {
                 model::Rule rule;

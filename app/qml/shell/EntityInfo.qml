@@ -312,6 +312,23 @@ Column {
             PlacementField { label: "Z"; lockBit: 11; decimals: 2; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sz ?? 1); onValueModified: (v) => root.document.setPlacement({ sz: v }) }
         }
         }
+
+        // Pivotul: punctul fix la rotire și scalare, ca distanță de la colțul minim (pe axele obiectului).
+        PropertyGroup {
+            title: "Pivot (mm)"
+            Row {
+                spacing: Theme.space1
+                NumberField { width: transformBox.third; compact: true; label: "X"; step: 10; value: transformBox.p.vx ?? 0; onValueModified: (v) => root.document.setPlacement({ vx: v }) }
+                NumberField { width: transformBox.third; compact: true; label: "Y"; step: 10; value: transformBox.p.vy ?? 0; onValueModified: (v) => root.document.setPlacement({ vy: v }) }
+                NumberField { width: transformBox.third; compact: true; label: "Z"; step: 10; value: transformBox.p.vz ?? 0; onValueModified: (v) => root.document.setPlacement({ vz: v }) }
+            }
+            Row {
+                spacing: Theme.space1
+                Button { width: transformBox.third; small: true; text: "Centru"; onClicked: root.document.setPlacement({ pivot: "center" }) }
+                Button { width: transformBox.third; small: true; text: "Bază"; onClicked: root.document.setPlacement({ pivot: "base" }) }
+                Button { width: transformBox.third; small: true; text: "Colț"; onClicked: root.document.setPlacement({ pivot: "corner" }) }
+            }
+        }
     }
 
     // Forma selectată: linie (lungime), arc (rază, segmente), cerc / poligon (rază, segmente / laturi), dreptunghi
@@ -434,10 +451,25 @@ Column {
             NumberField { width: geometryBox.third; compact: true; label: "Y"; decimals: 2; step: 0.1; from: -100; to: 100; value: geometryBox.g ? geometryBox.g.sy : 1; onValueModified: (v) => root.document.setGeometryPlacement({ sy: v }) }
             NumberField { width: geometryBox.third; compact: true; label: "Z"; decimals: 2; step: 0.1; from: -100; to: 100; value: geometryBox.g ? geometryBox.g.sz : 1; onValueModified: (v) => root.document.setGeometryPlacement({ sz: v }) }
         }
+        }
+        PropertyGroup {
+        title: "Pivot (mm)"
+        Row {
+            spacing: Theme.space1
+            NumberField { width: geometryBox.third; compact: true; label: "X"; step: 10; value: geometryBox.g ? geometryBox.g.vx : 0; onValueModified: (v) => root.document.setGeometryPlacement({ vx: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Y"; step: 10; value: geometryBox.g ? geometryBox.g.vy : 0; onValueModified: (v) => root.document.setGeometryPlacement({ vy: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Z"; step: 10; value: geometryBox.g ? geometryBox.g.vz : 0; onValueModified: (v) => root.document.setGeometryPlacement({ vz: v }) }
+        }
+        Row {
+            spacing: Theme.space1
+            Button { width: geometryBox.third; small: true; text: "Centru"; onClicked: root.document.setGeometryPlacement({ pivot: "center" }) }
+            Button { width: geometryBox.third; small: true; text: "Bază"; onClicked: root.document.setGeometryPlacement({ pivot: "base" }) }
+            Button { width: geometryBox.third; small: true; text: "Colț"; onClicked: root.document.setGeometryPlacement({ pivot: "corner" }) }
+        }
         Text {
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Rotația (în jurul centrului) și scara (față de colțul minim) pornesc de la 0° / 1 pentru fiecare selecție nouă."
+            text: "Rotația și scara se fac în jurul pivotului (implicit centrul). Rotația și scara pornesc de la 0° / 1 pentru fiecare selecție nouă."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }

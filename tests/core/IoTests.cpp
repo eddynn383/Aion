@@ -76,6 +76,7 @@ Model sampleModel()
     inst.tag = furniture;
     inst.locked = true;
     inst.name = "Taburet 2";
+    inst.pivot = math::Vec3d { 10, 20, 0 }; // un pivot ales (se salvează)
     m.setInstance(copy, inst);
     m.addTag({ "Ascuns", { 16, 185, 129, 255 }, false });
     // Materiale: o față a casei și un taburet întreg.

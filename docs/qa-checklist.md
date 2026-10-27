@@ -163,6 +163,13 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] La fel cu Line: redesenează una din muchiile de sus → fața revine
 - [ ] Unealta Eraser: cursorul e o gumă (vârful din stânga-jos șterge); la orbit / pan revine cursorul navigării
 
+## Pivot (Faza 33)
+- [ ] Cub 100 × 100 × 50 → Inspector → Pivot arată 50, 50, 25; marcajul (punct + axe) e în centrul cubului
+- [ ] Rotație Z 30° → cubul se rotește pe loc (centrul nu se mișcă), Poziția (colțul) se schimbă
+- [ ] Pivot → Colț, apoi Rotație Z 45° → colțul rămâne pe loc; Bază → pivotul coboară pe fața de jos
+- [ ] Salvare / deschidere → pivotul ales rămâne; ⌘Z anulează schimbarea pivotului
+- [ ] Un dreptunghi (geometrie liberă): Pivot implicit în centru; rotația și scara se fac în jurul lui
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

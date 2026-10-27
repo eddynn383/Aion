@@ -316,15 +316,16 @@ TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni ed
     CHECK(glm::length(m.instance(id).transform.applyToPoint({ hi.x, lo.y, lo.z }) - math::Vec3d { 1000, 1600, 50 }) < 1e-6);
     CHECK(m.validate().ok());
 
-    // Rotații pe toate axele (Euler XYZ): se citesc înapoi la fel, iar poziția și dimensiunile rămân.
+    // Rotații pe toate axele (Euler XYZ): se citesc înapoi la fel; pivotul (centrul) și dimensiunile rămân.
     model::Placement r = model::placementOf(m, id);
+    const math::Vec3d pivotBefore = model::pivotPoint(m, id);
     r.rotation = { 30.0, -20.0, 45.0 };
     model::setPlacement(m, id, r);
     const model::Placement t = model::placementOf(m, id);
     CHECK(t.rotation.x == Catch::Approx(30.0));
     CHECK(t.rotation.y == Catch::Approx(-20.0));
     CHECK(t.rotation.z == Catch::Approx(45.0));
-    CHECK(glm::length(t.position - r.position) < 1e-6);
+    CHECK(glm::length(model::pivotPoint(m, id) - pivotBefore) < 1e-6);
     CHECK(t.size.x == Catch::Approx(600.0));
     // Lacătele: o mutare și o rotație nu schimbă valorile blocate (Z-ul poziției și rotația pe Z).
     model::Instance locked = m.instance(id);
@@ -464,4 +465,56 @@ TEST_CASE("Camere și lumini ca obiecte: adăugare, editare și undo", "[core][m
     REQUIRE(doc.stack.undo());
     CHECK(doc.model.lights().contains(light));
     CHECK(doc.model.cameras().contains(camera));
+}
+
+TEST_CASE("Pivot: implicit în centru, rotația și scara îl țin pe loc, se poate muta", "[core][model]")
+{
+    model::Model m;
+    geom::Mesh& root = m.mesh(m.root());
+    geom::drawPolygon(root, { { 0, 0, 0 }, { 100, 0, 0 }, { 100, 100, 0 }, { 0, 100, 0 } });
+    geom::pushPull(root, root.faces().keys().front(), -50);
+    geom::Selection all;
+    for (geom::FaceId f : root.faces().keys()) {
+        all.faces.insert(f);
+    }
+    const model::InstanceId id = model::makeGroup(m, m.root(), all, false, "Cutie");
+
+    // 100 × 100 × 50 → pivotul la 50, 50, 25 de colț.
+    model::Placement p = model::placementOf(m, id);
+    REQUIRE(p.pivot);
+    CHECK(glm::length(*p.pivot - math::Vec3d { 50, 50, 25 }) < 1e-6);
+    CHECK(glm::length(model::pivotPoint(m, id) - math::Vec3d { 50, 50, 25 }) < 1e-6);
+
+    // Rotire 90° pe Z: centrul rămâne, colțul minim se mută.
+    p.rotation.z = 90.0;
+    model::setPlacement(m, id, p);
+    CHECK(glm::length(model::pivotPoint(m, id) - math::Vec3d { 50, 50, 25 }) < 1e-6);
+    // Dimensiunile dublate pe X: tot din centru.
+    p = model::placementOf(m, id);
+    p.size = { 200, 0, 0 };
+    model::setPlacement(m, id, p);
+    CHECK(model::placementOf(m, id).size.x == Catch::Approx(200.0));
+    CHECK(glm::length(model::pivotPoint(m, id) - math::Vec3d { 50, 50, 25 }) < 1e-6);
+
+    // Pivotul în colț (0, 0, 0 față de colț): obiectul nu se mișcă, iar scara pornește de acolo.
+    const math::Transform before = m.instance(id).transform;
+    p = model::placementOf(m, id);
+    const math::Vec3d corner = p.position;
+    p.pivot = math::Vec3d { 0.0 };
+    model::setPlacement(m, id, p);
+    CHECK(m.instance(id).transform == before);
+    CHECK(glm::length(model::pivotPoint(m, id) - corner) < 1e-6);
+    p = model::placementOf(m, id);
+    p.scale.z = 2.0;
+    p.size = math::Vec3d { 0.0 }; // ca din Inspector: doar scara
+    model::setPlacement(m, id, p);
+    CHECK(glm::length(model::placementOf(m, id).position - corner) < 1e-6);
+    CHECK(model::placementOf(m, id).size.z == Catch::Approx(100.0));
+
+    // O mutare duce colțul în poziția cerută (pivotul vine cu obiectul).
+    p = model::placementOf(m, id);
+    p.position = { 1000, 0, 0 };
+    model::setPlacement(m, id, p);
+    CHECK(glm::length(model::placementOf(m, id).position - math::Vec3d { 1000, 0, 0 }) < 1e-6);
+    CHECK(glm::length(model::pivotPoint(m, id) - math::Vec3d { 1000, 0, 0 }) < 1e-6);
 }

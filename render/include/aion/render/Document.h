@@ -372,6 +372,8 @@ public:
     // În Modul interacțiune: copia pe care rulează interacțiunile (documentul rămâne neatins).
     const model::Model& model() const { return m_runtime ? *m_runtime : m_model; }
     model::DefinitionId activeDefinition() const;
+    // Pivotul selecției (un obiect sau geometrie liberă), în coordonatele contextului activ; gol = nimic de arătat.
+    [[nodiscard]] std::optional<math::Vec3d> selectionPivot() const;
     const std::vector<model::InstanceId>& path() const { return m_path; }
     // Transformarea contextului editat (local → global).
     math::Transform contextTransform() const;
@@ -511,6 +513,8 @@ private:
     // Rotirea și scara aplicate din Inspector geometriei libere selectate (cheia = muchiile și fețele selecției).
     std::vector<std::uint64_t> m_geometryKey;
     math::Vec3d m_geometryRotation { 0.0 };
+    // Pivotul geometriei libere selectate (în lume), ales din Inspector; gol = centrul cutiei selecției.
+    std::optional<math::Vec3d> m_geometryPivot;
     math::Vec3d m_geometryScale { 1.0 };
     [[nodiscard]] std::vector<std::uint64_t> geometrySelectionKey() const;
     geom::Selection m_previewSelection;

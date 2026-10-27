@@ -56,17 +56,23 @@ struct BooleanResult {
 // iar cele două dispar. Subtract scade `b` din `a`.
 BooleanResult booleanOperation(Model& model, InstanceId a, InstanceId b, BooleanKind kind);
 
-// Plasarea unei instanțe, ca în Inspector: poziția colțului minim al cutiei (în coordonatele părintelui), rotația în
-// jurul axei Z (grade), scara pe axele proprii și dimensiunile rezultate (mm).
+// Plasarea unei instanțe, ca în Inspector: poziția colțului minim al cutiei (în coordonatele părintelui), rotația
+// (grade), scara pe axele proprii, dimensiunile rezultate (mm) și pivotul.
 struct Placement {
     math::Vec3d position { 0.0 };
     // Unghiurile Euler în grade: întâi în jurul lui X, apoi Y, apoi Z (axele lumii), ca în Blender (XYZ).
     math::Vec3d rotation { 0.0 };
     math::Vec3d scale { 1.0 };
     math::Vec3d size { 0.0 };
+    // Pivotul: distanța de la colțul minim, pe axele obiectului, în mm (cu scara aplicată). Gol = neschimbat.
+    std::optional<math::Vec3d> pivot {};
 };
 
 [[nodiscard]] Placement placementOf(const Model& model, InstanceId instance);
+
+// Pivotul instanței în coordonatele definiției (cel ales sau centrul cutiei) și în coordonatele părintelui.
+[[nodiscard]] math::Vec3d pivotLocal(const Model& model, InstanceId instance);
+[[nodiscard]] math::Vec3d pivotPoint(const Model& model, InstanceId instance);
 
 // Biții din Instance::placementLocks.
 enum PlacementLock : std::uint16_t {
@@ -81,6 +87,8 @@ void restoreLockedPlacement(Model& model, InstanceId instance, const Placement& 
 
 // Aplică poziția, rotația și scara cerute. `size`, dacă e nenul pe o axă, are prioritate față de `scale` pe acea axă
 // (scara se calculează din dimensiunea dorită). O rotație egală cu cea curentă păstrează exact matricea existentă.
+// O poziție nouă mută colțul minim acolo; altfel rotația, scara și dimensiunile țin pivotul pe loc (ca în Blender /
+// Figma). Un pivot nou (`wanted.pivot`) nu mută obiectul.
 void setPlacement(Model& model, InstanceId instance, const Placement& wanted);
 
 // Organizarea ca în Blender: un grup (colecție) din obiectele date, în `context`. Transformările lumii nu se schimbă.
