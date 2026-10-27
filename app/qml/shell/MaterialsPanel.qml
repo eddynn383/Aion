@@ -9,6 +9,10 @@ Item {
 
     property var document
     signal paintRequested()
+    // Un material tras spre viewport (Main desenează fantoma și vopsește la drop): id = „mat:model:ID” sau „mat:lib:INDEX”.
+    signal dragStarted(string id, string label)
+    signal dragMoved(point windowPosition)
+    signal dragEnded()
     // Editorul cere o imagine pentru textură; răspunsul vine prin textureChosen(path).
     signal pickTextureImage()
     function textureChosen(path) {
@@ -30,6 +34,7 @@ Item {
         id: swatch
         property var material
         property bool current: false
+        property string dragId: ""
         signal clicked()
         signal doubleClicked()
         signal rightClicked()
@@ -96,6 +101,12 @@ Item {
             color: swatch.current ? Theme.textPrimary : Theme.textSecondary
             font.pixelSize: Theme.fontSizeXs
         }
+        DragHandler {
+            target: null
+            enabled: swatch.dragId.length > 0
+            onActiveChanged: active ? root.dragStarted(swatch.dragId, swatch.material.name) : root.dragEnded()
+            onCentroidChanged: if (active) root.dragMoved(swatch.mapToItem(null, centroid.position.x, centroid.position.y))
+        }
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -137,6 +148,7 @@ Item {
                     delegate: Swatch {
                         required property var modelData
                         material: modelData
+                        dragId: "mat:model:" + modelData.id
                         current: root.document.currentMaterial.source === "model" && root.document.currentMaterial.id === modelData.id
                         onClicked: { root.document.selectModelMaterial(modelData.id); root.paintRequested() }
                         onDoubleClicked: editor.edit(modelData.id)
@@ -167,6 +179,7 @@ Item {
                     delegate: Swatch {
                         required property var modelData
                         material: modelData
+                        dragId: "mat:lib:" + modelData.index
                         current: root.document.currentMaterial.source === "library" && root.document.currentMaterial.index === modelData.index
                         onClicked: { root.document.selectLibraryMaterial(modelData.index); root.paintRequested() }
                     }

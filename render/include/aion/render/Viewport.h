@@ -179,6 +179,9 @@ public:
     Q_INVOKABLE QVector3D dropPointAt(const QPointF& position) const;
     // Previzualizarea unui obiect tras din bibliotecă: o cutie (colțul minim și mărimea, în mm) desenată peste model.
     Q_INVOKABLE void setDropPreview(const QVector3D& corner, const QVector3D& size);
+    // Unealta activă primește un hover / un click în punctul dat (drop-ul unui material = un click cu Paint Bucket).
+    Q_INVOKABLE void toolHoverAt(const QPointF& position);
+    Q_INVOKABLE void toolClickAt(const QPointF& position);
     Q_INVOKABLE void clearDropPreview();
 
     // Apelat de renderer (pe firul de randare, cu firul GUI blocat).

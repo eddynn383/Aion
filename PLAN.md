@@ -395,7 +395,7 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 - [ ] **SSAO / GTAO** cu filtrare care păstrează muchiile
 - [ ] **TAA** când camera stă pe loc; calitate adaptivă în timpul navigării
 - [~] Materiale **PBR** (albedo, roughness, metallic, normal map), cu bibliotecă de materiale incluse — fără normal map și texturi
-- [~] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe — fără drag & drop
+- [x] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe _(Faza 30)_
 - [x] **Paint Bucket (B):** aplicare pe față; Option = eyedropper
 - [x] Coordonate UV pentru texturi pe fețe (proiecție planară), poziționarea texturii _(Faza 24, ADR 0024)_
 - [x] Stiluri de afișare: Wireframe, Hidden Line, Shaded, Shaded with Textures, X-Ray, plus un stil **„Clay”** (alb mat cu AO, pentru prezentări) — „with Textures” vine cu texturile
@@ -617,8 +617,8 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 - [x] VCB: „2” (pe axele mânerului) sau „2,1,1.5” (pe axe); scările negative oglindesc; teste în core
 
 ### Faza 30 – Materiale trase pe fețe
-- [ ] Un material din panou (bibliotecă sau model) se trage peste viewport: fața de sub cursor e evidențiată și îl
-      primește la drop (versoul dacă e văzut din spate; un obiect întreg dacă e sub cursor)
+- [x] Un material din panou (bibliotecă sau model) se trage peste viewport: fața de sub cursor e evidențiată și îl
+      primește la drop (versoul dacă e văzut din spate; un obiect întreg dacă e sub cursor) _(Paint Bucket temporar)_
 
 ### Faza 31 – Grafică: mediu, umbrire ambientală, antialiasing
 - [ ] Iluminare din mediu: medii procedurale (Studio, Exterior, Înnorat) ca lumină ambientală (armonice sferice) și

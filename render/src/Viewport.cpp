@@ -1328,6 +1328,24 @@ void Viewport::setDropPreview(const QVector3D& corner, const QVector3D& size)
     update();
 }
 
+void Viewport::toolHoverAt(const QPointF& position)
+{
+    if (m_document && m_document->hasTool()) {
+        m_document->pointerMove(m_camera, toolEvent(position, {}, 0));
+        afterToolEvent();
+    }
+}
+
+void Viewport::toolClickAt(const QPointF& position)
+{
+    if (m_document && m_document->hasTool()) {
+        m_document->pointerMove(m_camera, toolEvent(position, {}, 0));
+        m_document->pointerDown(m_camera, toolEvent(position, {}, 1));
+        m_document->pointerUp(m_camera, toolEvent(position, {}, 1));
+        afterToolEvent();
+    }
+}
+
 void Viewport::clearDropPreview()
 {
     m_dropPreview.reset();

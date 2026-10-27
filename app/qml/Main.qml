@@ -202,6 +202,11 @@ Window {
         case "edit.array": arrayPanel.start(); break
         case "edit.soften": softenPanel.start(); break
         case "library.save": window.saveToLibrary(); break
+        case "debug.materialsOnly":
+            preferences.leftOutliner = preferences.leftLibrary = preferences.leftTags = false
+            preferences.leftScenes = preferences.leftInteractions = false
+            preferences.leftMaterials = true
+            break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
@@ -733,17 +738,38 @@ Window {
         parent: viewport
         anchors.fill: parent
         keys: ["aion-library"]
+        // Un material tras: Paint Bucket e activ cât timp e deasupra (fața de sub cursor se evidențiază).
+        property string toolBeforeMaterial: ""
+        readonly property bool material: libraryGhost.itemId.startsWith("mat:")
+        onEntered: if (material) { toolBeforeMaterial = window.activeTool; window.selectTool("paint") }
         // Cutia obiectului urmează cursorul (pe suprafața sau solul de sub el).
         onPositionChanged: (drag) => {
+            if (material) {
+                viewport.toolHoverAt(Qt.point(drag.x, drag.y))
+                return
+            }
             const size = doc.libraryItemSize(libraryGhost.itemId)
             if (size.dx === undefined)
                 return
             viewport.setDropPreview(viewport.dropPointAt(Qt.point(drag.x, drag.y)), Qt.vector3d(size.dx, size.dy, size.dz))
         }
-        onExited: viewport.clearDropPreview()
+        onExited: {
+            viewport.clearDropPreview()
+            if (material && toolBeforeMaterial.length > 0) window.selectTool(toolBeforeMaterial)
+        }
         onDropped: (drop) => {
             viewport.clearDropPreview()
-            doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
+            if (material) {
+                // „mat:model:ID” / „mat:lib:INDEX”: îl alegem ca material curent și vopsim fața (sau obiectul) de sub cursor.
+                const parts = libraryGhost.itemId.split(":")
+                if (parts[1] === "model") doc.selectModelMaterial(parseFloat(parts[2]))
+                else doc.selectLibraryMaterial(parseInt(parts[2]))
+                viewport.toolClickAt(Qt.point(drop.x, drop.y))
+                if (toolBeforeMaterial.length > 0) window.selectTool(toolBeforeMaterial)
+                toolBeforeMaterial = ""
+            } else {
+                doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
+            }
             drop.accept()
         }
     }
@@ -1188,6 +1214,13 @@ Window {
                         anchors.fill: parent
                         document: doc
                         onPaintRequested: window.selectTool("paint")
+                        onDragStarted: (id, label) => {
+                            libraryGhost.itemId = id
+                            libraryGhost.label = label
+                            libraryGhost.icon = "paint-bucket"
+                        }
+                        onDragMoved: (p) => libraryGhost.position = p
+                        onDragEnded: libraryGhost.finish()
                         onPickTextureImage: {
                             fileDialog.textureCallback = (path) => materialsPanel.textureChosen(path)
                             fileDialog.ask("textureImage")
