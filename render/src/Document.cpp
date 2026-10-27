@@ -847,7 +847,9 @@ QVariantMap Document::entityInfo() const
             { QStringLiteral("px"), placement.position.x },
             { QStringLiteral("py"), placement.position.y },
             { QStringLiteral("pz"), placement.position.z },
-            { QStringLiteral("rotation"), placement.rotationZ },
+            { QStringLiteral("rx"), placement.rotation.x },
+            { QStringLiteral("ry"), placement.rotation.y },
+            { QStringLiteral("rz"), placement.rotation.z },
             { QStringLiteral("sx"), placement.scale.x },
             { QStringLiteral("sy"), placement.scale.y },
             { QStringLiteral("sz"), placement.scale.z },
@@ -868,6 +870,7 @@ QVariantMap Document::entityInfo() const
             { QStringLiteral("open"), b.open },
         };
         info[QStringLiteral("ruleCount")] = static_cast<int>(inst.rules.size());
+        info[QStringLiteral("locks")] = static_cast<int>(inst.placementLocks);
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -2662,6 +2665,36 @@ QVariantMap Document::currentMaterial() const
         { QStringLiteral("name"), QStringLiteral("Implicit") }, { QStringLiteral("color"), QColor(0, 0, 0, 0) } };
 }
 
+void Document::setPlacementLock(int bit, bool locked)
+{
+    if (m_selection.instances.size() != 1 || bit < 0 || bit > 11) {
+        return;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    runOnModel(locked ? "Blochează valoarea" : "Deblochează valoarea", [&](model::Model& model) {
+        model::Instance inst = model.instance(id);
+        const auto mask = static_cast<std::uint16_t>(1u << bit);
+        inst.placementLocks = static_cast<std::uint16_t>(locked ? (inst.placementLocks | mask) : (inst.placementLocks & ~mask));
+        model.setInstance(id, inst);
+    });
+}
+
+bool Document::hasTransformKey(double instanceId) const
+{
+    const model::Animation* a = currentAnimation();
+    if (a == nullptr) {
+        return false;
+    }
+    const model::InstanceId id { static_cast<std::uint64_t>(instanceId) };
+    for (const model::ObjectTrack& track : a->tracks) {
+        if (track.instance == id) {
+            return std::any_of(track.transform.begin(), track.transform.end(),
+                [&](const model::TransformKey& k) { return std::abs(k.time - m_timelineTime) < 1e-3; });
+        }
+    }
+    return false;
+}
+
 void Document::setPlacement(const QVariantMap& placement)
 {
     if (m_selection.instances.size() != 1) {
@@ -2673,7 +2706,9 @@ void Document::setPlacement(const QVariantMap& placement)
         return placement.value(QLatin1String(key), fallback).toDouble();
     };
     p.position = { value("px", p.position.x), value("py", p.position.y), value("pz", p.position.z) };
-    p.rotationZ = value("rotation", p.rotationZ);
+    p.rotation.x = value("rx", p.rotation.x);
+    p.rotation.y = value("ry", p.rotation.y);
+    p.rotation.z = value("rz", value("rotation", p.rotation.z));
     p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
     // Dimensiunile se aplică doar dacă au fost cerute explicit (altfel ar anula o scară tocmai schimbată).
     p.size = { value("dx", 0.0), value("dy", 0.0), value("dz", 0.0) };

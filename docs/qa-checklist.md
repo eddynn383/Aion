@@ -139,3 +139,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
       dublu-click sau click dreapta pe un material din model îl editează sau îl șterge
 - [ ] Scene: „Scenă nouă din vederea curentă” după listă; ⚙ din antet → durata tranziției
 - [ ] Interacțiuni: obiectele cu reguli și regulile pe scurt; click → editorul cu blocuri; ▶ = Modul interacțiune
+## Plasarea în Inspector (12 valori)
+- [ ] Poziție, Dimensiuni, Rotație (Euler XYZ), Scară — câte X / Y / Z; valorile încap în câmpuri
+- [ ] Lacătul (la hover sau permanent când e blocat): valoarea devine gri, nu se poate edita; Move / Rotate / Scale nu o schimbă
+- [ ] 🔗 la Dimensiuni: proporții legate (axele blocate rămân)
+- [ ] Timeline deschis + hover pe un câmp: eticheta devine ◇; click → keyframe la momentul curent (creează animația dacă lipsește);
+      ◆ plin când obiectul are deja keyframe acolo
+- [ ] Salvare / deschidere `.aion` păstrează lacătele

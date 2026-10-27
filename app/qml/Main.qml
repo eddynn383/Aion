@@ -358,6 +358,10 @@ Window {
                         props[parts[0]] = isNaN(parseFloat(parts[1])) ? parts[1] : parseFloat(parts[1])
                     }
                     doc.setObjectProperties(props)
+                } else if (action.startsWith("clicks:")) {
+                    // Click în coordonatele ferestrei (butoane, câmpuri).
+                    const cs = action.slice(7).split(",").map(Number)
+                    AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
                 } else if (action.startsWith("drags:")) {
                     // Tragere în coordonatele ferestrei: „drags:x1,y1,x2,y2”.
                     const dg = action.slice(6).split(",").map(Number)
@@ -1376,6 +1380,7 @@ Window {
                 visible: doc.selectedObject.kind === "none"
                 width: parent.width
                 document: doc
+                timelineActive: window.timelineVisible
                 onEditRules: window.openRulesEditor()
             }
 

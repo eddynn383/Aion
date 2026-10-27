@@ -7,6 +7,8 @@ Column {
     id: root
 
     property var document
+    // Timeline-ul e deschis: la hover pe o valoare de plasare, eticheta devine butonul de keyframe.
+    property bool timelineActive: false
     signal editRules()
 
     readonly property var info: document ? document.entityInfo : ({ kind: "none" })
@@ -104,7 +106,8 @@ Column {
         }
     }
 
-    // Transformarea: poziția colțului, rotația în jurul lui Z, dimensiunile (cu proporții blocate) și scara.
+    // Transformarea: poziția colțului, dimensiunile, rotația (Euler XYZ) și scara, câte trei valori. Fiecare are un
+    // lacăt (blochează valoarea, inclusiv pentru Move / Rotate / Scale) și, cu timeline-ul deschis, un keyframe la hover.
     Column {
         id: transformBox
         visible: root.isInstance
@@ -112,102 +115,157 @@ Column {
         spacing: Theme.space2
 
         readonly property var p: root.isInstance && root.info.placement ? root.info.placement : ({})
-        property bool lockProportions: false
+        readonly property int locks: root.isInstance ? (root.info.locks ?? 0) : 0
+        property bool linkProportions: false
         readonly property real third: (width - Theme.space1 * 2) / 3
+        // Keyframe la momentul curent pentru obiect (diamantul plin).
+        readonly property bool keyed: root.isInstance && root.timelineActive && root.document.timeline !== undefined
+                                      && root.document.timelineTime >= 0 && root.document.hasTransformKey(root.info.instanceId)
 
-        // Dimensiunea nouă pe o axă; cu proporții blocate, celelalte se scalează la fel.
+        // Dimensiunea nouă pe o axă; cu proporțiile legate, celelalte se scalează la fel (fără cele blocate).
         function setSize(axis, value) {
             const old = { dx: p.dx, dy: p.dy, dz: p.dz }
             if (!(old[axis] > 0) || !(value > 0))
                 return
             const sizes = { dx: old.dx, dy: old.dy, dz: old.dz }
-            if (lockProportions) {
+            if (linkProportions) {
                 const k = value / old[axis]
-                sizes.dx = old.dx * k; sizes.dy = old.dy * k; sizes.dz = old.dz * k
+                const bits = { dx: 3, dy: 4, dz: 5 }
+                for (const a of ["dx", "dy", "dz"])
+                    if (a === axis || !(locks & (1 << bits[a])))
+                        sizes[a] = old[a] * k
             } else {
                 sizes[axis] = value
             }
             root.document.setPlacement(sizes)
         }
-
-        Text {
-            text: "Poziție (mm)"
-            color: Theme.textSecondary
-            font.pixelSize: Theme.fontSizeSm
-        }
-        Row {
-            spacing: Theme.space1
-            NumberField {
-                width: transformBox.third; label: "X"; decimals: 0
-                value: transformBox.p.px ?? 0
-                onValueModified: (v) => root.document.setPlacement({ px: v })
-            }
-            NumberField {
-                width: transformBox.third; label: "Y"; decimals: 0
-                value: transformBox.p.py ?? 0
-                onValueModified: (v) => root.document.setPlacement({ py: v })
-            }
-            NumberField {
-                width: transformBox.third; label: "Z"; decimals: 0
-                value: transformBox.p.pz ?? 0
-                onValueModified: (v) => root.document.setPlacement({ pz: v })
-            }
+        function key() {
+            if (root.document.activeAnimation <= 0)
+                root.document.createAnimation()
+            root.document.keySelection()
         }
 
-        Item {
-            width: parent.width
+        component PlacementField: Item {
+            id: field
+            property string label
+            property string unit: ""
+            property int decimals: 0
+            property real step: 1
+            property real from: -1e12
+            property real to: 1e12
+            property real value: 0
+            property int lockBit: 0
+            readonly property bool locked: (transformBox.locks & (1 << lockBit)) !== 0
+            readonly property bool keyMode: root.timelineActive && hover.hovered
+            signal valueModified(real value)
+
+            width: transformBox.third
+            height: input.implicitHeight
+
+            HoverHandler { id: hover }
+            NumberField {
+                id: input
+                anchors.fill: parent
+                label: field.label
+                labelVisible: !field.keyMode
+                unit: field.unit
+                decimals: field.decimals
+                step: field.step
+                from: field.from
+                to: field.to
+                value: field.value
+                readOnly: field.locked
+                color: field.locked ? Theme.textTertiary : Theme.textPrimary
+                compact: true
+                extraRightPadding: hover.hovered || field.locked ? 16 : 0
+                onValueModified: (v) => { if (!field.locked) field.valueModified(v) }
+            }
+            // Keyframe (în locul etichetei).
+            IconButton {
+                visible: field.keyMode
+                anchors.left: parent.left
+                anchors.leftMargin: 1
+                anchors.verticalCenter: parent.verticalCenter
+                width: 18; height: 18; iconSize: 11
+                iconName: "diamond"
+                checked: transformBox.keyed
+                tooltip: transformBox.keyed ? "Actualizează keyframe-ul la momentul curent" : "Pune un keyframe la momentul curent"
+                // La apăsare: dedesubt e eticheta câmpului, al cărei DragHandler preia eliberarea.
+                onPressed: { input.focus = false; transformBox.key() }
+            }
+            // Lacătul (se vede la hover sau când e blocat).
+            IconButton {
+                visible: hover.hovered || field.locked
+                anchors.right: parent.right
+                anchors.rightMargin: 2
+                anchors.verticalCenter: parent.verticalCenter
+                width: 16; height: 16; iconSize: 11
+                iconName: field.locked ? "lock" : "lock-open"
+                checked: field.locked
+                solidChecked: false
+                tooltip: field.locked ? "Deblochează valoarea" : "Blochează valoarea"
+                onClicked: root.document.setPlacementLock(field.lockBit, !field.locked)
+            }
+        }
+
+        component Caption: Item {
+            property alias text: captionText.text
+            default property alias trailing: trailingRow.data
+            width: transformBox.width
             height: Theme.controlHeightSm
             Text {
+                id: captionText
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Dimensiuni (mm)"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSm
             }
-            IconButton {
+            Row {
+                id: trailingRow
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                width: 24
-                height: 24
-                iconSize: Theme.iconSizeSm
-                iconName: "lock"
-                tooltip: transformBox.lockProportions ? "Proporții blocate" : "Blochează proporțiile"
-                checked: transformBox.lockProportions
-                solidChecked: false
-                onClicked: transformBox.lockProportions = !transformBox.lockProportions
-            }
-        }
-        Row {
-            spacing: Theme.space1
-            NumberField {
-                width: transformBox.third; label: "L"; decimals: 0; from: 0.01
-                value: transformBox.p.dx ?? 0
-                onValueModified: (v) => transformBox.setSize("dx", v)
-            }
-            NumberField {
-                width: transformBox.third; label: "l"; decimals: 0; from: 0.01
-                value: transformBox.p.dy ?? 0
-                onValueModified: (v) => transformBox.setSize("dy", v)
-            }
-            NumberField {
-                width: transformBox.third; label: "h"; decimals: 0; from: 0.01
-                value: transformBox.p.dz ?? 0
-                onValueModified: (v) => transformBox.setSize("dz", v)
             }
         }
 
+        Caption { text: "Poziție (mm)" }
         Row {
             spacing: Theme.space1
-            NumberField {
-                width: transformBox.third; label: "Rot."; unit: "°"; decimals: 0; from: -360; to: 360
-                value: transformBox.p.rotation ?? 0
-                onValueModified: (v) => root.document.setPlacement({ rotation: v })
+            PlacementField { label: "X"; lockBit: 0; value: transformBox.p.px ?? 0; onValueModified: (v) => root.document.setPlacement({ px: v }) }
+            PlacementField { label: "Y"; lockBit: 1; value: transformBox.p.py ?? 0; onValueModified: (v) => root.document.setPlacement({ py: v }) }
+            PlacementField { label: "Z"; lockBit: 2; value: transformBox.p.pz ?? 0; onValueModified: (v) => root.document.setPlacement({ pz: v }) }
+        }
+
+        Caption {
+            text: "Dimensiuni (mm)"
+            IconButton {
+                width: 24; height: 24; iconSize: Theme.iconSizeSm
+                iconName: "link"
+                tooltip: transformBox.linkProportions ? "Proporții legate" : "Leagă proporțiile"
+                checked: transformBox.linkProportions
+                solidChecked: false
+                onClicked: transformBox.linkProportions = !transformBox.linkProportions
             }
-            NumberField {
-                width: transformBox.third * 2 + Theme.space1; label: "Scară"; unit: "×"; decimals: 3; step: 0.1; from: 0.001
-                // Scara uniformă (media); pentru scări diferite pe axe, folosește dimensiunile.
-                value: transformBox.p.sx !== undefined ? (Math.abs(transformBox.p.sx) + Math.abs(transformBox.p.sy) + Math.abs(transformBox.p.sz)) / 3 : 1
-                onValueModified: (v) => root.document.setPlacement({ sx: v, sy: v, sz: v })
-            }
+        }
+        Row {
+            spacing: Theme.space1
+            PlacementField { label: "X"; lockBit: 3; from: 0.01; value: transformBox.p.dx ?? 0; onValueModified: (v) => transformBox.setSize("dx", v) }
+            PlacementField { label: "Y"; lockBit: 4; from: 0.01; value: transformBox.p.dy ?? 0; onValueModified: (v) => transformBox.setSize("dy", v) }
+            PlacementField { label: "Z"; lockBit: 5; from: 0.01; value: transformBox.p.dz ?? 0; onValueModified: (v) => transformBox.setSize("dz", v) }
+        }
+
+        Caption { text: "Rotație (°)" }
+        Row {
+            spacing: Theme.space1
+            PlacementField { label: "X"; lockBit: 6; decimals: 1; from: -360; to: 360; value: transformBox.p.rx ?? 0; onValueModified: (v) => root.document.setPlacement({ rx: v }) }
+            PlacementField { label: "Y"; lockBit: 7; decimals: 1; from: -360; to: 360; value: transformBox.p.ry ?? 0; onValueModified: (v) => root.document.setPlacement({ ry: v }) }
+            PlacementField { label: "Z"; lockBit: 8; decimals: 1; from: -360; to: 360; value: transformBox.p.rz ?? 0; onValueModified: (v) => root.document.setPlacement({ rz: v }) }
+        }
+
+        Caption { text: "Scară (×)" }
+        Row {
+            spacing: Theme.space1
+            PlacementField { label: "X"; lockBit: 9; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sx ?? 1); onValueModified: (v) => root.document.setPlacement({ sx: v }) }
+            PlacementField { label: "Y"; lockBit: 10; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sy ?? 1); onValueModified: (v) => root.document.setPlacement({ sy: v }) }
+            PlacementField { label: "Z"; lockBit: 11; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sz ?? 1); onValueModified: (v) => root.document.setPlacement({ sz: v }) }
         }
     }
 

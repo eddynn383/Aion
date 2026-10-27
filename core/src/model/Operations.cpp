@@ -8,7 +8,10 @@
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
+#include <optional>
 
 namespace aion::model {
 
@@ -174,8 +177,12 @@ void transformInstances(Model& model, const std::set<InstanceId>& instances, con
 {
     for (InstanceId id : instances) {
         Instance inst = model.instance(id);
+        const std::optional<Placement> before = inst.placementLocks != 0 ? std::optional(placementOf(model, id)) : std::nullopt;
         inst.transform = delta * inst.transform;
         model.setInstance(id, inst);
+        if (before) {
+            restoreLockedPlacement(model, id, *before);
+        }
     }
 }
 
@@ -231,6 +238,31 @@ Decomposed decompose(const math::Transform& t)
 
 } // namespace
 
+// Unghiurile Euler (grade) ale rotației R = Rz · Ry · Rx; la ±90° pe Y (gimbal lock), X devine 0.
+math::Vec3d eulerDegrees(const glm::dmat3& r)
+{
+    const double sy = std::clamp(-r[0].z, -1.0, 1.0);
+    const double y = std::asin(sy);
+    double x = 0.0;
+    double z = 0.0;
+    if (std::abs(sy) < 1.0 - 1e-9) {
+        x = std::atan2(r[1].z, r[2].z);
+        z = std::atan2(r[0].y, r[0].x);
+    } else {
+        z = std::atan2(-r[1].x, r[1].y);
+    }
+    const auto clean = [](double degrees) { return std::abs(degrees) < 1e-9 ? 0.0 : degrees; };
+    return { clean(glm::degrees(x)), clean(glm::degrees(y)), clean(glm::degrees(z)) };
+}
+
+glm::dmat3 rotationFromEuler(const math::Vec3d& degrees)
+{
+    const glm::dmat4 m = glm::rotate(glm::dmat4(1.0), glm::radians(degrees.z), math::Vec3d { 0, 0, 1 })
+        * glm::rotate(glm::dmat4(1.0), glm::radians(degrees.y), math::Vec3d { 0, 1, 0 })
+        * glm::rotate(glm::dmat4(1.0), glm::radians(degrees.x), math::Vec3d { 1, 0, 0 });
+    return glm::dmat3(m);
+}
+
 Placement placementOf(const Model& model, InstanceId instance)
 {
     const Instance& inst = model.instance(instance);
@@ -240,7 +272,7 @@ Placement placementOf(const Model& model, InstanceId instance)
     const Decomposed d = decompose(inst.transform);
     Placement p;
     p.position = inst.transform.applyToPoint(corner);
-    p.rotationZ = glm::degrees(std::atan2(d.rotation[0].y, d.rotation[0].x));
+    p.rotation = eulerDegrees(d.rotation);
     p.scale = d.scale;
     p.size = glm::abs(extent * d.scale);
     return p;
@@ -254,11 +286,11 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
     const math::Vec3d extent = lo.x <= hi.x ? hi - lo : math::Vec3d { 0.0 };
     Decomposed d = decompose(inst.transform);
 
-    // Rotația în jurul lui Z: diferența față de unghiul curent, aplicată peste rotația existentă.
-    const double current = std::atan2(d.rotation[0].y, d.rotation[0].x);
-    const double delta = glm::radians(wanted.rotationZ) - current;
-    const glm::dmat3 rz(glm::rotate(glm::dmat4(1.0), delta, math::Vec3d { 0, 0, 1 }));
-    d.rotation = rz * d.rotation;
+    // Rotația: refăcută din unghiuri doar dacă s-a schimbat (altfel rămâne exact cea existentă, fără erori de rotunjire).
+    const math::Vec3d current = eulerDegrees(d.rotation);
+    if (glm::length(wanted.rotation - current) > 1e-7) {
+        d.rotation = rotationFromEuler(wanted.rotation);
+    }
 
     math::Vec3d scale = wanted.scale;
     for (int i = 0; i < 3; ++i) {
@@ -278,6 +310,33 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
     m[3] = glm::dvec4(wanted.position - rs * corner, 1.0);
     inst.transform = math::Transform(m);
     model.setInstance(instance, inst);
+}
+
+void restoreLockedPlacement(Model& model, InstanceId instance, const Placement& before)
+{
+    const std::uint16_t locks = model.instance(instance).placementLocks;
+    if (locks == 0) {
+        return;
+    }
+    const Placement after = placementOf(model, instance);
+    Placement wanted = after;
+    wanted.size = math::Vec3d { 0.0 };
+    for (int i = 0; i < 3; ++i) {
+        const auto locked = [&](int group) { return (locks & (1u << (group * 3 + i))) != 0; };
+        if (locked(0)) {
+            wanted.position[i] = before.position[i];
+        }
+        if (locked(1)) {
+            wanted.size[i] = before.size[i];
+        }
+        if (locked(2)) {
+            wanted.rotation[i] = before.rotation[i];
+        }
+        if (locked(3)) {
+            wanted.scale[i] = before.scale[i];
+        }
+    }
+    setPlacement(model, instance, wanted);
 }
 
 InstanceId groupInstances(Model& model, DefinitionId context, const std::set<InstanceId>& instances, std::string name)

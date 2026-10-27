@@ -24,3 +24,11 @@
 - Fără auto-key, fără curbe Bézier editabile, fără piste pentru alte proprietăți (vizibilitate, materialul întreg).
 - ~~La export, obiectele selectate apar cu evidențierea selecției~~ — rezolvat: capturile (PNG, cadrele video)
   se randează fără selecție, hover, overlay-ul uneltei și marcajele camerelor / luminilor.
+
+## Completare (2026-10-27): plasarea în Inspector
+
+- `model::Placement` are rotația completă (Euler XYZ, grade); o rotație cerută egală cu cea curentă păstrează exact
+  matricea (fără erori de rotunjire).
+- Lacăte pe cele 12 valori (`Instance::placementLocks`, salvate în `.aion`): Inspector-ul nu le editează, iar
+  `transformInstances` (Move / Rotate / Scale) le readuce la valorile dinainte (`restoreLockedPlacement`).
+- Cu timeline-ul deschis, ◇ din câmpuri pune un keyframe de transformare (toată transformarea, ca butonul din timeline).

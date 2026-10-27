@@ -240,6 +240,10 @@ public:
     // prioritate față de scară) și materialul selecției. `material`: { id } din model sau { library } din bibliotecă,
     // gol = fără material; `side`: "front" sau "back" (pentru fețe).
     Q_INVOKABLE void setPlacement(const QVariantMap& placement);
+    // Lacătul unei valori de plasare a instanței selectate (bitul din model::PlacementLock, 0–11).
+    Q_INVOKABLE void setPlacementLock(int bit, bool locked);
+    // Animația activă are un keyframe de transformare pentru instanță la momentul curent al timeline-ului?
+    Q_INVOKABLE bool hasTransformKey(double instanceId) const;
     Q_INVOKABLE void assignMaterial(const QVariantMap& material, const QString& side);
     Q_INVOKABLE void selectLibraryMaterial(int index);
     Q_INVOKABLE void selectModelMaterial(double materialId);
