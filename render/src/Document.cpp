@@ -4173,6 +4173,27 @@ QVariantMap Document::cameraView(double cameraId) const
         { QStringLiteral("ortho"), c->orthographic }, { QStringLiteral("fov"), c->fov } };
 }
 
+std::optional<math::Vec3d> Document::selectedObjectPosition() const
+{
+    if (const model::CameraObject* c = m_model.cameras().find(m_selectedCamera)) {
+        return c->position;
+    }
+    if (const model::Light* l = m_model.lights().find(m_selectedLight)) {
+        return l->position;
+    }
+    return std::nullopt;
+}
+
+void Document::moveSelectedObjectTo(const math::Vec3d& position)
+{
+    if (const model::CameraObject* c = m_model.cameras().find(m_selectedCamera)) {
+        const math::Vec3d target = c->target + (position - c->position);
+        setObjectProperties({ { QStringLiteral("position"), vec3List(position) }, { QStringLiteral("target"), vec3List(target) } });
+    } else if (m_model.lights().contains(m_selectedLight)) {
+        setObjectProperties({ { QStringLiteral("position"), vec3List(position) } });
+    }
+}
+
 void Document::placeSelectedObjectAtView(const QVariantMap& camera)
 {
     const auto [eye, target] = eyeAndTarget(camera);

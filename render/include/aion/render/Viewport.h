@@ -245,6 +245,16 @@ private:
     // Cât se captează o imagine (PNG, cadrele unui video): fără selecție, hover și marcaje.
     bool m_cleanCapture = false;
     std::optional<std::pair<QVector3D, QVector3D>> m_dropPreview;
+    // Tragerea marcajului unei camere / lumini (cu Select): poziția de start și punctul apucat.
+    struct ObjectDrag {
+        math::Vec3d start { 0.0 };
+        math::Vec3d grab { 0.0 };
+        QPointF press;
+        bool moved = false;
+        bool vertical = false; // planul curent (Shift = vertical)
+    };
+    std::optional<ObjectDrag> m_objectDrag;
+    [[nodiscard]] std::optional<math::Vec3d> objectDragPoint(QPointF position, bool vertical) const;
     bool m_exporting = false;
     double m_exportProgress = 0.0;
     int m_exportFrame = 0;

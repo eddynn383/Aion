@@ -1744,6 +1744,14 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         && m_document->activeTool() == QLatin1String("select")) {
         if (const auto handle = objectHandleAt(event->position())) {
             m_document->selectObject(handle->first, handle->second);
+            // Se poate și trage: mutarea întreagă e un singur pas de undo.
+            if (const auto start = m_document->selectedObjectPosition()) {
+                m_objectDrag = ObjectDrag { *start, *start, event->position(), false };
+                if (const auto grab = objectDragPoint(event->position(), event->modifiers().testFlag(Qt::ShiftModifier))) {
+                    m_objectDrag->grab = *grab;
+                }
+                m_document->beginMacro("Mută");
+            }
             event->accept();
             return;
         }
@@ -1805,10 +1813,58 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
     } else if (m_drag == Drag::Zoom) {
         m_camera.zoomAbout(std::exp(delta.y() * kDragZoomPerPixel), m_zoomDragAnchor);
         onCameraMoved();
+    } else if (m_objectDrag && m_document) {
+        const bool vertical = event->modifiers().testFlag(Qt::ShiftModifier);
+        if (!m_objectDrag->moved && QLineF(event->position(), m_objectDrag->press).length() <= kMultiClickDistancePx) {
+            return;
+        }
+        if (!m_objectDrag->moved || vertical != m_objectDrag->vertical) {
+            // La prima mișcare și la schimbarea planului (Shift), mutarea pornește din poziția curentă.
+            m_objectDrag->start = m_document->selectedObjectPosition().value_or(m_objectDrag->start);
+            m_objectDrag->vertical = vertical;
+            if (const auto grab = objectDragPoint(event->position(), vertical)) {
+                m_objectDrag->grab = *grab;
+            }
+        }
+        m_objectDrag->moved = true;
+        if (const auto point = objectDragPoint(event->position(), vertical)) {
+            math::Vec3d p = m_objectDrag->start + (*point - m_objectDrag->grab);
+            if (vertical) {
+                p.x = m_objectDrag->start.x;
+                p.y = m_objectDrag->start.y;
+            } else {
+                p.z = m_objectDrag->start.z;
+            }
+            m_document->moveSelectedObjectTo(p);
+            update();
+        }
     } else if (m_toolPressed && m_document) {
         m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
         afterToolEvent();
     }
+}
+
+std::optional<math::Vec3d> Viewport::objectDragPoint(QPointF position, bool vertical) const
+{
+    if (!m_objectDrag) {
+        return std::nullopt;
+    }
+    // Orizontal: planul Z = înălțimea obiectului. Vertical: planul vertical prin obiect, cu fața spre cameră.
+    const math::Ray ray = m_camera.rayAt(toVec2(position));
+    math::Vec3d normal { 0, 0, 1 };
+    if (vertical) {
+        const math::Vec3d f = m_camera.forward();
+        normal = glm::length(math::Vec2d(f.x, f.y)) > 1e-6 ? glm::normalize(math::Vec3d(f.x, f.y, 0.0)) : math::Vec3d { 0, 1, 0 };
+    }
+    const double denom = glm::dot(normal, ray.direction);
+    if (std::abs(denom) < 1e-9) {
+        return std::nullopt;
+    }
+    const double t = glm::dot(normal, m_objectDrag->start - ray.origin) / denom;
+    if (t <= 0.0) {
+        return std::nullopt;
+    }
+    return ray.at(t);
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
@@ -1837,6 +1893,14 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
             emit contextMenuRequested(event->position());
         }
         m_rightPress.reset();
+        event->accept();
+        return;
+    }
+    if (m_objectDrag && event->button() == Qt::LeftButton) {
+        if (m_document) {
+            m_document->endMacro(m_objectDrag->moved);
+        }
+        m_objectDrag.reset();
         event->accept();
         return;
     }

@@ -394,6 +394,15 @@ Window {
                     // Click în coordonatele ferestrei (butoane, câmpuri).
                     const cs = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
+                } else if (action.startsWith("draglight:")) {
+                    // „draglight:dx,dy,shift”: trage marcajul primei lumini cu (dx, dy) pixeli; afișează poziția.
+                    const dl = action.slice(10).split(",").map(Number)
+                    doc.selectObject("light", doc.lights[0].id)
+                    const p = doc.selectedObject.position
+                    const screen = viewport.mapToItem(window.contentItem, viewport.projectToScreen(Qt.vector3d(p[0], p[1], p[2])))
+                    const before = JSON.stringify(p) // înainte de tragere (p e o referință vie)
+                    AppInfo.simulateDrag(window.contentItem, screen, Qt.point(screen.x + dl[0], screen.y + dl[1]))
+                    console.info("light:", before, "→", JSON.stringify(doc.selectedObject.position), "undo:", doc.undoName)
                 } else if (action.startsWith("droppreview:")) {
                     // „droppreview:gen:table,700,450”: cutia de previzualizare a obiectului la poziția din viewport.
                     const dp = action.slice(12).split(",")
