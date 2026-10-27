@@ -22,6 +22,7 @@
 
 #include <QColor>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -977,6 +978,21 @@ QVariantMap Document::entityInfo() const
     } else {
         info[QStringLiteral("kind")] = QStringLiteral("mixed");
         info[QStringLiteral("title")] = selectionSummary();
+    }
+    // Geometria liberă (fețe, muchii): cutia ei, pentru poziție și dimensiuni în Inspector.
+    if (m_selection.instances.empty() && (!m_selection.faces.empty() || !m_selection.edges.empty())) {
+        const std::set<geom::VertexId> vertices = geom::verticesOf(mesh, m_selection);
+        if (!vertices.empty()) {
+            math::Vec3d lo { std::numeric_limits<double>::infinity() };
+            math::Vec3d hi { -std::numeric_limits<double>::infinity() };
+            for (geom::VertexId v : vertices) {
+                lo = glm::min(lo, mesh.position(v));
+                hi = glm::max(hi, mesh.position(v));
+            }
+            info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), lo.x }, { QStringLiteral("py"), lo.y },
+                { QStringLiteral("pz"), lo.z }, { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
+                { QStringLiteral("dz"), hi.z - lo.z } };
+        }
     }
     // Forma recunoscută (linie, arc, cerc, poligon, dreptunghi), cu mărimile ei editabile.
     if (const auto shape = geom::recognizeShape(mesh, m_selection)) {
@@ -3795,6 +3811,64 @@ void Document::setShapeValue(const QString& key, double value)
     });
     if (!ok) {
         setError(QStringLiteral("Mărimea nu se poate schimba așa (o muchie ar ajunge de lungime zero)."));
+    }
+}
+
+void Document::setGeometryPlacement(const QVariantMap& changes)
+{
+    if (!m_selection.instances.empty()) {
+        return;
+    }
+    const geom::Mesh& current = m_model.mesh(activeDefinition());
+    const std::set<geom::VertexId> vertices = geom::verticesOf(current, m_selection);
+    if (vertices.empty()) {
+        return;
+    }
+    math::Vec3d lo { std::numeric_limits<double>::infinity() };
+    math::Vec3d hi { -std::numeric_limits<double>::infinity() };
+    for (geom::VertexId v : vertices) {
+        lo = glm::min(lo, current.position(v));
+        hi = glm::max(hi, current.position(v));
+    }
+    const auto has = [&](const char* key) { return changes.contains(QLatin1String(key)); };
+    const auto value = [&](const char* key) { return changes.value(QLatin1String(key)).toDouble(); };
+    math::Transform t;
+    std::string name = "Mută";
+    if (has("px") || has("py") || has("pz")) {
+        const math::Vec3d to { has("px") ? value("px") : lo.x, has("py") ? value("py") : lo.y, has("pz") ? value("pz") : lo.z };
+        t = math::Transform::translation(to - lo);
+    } else if (has("dx") || has("dy") || has("dz")) {
+        math::Vec3d k { 1.0 };
+        const char* const keys[] = { "dx", "dy", "dz" };
+        for (int a = 0; a < 3; ++a) {
+            const double size = hi[a] - lo[a];
+            if (has(keys[a]) && size > 1e-9 && value(keys[a]) > 1e-9) {
+                k[a] = value(keys[a]) / size;
+            }
+        }
+        t = math::Transform::scaling(lo, k);
+        name = "Dimensiuni";
+    } else if (has("rx") || has("ry") || has("rz")) {
+        const math::Vec3d center = (lo + hi) * 0.5;
+        t = math::Transform::rotation(center, { 0, 0, 1 }, glm::radians(value("rz")))
+            * math::Transform::rotation(center, { 0, 1, 0 }, glm::radians(value("ry")))
+            * math::Transform::rotation(center, { 1, 0, 0 }, glm::radians(value("rx")));
+        name = "Rotește";
+    } else if (has("sx") || has("sy") || has("sz")) {
+        const math::Vec3d k { has("sx") ? value("sx") : 1.0, has("sy") ? value("sy") : 1.0, has("sz") ? value("sz") : 1.0 };
+        if (std::abs(k.x) < 1e-6 || std::abs(k.y) < 1e-6 || std::abs(k.z) < 1e-6) {
+            return;
+        }
+        t = math::Transform::scaling(lo, k);
+        name = "Scalează";
+    }
+    if (t.isIdentity()) {
+        return;
+    }
+    bool ok = true;
+    runOnModel(name, [&](model::Model& model) { ok = geom::transformVertices(model.mesh(activeDefinition()), vertices, t); });
+    if (!ok) {
+        setError(QStringLiteral("Transformarea ar strânge o muchie într-un punct."));
     }
 }
 

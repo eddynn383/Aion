@@ -20,6 +20,9 @@ T.TextField {
     property real extraRightPadding: 0
     // Varianta îngustă (trei câmpuri pe un rând în Inspector): margini și font mai mici.
     property bool compact: false
+    // Câmp relativ (de exemplu „rotește cu”): după ce valoarea e trimisă, revine la `resetValue`; se aplică doar la
+    // Enter sau la ieșirea din câmp (nu în timp ce se tastează). NaN = câmp obișnuit.
+    property real resetValue: NaN
 
     signal valueModified(real value)
 
@@ -31,6 +34,11 @@ T.TextField {
     function commit(v, keepText) {
         const clamped = Math.max(root.from, Math.min(root.to, v))
         root.valueModified(clamped)
+        if (!isNaN(root.resetValue)) {
+            root.value = root.resetValue
+            root.text = root.format(root.resetValue)
+            return
+        }
         if (Math.abs(root.value - clamped) > 1e-9)
             root.value = clamped
         if (!keepText)
@@ -43,7 +51,7 @@ T.TextField {
         interval: 600
         onTriggered: {
             const parsed = Number(root.text.replace(",", "."))
-            if (root.activeFocus && root.text.trim().length > 0 && !isNaN(parsed) && Math.abs(parsed - root.value) > 1e-9)
+            if (isNaN(root.resetValue) && root.activeFocus && root.text.trim().length > 0 && !isNaN(parsed) && Math.abs(parsed - root.value) > 1e-9)
                 root.commit(parsed, true)
         }
     }
@@ -66,6 +74,8 @@ T.TextField {
 
     text: format(value)
     onValueChanged: if (!activeFocus) text = format(value)
+    // Zecimalele pot veni după valoare (ordinea inițializării): textul se reface.
+    onDecimalsChanged: if (!activeFocus) text = format(value)
     onEditingFinished: {
         liveCommit.stop()
         const parsed = Number(text.replace(",", "."))
