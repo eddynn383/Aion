@@ -390,17 +390,17 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ### Faza 8 – Grafică avansată, materiale și stiluri
 - [~] Pipeline de randare cu pași separați (`render/passes`): adâncime + normale → SSAO/GTAO → iluminare → outline → TAA → tonemapping — deocamdată: umbre → fețe → sol → grid → contur → transparente → linii
 - [~] Randare în spațiu liniar, HDR intern, **tonemapping ACES**, ieșire sRGB corectă (și Display P3 pe Mac) — fără Display P3
-- [ ] **Iluminare din mediu (IBL)** din HDRI, cu câteva medii incluse (studio, exterior, înnorat)
+- [x] **Iluminare din mediu** cu câteva medii incluse (studio, exterior, înnorat) _(procedurale, nu HDRI; Faza 31)_
 - [~] **Umbre moi**: cascaded shadow maps + PCF/PCSS, soarele poziționat după locație, dată și oră — o singură hartă + PCF; soarele după oră, lună și latitudine
-- [ ] **SSAO / GTAO** cu filtrare care păstrează muchiile
-- [ ] **TAA** când camera stă pe loc; calitate adaptivă în timpul navigării
+- [x] **SSAO** _(Faza 31)_
+- [x] Antialiasing mai fin când camera stă pe loc, calitate adaptivă în timpul navigării _(MSAA 8×, Faza 31)_
 - [~] Materiale **PBR** (albedo, roughness, metallic, normal map), cu bibliotecă de materiale incluse — fără normal map și texturi
 - [x] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe _(Faza 30)_
 - [x] **Paint Bucket (B):** aplicare pe față; Option = eyedropper
 - [x] Coordonate UV pentru texturi pe fețe (proiecție planară), poziționarea texturii _(Faza 24, ADR 0024)_
 - [x] Stiluri de afișare: Wireframe, Hidden Line, Shaded, Shaded with Textures, X-Ray, plus un stil **„Clay”** (alb mat cu AO, pentru prezentări) — „with Textures” vine cu texturile
 - [x] Profiluri (muchii exterioare îngroșate), ceață atmosferică
-- [ ] Preset-uri de calitate în Preferințe: *Performanță*, *Echilibrat*, *Calitate*
+- [x] Preset-uri de calitate în Preferințe: *Performanță*, *Echilibrat*, *Calitate* _(Faza 31)_
 
 **Gata când:** casa din faza 5, texturată, arată vizibil mai bine decât același model în SketchUp (comparație de capturi), cu 60 fps în timpul navigării pe un MacBook Air M1.
 
@@ -621,11 +621,11 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
       primește la drop (versoul dacă e văzut din spate; un obiect întreg dacă e sub cursor) _(Paint Bucket temporar)_
 
 ### Faza 31 – Grafică: mediu, umbrire ambientală, antialiasing
-- [ ] Iluminare din mediu: medii procedurale (Studio, Exterior, Înnorat) ca lumină ambientală (armonice sferice) și
-      reflexii după rugozitate; alese în bara de vizualizare
-- [ ] SSAO (umbrire ambientală în screen-space) cu filtrare care păstrează muchiile
-- [ ] Antialiasing progresiv când camera stă pe loc (cadre cu jitter acumulate)
-- [ ] Preset-uri de calitate în Preferințe: Performanță, Echilibrat, Calitate
+- [x] Iluminare din mediu: medii procedurale (Simplu, Studio, Exterior, Înnorat) ca lumină ambientală (gradient cer /
+      sol) și reflexii după rugozitate; alese în bara de vizualizare (meniul soarelui) și în Preferințe _(ADR 0028)_
+- [x] SSAO (umbrire ambientală în screen-space), netezită 4 × 4
+- [x] Antialiasing mai fin când camera stă pe loc _(MSAA 8× după 0,4 s, nu acumulare de cadre — ADR 0028)_
+- [x] Preset-uri de calitate în Preferințe: Performanță, Echilibrat, Calitate
 
 ## 7. Riscuri principale și cum le reducem
 

@@ -185,7 +185,22 @@ std::pair<glm::dvec3, double> sunPosition(double hour, int month, double latitud
 Viewport::Viewport(QQuickItem* parent)
     : QQuickRhiItem(parent)
 {
-    setSampleCount(4);
+    setSampleCount(m_preferredSamples);
+    m_stillTimer.setSingleShot(true);
+    m_stillTimer.setInterval(400);
+    connect(&m_stillTimer, &QTimer::timeout, this, [this] {
+        if (m_progressiveAA && sampleCount() < kStillSamples) {
+            setSampleCount(kStillSamples);
+            update();
+        }
+    });
+    connect(this, &Viewport::appearanceChanged, this, [this] {
+        if (!m_progressiveAA && sampleCount() != m_preferredSamples) {
+            setSampleCount(m_preferredSamples);
+        } else if (m_progressiveAA) {
+            m_stillTimer.start();
+        }
+    });
     setAcceptedMouseButtons(Qt::LeftButton | Qt::MiddleButton | Qt::RightButton);
     setAcceptHoverEvents(true);
     setFlag(ItemIsFocusScope, false);
@@ -1517,9 +1532,33 @@ ViewportFrame Viewport::frameForRendering() const
     f.colors.accent = toVec4(m_accent);
     f.style = styleIndex(m_displayStyle);
     f.fog = m_fog;
+    // Mediul de iluminare (culorile cerului și ale solului ca lumină ambientală, plus reflexii).
+    if (m_environment == QLatin1String("studio")) {
+        f.envZenith = { 0.92f, 0.92f, 0.95f, 0.62f };
+        f.envHorizon = { 0.80f, 0.80f, 0.83f, 0.62f };
+        f.envGround = { 0.34f, 0.34f, 0.36f, 0.62f };
+        f.envReflection = 0.65f;
+    } else if (m_environment == QLatin1String("exterior")) {
+        f.envZenith = { 0.36f, 0.56f, 0.95f, 0.62f };
+        f.envHorizon = { 0.82f, 0.86f, 0.92f, 0.62f };
+        f.envGround = { 0.42f, 0.37f, 0.30f, 0.62f };
+        f.envReflection = 0.5f;
+    } else if (m_environment == QLatin1String("innorat")) {
+        f.envZenith = { 0.74f, 0.76f, 0.79f, 0.82f };
+        f.envHorizon = { 0.80f, 0.81f, 0.82f, 0.82f };
+        f.envGround = { 0.46f, 0.46f, 0.46f, 0.82f };
+        f.envReflection = 0.35f;
+    } else {
+        // „simplu”: lumina de cer de până acum (fără reflexii).
+        f.envZenith = { 0.62f, 0.68f, 0.78f, 0.55f };
+        f.envGround = { 0.42f, 0.40f, 0.38f, 0.55f };
+        f.envHorizon = (f.envZenith + f.envGround) * 0.5f;
+        f.envReflection = 0.0f;
+    }
+    f.ambientOcclusion = m_ambientOcclusion;
     const auto [sunDir, sunIntensity] = sunPosition(m_sunHour, m_sunMonth, m_latitude);
     f.sunDirection = m_shadows ? sunDir : glm::normalize(glm::dvec3(-0.4, -0.6, 0.7));
-    f.sunIntensity = m_shadows ? sunIntensity : 1.0;
+    f.sunIntensity = (m_shadows ? sunIntensity : 1.0) * (m_environment == QLatin1String("innorat") ? 0.35 : 1.0);
     f.shadows = m_shadows && sunIntensity > 0.0 && f.style != 3;
     sceneBounds(f.sceneMin, f.sceneMax);
     if (m_document) {
@@ -1565,8 +1604,31 @@ ViewportFrame Viewport::frameForRendering() const
     return f;
 }
 
+void Viewport::setPreferredSamples(int samples)
+{
+    if (samples == m_preferredSamples) {
+        return;
+    }
+    m_preferredSamples = samples;
+    setSampleCount(samples);
+    emit preferredSamplesChanged();
+    markMotion();
+}
+
+void Viewport::markMotion()
+{
+    if (!m_progressiveAA) {
+        return;
+    }
+    if (sampleCount() != m_preferredSamples) {
+        setSampleCount(m_preferredSamples);
+    }
+    m_stillTimer.start();
+}
+
 void Viewport::onCameraMoved()
 {
+    markMotion();
     updateAnnotations();
     emit cameraChanged();
     update();

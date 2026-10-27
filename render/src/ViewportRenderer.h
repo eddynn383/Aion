@@ -80,6 +80,23 @@ private:
     std::size_t m_uploadedTextureSignature = ~std::size_t { 0 };
     bool m_texturesInitialized = false;
     void createTextureArray(int layers);
+
+    // SSAO: normala + adâncimea (RGBA16F), apoi umbrirea (RGBA8), la mărimea viewport-ului.
+    std::unique_ptr<QRhiTexture> m_gbufferTexture;
+    std::unique_ptr<QRhiRenderBuffer> m_gbufferDepth;
+    std::unique_ptr<QRhiTextureRenderTarget> m_gbufferTarget;
+    std::unique_ptr<QRhiRenderPassDescriptor> m_gbufferPass;
+    std::unique_ptr<QRhiGraphicsPipeline> m_gbufferPipeline;
+    std::unique_ptr<QRhiTexture> m_ssaoTexture;
+    std::unique_ptr<QRhiTextureRenderTarget> m_ssaoTarget;
+    std::unique_ptr<QRhiRenderPassDescriptor> m_ssaoPass;
+    std::unique_ptr<QRhiGraphicsPipeline> m_ssaoPipeline;
+    std::unique_ptr<QRhiShaderResourceBindings> m_ssaoBindings;
+    std::unique_ptr<QRhiSampler> m_linearClampSampler;
+    QSize m_ssaoSize;
+    bool m_ssaoSupported = false;
+    [[nodiscard]] bool ssaoActive() const { return m_frame.ambientOcclusion && m_ssaoSupported && m_ssaoSize.isValid(); }
+    void ensureSsaoTargets(QSize size);
     void updateBindings();
     void uploadTextures(QRhiResourceUpdateBatch* batch);
     glm::dmat4 m_lightViewProj { 1.0 };

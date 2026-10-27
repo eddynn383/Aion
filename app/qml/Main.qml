@@ -52,6 +52,12 @@ Window {
             { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
             { id: "edit.soften", title: "Soften / Smooth (muchii netede după unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
             { id: "library.save", title: "Salvează obiectul selectat în bibliotecă", category: "Obiecte", shortcut: "", icon: "book-open" },
+            { id: "view.environment:simplu", title: "Mediu: simplu", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:studio", title: "Mediu: studio", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:exterior", title: "Mediu: exterior", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:innorat", title: "Mediu: înnorat", category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.ambientOcclusion", title: "Umbrire ambientală (SSAO)", category: "Vizualizare", shortcut: "", icon: "circle" },
+            { id: "view.progressiveAA", title: "Antialiasing progresiv (cât camera stă pe loc)", category: "Vizualizare", shortcut: "", icon: "circle" },
             { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
@@ -145,6 +151,10 @@ Window {
             if (!r.ok) toast.show("Plugin: " + r.error)
             return
         }
+        if (id.startsWith("view.environment:")) {
+            preferences.environment = id.slice(17)
+            return
+        }
         if (id === "script.console") {
             scriptConsole.open()
             return
@@ -207,6 +217,8 @@ Window {
             preferences.leftScenes = preferences.leftInteractions = false
             preferences.leftMaterials = true
             break
+        case "view.ambientOcclusion": preferences.ambientOcclusion = !preferences.ambientOcclusion; break
+        case "view.progressiveAA": preferences.progressiveAA = !preferences.progressiveAA; break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
@@ -665,6 +677,11 @@ Window {
         property bool leftInteractions: false
         // Înălțimile secțiunilor din stânga (JSON: cheie → px), schimbate trăgând de marginea lor.
         property string leftSectionHeights: "{}"
+        property string environment: "simplu"
+        property bool ambientOcclusion: true
+        property bool progressiveAA: true
+        property int msaa: 4
+        property int shadowQuality: 2048
         property real gridStep: 0
     }
     Component.onCompleted: {
@@ -725,6 +742,7 @@ Window {
         sourceComponent: PreferencesPage {
             document: doc
             viewport: viewport
+            settings: preferences
             commands: window.commands
             onCloseRequested: preferencesPage.active = false
         }
@@ -1337,6 +1355,11 @@ Window {
 
     Viewport {
         id: viewport
+        environment: preferences.environment
+        ambientOcclusion: preferences.ambientOcclusion
+        progressiveAntialiasing: preferences.progressiveAA
+        antialiasing: preferences.msaa
+        shadowQuality: preferences.shadowQuality
         onFramesPerSecondChanged: if (AppInfo.startupActions.length > 0) console.info("fps:", framesPerSecond)
         anchors.top: titleBar.bottom
         anchors.bottom: timeline.visible ? timeline.top : statusBar.top
@@ -1617,6 +1640,7 @@ Window {
             anchors.rightMargin: Theme.space1
             viewport: viewport
             document: doc
+            onEnvironmentChosen: (key) => preferences.environment = key
         }
 
         NavigationGizmo {

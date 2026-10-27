@@ -181,3 +181,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Marginea de jos a unei secțiuni deschise (linia scurtă) se trage în sus / jos; cursorul devine ↕; înălțimea rămâne după repornire
 - [ ] Dublu-click pe margine = înălțimea implicită
 - [ ] Mai multe secțiuni deschise decât încap → bară de scroll în dreapta panoului (trasă sau cu rotița pe antete)
+## Etapa 4 (Fazele 28–31)
+- [ ] Select: trage marcajul unei lumini / camere → se mută la aceeași înălțime; cu Shift pe verticală; ⌘Z o readuce
+- [ ] Spot cu „Aruncă umbre” deasupra unui obiect → umbra lui pe podea; oprit → umbra dispare
+- [ ] Scale: cutia cu mânere; colț = uniform, muchie = două axe, față = o axă; VCB „2,1,1.5”; Option = din centru
+- [ ] Trage un material din panou pe o față: fața se evidențiază, la drop îl primește (versoul dacă e privit din spate)
+- [ ] Meniul soarelui → Mediu: Studio / Exterior / Înnorat schimbă lumina și reflexiile metalelor
+- [ ] Preferințe → Viewport: preset-urile Performanță / Echilibrat / Calitate; SSAO întunecă contactele; după repornire setările rămân
+- [ ] Orbită apoi oprire: după ~0,4 s marginile devin mai fine (MSAA 8×)

@@ -48,6 +48,13 @@ struct FrameUniforms {
     float spotViewProj[16]; // harta de umbre a spotului (proiecție perspectivă din spot)
     float spotShadow[4]; // x = 1 dacă e activă, y = indexul luminii, z = 1 / mărimea hărții, w = bias (mm)
     float spotRange[4]; // x = planul apropiat, y = cel îndepărtat (mm), pentru adâncimea liniară
+    float envZenith[4]; // mediul: rgb liniar, a = intensitatea luminii ambientale
+    float envHorizon[4];
+    float envGround[4];
+    float envParams[4]; // x = tăria reflexiilor, y = 1 dacă SSAO e activă
+    float view[16]; // matricea camerei (SSAO: normalele și pozițiile în spațiul camerei)
+    float projection[16];
+    float invProjection[16];
 };
 
 
@@ -183,6 +190,17 @@ void ViewportRenderer::createStaticResources()
     m_uploadedTextureSignature = ~std::size_t { 0 };
     createTextureArray(1);
 
+    // SSAO: la început o textură albă de 1 × 1 (fără umbrire); țintele adevărate vin cu mărimea viewport-ului.
+    m_ssaoSupported = m_rhi->isTextureFormatSupported(QRhiTexture::RGBA16F);
+    m_linearClampSampler.reset(m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
+        QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
+    m_linearClampSampler->create();
+    m_ssaoSize = {};
+    m_ssaoTexture.reset(m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1, QRhiTexture::RenderTarget));
+    m_ssaoTexture->create();
+    m_ssaoTarget.reset();
+    m_gbufferTarget.reset();
+
     m_bindings.reset(m_rhi->newShaderResourceBindings());
     m_spotBindings.reset(m_rhi->newShaderResourceBindings());
     updateBindings();
@@ -241,6 +259,8 @@ void ViewportRenderer::updateBindings()
             2, QRhiShaderResourceBinding::FragmentStage, m_textureArray.get(), m_textureSampler.get()),
         QRhiShaderResourceBinding::sampledTexture(
             3, QRhiShaderResourceBinding::FragmentStage, m_spotShadowTexture.get(), m_shadowSampler.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            4, QRhiShaderResourceBinding::FragmentStage, m_ssaoTexture.get(), m_linearClampSampler.get()),
     });
     m_bindings->create();
     // Pentru trecerea spotului: uniformele cu matricea spotului; în locul hărții spotului (în care se scrie), a soarelui.
@@ -253,6 +273,8 @@ void ViewportRenderer::updateBindings()
             2, QRhiShaderResourceBinding::FragmentStage, m_textureArray.get(), m_textureSampler.get()),
         QRhiShaderResourceBinding::sampledTexture(
             3, QRhiShaderResourceBinding::FragmentStage, m_shadowTexture.get(), m_shadowSampler.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            4, QRhiShaderResourceBinding::FragmentStage, m_ssaoTexture.get(), m_linearClampSampler.get()),
     });
     m_spotBindings->create();
 }
@@ -362,6 +384,64 @@ void ViewportRenderer::createPipelines()
         = makePipeline(QStringLiteral("point.vert"), QStringLiteral("point.frag"), pointLayout, Depth::Test, true);
     m_topPointPipeline
         = makePipeline(QStringLiteral("point.vert"), QStringLiteral("point.frag"), pointLayout, Depth::None, true);
+}
+
+void ViewportRenderer::ensureSsaoTargets(QSize size)
+{
+    if (!m_ssaoSupported || (m_ssaoTarget && size == m_ssaoSize)) {
+        return;
+    }
+    m_ssaoSize = size;
+    m_gbufferTexture.reset(m_rhi->newTexture(QRhiTexture::RGBA16F, size, 1, QRhiTexture::RenderTarget));
+    m_gbufferTexture->create();
+    m_gbufferDepth.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size, 1));
+    m_gbufferDepth->create();
+    QRhiTextureRenderTargetDescription gdesc { QRhiColorAttachment(m_gbufferTexture.get()) };
+    gdesc.setDepthStencilBuffer(m_gbufferDepth.get());
+    m_gbufferTarget.reset(m_rhi->newTextureRenderTarget(gdesc));
+    m_gbufferPass.reset(m_gbufferTarget->newCompatibleRenderPassDescriptor());
+    m_gbufferTarget->setRenderPassDescriptor(m_gbufferPass.get());
+    m_gbufferTarget->create();
+
+    m_ssaoTexture.reset(m_rhi->newTexture(QRhiTexture::RGBA8, size, 1, QRhiTexture::RenderTarget));
+    m_ssaoTexture->create();
+    m_ssaoTarget.reset(m_rhi->newTextureRenderTarget({ QRhiColorAttachment(m_ssaoTexture.get()) }));
+    m_ssaoPass.reset(m_ssaoTarget->newCompatibleRenderPassDescriptor());
+    m_ssaoTarget->setRenderPassDescriptor(m_ssaoPass.get());
+    m_ssaoTarget->create();
+    // Textura SSAO nouă: legăturile shaderelor o primesc (același layout, pipeline-urile rămân valabile).
+    updateBindings();
+
+    m_gbufferPipeline.reset(m_rhi->newGraphicsPipeline());
+    m_gbufferPipeline->setShaderStages({
+        { QRhiShaderStage::Vertex, loadShader(QStringLiteral("mesh.vert")) },
+        { QRhiShaderStage::Fragment, loadShader(QStringLiteral("gbuffer.frag")) },
+    });
+    m_gbufferPipeline->setVertexInputLayout(meshLayout());
+    m_gbufferPipeline->setShaderResourceBindings(m_bindings.get());
+    m_gbufferPipeline->setRenderPassDescriptor(m_gbufferPass.get());
+    m_gbufferPipeline->setDepthTest(true);
+    m_gbufferPipeline->setDepthWrite(true);
+    m_gbufferPipeline->setDepthOp(QRhiGraphicsPipeline::LessOrEqual);
+    m_gbufferPipeline->create();
+
+    m_ssaoBindings.reset(m_rhi->newShaderResourceBindings());
+    m_ssaoBindings->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, m_uniforms.get()),
+        QRhiShaderResourceBinding::sampledTexture(
+            1, QRhiShaderResourceBinding::FragmentStage, m_gbufferTexture.get(), m_shadowSampler.get()),
+    });
+    m_ssaoBindings->create();
+    m_ssaoPipeline.reset(m_rhi->newGraphicsPipeline());
+    m_ssaoPipeline->setShaderStages({
+        { QRhiShaderStage::Vertex, loadShader(QStringLiteral("fullscreen.vert")) },
+        { QRhiShaderStage::Fragment, loadShader(QStringLiteral("ssao.frag")) },
+    });
+    m_ssaoPipeline->setVertexInputLayout({});
+    m_ssaoPipeline->setShaderResourceBindings(m_ssaoBindings.get());
+    m_ssaoPipeline->setRenderPassDescriptor(m_ssaoPass.get());
+    m_ssaoPipeline->create();
 }
 
 void ViewportRenderer::releaseMaskTarget()
@@ -490,6 +570,16 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     if (m_frame.section) {
         copy4(u.section, glm::normalize(glm::dvec3(*m_frame.section)), (*m_frame.section).w);
     }
+
+    copy4(u.envZenith, m_frame.envZenith);
+    copy4(u.envHorizon, m_frame.envHorizon);
+    copy4(u.envGround, m_frame.envGround);
+    u.envParams[0] = m_frame.envReflection;
+    u.envParams[1] = ssaoActive() ? 1.0f : 0.0f;
+    copyMatrix(u.view, m_frame.view);
+    const glm::dmat4 projection = glm::dmat4(corrF) * m_frame.projection;
+    copyMatrix(u.projection, projection);
+    copyMatrix(u.invProjection, glm::inverse(projection));
 
     const int lightCount = std::min(static_cast<int>(m_frame.lights.size()), kMaxLights);
     u.lightCount[0] = static_cast<float>(lightCount);
@@ -631,6 +721,29 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
 
     const QSize size = renderTarget()->pixelSize();
+    // SSAO: normala și adâncimea fiecărui pixel, apoi umbrirea (citită în mesh.frag).
+    if (m_frame.ambientOcclusion && m_ssaoSupported) {
+        ensureSsaoTargets(size);
+    }
+    if (ssaoActive() && m_mesh && m_meshVertexCount > 0) {
+        cb->beginPass(m_gbufferTarget.get(), QColor::fromRgbF(0, 0, 0, 0), { 1.0f, 0 }, batch);
+        batch = nullptr;
+        cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
+        cb->setGraphicsPipeline(m_gbufferPipeline.get());
+        cb->setShaderResources();
+        const QRhiCommandBuffer::VertexInput input(m_mesh.get(), 0);
+        cb->setVertexInput(0, 1, &input);
+        cb->draw(m_meshVertexCount);
+        cb->endPass();
+
+        cb->beginPass(m_ssaoTarget.get(), Qt::white, { 1.0f, 0 });
+        cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
+        cb->setGraphicsPipeline(m_ssaoPipeline.get());
+        cb->setShaderResources();
+        cb->draw(3);
+        cb->endPass();
+    }
+
     const bool outline = m_frame.hasSelectedFaces && m_mesh && m_meshVertexCount > 0;
     if (outline) {
         ensureMaskTarget(size);

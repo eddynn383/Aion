@@ -67,6 +67,12 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(bool fog MEMBER m_fog NOTIFY appearanceChanged)
     // Umbrele soarelui, poziționat după oră, lună și latitudine (implicit România, 46° N).
     Q_PROPERTY(bool shadows MEMBER m_shadows NOTIFY appearanceChanged)
+    // Mediul de iluminare (lumina ambientală și reflexiile): "simplu", "studio", "exterior", "innorat".
+    Q_PROPERTY(QString environment MEMBER m_environment NOTIFY appearanceChanged)
+    // Umbrirea ambientală în screen-space (SSAO).
+    Q_PROPERTY(bool ambientOcclusion MEMBER m_ambientOcclusion NOTIFY appearanceChanged)
+    // Antialiasing progresiv: cât camera stă pe loc, cadre cu jitter sub-pixel se acumulează.
+    Q_PROPERTY(bool progressiveAntialiasing MEMBER m_progressiveAA NOTIFY appearanceChanged)
     Q_PROPERTY(double sunHour MEMBER m_sunHour NOTIFY appearanceChanged)
     Q_PROPERTY(int sunMonth MEMBER m_sunMonth NOTIFY appearanceChanged)
     Q_PROPERTY(double latitude MEMBER m_latitude NOTIFY appearanceChanged)
@@ -74,7 +80,8 @@ class Viewport : public QQuickRhiItem {
     // Navigare (Preferințe): centrul orbitei 0 = centrul vederii, 1 = selecția, 2 = punctul de sub cursor;
     // zoom spre suprafața de sub cursor („auto depth”); planurile de tăiere manuale, în mm (0 = automat).
     // Calitatea imaginii (Preferințe → Viewport): eșantioane MSAA (1, 2, 4, 8) și mărimea hărții de umbre.
-    Q_PROPERTY(int antialiasing READ sampleCount WRITE setSampleCount NOTIFY sampleCountChanged)
+    // MSAA ales în Preferințe (cât timp camera se mișcă, când antialiasing-ul progresiv e pornit).
+    Q_PROPERTY(int antialiasing READ preferredSamples WRITE setPreferredSamples NOTIFY preferredSamplesChanged)
     Q_PROPERTY(int shadowQuality MEMBER m_shadowMapSize NOTIFY appearanceChanged)
     Q_PROPERTY(int orbitPivot READ orbitPivot WRITE setOrbitPivot NOTIFY navigationSettingsChanged)
     Q_PROPERTY(bool zoomToSurface MEMBER m_zoomToSurface NOTIFY navigationSettingsChanged)
@@ -188,6 +195,7 @@ public:
     ViewportFrame frameForRendering() const;
 
 signals:
+    void preferredSamplesChanged();
     void appearanceChanged();
     void cameraChanged();
     void reducedMotionChanged();
@@ -275,6 +283,14 @@ private:
     bool m_longPressFired = false;
     QPointF m_interactionPress;
     QTimer m_longPressTimer;
+    // Antialiasing progresiv: după o pauză fără mișcare, MSAA trece la kStillSamples; la mișcare revine.
+    static constexpr int kStillSamples = 8;
+    int m_preferredSamples = 4;
+    QTimer m_stillTimer;
+    [[nodiscard]] int preferredSamples() const { return m_preferredSamples; }
+    void setPreferredSamples(int samples);
+    // Scena s-a mișcat: calitatea revine la cea preferată, iar după pauză crește din nou.
+    void markMotion();
     void updateInteractionCursor(QPointF position);
     int m_orbitPivotMode = 0;
     bool m_trackpadOrbiting = false;
@@ -380,6 +396,9 @@ private:
     bool m_profiles = true;
     bool m_fog = false;
     bool m_shadows = false;
+    QString m_environment = QStringLiteral("simplu");
+    bool m_ambientOcclusion = false;
+    bool m_progressiveAA = false;
     double m_sunHour = 14.0;
     int m_sunMonth = 6;
     double m_latitude = 46.0;

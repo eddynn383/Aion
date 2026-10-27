@@ -53,6 +53,8 @@ qt_add_shaders(aion_render "aion_render_shaders"
         shaders/mesh.frag
         shaders/mask.frag
         shaders/outline.frag
+        shaders/gbuffer.frag
+        shaders/ssao.frag
         shaders/shadow.vert
         shaders/shadow.frag
         shaders/ground.frag
