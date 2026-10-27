@@ -79,6 +79,8 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QVariantMap currentMaterial READ currentMaterial NOTIFY materialChanged)
 
     // --- Faza 9 ---
+    // Generatoarele de obiecte dinamice: { id, name, category, parameters: [{ key, label, unit, value, min, max, step }] }.
+    Q_PROPERTY(QVariantList generators READ generators CONSTANT)
     // Camerele și luminile: { id, name, kind, enabled, visible } (pentru Outliner).
     // Obiectele cu interacțiuni: { id, name, rules: [{ trigger, summary }] } (secțiunea Interacțiuni).
     Q_PROPERTY(QVariantList interactions READ interactions NOTIFY outlineChanged)
@@ -169,6 +171,7 @@ public:
     QVariantList scenes() const;
     QVariantList cameras() const;
     QVariantList interactions() const;
+    QVariantList generators() const;
     QVariantList lights() const;
     QVariantMap selectedObject() const;
     QVariantList sections() const;
@@ -301,6 +304,9 @@ public:
     // --- Modelare pe selecție (ADR 0023) ---
     // Oglindește selecția față de centrul ei, pe axa 0 (X), 1 (Y) sau 2 (Z).
     Q_INVOKABLE void mirrorSelection(int axis);
+    // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
+    Q_INVOKABLE void createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
+    Q_INVOKABLE void setParameter(const QString& key, double value);
     // Poziționarea texturii pe fețele selectate: { ox, oy (mm), rotation (°), sx, sy } sau { reset: true }.
     Q_INVOKABLE void setFaceTexture(const QVariantMap& changes);
     // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până la

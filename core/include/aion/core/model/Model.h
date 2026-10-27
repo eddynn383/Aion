@@ -203,6 +203,10 @@ struct Definition {
     bool collection = false;
     // Forma unei primitive („box”, „cylinder”, „cone”, „sphere”), pentru iconița din listă; gol = formă liberă.
     std::string shape {};
+    // Obiect dinamic (parametric): generatorul („door”, „table”…) și parametrii lui; geometria (părțile, ca
+    // subgrupuri) se reface din ei. Gol = obiect obișnuit. Vezi model/Parametric.h.
+    std::string generator {};
+    std::map<std::string, double> parameters {};
 
     bool operator==(const Definition&) const = default;
 };

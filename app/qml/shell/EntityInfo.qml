@@ -106,6 +106,49 @@ Column {
         }
     }
 
+    // Obiect dinamic: parametrii generatorului (lățime, înălțime, număr de polițe…). Copiile legate se schimbă împreună.
+    Column {
+        id: parametersBox
+        readonly property var parametric: root.isInstance ? (root.info.parametric ?? null) : null
+        visible: parametric !== null
+        width: parent.width
+        spacing: Theme.space2
+        Row {
+            spacing: Theme.space2
+            Icon { anchors.verticalCenter: parent.verticalCenter; name: "sliders-horizontal"; size: Theme.iconSizeSm; color: Theme.accent }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Parametri · " + (parametersBox.parametric ? parametersBox.parametric.name : "")
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSm
+            }
+        }
+        Repeater {
+            model: parametersBox.parametric ? parametersBox.parametric.parameters : []
+            delegate: NumberField {
+                required property var modelData
+                width: parametersBox.width
+                label: modelData.label
+                unit: modelData.unit
+                from: modelData.min
+                to: modelData.max
+                step: modelData.step
+                decimals: 0
+                value: modelData.value
+                onValueModified: (v) => root.document.setParameter(modelData.key, v)
+            }
+        }
+        Text {
+            visible: parametersBox.parametric !== null && parametersBox.parametric.copies > 1
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Se schimbă și celelalte " + ((parametersBox.parametric ? parametersBox.parametric.copies : 1) - 1)
+                  + " copii legate. „Fă unic” pentru o variantă separată."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
     // Transformarea: poziția colțului, dimensiunile, rotația (Euler XYZ) și scara, câte trei valori. Fiecare are un
     // lacăt (blochează valoarea, inclusiv pentru Move / Rotate / Scale) și, cu timeline-ul deschis, un keyframe la hover.
     Column {

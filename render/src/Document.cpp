@@ -8,6 +8,7 @@
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Interaction.h"
 #include "aion/core/model/Modeling.h"
+#include "aion/core/model/Parametric.h"
 #include "ProceduralTextures.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
@@ -882,6 +883,24 @@ QVariantMap Document::entityInfo() const
         };
         info[QStringLiteral("ruleCount")] = static_cast<int>(inst.rules.size());
         info[QStringLiteral("locks")] = static_cast<int>(inst.placementLocks);
+        // Obiect dinamic: parametrii lui, cu limitele generatorului.
+        const model::Definition& definition = m_model.definition(inst.definition);
+        if (const model::GeneratorInfo* g = model::findGenerator(definition.generator)) {
+            QVariantList parameters;
+            for (const model::ParameterSpec& spec : g->parameters) {
+                const auto it = definition.parameters.find(spec.key);
+                parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
+                    { QStringLiteral("label"), QString::fromStdString(spec.label) },
+                    { QStringLiteral("unit"), QString::fromStdString(spec.unit) },
+                    { QStringLiteral("value"), it != definition.parameters.end() ? it->second : spec.value },
+                    { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max },
+                    { QStringLiteral("step"), spec.step } });
+            }
+            info[QStringLiteral("parametric")] = QVariantMap { { QStringLiteral("generator"), QString::fromStdString(g->id) },
+                { QStringLiteral("name"), QString::fromStdString(g->name) },
+                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("parameters"), parameters } };
+        }
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -3322,6 +3341,64 @@ void Document::setFaceTexture(const QVariantMap& changes)
             mesh.setFaceTexture(f, t);
         }
     });
+}
+
+QVariantList Document::generators() const
+{
+    QVariantList out;
+    for (const model::GeneratorInfo& g : model::generators()) {
+        QVariantList parameters;
+        for (const model::ParameterSpec& spec : g.parameters) {
+            parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
+                { QStringLiteral("label"), QString::fromStdString(spec.label) },
+                { QStringLiteral("unit"), QString::fromStdString(spec.unit) }, { QStringLiteral("value"), spec.value },
+                { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max }, { QStringLiteral("step"), spec.step } });
+        }
+        out.append(QVariantMap { { QStringLiteral("id"), QString::fromStdString(g.id) },
+            { QStringLiteral("name"), QString::fromStdString(g.name) },
+            { QStringLiteral("category"), QString::fromStdString(g.category) }, { QStringLiteral("parameters"), parameters } });
+    }
+    return out;
+}
+
+void Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
+{
+    const model::GeneratorInfo* info = model::findGenerator(generator.toStdString());
+    if (info == nullptr) {
+        return;
+    }
+    std::map<std::string, double> given;
+    for (auto it = parameters.begin(); it != parameters.end(); ++it) {
+        given[it.key().toStdString()] = it.value().toDouble();
+    }
+    // Punctul dat, în coordonatele contextului editat.
+    const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    model::InstanceId created;
+    runOnModel("Obiect dinamic: " + info->name, [&](model::Model& model) {
+        created = model::createParametric(model, activeDefinition(), info->id, given, math::Transform::translation(point));
+    });
+    if (created) {
+        const geom::Selection before = m_selection;
+        m_selection.clear();
+        m_selection.instances.insert(created);
+        afterInteraction(before);
+    }
+}
+
+void Document::setParameter(const QString& key, double value)
+{
+    if (m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    if (m_model.definition(def).generator.empty()) {
+        return;
+    }
+    const auto it = m_model.definition(def).parameters.find(key.toStdString());
+    if (it != m_model.definition(def).parameters.end() && std::abs(it->second - value) < 1e-9) {
+        return;
+    }
+    runOnModel("Parametru", [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), value); });
 }
 
 void Document::mirrorSelection(int axis)

@@ -129,10 +129,17 @@ Window {
             list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.demos", title: "Galeria animațiilor din ghiduri", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
+        for (const g of doc.generators)
+            list.push({ id: "object.parametric:" + g.id, title: "Obiect dinamic: " + g.name, category: "Obiecte", shortcut: "", icon: "sliders-horizontal" })
         return list
     }
 
     function runCommand(id) {
+        if (id.startsWith("object.parametric:")) {
+            const c = viewport.cameraState()
+            doc.createParametric(id.slice(18), Qt.vector3d(c.tx, c.ty, 0))
+            return
+        }
         if (id.startsWith("file.recent:")) {
             const path = doc.recentFiles[parseInt(id.slice(12))]
             window.confirmDiscard(() => doc.openFile(path))
