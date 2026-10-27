@@ -9,6 +9,7 @@
 #include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <numbers>
@@ -761,7 +762,10 @@ private:
         const std::string name = m_name;
         model::InstanceId created;
         ctx.stack.run(name, [&](model::Model& model) {
-            const model::DefinitionId def = model.addDefinition({ name, true });
+            model::Definition definition { name, true };
+            constexpr std::array<const char*, 4> kShapes { "box", "cylinder", "cone", "sphere" };
+            definition.shape = kShapes[static_cast<std::size_t>(kind)];
+            const model::DefinitionId def = model.addDefinition(std::move(definition));
             geom::buildPrimitive(model.mesh(def), kind, size, 24);
             created = model.addInstance({ ctx.context, def, math::Transform(m), name, {}, false, false, {}, {}, {} });
         });

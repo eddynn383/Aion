@@ -347,6 +347,7 @@ std::string toJson(const model::Model& model)
             { "name", d.name },
             { "group", d.group },
             { "collection", d.collection },
+            { "shape", d.shape },
             { "mesh", meshToJson(model.mesh(id)) },
         });
     }
@@ -507,7 +508,7 @@ LoadResult fromJson(std::string_view text)
         for (const json& d : doc.at("definitions")) {
             const model::DefinitionId id { d.at("id").get<std::uint64_t>() };
             model::Definition def { d.at("name").get<std::string>(), d.at("group").get<bool>(),
-                d.value("collection", false) };
+                d.value("collection", false), d.value("shape", std::string()) };
             auto& change = changes.definitions[id];
             if (id == model.root()) {
                 change.before = model.definition(id);

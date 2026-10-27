@@ -1,9 +1,9 @@
 import QtQuick
 import Aion
 
-// Outliner, ca în Blender: arborele grupurilor (foldere) și obiectelor, cu ochi și lacăt; drag & drop mută un obiect
-// în alt grup (sau, pe zona goală de jos, înapoi în model). Dedesubt: tag-urile — etichete opționale, transversale,
-// care ascund, afișează și selectează elemente din grupuri diferite.
+// Obiectele modelului, ca Outliner-ul din Blender: arborele grupurilor (foldere) și obiectelor, fiecare cu iconița
+// tipului (cub, sferă, con, cilindru, formă liberă, componentă), cu ochi și lacăt; drag & drop mută un obiect în alt
+// grup (sau, pe zona goală de jos, înapoi în model). La final: camerele și luminile.
 Item {
     id: root
 
@@ -22,7 +22,34 @@ Item {
             hiddenBelow = root.collapsed[r.id] ? r.depth : -1
             out.push(r)
         }
+        if (root.document) {
+            const selected = root.document.selectedObject
+            for (const o of root.document.cameras.concat(root.document.lights))
+                out.push(Object.assign({}, o, { lightKind: o.kind, kind: o.kind === "camera" ? "camera" : "light", depth: 0,
+                    hasChildren: false, copies: 1, hidden: !o.visible, locked: false,
+                    selected: selected.id === o.id && selected.kind === (o.kind === "camera" ? "camera" : "light") }))
+        }
         return out
+    }
+
+    readonly property var shapeIcons: ({ box: "prim-cube", cylinder: "prim-cylinder", cone: "prim-cone", sphere: "prim-sphere" })
+    readonly property var lightIcons: ({ point: "lightbulb", spot: "light-spot", directional: "sun", area: "light-area" })
+    function iconFor(r) {
+        if (r.kind === "camera") return "camera"
+        if (r.kind === "light") return root.lightIcons[r.lightKind] ?? "lightbulb"
+        if (r.kind === "group") return "folder"
+        if (r.copies > 1) return "component"
+        return root.shapeIcons[r.shape] ?? "shapes"
+    }
+
+    // Camerele noi privesc ca vederea curentă; luminile vin deasupra punctului privit.
+    function addObject(kind) {
+        if (kind === "camera") {
+            root.document.addCamera(root.viewport.cameraState(), 0)
+        } else {
+            const c = root.viewport.cameraState()
+            root.document.addLight(kind, Qt.vector3d(c.tx, c.ty, c.tz))
+        }
     }
 
     function toggle(id) {
@@ -38,7 +65,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: parent.height - tagsBox.height - objectsBox.height - Theme.space3
+        height: parent.height
         clip: true
         model: root.rows
         spacing: 1
@@ -77,6 +104,7 @@ Item {
             required property var modelData
             property bool editing: false
             readonly property bool isGroup: modelData.kind === "group"
+            readonly property bool isSceneObject: modelData.kind === "camera" || modelData.kind === "light"
 
             width: ListView.view.width
             height: Theme.controlHeightSm
@@ -94,6 +122,7 @@ Item {
             DragHandler {
                 id: dragHandler
                 target: null
+                enabled: !row.isSceneObject
                 onActiveChanged: {
                     if (active) {
                         root.dragging = row.modelData.id
@@ -115,8 +144,14 @@ Item {
                 id: rowArea
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: root.document.selectInstance(row.modelData.id)
-                onDoubleClicked: row.editing = true
+                onClicked: row.isSceneObject ? root.document.selectObject(row.modelData.kind, row.modelData.id)
+                                             : root.document.selectInstance(row.modelData.id)
+                onDoubleClicked: {
+                    if (row.modelData.kind === "camera" && root.viewport)
+                        root.viewport.animateToCamera(root.document.cameraView(row.modelData.id), 0.8)
+                    else if (!row.isSceneObject)
+                        row.editing = true
+                }
             }
 
             Row {
@@ -148,10 +183,12 @@ Item {
                 }
                 Icon {
                     anchors.verticalCenter: parent.verticalCenter
-                    name: row.isGroup ? "folder" : row.modelData.copies > 1 ? "component" : "box"
+                    name: root.iconFor(row.modelData)
                     size: Theme.iconSizeSm
-                    color: row.modelData.current ? Theme.accent : row.isGroup ? Theme.textPrimary : Theme.textSecondary
-                    opacity: row.modelData.hidden ? 0.45 : 1
+                    color: row.modelData.current ? Theme.accent
+                         : row.modelData.kind === "light" ? row.modelData.color
+                         : row.isGroup ? Theme.textPrimary : Theme.textSecondary
+                    opacity: row.modelData.hidden || row.modelData.enabled === false ? 0.45 : 1
                 }
                 Text {
                     visible: !row.editing
@@ -204,7 +241,24 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 IconButton {
                     width: 22; height: 22; iconSize: 13
-                    visible: rowArea.containsMouse || hovered || row.modelData.locked
+                    visible: row.modelData.kind === "camera" && (rowArea.containsMouse || hovered)
+                    iconName: "video"
+                    tooltip: "Privește prin cameră"
+                    onClicked: root.viewport.animateToCamera(root.document.cameraView(row.modelData.id), 0.8)
+                }
+                IconButton {
+                    width: 22; height: 22; iconSize: 13
+                    visible: row.modelData.kind === "light"
+                    iconName: row.modelData.enabled ? "lightbulb" : "x"
+                    tooltip: row.modelData.enabled ? "Stinge" : "Aprinde"
+                    onClicked: {
+                        root.document.selectObject("light", row.modelData.id)
+                        root.document.setObjectProperties({ enabled: !row.modelData.enabled })
+                    }
+                }
+                IconButton {
+                    width: 22; height: 22; iconSize: 13
+                    visible: !row.isSceneObject && (rowArea.containsMouse || hovered || row.modelData.locked)
                     iconName: row.modelData.locked ? "lock" : "lock-open"
                     tooltip: row.modelData.locked ? "Deblochează" : "Blochează"
                     onClicked: root.document.setInstanceLocked(row.modelData.id, !row.modelData.locked)
@@ -214,7 +268,14 @@ Item {
                     visible: rowArea.containsMouse || hovered || row.modelData.hidden
                     iconName: row.modelData.hidden ? "eye-off" : "eye"
                     tooltip: row.modelData.hidden ? "Arată" : "Ascunde"
-                    onClicked: root.document.setInstanceHidden(row.modelData.id, !row.modelData.hidden)
+                    onClicked: {
+                        if (row.isSceneObject) {
+                            root.document.selectObject(row.modelData.kind, row.modelData.id)
+                            root.document.setObjectProperties({ visible: row.modelData.hidden })
+                        } else {
+                            root.document.setInstanceHidden(row.modelData.id, !row.modelData.hidden)
+                        }
+                    }
                 }
             }
         }
@@ -229,336 +290,5 @@ Item {
               + "grupează cu ⌥⌘G. Sau creează direct un cub, o sferă… din toolbar.")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeSm
-    }
-
-    // --- Camerele și luminile ---
-    readonly property var lightIcons: ({ point: "lightbulb", spot: "light-spot", directional: "sun", area: "light-area" })
-
-    Column {
-        id: objectsBox
-        anchors.bottom: tagsBox.top
-        anchors.bottomMargin: Theme.space2
-        anchors.left: parent.left
-        anchors.right: parent.right
-        spacing: 2
-
-        Separator { width: parent.width }
-        Item {
-            width: parent.width
-            height: Theme.controlHeightSm
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.space1
-                Icon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "camera"
-                    size: 13
-                    color: Theme.textTertiary
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "CAMERE ȘI LUMINI"
-                    color: Theme.textTertiary
-                    font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: 0.6
-                }
-            }
-            IconButton {
-                id: addObjectButton
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                width: 22; height: 22; iconSize: 13
-                iconName: "plus"
-                tooltip: "Adaugă o cameră sau o lumină"
-                checked: addMenu.opened
-                onClicked: addMenu.opened ? addMenu.close() : addMenu.open()
-
-                Popover {
-                    id: addMenu
-                    x: parent.width - width
-                    y: parent.height + 4
-                    width: 230
-                    padding: Theme.space1
-                    contentItem: Column {
-                        Repeater {
-                            model: [
-                                { id: "camera", icon: "camera", label: "Cameră (din vederea curentă)" },
-                                { id: "point", icon: "lightbulb", label: "Lumină punctuală" },
-                                { id: "spot", icon: "light-spot", label: "Spot" },
-                                { id: "directional", icon: "sun", label: "Lumină direcțională" },
-                                { id: "area", icon: "light-area", label: "Panou luminos (suprafață)" }
-                            ]
-                            delegate: Rectangle {
-                                id: addItem
-                                required property var modelData
-                                width: 222
-                                height: Theme.controlHeightSm
-                                radius: Theme.radiusSm
-                                color: addArea.containsMouse ? Theme.bgHover : "transparent"
-                                Row {
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: Theme.space2
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    spacing: Theme.space2
-                                    Icon { anchors.verticalCenter: parent.verticalCenter; name: addItem.modelData.icon; size: 14; color: Theme.textSecondary }
-                                    Text {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: addItem.modelData.label
-                                        color: Theme.textPrimary
-                                        font.pixelSize: Theme.fontSizeSm
-                                    }
-                                }
-                                MouseArea {
-                                    id: addArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        addMenu.close()
-                                        root.addObject(addItem.modelData.id)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Repeater {
-            model: root.document ? root.document.cameras.concat(root.document.lights) : []
-            delegate: Rectangle {
-                id: objectRow
-                required property var modelData
-                readonly property bool isCamera: modelData.kind === "camera"
-                readonly property bool current: root.document.selectedObject.id === modelData.id
-                                                && root.document.selectedObject.kind === (isCamera ? "camera" : "light")
-                width: objectsBox.width
-                height: Theme.controlHeightSm
-                radius: Theme.radiusSm
-                color: current ? Theme.accentSubtle : objectArea.containsMouse ? Theme.bgHover : "transparent"
-
-                MouseArea {
-                    id: objectArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: root.document.selectObject(objectRow.isCamera ? "camera" : "light", objectRow.modelData.id)
-                    onDoubleClicked: if (objectRow.isCamera && root.viewport)
-                        root.viewport.animateToCamera(root.document.cameraView(objectRow.modelData.id), 0.8)
-                }
-                Row {
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.space2
-                    anchors.right: objectActions.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.space2
-                    Icon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: objectRow.isCamera ? "camera" : root.lightIcons[objectRow.modelData.kind]
-                        size: Theme.iconSizeSm
-                        color: objectRow.isCamera ? Theme.textSecondary : objectRow.modelData.color
-                        opacity: objectRow.modelData.enabled ? 1 : 0.4
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.max(0, parent.width - 30)
-                        text: objectRow.modelData.name
-                        elide: Text.ElideRight
-                        color: objectRow.modelData.enabled ? Theme.textPrimary : Theme.textTertiary
-                        font.pixelSize: Theme.fontSizeSm
-                        font.weight: objectRow.current ? Font.DemiBold : Font.Normal
-                    }
-                }
-                Row {
-                    id: objectActions
-                    anchors.right: parent.right
-                    anchors.rightMargin: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    IconButton {
-                        visible: objectRow.isCamera && (objectArea.containsMouse || hovered)
-                        width: 22; height: 22; iconSize: 13
-                        iconName: "video"
-                        tooltip: "Privește prin cameră"
-                        onClicked: root.viewport.animateToCamera(root.document.cameraView(objectRow.modelData.id), 0.8)
-                    }
-                    IconButton {
-                        visible: !objectRow.isCamera
-                        width: 22; height: 22; iconSize: 13
-                        iconName: objectRow.modelData.enabled ? "lightbulb" : "x"
-                        tooltip: objectRow.modelData.enabled ? "Stinge" : "Aprinde"
-                        onClicked: {
-                            root.document.selectObject("light", objectRow.modelData.id)
-                            root.document.setObjectProperties({ enabled: !objectRow.modelData.enabled })
-                        }
-                    }
-                    IconButton {
-                        width: 22; height: 22; iconSize: 13
-                        iconName: objectRow.modelData.visible ? "eye" : "eye-off"
-                        tooltip: objectRow.modelData.visible ? "Ascunde marcajul din viewport" : "Arată marcajul"
-                        onClicked: {
-                            root.document.selectObject(objectRow.isCamera ? "camera" : "light", objectRow.modelData.id)
-                            root.document.setObjectProperties({ visible: !objectRow.modelData.visible })
-                        }
-                    }
-                }
-            }
-        }
-        Text {
-            visible: root.document && root.document.cameras.length + root.document.lights.length === 0
-            width: parent.width
-            wrapMode: Text.Wrap
-            text: "Camere pentru vederi fixe și lumini (bec, spot, soare, panou) cu setările lor. Adaugă cu +."
-            color: Theme.textTertiary
-            font.pixelSize: Theme.fontSizeXs
-        }
-    }
-
-    function addObject(kind) {
-        if (kind === "camera") {
-            root.document.addCamera(root.viewport.cameraState(), 0)
-        } else {
-            const c = root.viewport.cameraState()
-            root.document.addLight(kind, Qt.vector3d(c.tx, c.ty, c.tz))
-        }
-    }
-
-    // --- Tag-urile ---
-    Column {
-        id: tagsBox
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        spacing: 2
-
-        Separator { width: parent.width }
-        Item {
-            width: parent.width
-            height: Theme.controlHeightSm
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.space1
-                Icon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "tag"
-                    size: 13
-                    color: Theme.textTertiary
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "TAG-URI"
-                    color: Theme.textTertiary
-                    font.pixelSize: Theme.fontSizeXs
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: 0.6
-                }
-            }
-            IconButton {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                width: 22; height: 22; iconSize: 13
-                iconName: "plus"
-                tooltip: "Tag nou"
-                onClicked: root.document.addTag("Tag " + (root.document.tags.length + 1))
-            }
-        }
-
-        Repeater {
-            model: root.document ? root.document.tags : []
-            delegate: Rectangle {
-                id: tagRow
-                required property var modelData
-                property bool editing: false
-                width: tagsBox.width
-                height: Theme.controlHeightSm
-                radius: Theme.radiusSm
-                color: tagArea.containsMouse ? Theme.bgHover : "transparent"
-
-                MouseArea {
-                    id: tagArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onDoubleClicked: tagRow.editing = true
-                }
-                Row {
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.space2
-                    anchors.right: tagActions.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.space2
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 10
-                        height: 10
-                        radius: 5
-                        color: tagRow.modelData.color
-                        opacity: tagRow.modelData.visible ? 1 : 0.35
-                    }
-                    Text {
-                        visible: !tagRow.editing
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.max(0, parent.width - 40)
-                        text: tagRow.modelData.name + "  ·  " + tagRow.modelData.count
-                        elide: Text.ElideRight
-                        color: tagRow.modelData.visible ? Theme.textPrimary : Theme.textTertiary
-                        font.pixelSize: Theme.fontSizeSm
-                    }
-                    TextInput {
-                        visible: tagRow.editing
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 120
-                        text: tagRow.modelData.name
-                        color: Theme.textPrimary
-                        font.pixelSize: Theme.fontSizeSm
-                        onVisibleChanged: if (visible) { forceActiveFocus(); selectAll() }
-                        onEditingFinished: {
-                            if (tagRow.editing)
-                                root.document.renameTag(tagRow.modelData.id, text)
-                            tagRow.editing = false
-                        }
-                    }
-                }
-                Row {
-                    id: tagActions
-                    anchors.right: parent.right
-                    anchors.rightMargin: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    IconButton {
-                        visible: tagArea.containsMouse || hovered
-                        width: 22; height: 22; iconSize: 13
-                        iconName: "tag"
-                        tooltip: "Atribuie selecției"
-                        onClicked: root.document.assignTag(tagRow.modelData.id)
-                    }
-                    IconButton {
-                        visible: tagArea.containsMouse || hovered
-                        width: 22; height: 22; iconSize: 13
-                        iconName: "mouse-pointer-2"
-                        tooltip: "Selectează ce are tag-ul"
-                        onClicked: root.document.selectByTag(tagRow.modelData.id)
-                    }
-                    IconButton {
-                        visible: tagArea.containsMouse || hovered
-                        width: 22; height: 22; iconSize: 13
-                        iconName: "trash-2"
-                        tooltip: "Șterge tag-ul"
-                        onClicked: root.document.removeTag(tagRow.modelData.id)
-                    }
-                    IconButton {
-                        width: 22; height: 22; iconSize: 13
-                        iconName: tagRow.modelData.visible ? "eye" : "eye-off"
-                        tooltip: tagRow.modelData.visible ? "Ascunde tot ce are tag-ul" : "Arată"
-                        onClicked: root.document.setTagVisible(tagRow.modelData.id, !tagRow.modelData.visible)
-                    }
-                }
-            }
-        }
-        Text {
-            visible: root.document && root.document.tags.length === 0
-            width: parent.width
-            wrapMode: Text.Wrap
-            text: "Opționale: pune același tag pe elemente din grupuri diferite (de exemplu toți pereții) ca să le ascunzi sau selectezi împreună."
-            color: Theme.textTertiary
-            font.pixelSize: Theme.fontSizeXs
-        }
     }
 }
