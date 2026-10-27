@@ -134,6 +134,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `Document::createMaterial` / `updateMaterial`), Scene (tranziția în ⚙), Interacțiuni (`InteractionsPanel.qml`,
   `Document::interactions`). Acțiuni de script: `debug.leftAll`, `material.new`.
 
+- **Fazele 21–23** (ADR 0023): `model/Modeling.h` (mirror, array liniar / polar, soften), panourile
+  `overlays/ArrayPanel.qml` și `SoftenPanel.qml` (previzualizare prin undo: `Document::previewArray` /
+  `previewSoften` / `commitOperation` / `cancelOperation`). Comenzi: `edit.mirrorX|Y|Z`, `edit.array`, `edit.soften`.
+  Atenție în QML: un Popover nu poate avea proprietăți proprii numite `opacity` sau `spacing` (FINAL în Popup).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

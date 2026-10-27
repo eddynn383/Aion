@@ -29,6 +29,7 @@ add_library(aion_core STATIC
     src/model/Rules.cpp
     src/model/MaterialLibrary.cpp
     src/model/Boolean.cpp
+    src/model/Modeling.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
     src/text/FuzzyMatch.cpp

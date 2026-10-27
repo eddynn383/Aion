@@ -554,19 +554,20 @@ celelalte), apoi texturile (le folosesc obiectele din bibliotecă), obiectele di
 scripturile, care expun tot ce există deja.
 
 ### Faza 21 – Mirror / Flip
-- [ ] Core: oglindirea selecției (instanțe și geometrie liberă) față de planul care trece prin centrul selecției,
+- [x] Core: oglindirea selecției (instanțe și geometrie liberă) față de planul care trece prin centrul selecției,
       perpendicular pe axa roșie / verde / albastră; fețele rămân orientate corect (normalele inversate la nevoie)
-- [ ] Comenzi „Oglindește pe X / Y / Z” (meniul contextual, palette, Inspector), cu undo; teste
+- [x] Comenzi „Oglindește pe X / Y / Z” (meniul contextual, palette, Inspector), cu undo; teste _(ADR 0023)_
 
 ### Faza 22 – Array liniar și polar
-- [ ] Core: copii ale selecției (instanțe legate sau grupuri) pe o direcție cu pas sau distanță totală, ori în jurul
+- [x] Core: copii ale selecției (instanțe legate sau grupuri) pe o direcție cu pas sau distanță totală, ori în jurul
       unei axe (centru, unghi total sau pas, rotirea copiilor da/nu)
-- [ ] Panou „Array” cu previzualizare în viewport (număr, distanță / unghi, axă), aplicat ca un singur pas de undo
-- [ ] `x3` / `/3` după Move rămân ca scurtătură
+- [x] Panou „Array” cu previzualizare în viewport (număr, distanță / unghi, axă), aplicat ca un singur pas de undo
+- [x] `x3` / `/3` după Move rămân ca scurtătură
 
 ### Faza 23 – Soften / Smooth
-- [ ] Core: muchiile dintre fețe cu unghi sub prag devin soft (și netede); invers pentru unghiuri peste prag
-- [ ] Panou cu slider de unghi (0–180°), „Netezește normalele”, „Soft pentru coplanare”, aplicat pe selecție, cu undo
+- [x] Core: muchiile dintre fețe cu unghi sub prag devin soft (și netede); invers pentru unghiuri peste prag
+- [x] Panou cu slider de unghi (0–180°), „Soft pentru coplanare”, aplicat pe selecție, cu undo _(soft = ascunsă +
+      umbrire netedă, un singur flag)_
 
 ### Faza 24 – Texturi și UV
 - [ ] Materialul poate avea o imagine (PNG / JPG, salvată în arhiva `.aion`), cu mărime reală (mm pe repetiție)

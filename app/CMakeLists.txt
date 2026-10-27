@@ -87,6 +87,8 @@ qt_add_qml_module(aion_app
         qml/shell/ObjectInfo.qml
         qml/shell/TagsPanel.qml
         qml/shell/InteractionsPanel.qml
+        qml/overlays/ArrayPanel.qml
+        qml/overlays/SoftenPanel.qml
         qml/overlays/RulesEditor.qml
         qml/overlays/RulesActionBlock.qml
         qml/overlays/RulesActionList.qml

@@ -297,6 +297,20 @@ public:
     // `id` e o comandă din Main.qml (runCommand).
     Q_INVOKABLE QVariantList contextMenuItems() const;
     Q_INVOKABLE void reverseSelectedFaces();
+
+    // --- Modelare pe selecție (ADR 0023) ---
+    // Oglindește selecția față de centrul ei, pe axa 0 (X), 1 (Y) sau 2 (Z).
+    Q_INVOKABLE void mirrorSelection(int axis);
+    // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până la
+    // commitOperation() / cancelOperation(). options: { mode: "linear"|"polar", count, dx, dy, dz (pasul liniar, mm),
+    // axis: 0|1|2, angle (grade între copii), rotate, aroundOrigin (altfel în jurul centrului selecției) }.
+    Q_INVOKABLE void previewArray(const QVariantMap& options);
+    // Soften / Smooth cu previzualizare: muchiile selecției (sau toate muchiile obiectelor selectate).
+    Q_INVOKABLE void previewSoften(double maxAngleDegrees, bool includeCoplanar);
+    Q_INVOKABLE void commitOperation();
+    Q_INVOKABLE void cancelOperation();
+    // Mijlocul selecției (pentru panoul Array): { x, y, z, dx, dy, dz } (centrul și mărimea cutiei).
+    Q_INVOKABLE QVariantMap selectionBox() const;
     Q_INVOKABLE void selectConnected();
 
     // --- Pentru Viewport ---
@@ -434,6 +448,9 @@ private:
         double duration = 1.0;
     };
     std::optional<SceneTransition> m_sceneTransition;
+    // Operația cu previzualizare în curs (array, soften): selecția de dinainte și dacă e un pas de anulat.
+    bool m_previewApplied = false;
+    geom::Selection m_previewSelection;
     model::CameraId m_selectedCamera;
     model::LightId m_selectedLight;
     std::optional<model::Model> m_runtime;

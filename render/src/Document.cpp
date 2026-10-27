@@ -7,6 +7,7 @@
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Interaction.h"
+#include "aion/core/model/Modeling.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
@@ -23,6 +24,7 @@
 #include <QStandardPaths>
 
 #include <glm/geometric.hpp>
+#include <glm/trigonometric.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -2567,6 +2569,12 @@ QVariantList Document::contextMenuItems() const
         item(QStringLiteral("solid.subtract"), QStringLiteral("Scade al doilea din primul"));
         item(QStringLiteral("solid.intersect"), QStringLiteral("Intersecție (partea comună)"));
     }
+    separator();
+    item(QStringLiteral("edit.mirrorX"), QStringLiteral("Oglindește pe X (roșu)"));
+    item(QStringLiteral("edit.mirrorY"), QStringLiteral("Oglindește pe Y (verde)"));
+    item(QStringLiteral("edit.mirrorZ"), QStringLiteral("Oglindește pe Z (albastru)"));
+    item(QStringLiteral("edit.array"), QStringLiteral("Array (copii în linie sau în cerc)…"));
+    item(QStringLiteral("edit.soften"), QStringLiteral("Soften / Smooth…"));
     if (geometry) {
         separator();
         item(QStringLiteral("edit.selectConnected"), QStringLiteral("Selectează ce e conectat"));
@@ -3134,6 +3142,142 @@ void Document::reverseSelectedFaces()
         }
         m_selection.faces = flipped;
     });
+}
+
+void Document::mirrorSelection(int axis)
+{
+    if (m_selection.empty()) {
+        setError(QStringLiteral("Selectează ce vrei să oglindești."));
+        return;
+    }
+    const auto [lo, hi] = model::selectionBounds(m_model, activeDefinition(), m_selection);
+    if (lo.x > hi.x) {
+        return;
+    }
+    static const char* const kNames[] = { "Oglindește pe X", "Oglindește pe Y", "Oglindește pe Z" };
+    const int a = std::clamp(axis, 0, 2);
+    const geom::Selection selection = m_selection;
+    runOnModel(kNames[a], [&](model::Model& model) {
+        m_selection = model::mirrorSelection(model, activeDefinition(), selection, a, (lo + hi) * 0.5);
+    });
+}
+
+QVariantMap Document::selectionBox() const
+{
+    const geom::Selection& s = m_previewApplied ? m_previewSelection : m_selection;
+    const auto [lo, hi] = model::selectionBounds(m_model, activeDefinition(), s);
+    if (lo.x > hi.x) {
+        return {};
+    }
+    const math::Vec3d c = (lo + hi) * 0.5;
+    const math::Vec3d d = hi - lo;
+    return { { QStringLiteral("x"), c.x }, { QStringLiteral("y"), c.y }, { QStringLiteral("z"), c.z },
+        { QStringLiteral("dx"), d.x }, { QStringLiteral("dy"), d.y }, { QStringLiteral("dz"), d.z } };
+}
+
+void Document::previewArray(const QVariantMap& options)
+{
+    if (!m_previewApplied && m_selection.empty()) {
+        setError(QStringLiteral("Selectează obiectele sau geometria pe care vrei s-o multiplici."));
+        return;
+    }
+    if (m_previewApplied) {
+        m_stack.undo();
+        m_selection = m_previewSelection;
+    } else {
+        m_previewSelection = m_selection;
+    }
+    const int count = std::clamp(options.value(QStringLiteral("count"), 3).toInt(), 1, 500);
+    const geom::Selection source = m_previewSelection;
+    const bool polar = options.value(QStringLiteral("mode")).toString() == QStringLiteral("polar");
+    runOnModel(polar ? "Array polar" : "Array liniar", [&](model::Model& model) {
+        if (polar) {
+            math::Vec3d axis { 0.0 };
+            axis[std::clamp(options.value(QStringLiteral("axis"), 2).toInt(), 0, 2)] = 1.0;
+            math::Vec3d center { 0.0 };
+            if (!options.value(QStringLiteral("aroundOrigin")).toBool()) {
+                // În jurul unui punct la o latură de selecție, ca obiectele să se rotească „în cerc” (scaune la masă).
+                const auto [lo, hi] = model::selectionBounds(model, activeDefinition(), source);
+                center = (lo + hi) * 0.5;
+                const int sideAxis = axis.x != 0.0 ? 1 : 0;
+                center[sideAxis] = lo[sideAxis] - options.value(QStringLiteral("radius"), 1000.0).toDouble();
+            }
+            model::polarArray(model, activeDefinition(), source, center, axis,
+                glm::radians(options.value(QStringLiteral("angle"), 90.0).toDouble()), count,
+                options.value(QStringLiteral("rotate"), true).toBool());
+        } else {
+            const math::Vec3d step { options.value(QStringLiteral("dx")).toDouble(), options.value(QStringLiteral("dy")).toDouble(),
+                options.value(QStringLiteral("dz")).toDouble() };
+            model::linearArray(model, activeDefinition(), source, step, count);
+        }
+    });
+    m_selection = source;
+    m_previewApplied = true;
+    emit selectionChanged();
+}
+
+void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
+{
+    if (!m_previewApplied && m_selection.empty()) {
+        setError(QStringLiteral("Selectează muchiile, fețele sau obiectele de netezit."));
+        return;
+    }
+    if (m_previewApplied) {
+        m_stack.undo();
+        m_selection = m_previewSelection;
+    } else {
+        m_previewSelection = m_selection;
+    }
+    const geom::Selection source = m_previewSelection;
+    runOnModel("Soften / Smooth", [&](model::Model& model) {
+        // Muchiile selectate și ale fețelor selectate, în context.
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        std::set<geom::EdgeId> edges = source.edges;
+        for (geom::FaceId f : source.faces) {
+            if (!mesh.faces().contains(f)) {
+                continue;
+            }
+            for (const geom::EdgeUse& u : mesh.face(f).outer.uses) {
+                edges.insert(u.edge);
+            }
+            for (const geom::Loop& h : mesh.face(f).inner) {
+                for (const geom::EdgeUse& u : h.uses) {
+                    edges.insert(u.edge);
+                }
+            }
+        }
+        model::softenEdges(mesh, edges, maxAngleDegrees, includeCoplanar);
+        // Obiectele selectate: toate muchiile din definiția lor.
+        std::set<model::DefinitionId> definitions;
+        for (model::InstanceId id : source.instances) {
+            definitions.insert(model.instance(id).definition);
+        }
+        for (model::DefinitionId d : definitions) {
+            geom::Mesh& inner = model.mesh(d);
+            const std::set<geom::EdgeId> all(inner.edges().keys().begin(), inner.edges().keys().end());
+            model::softenEdges(inner, all, maxAngleDegrees, includeCoplanar);
+        }
+    });
+    m_selection = source;
+    m_previewApplied = true;
+    emit selectionChanged();
+}
+
+void Document::commitOperation()
+{
+    m_previewApplied = false;
+}
+
+void Document::cancelOperation()
+{
+    if (m_previewApplied) {
+        m_stack.undo();
+        m_selection = m_previewSelection;
+        m_previewApplied = false;
+        emit selectionChanged();
+        emit outlineChanged();
+        touch();
+    }
 }
 
 void Document::selectConnected()

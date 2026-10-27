@@ -46,6 +46,11 @@ Window {
             { id: "object.light.directional", title: "Adaugă o lumină direcțională", category: "Obiecte", shortcut: "", icon: "sun" },
             { id: "object.light.area", title: "Adaugă un panou luminos", category: "Obiecte", shortcut: "", icon: "light-area" },
             { id: "camera.look", title: "Privește prin camera selectată", category: "Vizualizare", shortcut: "", icon: "video" },
+            { id: "edit.mirrorX", title: "Oglindește pe X (roșu)", category: "Modelare", shortcut: "", icon: "flip-horizontal" },
+            { id: "edit.mirrorY", title: "Oglindește pe Y (verde)", category: "Modelare", shortcut: "", icon: "flip-horizontal" },
+            { id: "edit.mirrorZ", title: "Oglindește pe Z (albastru)", category: "Modelare", shortcut: "", icon: "flip-vertical" },
+            { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
+            { id: "edit.soften", title: "Soften / Smooth (muchii netede după unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
             { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
@@ -170,6 +175,11 @@ Window {
             preferences.leftOutliner = preferences.leftTags = preferences.leftMaterials = true
             preferences.leftScenes = preferences.leftInteractions = true
             break
+        case "edit.mirrorX": doc.mirrorSelection(0); break
+        case "edit.mirrorY": doc.mirrorSelection(1); break
+        case "edit.mirrorZ": doc.mirrorSelection(2); break
+        case "edit.array": arrayPanel.start(); break
+        case "edit.soften": softenPanel.start(); break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
@@ -441,7 +451,11 @@ Window {
     }
 
     function escapePressed() {
-        if (doc.interactionMode)
+        if (arrayPanel.visible || softenPanel.visible) {
+            doc.cancelOperation()
+            arrayPanel.close()
+            softenPanel.close()
+        } else if (doc.interactionMode)
             doc.interactionMode = false
         else if (vcbText.length > 0)
             vcbText = ""
@@ -615,6 +629,20 @@ Window {
     AboutDialog {
         id: aboutDialog
         parent: window.contentItem
+    }
+    ArrayPanel {
+        id: arrayPanel
+        parent: viewport
+        x: Theme.space3
+        y: 56
+        document: doc
+    }
+    SoftenPanel {
+        id: softenPanel
+        parent: viewport
+        x: Theme.space3
+        y: 56
+        document: doc
     }
     RulesEditor {
         id: rulesEditor

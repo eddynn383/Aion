@@ -260,7 +260,23 @@ Column {
             PlacementField { label: "Z"; lockBit: 8; decimals: 1; from: -360; to: 360; value: transformBox.p.rz ?? 0; onValueModified: (v) => root.document.setPlacement({ rz: v }) }
         }
 
-        Caption { text: "Scară (×)" }
+        Caption {
+            text: "Scară (×)"
+            Repeater {
+                model: [{ icon: "flip-horizontal", tip: "Oglindește pe X (roșu)" },
+                        { icon: "flip-horizontal", tip: "Oglindește pe Y (verde)" },
+                        { icon: "flip-vertical", tip: "Oglindește pe Z (albastru)" }]
+                delegate: IconButton {
+                    required property var modelData
+                    required property int index
+                    width: 24; height: 24; iconSize: Theme.iconSizeSm
+                    iconName: modelData.icon
+                    rotation: index === 1 ? 90 : 0
+                    tooltip: modelData.tip
+                    onClicked: root.document.mirrorSelection(index)
+                }
+            }
+        }
         Row {
             spacing: Theme.space1
             PlacementField { label: "X"; lockBit: 9; decimals: 3; step: 0.1; from: 0.001; value: Math.abs(transformBox.p.sx ?? 1); onValueModified: (v) => root.document.setPlacement({ sx: v }) }
