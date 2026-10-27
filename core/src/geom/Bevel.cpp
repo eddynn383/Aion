@@ -184,7 +184,8 @@ Selection rebuild(Mesh& mesh, const std::set<FaceId>& faces, const std::set<Vert
     }
     // drawPolygon închide singur orice buclă plană; fețele pe care nu le-am cerut (de ex. inelul de muchii
     // coplanare de sub o față teșită) se scot, muchiile rămân.
-    for (FaceId f : mesh.faces().keys()) {
+    const std::vector<FaceId> after = mesh.faces().keys(); // o copie: eraseFace schimbă lista
+    for (FaceId f : after) {
         if (!existing.contains(f) && !built.contains(f)) {
             eraseFace(mesh, f);
         }
