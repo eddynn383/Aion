@@ -636,6 +636,9 @@ void Document::setActiveTool(const QString& id)
 
 QString Document::toolStatus() const
 {
+    if (m_runtime) {
+        return QStringLiteral("Modul interacțiune · click, hover, trage sau apasă taste pe obiecte · Esc: ieșire");
+    }
     if (!m_tool) {
         return {};
     }
@@ -862,6 +865,7 @@ QVariantMap Document::entityInfo() const
             { QStringLiteral("duration"), b.duration },
             { QStringLiteral("open"), b.open },
         };
+        info[QStringLiteral("ruleCount")] = static_cast<int>(inst.rules.size());
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -1896,6 +1900,311 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
     return t ? model::evaluateColor(*t, m_timelineTime) : std::nullopt;
 }
 
+// --- Modul interacțiune ---
+
+void Document::setInteractionMode(bool on)
+{
+    if (on == m_runtime.has_value()) {
+        return;
+    }
+    if (on) {
+        if (m_tool) {
+            const view::Camera camera;
+            tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+            m_tool->cancel(ctx);
+        }
+        endPreview();
+        m_runtime.emplace(m_model); // o copie: nimic din ce se întâmplă aici nu ajunge în document
+        m_rules.reset();
+        m_hoverInstance = {};
+    } else {
+        m_rules.reset();
+        m_interactions.clear();
+        m_drag.reset();
+        m_runtime.reset();
+    }
+    ++m_interactionRevision;
+    emit interactionModeChanged();
+    emit toolStatusChanged();
+    emit selectionChanged();
+    emit changed();
+}
+
+namespace {
+
+// Ce eveniment are o instanță (pentru cursor): drag > click > restul.
+bool hasTrigger(const model::Instance& inst, model::Trigger t)
+{
+    return std::any_of(inst.rules.begin(), inst.rules.end(), [&](const model::Rule& r) { return r.trigger == t; });
+}
+
+} // namespace
+
+model::InstanceId Document::ruleTargetAt(const view::Camera& camera, math::Vec2d screen) const
+{
+    // Cea mai adâncă instanță de sub cursor care are reguli sau un comportament (balama, glisare).
+    model::InstanceId found;
+    model::DefinitionId context = model().root();
+    view::Camera local = camera;
+    while (const auto hit = view::pickInstance(model(), context, local, screen)) {
+        const model::Instance& inst = model().instance(hit->instance);
+        if (!inst.rules.empty() || inst.behavior.kind != model::Behavior::Kind::None) {
+            found = hit->instance;
+        }
+        local = local.inContext(inst.transform);
+        context = inst.definition;
+    }
+    return found;
+}
+
+QString Document::interactionHover(const view::Camera& camera, math::Vec2d screen)
+{
+    if (!m_runtime) {
+        return {};
+    }
+    const model::InstanceId hit = ruleTargetAt(camera, screen);
+    if (hit != m_hoverInstance) {
+        if (m_hoverInstance && m_runtime->instances().contains(m_hoverInstance)) {
+            m_rules.fire(*m_runtime, m_hoverInstance, model::Trigger::HoverLeave);
+        }
+        if (hit) {
+            m_rules.fire(*m_runtime, hit, model::Trigger::HoverEnter);
+        }
+        m_hoverInstance = hit;
+        handleRuleRequests();
+        if (m_rules.active()) {
+            emit animationStarted();
+        }
+    }
+    if (!hit) {
+        return {};
+    }
+    const model::Instance& inst = m_runtime->instance(hit);
+    if (hasTrigger(inst, model::Trigger::Drag)) {
+        return QStringLiteral("drag");
+    }
+    if (hasTrigger(inst, model::Trigger::Click) || hasTrigger(inst, model::Trigger::DoubleClick)
+        || hasTrigger(inst, model::Trigger::LongPress) || inst.behavior.kind != model::Behavior::Kind::None) {
+        return QStringLiteral("click");
+    }
+    if (hasTrigger(inst, model::Trigger::RightClick)) {
+        return QStringLiteral("context");
+    }
+    return QStringLiteral("hover");
+}
+
+bool Document::interactionEvent(const view::Camera& camera, math::Vec2d screen, const QString& event)
+{
+    if (!m_runtime) {
+        return false;
+    }
+    const model::InstanceId hit = ruleTargetAt(camera, screen);
+    if (!hit) {
+        return false;
+    }
+    const model::Trigger trigger = event == QLatin1String("rightClick") ? model::Trigger::RightClick
+        : event == QLatin1String("doubleClick")                       ? model::Trigger::DoubleClick
+        : event == QLatin1String("longPress")                         ? model::Trigger::LongPress
+                                                                       : model::Trigger::Click;
+    bool fired = m_rules.fire(*m_runtime, hit, trigger);
+    // Fără o regulă de click, o ușă sau un sertar (comportamentul simplu) se deschide / închide.
+    if (!fired && trigger == model::Trigger::Click
+        && m_runtime->instance(hit).behavior.kind != model::Behavior::Kind::None) {
+        fired = interactAt(camera, screen);
+    }
+    handleRuleRequests();
+    if (fired) {
+        emit animationStarted();
+    }
+    return fired;
+}
+
+bool Document::interactionDragStart(const view::Camera& camera, math::Vec2d screen)
+{
+    if (!m_runtime) {
+        return false;
+    }
+    const model::InstanceId hit = ruleTargetAt(camera, screen);
+    if (!hit || !hasTrigger(m_runtime->instance(hit), model::Trigger::Drag)) {
+        return false;
+    }
+    // Obiectul urmează cursorul pe planul orizontal care trece prin poziția lui.
+    const math::Vec3d at = m_runtime->instance(hit).transform.applyToPoint({ 0, 0, 0 });
+    const math::Ray ray = camera.rayAt(screen);
+    const double t = std::abs(ray.direction.z) > 1e-9 ? (at.z - ray.origin.z) / ray.direction.z : 0.0;
+    m_drag = DragState { hit, ray.at(std::max(t, 0.0)), at.z };
+    return true;
+}
+
+void Document::interactionDragMove(const view::Camera& camera, math::Vec2d screen)
+{
+    if (!m_runtime || !m_drag || !m_runtime->instances().contains(m_drag->instance)) {
+        return;
+    }
+    const math::Ray ray = camera.rayAt(screen);
+    if (std::abs(ray.direction.z) < 1e-9) {
+        return;
+    }
+    const double t = (m_drag->planeZ - ray.origin.z) / ray.direction.z;
+    if (t <= 0.0) {
+        return;
+    }
+    const math::Vec3d p = ray.at(t);
+    model::Instance inst = m_runtime->instance(m_drag->instance);
+    inst.transform = math::Transform::translation(p - m_drag->last) * inst.transform;
+    m_runtime->setInstance(m_drag->instance, inst);
+    m_drag->last = p;
+    ++m_interactionRevision;
+    emit changed();
+}
+
+void Document::interactionDragEnd()
+{
+    if (!m_runtime || !m_drag) {
+        return;
+    }
+    const model::InstanceId id = m_drag->instance;
+    m_drag.reset();
+    if (m_rules.fire(*m_runtime, id, model::Trigger::Drag)) {
+        handleRuleRequests();
+        emit animationStarted();
+    }
+}
+
+void Document::interactionKey(const QString& key)
+{
+    if (!m_runtime) {
+        return;
+    }
+    bool fired = false;
+    for (model::InstanceId id : std::vector(m_runtime->instances().keys().begin(), m_runtime->instances().keys().end())) {
+        fired = m_rules.fire(*m_runtime, id, model::Trigger::Key, key.toStdString()) || fired;
+    }
+    handleRuleRequests();
+    if (fired) {
+        emit animationStarted();
+    }
+}
+
+namespace {
+
+const char* const kTriggerNames[] = { "click", "rightClick", "doubleClick", "hoverEnter", "hoverLeave", "longPress",
+    "drag", "key" };
+const char* const kActionNames[] = { "moveBy", "moveTo", "rotateBy", "scaleTo", "show", "hide", "toggleVisible",
+    "setMaterial", "playAnimation", "goToScene", "wait", "alternate" };
+
+template <std::size_t N>
+int indexOf(const char* const (&names)[N], const QString& name)
+{
+    for (std::size_t i = 0; i < N; ++i) {
+        if (name == QLatin1String(names[i])) {
+            return static_cast<int>(i);
+        }
+    }
+    return 0;
+}
+
+QVariantMap actionToMap(const model::Action& a)
+{
+    QVariantList first;
+    for (const model::Action& c : a.first) {
+        first.append(actionToMap(c));
+    }
+    QVariantList second;
+    for (const model::Action& c : a.second) {
+        second.append(actionToMap(c));
+    }
+    return { { QStringLiteral("kind"), QString::fromLatin1(kActionNames[static_cast<int>(a.kind)]) },
+        { QStringLiteral("target"), static_cast<double>(a.target.value) }, { QStringLiteral("x"), a.vector.x },
+        { QStringLiteral("y"), a.vector.y }, { QStringLiteral("z"), a.vector.z }, { QStringLiteral("duration"), a.duration },
+        { QStringLiteral("material"), static_cast<double>(a.material.value) },
+        { QStringLiteral("animation"), static_cast<double>(a.animation.value) },
+        { QStringLiteral("scene"), static_cast<double>(a.scene.value) }, { QStringLiteral("first"), first },
+        { QStringLiteral("second"), second } };
+}
+
+model::Action actionFromMap(const QVariantMap& m)
+{
+    model::Action a;
+    a.kind = static_cast<model::ActionKind>(indexOf(kActionNames, m.value(QStringLiteral("kind")).toString()));
+    a.target = model::InstanceId { static_cast<std::uint64_t>(m.value(QStringLiteral("target")).toDouble()) };
+    a.vector = { m.value(QStringLiteral("x")).toDouble(), m.value(QStringLiteral("y")).toDouble(),
+        m.value(QStringLiteral("z")).toDouble() };
+    a.duration = m.value(QStringLiteral("duration"), 0.5).toDouble();
+    a.material = model::MaterialId { static_cast<std::uint64_t>(m.value(QStringLiteral("material")).toDouble()) };
+    a.animation = model::AnimationId { static_cast<std::uint64_t>(m.value(QStringLiteral("animation")).toDouble()) };
+    a.scene = model::SceneId { static_cast<std::uint64_t>(m.value(QStringLiteral("scene")).toDouble()) };
+    for (const QVariant& c : m.value(QStringLiteral("first")).toList()) {
+        a.first.push_back(actionFromMap(c.toMap()));
+    }
+    for (const QVariant& c : m.value(QStringLiteral("second")).toList()) {
+        a.second.push_back(actionFromMap(c.toMap()));
+    }
+    return a;
+}
+
+} // namespace
+
+QVariantList Document::rulesOf(double instanceId) const
+{
+    const model::Instance* inst = m_model.instances().find(toInstanceId(instanceId));
+    QVariantList out;
+    if (inst == nullptr) {
+        return out;
+    }
+    for (const model::Rule& r : inst->rules) {
+        QVariantList actions;
+        for (const model::Action& a : r.actions) {
+            actions.append(actionToMap(a));
+        }
+        out.append(QVariantMap { { QStringLiteral("trigger"), QString::fromLatin1(kTriggerNames[static_cast<int>(r.trigger)]) },
+            { QStringLiteral("key"), QString::fromStdString(r.key) }, { QStringLiteral("actions"), actions } });
+    }
+    return out;
+}
+
+void Document::setRules(double instanceId, const QVariantList& rules)
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    if (!m_model.instances().contains(id)) {
+        return;
+    }
+    std::vector<model::Rule> converted;
+    for (const QVariant& v : rules) {
+        const QVariantMap m = v.toMap();
+        model::Rule r;
+        r.trigger = static_cast<model::Trigger>(indexOf(kTriggerNames, m.value(QStringLiteral("trigger")).toString()));
+        r.key = m.value(QStringLiteral("key")).toString().toStdString();
+        for (const QVariant& a : m.value(QStringLiteral("actions")).toList()) {
+            r.actions.push_back(actionFromMap(a.toMap()));
+        }
+        converted.push_back(std::move(r));
+    }
+    runOnModel("Interacțiuni", [&](model::Model& model) {
+        model::Instance inst = model.instance(id);
+        inst.rules = std::move(converted);
+        model.setInstance(id, inst);
+    });
+}
+
+void Document::handleRuleRequests()
+{
+    for (const model::HostRequest& r : m_rules.takeRequests()) {
+        if (r.playAnimation && m_model.animations().contains(r.playAnimation)) {
+            m_activeAnimation = r.playAnimation;
+            m_timelineTime = 0.0;
+            play();
+        }
+        if (r.goToScene && m_runtime && m_model.scenes().contains(r.goToScene)) {
+            const model::Scene& scene = m_model.scenes().at(r.goToScene);
+            model::applySceneState(*m_runtime, scene);
+            emit cameraRequested(sceneCamera(static_cast<double>(r.goToScene.value)));
+            ++m_interactionRevision;
+            emit changed();
+        }
+    }
+}
+
 void Document::applyScene(double sceneId, double seconds)
 {
     const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
@@ -1933,7 +2242,7 @@ void Document::finishSceneTransition()
 
 bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
 {
-    const auto hit = view::interactiveInstanceAt(m_model, camera, screen);
+    const auto hit = view::interactiveInstanceAt(model(), camera, screen);
     if (!hit) {
         return false;
     }
@@ -1942,20 +2251,19 @@ bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
             return true; // deja în mișcare
         }
     }
-    const model::Behavior& b = m_model.instance(*hit).behavior;
+    const model::Behavior& b = model().instance(*hit).behavior;
     m_interactions.push_back({ *hit, 0.0, std::max(b.duration, 0.0), !b.open });
     return true;
 }
 
 bool Document::advanceInteractions(double dt)
 {
-    bool playingNow = false;
+    bool active = false;
+    bool moved = false;
+
+    // Timeline-ul (redare).
     if (m_playing) {
-        const model::Animation* a = currentAnimation();
-        if (a == nullptr) {
-            m_playing = false;
-            emit timelineChanged();
-        } else {
+        if (const model::Animation* a = currentAnimation()) {
             m_timelineTime += dt;
             if (m_timelineTime >= a->duration) {
                 if (a->loop && a->duration > 0.0) {
@@ -1966,47 +2274,62 @@ bool Document::advanceInteractions(double dt)
                     emit timelineChanged();
                 }
             }
-            ++m_interactionRevision;
             emit timelineTimeChanged();
-            emit changed();
-            playingNow = m_playing;
+        } else {
+            m_playing = false;
+            emit timelineChanged();
         }
+        moved = true;
+        active = active || m_playing;
     }
-    if (playingNow && !m_sceneTransition && m_interactions.empty()) {
-        return true;
-    }
+
+    // Tranziția unei scene.
     if (m_sceneTransition) {
-        ++m_interactionRevision;
         m_sceneTransition->elapsed += dt;
         if (m_sceneTransition->elapsed >= m_sceneTransition->duration) {
             finishSceneTransition();
         }
+        moved = true;
+        active = active || m_sceneTransition.has_value();
+    }
+
+    // Ușile și sertarele (Interact): la sfârșit, starea nouă intră în model (cu undo) sau în copia Modului interacțiune.
+    if (!m_interactions.empty()) {
+        std::vector<model::InstanceId> finished;
+        for (InteractionAnimation& a : m_interactions) {
+            a.elapsed += dt;
+            if (a.elapsed >= a.duration) {
+                finished.push_back(a.instance);
+            }
+        }
+        std::erase_if(m_interactions, [](const InteractionAnimation& a) { return a.elapsed >= a.duration; });
+        for (model::InstanceId id : finished) {
+            if (m_runtime) {
+                if (m_runtime->instances().contains(id)) {
+                    model::toggleBehavior(*m_runtime, id);
+                }
+            } else if (m_model.instances().contains(id)) {
+                const bool opening = !m_model.instance(id).behavior.open;
+                runOnModel(opening ? "Deschide" : "Închide", [id](model::Model& model) { model::toggleBehavior(model, id); });
+            }
+        }
+        moved = true;
+        active = active || !m_interactions.empty();
+    }
+
+    // Regulile (Modul interacțiune).
+    if (m_runtime && m_rules.active()) {
+        m_rules.update(*m_runtime, dt);
+        handleRuleRequests();
+        moved = true;
+        active = active || m_rules.active();
+    }
+
+    if (moved) {
+        ++m_interactionRevision;
         emit changed();
-        if (m_interactions.empty()) {
-            return m_sceneTransition.has_value() || playingNow;
-        }
     }
-    if (m_interactions.empty()) {
-        return playingNow;
-    }
-    ++m_interactionRevision;
-    std::vector<model::InstanceId> finished;
-    for (InteractionAnimation& a : m_interactions) {
-        a.elapsed += dt;
-        if (a.elapsed >= a.duration) {
-            finished.push_back(a.instance);
-        }
-    }
-    std::erase_if(m_interactions, [](const InteractionAnimation& a) { return a.elapsed >= a.duration; });
-    // La sfârșit, starea nouă intră în model (cu undo), ca o singură operație.
-    for (model::InstanceId id : finished) {
-        if (m_model.instances().contains(id)) {
-            const bool opening = !m_model.instance(id).behavior.open;
-            runOnModel(opening ? "Deschide" : "Închide", [id](model::Model& model) { model::toggleBehavior(model, id); });
-        }
-    }
-    emit changed();
-    return !m_interactions.empty() || playingNow;
+    return active;
 }
 
 std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
@@ -2031,10 +2354,10 @@ std::optional<math::Transform> Document::displayTransform(model::InstanceId inst
         }
     }
     for (const InteractionAnimation& a : m_interactions) {
-        if (a.instance == instance && m_model.instances().contains(instance)) {
+        if (a.instance == instance && model().instances().contains(instance)) {
             const double k = a.duration > 0.0 ? std::clamp(a.elapsed / a.duration, 0.0, 1.0) : 1.0;
             const double eased = k * k * (3.0 - 2.0 * k);
-            return model::transformAtOpenness(m_model, instance, a.opening ? eased : 1.0 - eased);
+            return model::transformAtOpenness(model(), instance, a.opening ? eased : 1.0 - eased);
         }
     }
     return std::nullopt;

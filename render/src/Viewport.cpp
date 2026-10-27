@@ -12,6 +12,8 @@
 #include <QPointingDevice>
 #include <QBuffer>
 #include <QDir>
+#include <QKeyEvent>
+#include <QKeySequence>
 #include <QGuiApplication>
 #include <QLineF>
 #include <QQuickWindow>
@@ -275,6 +277,12 @@ void Viewport::setDocument(Document* document)
         connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
         connect(m_document, &Document::animationStarted, this, &Viewport::requestAnimationFrame);
         connect(m_document, &Document::timelineTimeChanged, this, &Viewport::applyAnimationCamera);
+        connect(m_document, &Document::cameraRequested, this, [this](const QVariantMap& camera) { animateToCamera(camera, 1.0); });
+        connect(m_document, &Document::interactionModeChanged, this, [this] {
+            if (!m_document->interactionMode()) {
+                updateCursor();
+            }
+        });
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
             updateSceneBounds();
@@ -1375,8 +1383,59 @@ void Viewport::beginDrag(Drag drag, QPointF position)
     m_motion.stop();
 }
 
+void Viewport::updateInteractionCursor(QPointF position)
+{
+    const QString kind = m_document->interactionHover(m_camera, toVec2(position));
+    setCursor(kind == QLatin1String("drag") ? Qt::OpenHandCursor
+            : kind == QLatin1String("click") ? Qt::PointingHandCursor
+            : kind == QLatin1String("context") ? Qt::WhatsThisCursor
+                                               : Qt::ArrowCursor);
+}
+
+void Viewport::keyPressEvent(QKeyEvent* event)
+{
+    if (m_document && m_document->interactionMode() && !event->isAutoRepeat()) {
+        m_document->interactionKey(QKeySequence(event->key()).toString());
+        event->accept();
+        return;
+    }
+    QQuickRhiItem::keyPressEvent(event);
+}
+
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
+    // Modul interacțiune: nicio unealtă de editare; evenimentele pornesc regulile obiectelor.
+    if (m_document && m_document->interactionMode() && event->button() != Qt::MiddleButton
+        && m_navigationTool.isEmpty()) {
+        forceActiveFocus(Qt::MouseFocusReason);
+        if (event->button() == Qt::RightButton) {
+            if (m_document->interactionEvent(m_camera, toVec2(event->position()), QStringLiteral("rightClick"))) {
+                requestAnimationFrame();
+            }
+        } else if (event->button() == Qt::LeftButton) {
+            m_interactionPressed = true;
+            m_longPressFired = false;
+            m_interactionPress = event->position();
+            m_interactionDragging = m_document->interactionDragStart(m_camera, toVec2(event->position()));
+            if (m_interactionDragging) {
+                setCursor(Qt::ClosedHandCursor);
+            } else {
+                m_longPressTimer.setSingleShot(true);
+                m_longPressTimer.setInterval(600);
+                disconnect(&m_longPressTimer, nullptr, this, nullptr);
+                connect(&m_longPressTimer, &QTimer::timeout, this, [this] {
+                    if (m_interactionPressed && m_document
+                        && m_document->interactionEvent(m_camera, toVec2(m_interactionPress), QStringLiteral("longPress"))) {
+                        m_longPressFired = true;
+                        requestAnimationFrame();
+                    }
+                });
+                m_longPressTimer.start();
+            }
+        }
+        event->accept();
+        return;
+    }
     stopScenes(); // ca în SketchUp: orice click oprește animația
     // Tastele (Measurements box, săgețile) ajung la viewport după un click în el.
     forceActiveFocus(Qt::MouseFocusReason);
@@ -1443,6 +1502,15 @@ void Viewport::mousePressEvent(QMouseEvent* event)
 
 void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
+    if (m_interactionPressed && m_document && m_document->interactionMode()) {
+        if (m_interactionDragging) {
+            m_document->interactionDragMove(m_camera, toVec2(event->position()));
+        } else if (QLineF(event->position(), m_interactionPress).length() > kMultiClickDistancePx) {
+            m_longPressTimer.stop(); // s-a mișcat: nu mai e o apăsare lungă
+        }
+        event->accept();
+        return;
+    }
     const QPointF delta = event->position() - m_lastPointer;
     m_lastPointer = event->position();
     setPointer(event->position(), contains(event->position()));
@@ -1465,6 +1533,23 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_interactionPressed && m_document && m_document->interactionMode() && event->button() == Qt::LeftButton) {
+        m_interactionPressed = false;
+        m_longPressTimer.stop();
+        if (m_interactionDragging) {
+            m_document->interactionDragEnd();
+            m_interactionDragging = false;
+            requestAnimationFrame();
+        } else if (!m_longPressFired
+            && QLineF(event->position(), m_interactionPress).length() <= kMultiClickDistancePx) {
+            if (m_document->interactionEvent(m_camera, toVec2(event->position()), QStringLiteral("click"))) {
+                requestAnimationFrame();
+            }
+        }
+        updateInteractionCursor(event->position());
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::RightButton) {
         if (m_rightPress && QLineF(*m_rightPress, event->position()).length() <= kMultiClickDistancePx && m_document) {
             m_document->selectForContextMenu(m_camera, toVec2(event->position()));
@@ -1495,6 +1580,13 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
 
 void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
 {
+    if (m_document && m_document->interactionMode() && event->button() == Qt::LeftButton) {
+        if (m_document->interactionEvent(m_camera, toVec2(event->position()), QStringLiteral("doubleClick"))) {
+            requestAnimationFrame();
+        }
+        event->accept();
+        return;
+    }
     // Dublu-click cu butonul din mijloc centrează vederea pe punctul de sub cursor (ca în SketchUp).
     if (event->button() == Qt::MiddleButton) {
         auto pose = m_camera.pose();
@@ -1590,6 +1682,13 @@ void Viewport::hoverEnterEvent(QHoverEvent* event)
 void Viewport::hoverMoveEvent(QHoverEvent* event)
 {
     setPointer(event->position(), true);
+    if (m_document && m_document->interactionMode()) {
+        if (m_drag == Drag::None && m_navigationTool.isEmpty()) {
+            updateInteractionCursor(event->position());
+        }
+        QQuickRhiItem::hoverMoveEvent(event);
+        return;
+    }
     // În timpul navigării cu butonul din mijloc nu actualizăm unealta (evenimentele vin prin mouseMove).
     if (m_document && m_drag == Drag::None && !m_toolPressed) {
         m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers()));

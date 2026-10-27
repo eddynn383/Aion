@@ -207,6 +207,7 @@ protected:
     void hoverMoveEvent(QHoverEvent* event) override;
     void hoverEnterEvent(QHoverEvent* event) override;
     void hoverLeaveEvent(QHoverEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 public:
     int orbitPivot() const { return m_orbitPivotMode; }
@@ -244,6 +245,13 @@ private:
     void applyAnimationCamera();
 
     int m_shadowMapSize = 2048;
+    // Modul interacțiune: apăsarea curentă (pentru click / apăsare lungă / drag).
+    bool m_interactionPressed = false;
+    bool m_interactionDragging = false;
+    bool m_longPressFired = false;
+    QPointF m_interactionPress;
+    QTimer m_longPressTimer;
+    void updateInteractionCursor(QPointF position);
     int m_orbitPivotMode = 0;
     bool m_trackpadOrbiting = false;
     bool m_zoomToSurface = true;

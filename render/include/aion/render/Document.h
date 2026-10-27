@@ -5,6 +5,7 @@
 #include "aion/core/geom/Selection.h"
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/model/Model.h"
+#include "aion/core/model/Rules.h"
 #include "aion/core/tools/Tool.h"
 
 #include <QColor>
@@ -86,6 +87,8 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(double timelineTime READ timelineTime WRITE setTimelineTime NOTIFY timelineTimeChanged)
     Q_PROPERTY(bool previewing READ previewing NOTIFY timelineChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
+    // Modul interacțiune: modelul nu se mai editează; evenimentele pornesc regulile obiectelor.
+    Q_PROPERTY(bool interactionMode READ interactionMode WRITE setInteractionMode NOTIFY interactionModeChanged)
     // Planurile de secțiune: { id, name, active }.
     Q_PROPERTY(QVariantList sections READ sections NOTIFY outlineChanged)
     Q_PROPERTY(int guideCount READ guideCount NOTIFY outlineChanged)
@@ -258,7 +261,8 @@ public:
     Q_INVOKABLE void selectConnected();
 
     // --- Pentru Viewport ---
-    const model::Model& model() const { return m_model; }
+    // În Modul interacțiune: copia pe care rulează interacțiunile (documentul rămâne neatins).
+    const model::Model& model() const { return m_runtime ? *m_runtime : m_model; }
     model::DefinitionId activeDefinition() const;
     const std::vector<model::InstanceId>& path() const { return m_path; }
     // Transformarea contextului editat (local → global).
@@ -286,6 +290,22 @@ public:
     unsigned interactionRevision() const { return m_interactionRevision; }
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
+    // --- Modul interacțiune ---
+    bool interactionMode() const { return m_runtime.has_value(); }
+    void setInteractionMode(bool on);
+    // Cursorul pentru obiectul de sub mouse: "drag", "click", "context", "hover" sau gol (nimic interactiv).
+    QString interactionHover(const view::Camera& camera, math::Vec2d screen);
+    // event: "click", "rightClick", "doubleClick", "longPress". Întoarce true dacă a pornit ceva.
+    bool interactionEvent(const view::Camera& camera, math::Vec2d screen, const QString& event);
+    bool interactionDragStart(const view::Camera& camera, math::Vec2d screen);
+    void interactionDragMove(const view::Camera& camera, math::Vec2d screen);
+    void interactionDragEnd();
+    Q_INVOKABLE void interactionKey(const QString& key);
+    // Editorul de blocuri: regulile unei instanțe ca liste de hărți ({ trigger, key, actions: [{ kind, target, x, y,
+    // z, duration, material, animation, scene, first, second }] }); trigger și kind sunt nume („click”, „moveBy”…).
+    Q_INVOKABLE QVariantList rulesOf(double instanceId) const;
+    Q_INVOKABLE void setRules(double instanceId, const QVariantList& rules);
+
     // --- Timeline ---
     QVariantList animations() const;
     double activeAnimation() const { return static_cast<double>(m_activeAnimation.value); }
@@ -351,6 +371,9 @@ signals:
     // A pornit o animație a modelului (tranziția unei scene): viewport-ul cere cadre.
     void animationStarted();
     void timelineChanged();
+    void interactionModeChanged();
+    // O regulă cere o vedere (mergi la scenă): viewport-ul mută camera.
+    void cameraRequested(const QVariantMap& camera);
     void timelineTimeChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
@@ -372,6 +395,17 @@ private:
         double duration = 1.0;
     };
     std::optional<SceneTransition> m_sceneTransition;
+    std::optional<model::Model> m_runtime;
+    model::RuleRuntime m_rules;
+    model::InstanceId m_hoverInstance;
+    struct DragState {
+        model::InstanceId instance;
+        math::Vec3d last;
+        double planeZ = 0.0;
+    };
+    std::optional<DragState> m_drag;
+    model::InstanceId ruleTargetAt(const view::Camera& camera, math::Vec2d screen) const;
+    void handleRuleRequests();
     model::AnimationId m_activeAnimation;
     double m_timelineTime = 0.0;
     bool m_previewing = false;

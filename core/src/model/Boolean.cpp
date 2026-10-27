@@ -113,7 +113,7 @@ BooleanResult booleanOperation(Model& model, InstanceId a, InstanceId b, Boolean
     }
     builder.finish();
     // Materialul primului obiect trece pe grupul nou.
-    result.instance = model.addInstance({ ia.parent, definition, {}, {}, ia.tag, false, false, ia.material, {} });
+    result.instance = model.addInstance({ ia.parent, definition, {}, {}, ia.tag, false, false, ia.material, {}, {} });
     eraseInstance(model, a);
     eraseInstance(model, b);
     return result;

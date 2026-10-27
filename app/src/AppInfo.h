@@ -46,6 +46,8 @@ public:
     Q_INVOKABLE void simulateClick(QQuickItem* item, const QPointF& position) const;
     // Doar mișcarea cursorului (hover), fără click.
     Q_INVOKABLE void simulateMove(QQuickItem* item, const QPointF& position) const;
+    // Tragere cu butonul stâng apăsat, în pași mici (pentru verificarea drag & drop-ului).
+    Q_INVOKABLE void simulateDrag(QQuickItem* item, const QPointF& from, const QPointF& to) const;
     // Click cu butonul drept (meniul contextual).
     Q_INVOKABLE void simulateRightClick(QQuickItem* item, const QPointF& position) const;
     // Animația scenelor: cadrele PNG din `directory` → video MP4 la `output` (AVFoundation pe macOS, altfel ffmpeg).

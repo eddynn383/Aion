@@ -116,3 +116,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Deschide (selectorul browserului), Salvează (download .aion), Exportă (OBJ + MTL, GLB, PNG), Importă
 - [ ] Reîncarcă pagina după modificări (> 1 min) → bannerul de recuperare
 - [ ] Umbrele: merg sau se dezactivează fără erori; fps pe casa din Faza 5
+## Interacțiuni cu blocuri (Faza 18)
+- [ ] Inspector → „Interacțiuni cu blocuri…” pe un grup: editorul se deschide cu numele obiectului
+- [ ] Trage „Când dau click” în dreapta → regulă nouă; trage „Mută cu” sub ea; editează Z și durata în bloc
+- [ ] Bara albastră arată unde intră blocul (înainte / după); „Alternează” primește blocuri în „întâi” și „apoi”
+- [ ] Un bloc tras înapoi pe paletă se șterge; ⌘Z anulează fiecare schimbare
+- [ ] F5 (sau ▶): bannerul apare, hover pe obiect → cursor mână; click → obiectul se mută; Esc → totul revine
+- [ ] În Modul Interacțiune nu se poate selecta, desena sau șterge nimic
+- [ ] Salvează / deschide `.aion`: regulile rămân

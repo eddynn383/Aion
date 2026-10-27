@@ -508,16 +508,17 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 - [x] Bara de timeline (ca în Figma/Blender): riglă, playhead, play/pauză/buclă, pistele selecției cu romburi,
       „◆ Keyframe” și auto-key, mutarea keyframe-urilor prin tragere
 - [x] Animații multiple, salvate în `.aion`; exportul video (MP4) din timeline
-- [ ] O animație poate fi pornită dintr-o interacțiune (Faza 18)
+- [x] O animație poate fi pornită dintr-o interacțiune (Faza 18)
 
 ### Faza 18 – Interacțiuni cu blocuri (puzzle) și Modul Interacțiune
-- [ ] Core: reguli pe obiect: eveniment (click, click dreapta, dublu-click, hover intrare/ieșire, apăsare lungă,
+- [x] Core: reguli pe obiect: eveniment (click, click dreapta, dublu-click, hover intrare/ieșire, apăsare lungă,
       drag, tastă) → secvență de acțiuni înlănțuite (mută la/cu, rotește, scalează, ascunde/arată/comută,
-      schimbă materialul/culoarea, pornește o animație, mergi la scenă, așteaptă, repetă, dacă/altfel pe o stare)
-- [ ] Editor vizual cu blocuri tip puzzle (ca Sketchware/Scratch): paletă colorată pe categorii, blocuri trase și
-      îmbinate vertical, parametri în bloc; interacțiunile actuale (balama, glisare) devin blocuri gata făcute
-- [ ] Modul Interacțiune: modelul nu mai poate fi editat; la hover pe un obiect cu interacțiuni apare cursorul
-      evenimentului disponibil (mână, săgeată de drag etc.); ieșire cu Esc
+      schimbă materialul, pornește o animație, mergi la scenă, așteaptă, alternează)
+      _(2026-10-27, ADR 0021; „repetă”, condiții pe stări arbitrare și culoarea simplă rămân pentru mai târziu)_
+- [x] Editor vizual cu blocuri tip puzzle (ca Sketchware/Scratch): paletă colorată pe categorii, blocuri trase și
+      îmbinate vertical, parametri în bloc _(balama și glisare rămân prescurtări în Inspector)_
+- [x] Modul Interacțiune: modelul nu mai poate fi editat; la hover pe un obiect cu interacțiuni apare cursorul
+      evenimentului disponibil (mână, săgeată de drag etc.); ieșire cu Esc _(F5 sau ▶ din bara viewport-ului)_
 
 ### Faza 19 – Camere și lumini ca obiecte
 - [ ] Camere: transformare, FOV, proiecție, planuri de tăiere; „Privește prin cameră”; pot fi folosite în scene și
