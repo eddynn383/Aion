@@ -432,16 +432,20 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             color = *style.colorOverride;
         }
         glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f };
-        if (const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr) {
+        const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr;
+        if (back != nullptr) {
             backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f, back->color.a / 255.0f };
         }
-        // Textura: stratul ei în array și mărimea reală (UV-ul se calculează în coordonatele definiției).
-        float layer = -1.0f;
-        if (material != nullptr && material->texture && !style.colorOverride) {
-            if (const auto it = m_textureLayers.find(material->texture.value); it != m_textureLayers.end()) {
-                layer = static_cast<float>(it->second);
+        // Texturile (față și verso): stratul în array și mărimea reală (UV-ul se calculează în coordonatele definiției).
+        const auto layerOf = [&](const model::Material* m) {
+            if (m != nullptr && m->texture && !style.colorOverride) {
+                if (const auto it = m_textureLayers.find(m->texture.value); it != m_textureLayers.end()) {
+                    return static_cast<float>(it->second);
+                }
             }
-        }
+            return -1.0f;
+        };
+        const glm::vec2 layers { layerOf(material), layerOf(back) };
         const bool transparent = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
         std::vector<MeshVertex>& target = transparent ? f.transparent : f.triangles;
         // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
@@ -452,14 +456,22 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         }
         for (std::uint32_t i : tri.indices) {
             const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
-            glm::vec3 uv { 0.0f, 0.0f, -1.0f };
-            if (layer >= 0.0f) {
+            glm::vec4 uv { 0.0f };
+            if (layers.x >= 0.0f) {
                 const math::Vec2d t = model::textureCoordinates(face->plane.normal, tri.points[i], face->texture,
                     material->textureSize);
-                uv = { static_cast<float>(t.x), static_cast<float>(-t.y), layer };
+                uv.x = static_cast<float>(t.x);
+                uv.y = static_cast<float>(-t.y);
+            }
+            if (layers.y >= 0.0f) {
+                // Versoul se vede din partea cealaltă: proiecția după normala inversă (textura nu apare în oglindă).
+                const math::Vec2d t = model::textureCoordinates(-face->plane.normal, tri.points[i], face->texture,
+                    back->textureSize);
+                uv.z = static_cast<float>(t.x);
+                uv.w = static_cast<float>(-t.y);
             }
             target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
-                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor, uv });
+                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor, uv, layers });
         }
     }
 
