@@ -831,6 +831,7 @@ TEST_CASE("Obiecte primitive: două clicuri creează un obiect nou, selectat, cu
     CHECK(p.size.z == Approx(800.0).margin(1.0));
     CHECK(m.mesh(m.root()).faces().empty()); // geometria e în obiect, nu în model
     CHECK(model::isSolid(m, m.instance(id).definition));
+    CHECK(m.definition(m.instance(id).definition).shape == "box"); // iconița din listă
 
     // VCB: lățime și înălțime.
     auto cylinder = tools::makeTool("cylinder");
@@ -843,6 +844,7 @@ TEST_CASE("Obiecte primitive: două clicuri creează un obiect nou, selectat, cu
     const model::Placement c = model::placementOf(m, *selection.instances.begin());
     CHECK(c.size.x == Approx(600.0).margin(1.0));
     CHECK(c.size.z == Approx(1500.0).margin(1e-6));
+    CHECK(m.definition(m.instance(*selection.instances.begin()).definition).shape == "cylinder");
 }
 
 TEST_CASE("Tag-uri pe forme: o față cu tag ascuns nu se mai alege", "[core][view][tags]")

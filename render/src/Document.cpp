@@ -749,6 +749,7 @@ QVariantList Document::outline() const
                 { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
                 { QStringLiteral("definition"), QString::fromStdString(def.name) },
                 { QStringLiteral("kind"), def.collection ? QStringLiteral("group") : QStringLiteral("object") },
+                { QStringLiteral("shape"), QString::fromStdString(def.shape) },
                 { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
                 { QStringLiteral("parentDefinition"), static_cast<double>(inst.parent.value) },
                 { QStringLiteral("hasChildren"), !m_model.childrenOf(inst.definition).empty() },
@@ -2205,6 +2206,31 @@ void Document::setRules(double instanceId, const QVariantList& rules)
     });
 }
 
+QVariantList Document::interactions() const
+{
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.instances().size(); ++i) {
+        const model::Instance& inst = m_model.instances().values()[i];
+        if (inst.rules.empty()) {
+            continue;
+        }
+        QVariantList rules;
+        for (const model::Rule& r : inst.rules) {
+            QStringList actions;
+            for (const model::Action& a : r.actions) {
+                actions.append(QString::fromLatin1(kActionNames[static_cast<int>(a.kind)]));
+            }
+            rules.append(QVariantMap { { QStringLiteral("trigger"), QString::fromLatin1(kTriggerNames[static_cast<int>(r.trigger)]) },
+                { QStringLiteral("key"), QString::fromStdString(r.key) }, { QStringLiteral("actions"), actions } });
+        }
+        const model::Definition& def = m_model.definition(inst.definition);
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.instances().keys()[i].value) },
+            { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
+            { QStringLiteral("shape"), QString::fromStdString(def.shape) }, { QStringLiteral("rules"), rules } });
+    }
+    return out;
+}
+
 void Document::handleRuleRequests()
 {
     for (const model::HostRequest& r : m_rules.takeRequests()) {
@@ -2724,6 +2750,66 @@ void Document::selectModelMaterial(double materialId)
     }
     m_currentMaterial = id;
     m_libraryMaterial = -1;
+    emit materialChanged();
+}
+
+namespace {
+
+// Aplică cheile date (name, color, opacity, roughness, metallic) peste un material.
+void applyMaterialProperties(model::Material& m, const QVariantMap& p)
+{
+    if (p.contains(QStringLiteral("name"))) {
+        m.name = p.value(QStringLiteral("name")).toString().trimmed().toStdString();
+    }
+    if (p.contains(QStringLiteral("color"))) {
+        const QColor c(p.value(QStringLiteral("color")).toString());
+        if (c.isValid()) {
+            m.color.r = static_cast<std::uint8_t>(c.red());
+            m.color.g = static_cast<std::uint8_t>(c.green());
+            m.color.b = static_cast<std::uint8_t>(c.blue());
+        }
+    }
+    if (p.contains(QStringLiteral("opacity"))) {
+        m.color.a = static_cast<std::uint8_t>(std::lround(std::clamp(p.value(QStringLiteral("opacity")).toDouble(), 0.0, 1.0) * 255.0));
+    }
+    if (p.contains(QStringLiteral("roughness"))) {
+        m.roughness = static_cast<float>(std::clamp(p.value(QStringLiteral("roughness")).toDouble(), 0.0, 1.0));
+    }
+    if (p.contains(QStringLiteral("metallic"))) {
+        m.metallic = static_cast<float>(std::clamp(p.value(QStringLiteral("metallic")).toDouble(), 0.0, 1.0));
+    }
+}
+
+} // namespace
+
+double Document::createMaterial(const QVariantMap& properties)
+{
+    model::MaterialId added;
+    runOnModel("Material nou", [&](model::Model& model) {
+        model::Material m;
+        m.name = "Material " + std::to_string(model.materials().size() + 1);
+        applyMaterialProperties(m, properties);
+        if (m.name.empty()) {
+            m.name = "Material " + std::to_string(model.materials().size() + 1);
+        }
+        added = model.addMaterial(m);
+    });
+    selectModelMaterial(static_cast<double>(added.value));
+    return static_cast<double>(added.value);
+}
+
+void Document::updateMaterial(double materialId, const QVariantMap& properties)
+{
+    const model::MaterialId id { static_cast<std::uint64_t>(materialId) };
+    if (!m_model.materials().contains(id)) {
+        return;
+    }
+    model::Material m = m_model.material(id);
+    applyMaterialProperties(m, properties);
+    if (m.name.empty() || m == m_model.material(id)) {
+        return;
+    }
+    runOnModel("Proprietățile materialului", [&](model::Model& model) { model.setMaterial(id, m); });
     emit materialChanged();
 }
 

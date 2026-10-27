@@ -188,6 +188,8 @@ struct Definition {
     bool group = false; // fără copii legate (o singură instanță); altfel, un obiect cu copii
     // Un grup în sensul Outliner-ului: colecție de obiecte și alte grupuri (folder), fără geometrie proprie.
     bool collection = false;
+    // Forma unei primitive („box”, „cylinder”, „cone”, „sphere”), pentru iconița din listă; gol = formă liberă.
+    std::string shape {};
 
     bool operator==(const Definition&) const = default;
 };

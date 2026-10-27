@@ -132,3 +132,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] „Privește prin cameră” (Inspector, dublu-click în Outliner, palette) → vederea și unghiul camerei; o vedere
       standard revine la 35°
 - [ ] ⌘Z / ⇧⌘Z pe adăugare, proprietăți, ștergere; salvare și redeschidere `.aion` păstrează tot
+## Sidebar-ul din stânga
+- [ ] Cinci secțiuni cu același antet (iconiță, TITLU, număr, acțiuni): Obiecte, Tag-uri, Materiale, Scene, Interacțiuni
+- [ ] Obiecte: iconița tipului (cub, sferă, con, cilindru, formă liberă, componentă, grup, cameră, lumină); + adaugă camere și lumini
+- [ ] Materiale: + deschide editorul (nume, culoare, opacitate, rugozitate, metalic) → „Creează” alege Paint Bucket;
+      dublu-click sau click dreapta pe un material din model îl editează sau îl șterge
+- [ ] Scene: „Scenă nouă din vederea curentă” după listă; ⚙ din antet → durata tranziției
+- [ ] Interacțiuni: obiectele cu reguli și regulile pe scurt; click → editorul cu blocuri; ▶ = Modul interacțiune

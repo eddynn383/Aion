@@ -46,6 +46,7 @@ Window {
             { id: "object.light.directional", title: "Adaugă o lumină direcțională", category: "Obiecte", shortcut: "", icon: "sun" },
             { id: "object.light.area", title: "Adaugă un panou luminos", category: "Obiecte", shortcut: "", icon: "light-area" },
             { id: "camera.look", title: "Privește prin camera selectată", category: "Vizualizare", shortcut: "", icon: "video" },
+            { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
@@ -165,6 +166,11 @@ Window {
             break
         case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
         case "debug.materials": preferences.leftMaterials = true; break
+        case "debug.leftAll":
+            preferences.leftOutliner = preferences.leftTags = preferences.leftMaterials = true
+            preferences.leftScenes = preferences.leftInteractions = true
+            break
+        case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
@@ -536,6 +542,8 @@ Window {
         property bool leftOutliner: true
         property bool leftMaterials: true
         property bool leftScenes: false
+        property bool leftTags: false
+        property bool leftInteractions: false
         property real gridStep: 0
     }
     Component.onCompleted: {
@@ -823,32 +831,119 @@ Window {
 
         Behavior on width { NumberAnimation { duration: Theme.motionNormal; easing.type: Easing.OutCubic } }
 
-        // Acordeon: Outliner (cu tag-urile), Materiale, Scene. Spațiul se împarte între secțiunile deschise.
+        // Acordeon: Obiecte, Tag-uri, Materiale, Scene, Interacțiuni — toate cu același antet (iconiță, titlu, număr,
+        // acțiuni). Spațiul se împarte între secțiunile deschise, după `weight`.
         Item {
             id: accordion
             anchors.fill: parent
-            readonly property var sections: [outlinerSection, materialsSection, scenesSection]
-            readonly property real free: height - sections.reduce((sum, s) => sum + s.headerHeight, 0) - Theme.space2 * 2
+            anchors.topMargin: Theme.space1
+            readonly property var sections: [objectsSection, tagsSection, materialsSection, scenesSection, interactionsSection]
+            readonly property real free: height - sections.reduce((sum, s) => sum + s.headerHeight, 0) - Theme.space1 * 4
             readonly property real weights: sections.reduce((sum, s) => sum + (s.expanded ? s.weight : 0), 0)
             function share(section) { return weights > 0 ? Math.max(0, free) * section.weight / weights : 0 }
 
+            component HeaderButton: IconButton {
+                width: 22; height: 22; iconSize: 13
+            }
+
             Column {
                 anchors.fill: parent
-                spacing: Theme.space2
+                spacing: Theme.space1
 
                 AccordionSection {
-                    id: outlinerSection
+                    id: objectsSection
                     width: parent.width
-                    title: "Outliner"
-                    iconName: "folder"
+                    separator: false
+                    title: "Obiecte"
+                    iconName: "layers"
+                    count: doc.outline.length + doc.cameras.length + doc.lights.length
                     weight: 2
                     expanded: preferences.leftOutliner
                     bodyHeight: accordion.share(this)
                     onToggled: preferences.leftOutliner = !preferences.leftOutliner
+                    actions: HeaderButton {
+                        id: addObjectButton
+                        iconName: "plus"
+                        tooltip: "Adaugă o cameră sau o lumină"
+                        checked: addObjectMenu.opened
+                        onClicked: addObjectMenu.opened ? addObjectMenu.close() : addObjectMenu.open()
+                        Popover {
+                            id: addObjectMenu
+                            x: parent.width - width
+                            y: parent.height + 4
+                            width: 240
+                            padding: Theme.space1
+                            contentItem: Column {
+                                Repeater {
+                                    model: [
+                                        { id: "camera", icon: "camera", label: "Cameră (din vederea curentă)" },
+                                        { id: "point", icon: "lightbulb", label: "Lumină punctuală (bec)" },
+                                        { id: "spot", icon: "light-spot", label: "Spot" },
+                                        { id: "directional", icon: "sun", label: "Lumină direcțională" },
+                                        { id: "area", icon: "light-area", label: "Panou luminos" }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: addItem
+                                        required property var modelData
+                                        width: 232
+                                        height: Theme.controlHeightSm
+                                        radius: Theme.radiusSm
+                                        color: addItemArea.containsMouse ? Theme.bgHover : "transparent"
+                                        Row {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: Theme.space2
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: Theme.space2
+                                            Icon { anchors.verticalCenter: parent.verticalCenter; name: addItem.modelData.icon; size: 14; color: Theme.textSecondary }
+                                            Text {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: addItem.modelData.label
+                                                color: Theme.textPrimary
+                                                font.pixelSize: Theme.fontSizeSm
+                                            }
+                                        }
+                                        MouseArea {
+                                            id: addItemArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: {
+                                                addObjectMenu.close()
+                                                outliner.addObject(addItem.modelData.id)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Outliner {
+                        id: outliner
                         anchors.fill: parent
                         document: doc
                         viewport: viewport
+                    }
+                }
+                AccordionSection {
+                    id: tagsSection
+                    width: parent.width
+                    title: "Tag-uri"
+                    iconName: "tag"
+                    count: doc.tags.length
+                    weight: 0.8
+                    expanded: preferences.leftTags
+                    bodyHeight: accordion.share(this)
+                    onToggled: preferences.leftTags = !preferences.leftTags
+                    actions: HeaderButton {
+                        iconName: "plus"
+                        tooltip: "Tag nou"
+                        onClicked: {
+                            doc.addTag("Tag " + (doc.tags.length + 1))
+                            preferences.leftTags = true
+                        }
+                    }
+                    TagsPanel {
+                        anchors.fill: parent
+                        document: doc
                     }
                 }
                 AccordionSection {
@@ -856,11 +951,21 @@ Window {
                     width: parent.width
                     title: "Materiale"
                     iconName: "palette"
+                    count: doc.modelMaterials.length
                     weight: 1.5
                     expanded: preferences.leftMaterials
                     bodyHeight: accordion.share(this)
                     onToggled: preferences.leftMaterials = !preferences.leftMaterials
+                    actions: HeaderButton {
+                        iconName: "plus"
+                        tooltip: "Material nou (personalizat)"
+                        onClicked: {
+                            preferences.leftMaterials = true
+                            materialsPanel.newMaterial()
+                        }
+                    }
                     MaterialsPanel {
+                        id: materialsPanel
                         anchors.fill: parent
                         document: doc
                         onPaintRequested: window.selectTool("paint")
@@ -871,10 +976,27 @@ Window {
                     width: parent.width
                     title: "Scene"
                     iconName: "monitor"
+                    count: doc.scenes.length
                     weight: 1
                     expanded: preferences.leftScenes
                     bodyHeight: accordion.share(this)
                     onToggled: preferences.leftScenes = !preferences.leftScenes
+                    actions: [
+                        HeaderButton {
+                            id: sceneSettingsButton
+                            iconName: "settings"
+                            tooltip: "Setările scenelor (tranziția)"
+                            onClicked: scenesPanel.openSettings(sceneSettingsButton)
+                        },
+                        HeaderButton {
+                            iconName: "plus"
+                            tooltip: "Scenă nouă din vederea curentă"
+                            onClicked: {
+                                doc.addScene(viewport.cameraState(), viewport.displayStyle)
+                                preferences.leftScenes = true
+                            }
+                        }
+                    ]
                     ScenesPanel {
                         id: scenesPanel
                         anchors.fill: parent
@@ -882,6 +1004,35 @@ Window {
                         viewport: viewport
                         transition: preferences.sceneTransition
                         onTransitionChanged: preferences.sceneTransition = transition
+                    }
+                }
+                AccordionSection {
+                    id: interactionsSection
+                    width: parent.width
+                    title: "Interacțiuni"
+                    iconName: "hand-pointer"
+                    count: doc.interactions.length
+                    weight: 1
+                    expanded: preferences.leftInteractions
+                    bodyHeight: accordion.share(this)
+                    onToggled: preferences.leftInteractions = !preferences.leftInteractions
+                    actions: [
+                        HeaderButton {
+                            iconName: "play"
+                            tooltip: "Modul interacțiune (F5)"
+                            checked: doc.interactionMode
+                            onClicked: doc.interactionMode = !doc.interactionMode
+                        },
+                        HeaderButton {
+                            iconName: "plus"
+                            tooltip: "Interacțiune nouă pentru obiectul selectat"
+                            onClicked: window.openRulesEditor()
+                        }
+                    ]
+                    InteractionsPanel {
+                        anchors.fill: parent
+                        document: doc
+                        onEditRequested: (id, name) => rulesEditor.openFor(id, name)
                     }
                 }
             }

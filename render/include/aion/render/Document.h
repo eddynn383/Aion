@@ -80,6 +80,8 @@ class Document : public QObject, private model::ModelObserver {
 
     // --- Faza 9 ---
     // Camerele și luminile: { id, name, kind, enabled, visible } (pentru Outliner).
+    // Obiectele cu interacțiuni: { id, name, rules: [{ trigger, summary }] } (secțiunea Interacțiuni).
+    Q_PROPERTY(QVariantList interactions READ interactions NOTIFY outlineChanged)
     Q_PROPERTY(QVariantList cameras READ cameras NOTIFY outlineChanged)
     Q_PROPERTY(QVariantList lights READ lights NOTIFY outlineChanged)
     // Obiectul selectat (cameră sau lumină) cu toate proprietățile; { kind: "none" } dacă nu e niciunul.
@@ -166,6 +168,7 @@ public:
     QVariantMap currentMaterial() const;
     QVariantList scenes() const;
     QVariantList cameras() const;
+    QVariantList interactions() const;
     QVariantList lights() const;
     QVariantMap selectedObject() const;
     QVariantList sections() const;
@@ -244,6 +247,11 @@ public:
     Q_INVOKABLE void renameMaterial(double materialId, const QString& name);
     Q_INVOKABLE void setMaterialColor(double materialId, const QColor& color);
     Q_INVOKABLE void removeMaterial(double materialId);
+    // Un material nou (personalizat): { name, color: "#rrggbb", opacity 0–1, roughness 0–1, metallic 0–1 }.
+    // Devine materialul curent (Paint Bucket). Întoarce id-ul.
+    Q_INVOKABLE double createMaterial(const QVariantMap& properties);
+    // Schimbă proprietățile date (aceleași chei ca la createMaterial).
+    Q_INVOKABLE void updateMaterial(double materialId, const QVariantMap& properties);
 
     // --- Faza 9: intersecții, booleene, ghidaje, adnotări, secțiuni, scene ---
     Q_INVOKABLE void intersectSelection(bool withModel);

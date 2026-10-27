@@ -129,6 +129,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   script: `object.camera`, `object.light.point|spot|directional|area`, `object:intensity=3,color=#EF4444`,
   `camera.look`.
 
+- **Sidebar-ul din stânga** (`components/AccordionSection.qml` cu `count` și `actions`): Obiecte (`Outliner.qml`,
+  iconițe după `Definition::shape`), Tag-uri (`TagsPanel.qml`), Materiale (editor de material personalizat:
+  `Document::createMaterial` / `updateMaterial`), Scene (tranziția în ⚙), Interacțiuni (`InteractionsPanel.qml`,
+  `Document::interactions`). Acțiuni de script: `debug.leftAll`, `material.new`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 
