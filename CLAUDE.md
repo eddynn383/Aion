@@ -153,6 +153,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `docs/scripting.md`; exemplu: `examples/plugins/gard/`. Acțiuni de script: `script:N` (exemplul N),
   `scriptjs:cod` (fără `;` — separă acțiunile), `plugin:dosar/funcție`.
 
+- **Panoul din stânga** e un `Flickable` cu bară de scroll proprie; fiecare `AccordionSection` deschisă are
+  înălțimea ei (`bodyHeight`), trasă de marginea de jos (`resizeRequested` / `resetRequested`) și păstrată în
+  `preferences.leftSectionHeights` (JSON cheie → px).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

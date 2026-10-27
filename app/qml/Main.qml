@@ -649,6 +649,8 @@ Window {
         property bool leftTags: false
         property bool leftLibrary: true
         property bool leftInteractions: false
+        // Înălțimile secțiunilor din stânga (JSON: cheie → px), schimbate trăgând de marginea lor.
+        property string leftSectionHeights: "{}"
         property real gridStep: 0
     }
     Component.onCompleted: {
@@ -987,24 +989,41 @@ Window {
 
         Behavior on width { NumberAnimation { duration: Theme.motionNormal; easing.type: Easing.OutCubic } }
 
-        // Acordeon: Obiecte, Tag-uri, Materiale, Scene, Interacțiuni — toate cu același antet (iconiță, titlu, număr,
-        // acțiuni). Spațiul se împarte între secțiunile deschise, după `weight`.
-        Item {
+        // Acordeon: Obiecte, Bibliotecă, Tag-uri, Materiale, Scene, Interacțiuni — toate cu același antet (iconiță, titlu,
+        // număr, acțiuni). Fiecare secțiune deschisă are înălțimea ei (trasă de marginea de jos, păstrată în preferințe);
+        // când nu încap toate, panoul întreg are scroll.
+        Flickable {
             id: accordion
             anchors.fill: parent
             anchors.topMargin: Theme.space1
-            readonly property var sections: [objectsSection, librarySection, tagsSection, materialsSection, scenesSection,
-                interactionsSection]
-            readonly property real free: height - sections.reduce((sum, s) => sum + s.headerHeight, 0) - Theme.space1 * 5
-            readonly property real weights: sections.reduce((sum, s) => sum + (s.expanded ? s.weight : 0), 0)
-            function share(section) { return weights > 0 ? Math.max(0, free) * section.weight / weights : 0 }
+            contentHeight: sectionsColumn.height + Theme.space3
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            readonly property bool scrollable: contentHeight > height + 1
+
+            readonly property var heights: {
+                try { return JSON.parse(preferences.leftSectionHeights) } catch (e) { return {} }
+            }
+            function heightOf(key, fallback) { return accordion.heights[key] ?? fallback }
+            function setHeight(key, value) {
+                const next = Object.assign({}, accordion.heights)
+                next[key] = Math.round(value)
+                preferences.leftSectionHeights = JSON.stringify(next)
+            }
+            function resetHeight(key) {
+                const next = Object.assign({}, accordion.heights)
+                delete next[key]
+                preferences.leftSectionHeights = JSON.stringify(next)
+            }
 
             component HeaderButton: IconButton {
                 width: 22; height: 22; iconSize: 13
             }
 
             Column {
-                anchors.fill: parent
+                id: sectionsColumn
+                // Loc pentru bara de scroll, cât e vizibilă.
+                width: accordion.width - (accordion.scrollable ? 10 : 0)
                 spacing: Theme.space1
 
                 AccordionSection {
@@ -1014,9 +1033,10 @@ Window {
                     title: "Obiecte"
                     iconName: "layers"
                     count: doc.outline.length + doc.cameras.length + doc.lights.length
-                    weight: 2
                     expanded: preferences.leftOutliner
-                    bodyHeight: accordion.share(this)
+                    bodyHeight: accordion.heightOf("objects", 300)
+                    onResizeRequested: (value) => accordion.setHeight("objects", value)
+                    onResetRequested: accordion.resetHeight("objects")
                     onToggled: preferences.leftOutliner = !preferences.leftOutliner
                     actions: HeaderButton {
                         id: addObjectButton
@@ -1085,9 +1105,10 @@ Window {
                     width: parent.width
                     title: "Bibliotecă"
                     iconName: "book-open"
-                    weight: 1.5
                     expanded: preferences.leftLibrary
-                    bodyHeight: accordion.share(this)
+                    bodyHeight: accordion.heightOf("library", 260)
+                    onResizeRequested: (value) => accordion.setHeight("library", value)
+                    onResetRequested: accordion.resetHeight("library")
                     onToggled: preferences.leftLibrary = !preferences.leftLibrary
                     actions: HeaderButton {
                         iconName: "plus"
@@ -1116,9 +1137,10 @@ Window {
                     title: "Tag-uri"
                     iconName: "tag"
                     count: doc.tags.length
-                    weight: 0.8
                     expanded: preferences.leftTags
-                    bodyHeight: accordion.share(this)
+                    bodyHeight: accordion.heightOf("tags", 160)
+                    onResizeRequested: (value) => accordion.setHeight("tags", value)
+                    onResetRequested: accordion.resetHeight("tags")
                     onToggled: preferences.leftTags = !preferences.leftTags
                     actions: HeaderButton {
                         iconName: "plus"
@@ -1139,9 +1161,10 @@ Window {
                     title: "Materiale"
                     iconName: "palette"
                     count: doc.modelMaterials.length
-                    weight: 1.5
                     expanded: preferences.leftMaterials
-                    bodyHeight: accordion.share(this)
+                    bodyHeight: accordion.heightOf("materials", 300)
+                    onResizeRequested: (value) => accordion.setHeight("materials", value)
+                    onResetRequested: accordion.resetHeight("materials")
                     onToggled: preferences.leftMaterials = !preferences.leftMaterials
                     actions: HeaderButton {
                         iconName: "plus"
@@ -1168,9 +1191,10 @@ Window {
                     title: "Scene"
                     iconName: "monitor"
                     count: doc.scenes.length
-                    weight: 1
                     expanded: preferences.leftScenes
-                    bodyHeight: accordion.share(this)
+                    bodyHeight: accordion.heightOf("scenes", 200)
+                    onResizeRequested: (value) => accordion.setHeight("scenes", value)
+                    onResetRequested: accordion.resetHeight("scenes")
                     onToggled: preferences.leftScenes = !preferences.leftScenes
                     actions: [
                         HeaderButton {
@@ -1203,9 +1227,10 @@ Window {
                     title: "Interacțiuni"
                     iconName: "hand-pointer"
                     count: doc.interactions.length
-                    weight: 1
                     expanded: preferences.leftInteractions
-                    bodyHeight: accordion.share(this)
+                    bodyHeight: accordion.heightOf("interactions", 200)
+                    onResizeRequested: (value) => accordion.setHeight("interactions", value)
+                    onResetRequested: accordion.resetHeight("interactions")
                     onToggled: preferences.leftInteractions = !preferences.leftInteractions
                     actions: [
                         HeaderButton {
@@ -1225,6 +1250,37 @@ Window {
                         document: doc
                         onEditRequested: (id, name) => rulesEditor.openFor(id, name)
                     }
+                }
+            }
+        }
+
+        // Bara de scroll a panoului (trasă sau cu rotița), vizibilă doar când secțiunile nu încap.
+        Rectangle {
+            id: accordionScrollbar
+            visible: accordion.scrollable
+            anchors.right: parent.right
+            anchors.rightMargin: 1
+            y: accordion.y + accordion.visibleArea.yPosition * accordion.height
+            width: 6
+            height: Math.max(24, accordion.visibleArea.heightRatio * accordion.height)
+            radius: 3
+            color: scrollbarArea.pressed || scrollbarArea.containsMouse ? Theme.textTertiary : Theme.borderStrong
+            MouseArea {
+                id: scrollbarArea
+                anchors.fill: parent
+                anchors.margins: -3
+                hoverEnabled: true
+                preventStealing: true
+                property real startY: 0
+                property real startContentY: 0
+                onPressed: (mouse) => { startY = mapToItem(accordion, 0, mouse.y).y; startContentY = accordion.contentY }
+                onPositionChanged: (mouse) => {
+                    if (!pressed)
+                        return
+                    const dy = mapToItem(accordion, 0, mouse.y).y - startY
+                    const range = accordion.contentHeight - accordion.height
+                    const track = accordion.height - accordionScrollbar.height
+                    accordion.contentY = Math.max(0, Math.min(range, startContentY + dy * (track > 0 ? range / track : 0)))
                 }
             }
         }
