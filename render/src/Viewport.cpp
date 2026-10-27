@@ -273,6 +273,7 @@ void Viewport::setDocument(Document* document)
         connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
         connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
         connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
+        connect(m_document, &Document::animationStarted, this, &Viewport::requestAnimationFrame);
         // Un document deschis sau nou: îl încadrăm.
         connect(m_document, &Document::documentReplaced, this, [this] {
             updateSceneBounds();
@@ -853,13 +854,17 @@ std::vector<view::CameraPose> posesFromStates(const QVariantList& states)
 
 } // namespace
 
-void Viewport::animateToCamera(const QVariantMap& state)
+void Viewport::animateToCamera(const QVariantMap& state, double seconds)
 {
     if (state.isEmpty()) {
         return;
     }
     setOrthographic(state.value(QStringLiteral("ortho")).toBool());
-    m_motion.animateTo(m_camera, poseFromState(state));
+    if (seconds >= 0.0) {
+        m_motion.animateTo(m_camera, poseFromState(state), seconds);
+    } else {
+        m_motion.animateTo(m_camera, poseFromState(state));
+    }
     requestAnimationFrame();
 }
 

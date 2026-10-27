@@ -279,6 +279,9 @@ public:
     unsigned interactionRevision() const { return m_interactionRevision; }
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
+    // Aplică starea unei scene (pozițiile obiectelor, ascunderile, tag-urile), cu o tranziție de `seconds`.
+    Q_INVOKABLE void applyScene(double sceneId, double seconds);
+    bool animating() const { return m_sceneTransition.has_value() || !m_interactions.empty(); }
 
     // Punctul de pe model (fețe, muchii, grupuri și obiecte vizibile) de sub cursor, în coordonate globale.
     // `camera` e camera globală a viewport-ului. Pentru zoom spre suprafață și orbita în jurul cursorului.
@@ -305,6 +308,8 @@ signals:
     void unitsChanged();
     void gridSnapChanged();
     void autosaveSettingsChanged();
+    // A pornit o animație a modelului (tranziția unei scene): viewport-ul cere cadre.
+    void animationStarted();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
@@ -318,6 +323,14 @@ private:
         bool opening = true;
     };
     std::vector<InteractionAnimation> m_interactions;
+    struct SceneTransition {
+        model::SceneId scene;
+        std::map<model::InstanceId, std::pair<math::Transform, math::Transform>> moves;
+        double elapsed = 0.0;
+        double duration = 1.0;
+    };
+    std::optional<SceneTransition> m_sceneTransition;
+    void finishSceneTransition();
     unsigned m_interactionRevision = 0;
 
     bool m_snapToGrid = false;

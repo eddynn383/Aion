@@ -37,8 +37,6 @@ Window {
             { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
-            { id: "view.playScenes", title: viewport.scenesPlaying ? "Oprește animația scenelor" : "Redă animația scenelor", category: "Vedere", shortcut: "", icon: "play" },
-            { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
             { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
@@ -135,11 +133,6 @@ Window {
         case "file.exportPng": fileDialog.ask("exportPng"); break
         case "file.quantities": quantitiesDialog.open(); break
         case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
-        case "view.playScenes": viewport.scenesPlaying ? viewport.stopScenes() : scenesPanel.play(); break
-        case "file.exportVideo":
-            if (doc.scenes.length === 0) toast.show("Adaugă întâi scene (panoul Scene).")
-            else fileDialog.ask("exportVideo")
-            break
         case "debug.materials": preferences.leftMaterials = true; break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
@@ -265,6 +258,11 @@ Window {
                     // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("scene:")) {
+                    // „scene:0” aplică scena cu indexul dat (camera și obiectele).
+                    const sc = doc.scenes[parseInt(action.slice(6))]
+                    viewport.animateToCamera(doc.sceneCamera(sc.id), 1.0)
+                    doc.applyScene(sc.id, 1.0)
                 } else if (action.startsWith("tag:")) {
                     // „tag:add,Pereți”, „tag:assign,0” (indexul tag-ului), „tag:hide,0”, „tag:select,0”.
                     const tg = action.slice(4).split(",")
@@ -462,6 +460,7 @@ Window {
         property real animDelay: 1
         property bool animLoop: true
         property int animFps: 30
+        property real sceneTransition: 1
         property bool leftOutliner: true
         property bool leftMaterials: true
         property bool leftScenes: false
@@ -705,9 +704,8 @@ Window {
     function exportVideo(path) {
         window.videoOutput = path
         const frames = path.replace(/\.mp4$/i, "") + " - cadre"
-        viewport.exportScenes(scenesPanel.sceneStates(), scenesPanel.transition, scenesPanel.delay, scenesPanel.loop,
-                              frames, scenesPanel.fps)
-        toast.show("Se exportă animația… (vezi progresul în panoul Scene)")
+        // Exportul video vine din timeline (Faza 17).
+        toast.show("Exportul video se face din timeline.")
     }
     Connections {
         target: viewport
@@ -718,14 +716,6 @@ Window {
             }
             const error = AppInfo.encodeVideo(directory, fps, window.videoOutput)
             toast.show(error.length === 0 ? "Video salvat: " + window.videoOutput.split("/").pop() : error)
-        }
-        // În timpul animației, fiecare scenă își aplică stilul.
-        function onSceneAnimationChanged() {
-            if (viewport.playingScene < 0 || viewport.playingScene >= doc.scenes.length)
-                return
-            const camera = doc.sceneCamera(doc.scenes[viewport.playingScene].id)
-            if (camera.style && camera.style.length > 0 && viewport.displayStyle !== camera.style)
-                viewport.displayStyle = camera.style
         }
     }
 
@@ -812,15 +802,8 @@ Window {
                         anchors.fill: parent
                         document: doc
                         viewport: viewport
-                        transition: preferences.animTransition
-                        delay: preferences.animDelay
-                        loop: preferences.animLoop
-                        fps: preferences.animFps
-                        onTransitionChanged: preferences.animTransition = transition
-                        onDelayChanged: preferences.animDelay = delay
-                        onLoopChanged: preferences.animLoop = loop
-                        onFpsChanged: preferences.animFps = fps
-                        onExportVideoRequested: fileDialog.ask("exportVideo")
+                        transition: preferences.sceneTransition
+                        onTransitionChanged: preferences.sceneTransition = transition
                     }
                 }
             }

@@ -84,7 +84,7 @@ Platform.MenuBar {
         id: fileMenu
         title: "Fișier"
         commandIds: ["file.new", "file.open", "-", "file.save", "file.saveAs", "-", "file.import",
-                     "file.exportObj", "file.exportGlb", "file.exportGltf", "file.exportPng", "file.exportVideo", "-", "file.quantities", "-"]
+                     "file.exportObj", "file.exportGlb", "file.exportGltf", "file.exportPng", "-", "file.quantities", "-"]
 
         // Rămâne la sfârșitul meniului: comenzile se inserează înaintea lui.
         Platform.Menu {
@@ -116,7 +116,7 @@ Platform.MenuBar {
         title: "Vedere"
         commandIds: ["view.iso", "view.top", "view.front", "view.right", "view.back", "view.left", "view.bottom", "-",
                      "view.extents", "view.zoomSelection", "view.projection", "view.grid", "view.snapGrid", "-",
-                     "nav.pivotView", "nav.pivotSelection", "nav.pivotCursor", "-", "view.playScenes", "-",
+                     "nav.pivotView", "nav.pivotSelection", "nav.pivotCursor", "-",
                      "ui.leftPanel", "ui.rightPanel", "ui.panels", "ui.theme"]
     }
     CommandMenu {

@@ -80,6 +80,11 @@ bool moveToParent(Model& model, InstanceId instance, DefinitionId target);
 // Transformarea lumii a (primei apariții a) unei definiții; identitate pentru rădăcină.
 [[nodiscard]] math::Transform definitionWorldTransform(const Model& model, DefinitionId definition);
 
+// Scenele ca stări: capturează pozițiile obiectelor, obiectele ascunse și tag-urile ascunse, sau le aplică
+// (obiectele care între timp au dispărut se sar; cele noi rămân cum sunt).
+void captureSceneState(const Model& model, Scene& scene);
+void applySceneState(Model& model, const Scene& scene);
+
 // Cutia (min, max) a geometriei unei definiții, cu tot ce conține, în coordonatele ei.
 [[nodiscard]] std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition);
 

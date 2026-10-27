@@ -498,9 +498,9 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 - [x] Inspector: tag-ul selecției (inclusiv pentru fețe și muchii)
 
 ### Faza 16 – Scene = stări ale modelului
-- [ ] O scenă reține camera, stilul, tag-urile vizibile, obiectele ascunse și **pozițiile obiectelor**
-- [ ] Aplicarea unei scene: tranziție a camerei și a obiectelor (cu undo); „Actualizează scena” recapturează tot
-- [ ] Redarea și exportul animației scenelor se mută în Timeline (Faza 17); scenele nu mai au legătură cu animațiile
+- [x] O scenă reține camera, stilul, tag-urile vizibile, obiectele ascunse și **pozițiile obiectelor**
+- [x] Aplicarea unei scene: tranziție a camerei și a obiectelor (cu undo); „Actualizează scena” recapturează tot
+- [x] Redarea și exportul animației scenelor se mută în Timeline (Faza 17); scenele nu mai au legătură cu animațiile
 
 ### Faza 17 – Timeline și keyframe-uri (animații salvate)
 - [ ] Core: `Animation` (nume, durată, fps) cu piste pe obiecte (poziție, rotație, scară, culoarea materialului) și

@@ -66,6 +66,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Grup/obiect: Poziție X/Y/Z, Dimensiuni L/l/h (lacăt = proporții), Rotație, Scară — editabile, cu undo
 - [ ] Material: pastila deschide paleta (model + bibliotecă + „Fără material”)
 - [ ] Fețe: Față / Verso; Paint Bucket pe o față văzută din spate vopsește versoul; Reverse Faces le schimbă
+## Scene ca stări (Faza 16)
+- [ ] „Adaugă scena curentă” reține camera, stilul, pozițiile obiectelor, ce e ascuns și tag-urile ascunse
+- [ ] Click pe o scenă: camera și obiectele trec lin (durata din slider-ul „Tranziție”); ⌘Z anulează aplicarea
+- [ ] ↻ pe o scenă o recapturează; fișierele vechi (scene doar cu cameră) schimbă doar camera
 ## Grafică
 - [ ] Materiale (bibliotecă, în model, pipetă ⌥, ⌘ conectate, ⇧ același material), sticlă transparentă
 - [ ] Stiluri: materiale, clay, linii, wireframe, X-Ray; profile; ceață; umbre (oră, lună)

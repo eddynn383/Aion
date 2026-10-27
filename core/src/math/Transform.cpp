@@ -4,6 +4,7 @@
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/matrix.hpp>
 
 namespace aion::math {
@@ -66,6 +67,41 @@ bool Transform::isIdentity() const
         }
     }
     return true;
+}
+
+Transform interpolate(const Transform& a, const Transform& b, double t)
+{
+    const auto split = [](const Transform& x, Vec3d& scale, glm::dquat& rotation) {
+        glm::dmat3 m(x.matrix());
+        for (int i = 0; i < 3; ++i) {
+            scale[i] = glm::length(m[i]);
+            if (scale[i] > 1e-12) {
+                m[i] /= scale[i];
+            }
+        }
+        if (glm::determinant(m) < 0.0) {
+            m[0] = -m[0];
+            scale.x = -scale.x;
+        }
+        rotation = glm::quat_cast(m);
+    };
+    Vec3d sa { 1.0 };
+    Vec3d sb { 1.0 };
+    glm::dquat ra;
+    glm::dquat rb;
+    split(a, sa, ra);
+    split(b, sb, rb);
+    const glm::dquat r = glm::slerp(ra, rb, t);
+    const Vec3d s = sa + (sb - sa) * t;
+    glm::dmat3 m = glm::mat3_cast(r);
+    for (int i = 0; i < 3; ++i) {
+        m[i] *= s[i];
+    }
+    glm::dmat4 out(m);
+    const Vec3d ta(a.matrix()[3]);
+    const Vec3d tb(b.matrix()[3]);
+    out[3] = glm::dvec4(ta + (tb - ta) * t, 1.0);
+    return Transform(out);
 }
 
 } // namespace aion::math

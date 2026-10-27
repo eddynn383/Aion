@@ -248,6 +248,27 @@ std::string toJson(const model::Model& model)
         scenes.push_back({ { "id", model.scenes().keys()[i].value }, { "name", s.name }, { "target", vec(s.target) },
             { "yaw", s.yaw }, { "pitch", s.pitch }, { "distance", s.distance }, { "orthographic", s.orthographic },
             { "style", s.style } });
+        if (s.hasState) {
+            json transforms = json::array();
+            for (const auto& [id, t] : s.transforms) {
+                json entry = json::array({ id.value });
+                for (int c = 0; c < 4; ++c) {
+                    for (int r = 0; r < 4; ++r) {
+                        entry.push_back(t.matrix()[c][r]);
+                    }
+                }
+                transforms.push_back(std::move(entry));
+            }
+            json hidden = json::array();
+            for (model::InstanceId id : s.hiddenInstances) {
+                hidden.push_back(id.value);
+            }
+            json hiddenTags = json::array();
+            for (model::TagId id : s.hiddenTags) {
+                hiddenTags.push_back(id.value);
+            }
+            scenes.back()["state"] = { { "transforms", transforms }, { "hidden", hidden }, { "hiddenTags", hiddenTags } };
+        }
     }
     const json doc {
         { "format", "aion" },
@@ -374,6 +395,24 @@ LoadResult fromJson(std::string_view text)
             scene.distance = s.value("distance", 10000.0);
             scene.orthographic = s.value("orthographic", false);
             scene.style = s.value("style", std::string());
+            if (const auto st = s.find("state"); st != s.end()) {
+                scene.hasState = true;
+                for (const json& entry : st->at("transforms")) {
+                    math::Mat4d m(1.0);
+                    for (int c = 0; c < 4; ++c) {
+                        for (int r = 0; r < 4; ++r) {
+                            m[c][r] = entry.at(static_cast<std::size_t>(1 + c * 4 + r)).get<double>();
+                        }
+                    }
+                    scene.transforms[model::InstanceId { entry.at(0).get<std::uint64_t>() }] = math::Transform(m);
+                }
+                for (const json& id : st->at("hidden")) {
+                    scene.hiddenInstances.insert(model::InstanceId { id.get<std::uint64_t>() });
+                }
+                for (const json& id : st->at("hiddenTags")) {
+                    scene.hiddenTags.insert(model::TagId { id.get<std::uint64_t>() });
+                }
+            }
             changes.scenes[model::SceneId { s.at("id").get<std::uint64_t>() }].after = std::move(scene);
         }
         model.apply(changes, geom::ChangeDirection::Forward);

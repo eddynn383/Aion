@@ -151,7 +151,7 @@ public:
     Q_INVOKABLE QByteArray captureThumbnail();
     // Poziția camerei pentru scene: { tx, ty, tz, yaw, pitch, distance, ortho }; și tranziția animată spre una.
     Q_INVOKABLE QVariantMap cameraState() const;
-    Q_INVOKABLE void animateToCamera(const QVariantMap& state);
+    Q_INVOKABLE void animateToCamera(const QVariantMap& state, double seconds = -1.0);
     // `states`: pozițiile scenelor (ca cameraState()). Orice click sau scroll în viewport oprește redarea.
     Q_INVOKABLE void playScenes(const QVariantList& states, double transition, double delay, bool loop);
     Q_INVOKABLE void stopScenes();

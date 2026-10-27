@@ -1582,6 +1582,41 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
     afterInteraction(before);
 }
 
+void Document::applyScene(double sceneId, double seconds)
+{
+    const model::SceneId id { static_cast<std::uint64_t>(sceneId) };
+    if (!m_model.scenes().contains(id) || !m_model.scenes().at(id).hasState) {
+        return;
+    }
+    const model::Scene& scene = m_model.scenes().at(id);
+    m_sceneTransition = SceneTransition {};
+    m_sceneTransition->scene = id;
+    m_sceneTransition->duration = std::max(seconds, 0.0);
+    for (const auto& [instance, to] : scene.transforms) {
+        if (m_model.instances().contains(instance) && m_model.instance(instance).transform != to) {
+            m_sceneTransition->moves[instance] = { m_model.instance(instance).transform, to };
+        }
+    }
+    if (m_sceneTransition->duration <= 0.0 || m_sceneTransition->moves.empty()) {
+        finishSceneTransition();
+        return;
+    }
+    emit animationStarted();
+}
+
+void Document::finishSceneTransition()
+{
+    if (!m_sceneTransition) {
+        return;
+    }
+    const model::SceneId id = m_sceneTransition->scene;
+    m_sceneTransition.reset();
+    if (m_model.scenes().contains(id)) {
+        const model::Scene scene = m_model.scenes().at(id);
+        runOnModel("Aplică scena", [&](model::Model& model) { model::applySceneState(model, scene); });
+    }
+}
+
 bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
 {
     const auto hit = view::interactiveInstanceAt(m_model, camera, screen);
@@ -1600,6 +1635,17 @@ bool Document::interactAt(const view::Camera& camera, math::Vec2d screen)
 
 bool Document::advanceInteractions(double dt)
 {
+    if (m_sceneTransition) {
+        ++m_interactionRevision;
+        m_sceneTransition->elapsed += dt;
+        if (m_sceneTransition->elapsed >= m_sceneTransition->duration) {
+            finishSceneTransition();
+        }
+        emit changed();
+        if (m_interactions.empty()) {
+            return m_sceneTransition.has_value();
+        }
+    }
     if (m_interactions.empty()) {
         return false;
     }
@@ -1625,6 +1671,16 @@ bool Document::advanceInteractions(double dt)
 
 std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
 {
+    if (m_sceneTransition) {
+        const auto it = m_sceneTransition->moves.find(instance);
+        if (it != m_sceneTransition->moves.end()) {
+            const double k = m_sceneTransition->duration > 0.0
+                ? std::clamp(m_sceneTransition->elapsed / m_sceneTransition->duration, 0.0, 1.0)
+                : 1.0;
+            const double eased = k < 0.5 ? 4 * k * k * k : 1 - std::pow(-2 * k + 2, 3) / 2;
+            return math::interpolate(it->second.first, it->second.second, eased);
+        }
+    }
     for (const InteractionAnimation& a : m_interactions) {
         if (a.instance == instance && m_model.instances().contains(instance)) {
             const double k = a.duration > 0.0 ? std::clamp(a.elapsed / a.duration, 0.0, 1.0) : 1.0;
@@ -2198,6 +2254,7 @@ void Document::addScene(const QVariantMap& camera, const QString& style)
 {
     runOnModel("Scenă nouă", [&](model::Model& model) {
         model::Scene s = sceneFrom(camera, style);
+        model::captureSceneState(model, s);
         s.name = "Scena " + std::to_string(model.scenes().size() + 1);
         model.addScene(s);
     });
@@ -2211,6 +2268,7 @@ void Document::updateScene(double sceneId, const QVariantMap& camera, const QStr
     }
     runOnModel("Actualizează scena", [&](model::Model& model) {
         model::Scene s = sceneFrom(camera, style);
+        model::captureSceneState(model, s);
         s.name = model.scenes().at(id).name;
         model.setScene(id, s);
     });
