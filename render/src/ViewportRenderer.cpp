@@ -40,6 +40,11 @@ struct FrameUniforms {
     float shadow[4];
     float style[4];
     float section[4];
+    float lightCount[4]; // x = numărul de lumini
+    float lightPos[8][4]; // xyz = poziția, w = tipul
+    float lightColor[8][4]; // rgb = culoarea liniară × intensitatea, w = raza
+    float lightDirection[8][4]; // xyz = direcția, w = cos(jumătatea conului)
+    float lightExtra[8][4]; // x = cos(începutul marginii), y = mărimea (suprafață)
 };
 
 
@@ -378,6 +383,16 @@ void ViewportRenderer::updateUniforms(QRhiResourceUpdateBatch* batch)
     u.style[3] = static_cast<float>(m_frame.targetDistance * 6.0);
     if (m_frame.section) {
         copy4(u.section, glm::normalize(glm::dvec3(*m_frame.section)), (*m_frame.section).w);
+    }
+
+    const int lightCount = std::min(static_cast<int>(m_frame.lights.size()), kMaxLights);
+    u.lightCount[0] = static_cast<float>(lightCount);
+    for (int i = 0; i < lightCount; ++i) {
+        const LightData& l = m_frame.lights[static_cast<std::size_t>(i)];
+        copy4(u.lightPos[i], glm::vec4(l.position, static_cast<float>(l.kind)));
+        copy4(u.lightColor[i], glm::vec4(l.color, l.range));
+        copy4(u.lightDirection[i], glm::vec4(glm::normalize(l.direction), l.cosOuter));
+        copy4(u.lightExtra[i], glm::vec4(l.cosInner, l.size, 0.0f, 0.0f));
     }
 
     batch->updateDynamicBuffer(m_uniforms.get(), 0, sizeof(u), &u);

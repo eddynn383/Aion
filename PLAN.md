@@ -521,11 +521,11 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
       evenimentului disponibil (mână, săgeată de drag etc.); ieșire cu Esc _(F5 sau ▶ din bara viewport-ului)_
 
 ### Faza 19 – Camere și lumini ca obiecte
-- [ ] Camere: transformare, FOV, proiecție, planuri de tăiere; „Privește prin cameră”; pot fi folosite în scene și
-      pe timeline
-- [ ] Lumini: punctuală, spot, direcțională, de suprafață; culoare, intensitate, rază, con, umbre
-- [ ] Randare: mai multe lumini în shader (până la 8), umbre pentru soare + o lumină spot; gizmo-uri în viewport,
-      în Outliner și Inspector, salvate în `.aion`
+- [x] Camere: transformare, FOV, proiecție, planuri de tăiere; „Privește prin cameră”; pot fi folosite în scene și
+      pe timeline _(2026-10-27, ADR 0022: scenele / cheile se iau din vederea prin cameră)_
+- [x] Lumini: punctuală, spot, direcțională, de suprafață; culoare, intensitate, rază, con
+- [x] Randare: mai multe lumini în shader (până la 8); gizmo-uri în viewport, în Outliner și Inspector, salvate în `.aion`
+- [ ] Umbre pentru o lumină spot (a doua hartă de umbre); mutarea luminilor trăgând de gizmo
 
 ### Faza 20 – Import `.skp` (Faza 7b)
 - [ ] SDK-ul SketchUp (Trimble) se descarcă de pe developer.sketchup.com cu un cont și acceptarea licenței — pasul

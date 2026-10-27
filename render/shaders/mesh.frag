@@ -30,6 +30,11 @@ layout(std140, binding = 0) uniform Frame {
     vec4 shadow;       // x = 1 dacă umbrele sunt active, y = bias, z = 1 / mărimea hărții, w = intensitatea umbrei
     vec4 style;        // x = stilul (0 shaded, 1 clay, 2 linii ascunse, 3 wireframe, 4 x-ray), y = ceață, z/w = începutul/sfârșitul ceții
     vec4 section;      // planul de secțiune activ: xyz = normala, w = d (n·x = d); normală nulă = fără secțiune
+    vec4 lightCount;   // x = numărul de lumini ale modelului (cel mult 8)
+    vec4 lightPos[8];  // xyz = poziția, w = tipul (0 punctuală, 1 spot, 2 direcțională, 3 suprafață)
+    vec4 lightColor[8]; // rgb = culoarea liniară × intensitatea, w = raza
+    vec4 lightDirection[8]; // xyz = încotro bate lumina, w = cos(jumătatea conului)
+    vec4 lightExtra[8]; // x = cos(începutul marginii conului), y = mărimea (suprafață)
 } frame;
 
 layout(binding = 1) uniform sampler2D shadowMap;
@@ -107,6 +112,42 @@ void main()
     float spec = pow(max(dot(n, h), 0.0), shininess) * (1.0 - roughness) * sun;
     vec3 specColor = mix(vec3(0.04), albedo, metallic);
     vec3 color = diffuse + specColor * spec * 2.0;
+
+    // Luminile modelului: atenuare netedă până la rază, con pentru spot, o singură față pentru suprafață.
+    int count = int(frame.lightCount.x + 0.5);
+    for (int i = 0; i < 8; ++i) {
+        if (i >= count)
+            break;
+        int kind = int(frame.lightPos[i].w + 0.5);
+        vec3 dir = normalize(frame.lightDirection[i].xyz);
+        vec3 toLight;
+        float att = 1.0;
+        if (kind == 2) {
+            toLight = -dir;
+        } else {
+            vec3 d = frame.lightPos[i].xyz - v_world;
+            float dist = length(d);
+            toLight = d / max(dist, 1e-3);
+            float range = max(frame.lightColor[i].w, 1.0);
+            float x = clamp(1.0 - dist / range, 0.0, 1.0);
+            att = x * x;
+            if (kind == 1) {
+                float c = dot(-toLight, dir);
+                att *= smoothstep(frame.lightDirection[i].w, frame.lightExtra[i].x, c);
+            } else if (kind == 3) {
+                // Suprafața luminează doar în fața ei; mărimea înmoaie apropierea.
+                att *= clamp(dot(-toLight, dir) + 0.15, 0.0, 1.0);
+                att *= clamp(dist / max(frame.lightExtra[i].y * 0.5, 1.0), 0.35, 1.0);
+            }
+        }
+        float ndl = max(dot(n, toLight), 0.0) * att;
+        if (ndl <= 0.0)
+            continue;
+        vec3 lc = frame.lightColor[i].rgb;
+        vec3 hl = normalize(toLight + toEye);
+        float sl = pow(max(dot(n, hl), 0.0), shininess) * (1.0 - roughness);
+        color += albedo * lc * ndl * (1.0 - metallic * 0.6) + specColor * lc * sl * ndl * 2.0;
+    }
 
     vec3 lit = toSrgb(aces(color * 1.15));
 

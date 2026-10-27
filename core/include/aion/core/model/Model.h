@@ -101,6 +101,42 @@ struct Scene {
     bool operator==(const Scene&) const = default;
 };
 
+// O cameră ca obiect: se vede în viewport (gizmo), se poate „privi prin ea” și folosi în scene și pe timeline.
+struct CameraObject {
+    std::string name;
+    math::Vec3d position { -6000.0, -6000.0, 4000.0 };
+    math::Vec3d target { 0.0 };
+    double fov = 50.0; // grade, pe verticală
+    bool orthographic = false;
+    double nearClip = 0.0; // 0 = automat
+    double farClip = 0.0;
+    bool visible = true; // gizmo-ul în viewport
+
+    bool operator==(const CameraObject&) const = default;
+};
+
+// O lumină. Punctuală și spot luminează din `position`; direcțională e ca soarele (după `direction`);
+// de suprafață e un dreptunghi `width` × `height` care luminează spre `direction`.
+struct Light {
+    enum class Kind { Point, Spot, Directional, Area };
+    std::string name;
+    Kind kind = Kind::Point;
+    math::Vec3d position { 0.0, 0.0, 2500.0 };
+    math::Vec3d direction { 0.0, 0.0, -1.0 }; // încotro bate lumina (normalizat)
+    Color color { 255, 244, 229, 255 };
+    double intensity = 1.0;
+    double range = 6000.0; // mm: dincolo de rază lumina nu mai ajunge (punctuală, spot, suprafață)
+    double cone = 45.0;    // spot: unghiul conului (grade, întreg)
+    double softness = 0.25; // spot: cât din con e marginea estompată
+    double width = 1000.0;  // suprafață
+    double height = 1000.0;
+    bool castShadows = false;
+    bool enabled = true;
+    bool visible = true; // gizmo-ul în viewport
+
+    bool operator==(const Light&) const = default;
+};
+
 // Animațiile (timeline-ul): keyframe-uri cu valori absolute pe obiecte (transformare, culoare) și pe cameră.
 enum class Easing { Linear, EaseInOut, EaseIn, EaseOut, Step };
 
@@ -240,6 +276,8 @@ struct ChangeSet {
     std::map<SectionId, geom::EntityChange<SectionPlane>> sections;
     std::map<SceneId, geom::EntityChange<Scene>> scenes;
     std::map<AnimationId, geom::EntityChange<Animation>> animations;
+    std::map<CameraId, geom::EntityChange<CameraObject>> cameras;
+    std::map<LightId, geom::EntityChange<Light>> lights;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -278,6 +316,8 @@ public:
     [[nodiscard]] const geom::SlotMap<SectionId, SectionPlane>& sections() const { return m_sections; }
     [[nodiscard]] const geom::SlotMap<SceneId, Scene>& scenes() const { return m_scenes; }
     [[nodiscard]] const geom::SlotMap<AnimationId, Animation>& animations() const { return m_animations; }
+    [[nodiscard]] const geom::SlotMap<CameraId, CameraObject>& cameras() const { return m_cameras; }
+    [[nodiscard]] const geom::SlotMap<LightId, Light>& lights() const { return m_lights; }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -317,6 +357,12 @@ public:
     AnimationId addAnimation(Animation animation);
     void removeAnimation(AnimationId id);
     void setAnimation(AnimationId id, Animation animation);
+    CameraId addCamera(CameraObject camera);
+    void removeCamera(CameraId id);
+    void setCamera(CameraId id, CameraObject camera);
+    LightId addLight(Light light);
+    void removeLight(LightId id);
+    void setLight(LightId id, Light light);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -358,6 +404,8 @@ private:
     geom::SlotMap<SectionId, SectionPlane> m_sections;
     geom::SlotMap<SceneId, Scene> m_scenes;
     geom::SlotMap<AnimationId, Animation> m_animations;
+    geom::SlotMap<CameraId, CameraObject> m_cameras;
+    geom::SlotMap<LightId, Light> m_lights;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;
     // Geometria (goală) a definițiilor șterse, păstrată ca undo să le refacă fără să refolosească ID-uri.
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_graveyard;

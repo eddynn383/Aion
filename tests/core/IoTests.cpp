@@ -90,6 +90,26 @@ Model sampleModel()
     m.addAnnotation({ model::Annotation::Kind::Text, m.root(), { 3000, 0, 1000 }, {}, { 0, -800, 600 }, "Ușa" });
     m.addSection({ "Secțiune 1", { 3000, 2000, 1200 }, { 0, 0, 1 }, false });
     m.addScene({ "Fațada", { 3000, 2000, 1000 }, 0.4, 0.2, 15000, false, "clay", false, {}, {}, {} });
+    // O cameră și două lumini.
+    model::CameraObject camera;
+    camera.name = "Intrare";
+    camera.position = { -3000, -5000, 1700 };
+    camera.target = { 3000, 2000, 1200 };
+    camera.fov = 65.0;
+    m.addCamera(camera);
+    model::Light lamp;
+    lamp.name = "Bec";
+    lamp.position = { 3000, 2000, 2500 };
+    lamp.color = { 255, 200, 150, 255 };
+    lamp.intensity = 1.5;
+    m.addLight(lamp);
+    model::Light spot;
+    spot.name = "Spot";
+    spot.kind = model::Light::Kind::Spot;
+    spot.direction = { 0.0, 0.6, -0.8 };
+    spot.cone = 30.0;
+    spot.castShadows = true;
+    m.addLight(spot);
     requireValid(m);
     return m;
 }

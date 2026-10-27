@@ -8,6 +8,7 @@ Item {
     id: root
 
     property var document
+    property var viewport // pentru camerele noi (vederea curentă)
     property var collapsed: ({}) // id-ul instanței → true dacă e strânsă
     property double dragging: 0 // instanța trasă
 
@@ -37,7 +38,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: parent.height - tagsBox.height - Theme.space3
+        height: parent.height - tagsBox.height - objectsBox.height - Theme.space3
         clip: true
         model: root.rows
         spacing: 1
@@ -228,6 +229,197 @@ Item {
               + "grupează cu ⌥⌘G. Sau creează direct un cub, o sferă… din toolbar.")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeSm
+    }
+
+    // --- Camerele și luminile ---
+    readonly property var lightIcons: ({ point: "lightbulb", spot: "light-spot", directional: "sun", area: "light-area" })
+
+    Column {
+        id: objectsBox
+        anchors.bottom: tagsBox.top
+        anchors.bottomMargin: Theme.space2
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: 2
+
+        Separator { width: parent.width }
+        Item {
+            width: parent.width
+            height: Theme.controlHeightSm
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.space1
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "camera"
+                    size: 13
+                    color: Theme.textTertiary
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "CAMERE ȘI LUMINI"
+                    color: Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 0.6
+                }
+            }
+            IconButton {
+                id: addObjectButton
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: 22; height: 22; iconSize: 13
+                iconName: "plus"
+                tooltip: "Adaugă o cameră sau o lumină"
+                checked: addMenu.opened
+                onClicked: addMenu.opened ? addMenu.close() : addMenu.open()
+
+                Popover {
+                    id: addMenu
+                    x: parent.width - width
+                    y: parent.height + 4
+                    width: 230
+                    padding: Theme.space1
+                    contentItem: Column {
+                        Repeater {
+                            model: [
+                                { id: "camera", icon: "camera", label: "Cameră (din vederea curentă)" },
+                                { id: "point", icon: "lightbulb", label: "Lumină punctuală" },
+                                { id: "spot", icon: "light-spot", label: "Spot" },
+                                { id: "directional", icon: "sun", label: "Lumină direcțională" },
+                                { id: "area", icon: "light-area", label: "Panou luminos (suprafață)" }
+                            ]
+                            delegate: Rectangle {
+                                id: addItem
+                                required property var modelData
+                                width: 222
+                                height: Theme.controlHeightSm
+                                radius: Theme.radiusSm
+                                color: addArea.containsMouse ? Theme.bgHover : "transparent"
+                                Row {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: Theme.space2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: Theme.space2
+                                    Icon { anchors.verticalCenter: parent.verticalCenter; name: addItem.modelData.icon; size: 14; color: Theme.textSecondary }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: addItem.modelData.label
+                                        color: Theme.textPrimary
+                                        font.pixelSize: Theme.fontSizeSm
+                                    }
+                                }
+                                MouseArea {
+                                    id: addArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: {
+                                        addMenu.close()
+                                        root.addObject(addItem.modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Repeater {
+            model: root.document ? root.document.cameras.concat(root.document.lights) : []
+            delegate: Rectangle {
+                id: objectRow
+                required property var modelData
+                readonly property bool isCamera: modelData.kind === "camera"
+                readonly property bool current: root.document.selectedObject.id === modelData.id
+                                                && root.document.selectedObject.kind === (isCamera ? "camera" : "light")
+                width: objectsBox.width
+                height: Theme.controlHeightSm
+                radius: Theme.radiusSm
+                color: current ? Theme.accentSubtle : objectArea.containsMouse ? Theme.bgHover : "transparent"
+
+                MouseArea {
+                    id: objectArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: root.document.selectObject(objectRow.isCamera ? "camera" : "light", objectRow.modelData.id)
+                    onDoubleClicked: if (objectRow.isCamera && root.viewport)
+                        root.viewport.animateToCamera(root.document.cameraView(objectRow.modelData.id), 0.8)
+                }
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.space2
+                    anchors.right: objectActions.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.space2
+                    Icon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: objectRow.isCamera ? "camera" : root.lightIcons[objectRow.modelData.kind]
+                        size: Theme.iconSizeSm
+                        color: objectRow.isCamera ? Theme.textSecondary : objectRow.modelData.color
+                        opacity: objectRow.modelData.enabled ? 1 : 0.4
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 30)
+                        text: objectRow.modelData.name
+                        elide: Text.ElideRight
+                        color: objectRow.modelData.enabled ? Theme.textPrimary : Theme.textTertiary
+                        font.pixelSize: Theme.fontSizeSm
+                        font.weight: objectRow.current ? Font.DemiBold : Font.Normal
+                    }
+                }
+                Row {
+                    id: objectActions
+                    anchors.right: parent.right
+                    anchors.rightMargin: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    IconButton {
+                        visible: objectRow.isCamera && (objectArea.containsMouse || hovered)
+                        width: 22; height: 22; iconSize: 13
+                        iconName: "video"
+                        tooltip: "Privește prin cameră"
+                        onClicked: root.viewport.animateToCamera(root.document.cameraView(objectRow.modelData.id), 0.8)
+                    }
+                    IconButton {
+                        visible: !objectRow.isCamera
+                        width: 22; height: 22; iconSize: 13
+                        iconName: objectRow.modelData.enabled ? "lightbulb" : "x"
+                        tooltip: objectRow.modelData.enabled ? "Stinge" : "Aprinde"
+                        onClicked: {
+                            root.document.selectObject("light", objectRow.modelData.id)
+                            root.document.setObjectProperties({ enabled: !objectRow.modelData.enabled })
+                        }
+                    }
+                    IconButton {
+                        width: 22; height: 22; iconSize: 13
+                        iconName: objectRow.modelData.visible ? "eye" : "eye-off"
+                        tooltip: objectRow.modelData.visible ? "Ascunde marcajul din viewport" : "Arată marcajul"
+                        onClicked: {
+                            root.document.selectObject(objectRow.isCamera ? "camera" : "light", objectRow.modelData.id)
+                            root.document.setObjectProperties({ visible: !objectRow.modelData.visible })
+                        }
+                    }
+                }
+            }
+        }
+        Text {
+            visible: root.document && root.document.cameras.length + root.document.lights.length === 0
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Camere pentru vederi fixe și lumini (bec, spot, soare, panou) cu setările lor. Adaugă cu +."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
+    function addObject(kind) {
+        if (kind === "camera") {
+            root.document.addCamera(root.viewport.cameraState(), 0)
+        } else {
+            const c = root.viewport.cameraState()
+            root.document.addLight(kind, Qt.vector3d(c.tx, c.ty, c.tz))
+        }
     }
 
     // --- Tag-urile ---

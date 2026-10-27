@@ -11,6 +11,7 @@
 #include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
 #include "aion/core/view/ModelPicking.h"
+#include "aion/core/view/Camera.h"
 #include "aion/core/view/Picking.h"
 
 #include <QColor>
@@ -986,6 +987,10 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
 void Document::afterInteraction(const geom::Selection& before)
 {
     repairContext();
+    if (!m_selection.empty()) {
+        m_selectedCamera = {};
+        m_selectedLight = {};
+    }
     if (m_selection != before) {
         emit selectionChanged();
         emit outlineChanged();
@@ -1035,6 +1040,12 @@ void Document::updateHiddenTags()
 
 void Document::dropStaleReferences()
 {
+    if (!m_model.cameras().contains(m_selectedCamera)) {
+        m_selectedCamera = {};
+    }
+    if (!m_model.lights().contains(m_selectedLight)) {
+        m_selectedLight = {};
+    }
     const std::size_t valid = validPathLength();
     if (valid < m_path.size()) {
         // Contextul editat a dispărut: ieșim din el fără să atingem unealta (poate fi chiar ea în lucru);
@@ -1158,6 +1169,10 @@ void Document::redo()
 
 void Document::deleteSelection()
 {
+    if (m_selectedCamera || m_selectedLight) {
+        deleteSelectedObject();
+        return;
+    }
     const geom::Selection before = m_selection;
     const view::Camera camera;
     tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -1184,6 +1199,9 @@ void Document::selectAll()
 
 void Document::clearSelection()
 {
+    if (m_selectedCamera || m_selectedLight) {
+        selectObject(QString(), 0.0);
+    }
     const geom::Selection before = m_selection;
     m_selection.clear();
     afterInteraction(before);
@@ -3042,6 +3060,280 @@ void Document::meshChanged(model::DefinitionId definition, const geom::Mesh& mes
     }
     emit modelChanged();
     touch();
+}
+
+// --- Camere și lumini ---
+
+namespace {
+
+const std::array<QString, 4> kLightKinds { QStringLiteral("point"), QStringLiteral("spot"), QStringLiteral("directional"),
+    QStringLiteral("area") };
+
+QString colorName(const model::Color& c)
+{
+    return QColor(c.r, c.g, c.b).name();
+}
+
+QVariantList vec3List(const math::Vec3d& v)
+{
+    return { v.x, v.y, v.z };
+}
+
+math::Vec3d vec3From(const QVariant& value, const math::Vec3d& fallback)
+{
+    const QVariantList l = value.toList();
+    return l.size() == 3 ? math::Vec3d { l[0].toDouble(), l[1].toDouble(), l[2].toDouble() } : fallback;
+}
+
+// Ochiul și ținta vederii date ca { tx, ty, tz, yaw, pitch, distance }.
+std::pair<math::Vec3d, math::Vec3d> eyeAndTarget(const QVariantMap& camera)
+{
+    const math::Vec3d target { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
+        camera.value(QStringLiteral("tz")).toDouble() };
+    const double yaw = camera.value(QStringLiteral("yaw")).toDouble();
+    const double pitch = camera.value(QStringLiteral("pitch")).toDouble();
+    const double distance = camera.value(QStringLiteral("distance"), 10000.0).toDouble();
+    const math::Vec3d forward { std::cos(pitch) * std::cos(yaw), std::cos(pitch) * std::sin(yaw), std::sin(pitch) };
+    return { target - forward * distance, target };
+}
+
+} // namespace
+
+QVariantList Document::cameras() const
+{
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.cameras().size(); ++i) {
+        const model::CameraObject& c = m_model.cameras().values()[i];
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.cameras().keys()[i].value) },
+            { QStringLiteral("name"), QString::fromStdString(c.name) }, { QStringLiteral("kind"), QStringLiteral("camera") },
+            { QStringLiteral("visible"), c.visible }, { QStringLiteral("enabled"), true } });
+    }
+    return out;
+}
+
+QVariantList Document::lights() const
+{
+    QVariantList out;
+    for (std::size_t i = 0; i < m_model.lights().size(); ++i) {
+        const model::Light& l = m_model.lights().values()[i];
+        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.lights().keys()[i].value) },
+            { QStringLiteral("name"), QString::fromStdString(l.name) },
+            { QStringLiteral("kind"), kLightKinds[static_cast<std::size_t>(l.kind)] },
+            { QStringLiteral("visible"), l.visible }, { QStringLiteral("enabled"), l.enabled },
+            { QStringLiteral("color"), colorName(l.color) } });
+    }
+    return out;
+}
+
+QVariantMap Document::selectedObject() const
+{
+    if (const model::CameraObject* c = m_model.cameras().find(m_selectedCamera)) {
+        return { { QStringLiteral("kind"), QStringLiteral("camera") },
+            { QStringLiteral("id"), static_cast<double>(m_selectedCamera.value) },
+            { QStringLiteral("name"), QString::fromStdString(c->name) },
+            { QStringLiteral("position"), vec3List(c->position) }, { QStringLiteral("target"), vec3List(c->target) },
+            { QStringLiteral("fov"), c->fov }, { QStringLiteral("orthographic"), c->orthographic },
+            { QStringLiteral("nearClip"), c->nearClip }, { QStringLiteral("farClip"), c->farClip },
+            { QStringLiteral("visible"), c->visible } };
+    }
+    if (const model::Light* l = m_model.lights().find(m_selectedLight)) {
+        return { { QStringLiteral("kind"), QStringLiteral("light") },
+            { QStringLiteral("id"), static_cast<double>(m_selectedLight.value) },
+            { QStringLiteral("name"), QString::fromStdString(l->name) },
+            { QStringLiteral("lightKind"), kLightKinds[static_cast<std::size_t>(l->kind)] },
+            { QStringLiteral("position"), vec3List(l->position) }, { QStringLiteral("direction"), vec3List(l->direction) },
+            { QStringLiteral("color"), colorName(l->color) }, { QStringLiteral("intensity"), l->intensity },
+            { QStringLiteral("range"), l->range }, { QStringLiteral("cone"), l->cone },
+            { QStringLiteral("softness"), l->softness }, { QStringLiteral("width"), l->width },
+            { QStringLiteral("height"), l->height }, { QStringLiteral("castShadows"), l->castShadows },
+            { QStringLiteral("enabled"), l->enabled }, { QStringLiteral("visible"), l->visible } };
+    }
+    return { { QStringLiteral("kind"), QStringLiteral("none") } };
+}
+
+void Document::addCamera(const QVariantMap& camera, double fovDegrees)
+{
+    model::CameraId added;
+    runOnModel("Cameră nouă", [&](model::Model& model) {
+        model::CameraObject c;
+        std::tie(c.position, c.target) = eyeAndTarget(camera);
+        c.fov = fovDegrees > 0.0 ? fovDegrees : camera.value(QStringLiteral("fov"), 35.0).toDouble();
+        c.orthographic = camera.value(QStringLiteral("ortho")).toBool();
+        c.name = "Cameră " + std::to_string(model.cameras().size() + 1);
+        added = model.addCamera(c);
+    });
+    selectObject(QStringLiteral("camera"), static_cast<double>(added.value));
+}
+
+void Document::addLight(const QString& kind, const QVector3D& at)
+{
+    const auto index = static_cast<std::size_t>(std::max<qsizetype>(0, std::find(kLightKinds.begin(), kLightKinds.end(), kind) - kLightKinds.begin()));
+    model::LightId added;
+    runOnModel("Lumină nouă", [&](model::Model& model) {
+        model::Light l;
+        l.kind = static_cast<model::Light::Kind>(std::min<std::size_t>(index, 3));
+        const math::Vec3d ground { at.x(), at.y(), at.z() };
+        switch (l.kind) {
+        case model::Light::Kind::Point:
+            l.name = "Lumină punctuală";
+            l.position = ground + math::Vec3d { 0.0, 0.0, 2200.0 };
+            break;
+        case model::Light::Kind::Spot:
+            l.name = "Spot";
+            l.position = ground + math::Vec3d { -1500.0, -1500.0, 3000.0 };
+            l.direction = glm::normalize(ground - l.position);
+            l.range = 9000.0;
+            break;
+        case model::Light::Kind::Directional:
+            l.name = "Lumină direcțională";
+            l.position = ground + math::Vec3d { 0.0, 0.0, 4000.0 };
+            l.direction = glm::normalize(math::Vec3d { 0.5, 0.3, -1.0 });
+            l.intensity = 0.6;
+            break;
+        case model::Light::Kind::Area:
+            l.name = "Panou luminos";
+            l.position = ground + math::Vec3d { 0.0, 0.0, 2600.0 };
+            l.color = { 255, 255, 255, 255 };
+            break;
+        }
+        l.name += " " + std::to_string(model.lights().size() + 1);
+        added = model.addLight(l);
+    });
+    selectObject(QStringLiteral("light"), static_cast<double>(added.value));
+}
+
+void Document::selectObject(const QString& kind, double id)
+{
+    m_selectedCamera = {};
+    m_selectedLight = {};
+    if (kind == QStringLiteral("camera")) {
+        m_selectedCamera = model::CameraId { static_cast<std::uint64_t>(id) };
+    } else if (kind == QStringLiteral("light")) {
+        m_selectedLight = model::LightId { static_cast<std::uint64_t>(id) };
+    }
+    if (m_selectedCamera || m_selectedLight) {
+        m_selection.clear();
+    }
+    emit selectionChanged();
+    emit outlineChanged();
+    touch();
+}
+
+void Document::setObjectProperties(const QVariantMap& changes)
+{
+    const auto num = [&](const char* key, double& value) {
+        if (changes.contains(QLatin1String(key))) {
+            value = changes.value(QLatin1String(key)).toDouble();
+        }
+    };
+    const auto flag = [&](const char* key, bool& value) {
+        if (changes.contains(QLatin1String(key))) {
+            value = changes.value(QLatin1String(key)).toBool();
+        }
+    };
+    if (const model::CameraObject* found = m_model.cameras().find(m_selectedCamera)) {
+        model::CameraObject c = *found;
+        if (changes.contains(QStringLiteral("name"))) {
+            c.name = changes.value(QStringLiteral("name")).toString().toStdString();
+        }
+        c.position = vec3From(changes.value(QStringLiteral("position")), c.position);
+        c.target = vec3From(changes.value(QStringLiteral("target")), c.target);
+        num("fov", c.fov);
+        c.fov = std::clamp(c.fov, 5.0, 150.0);
+        num("nearClip", c.nearClip);
+        num("farClip", c.farClip);
+        flag("orthographic", c.orthographic);
+        flag("visible", c.visible);
+        if (c == *found) {
+            return;
+        }
+        const model::CameraId id = m_selectedCamera;
+        runOnModel("Proprietățile camerei", [&](model::Model& model) { model.setCamera(id, c); });
+        return;
+    }
+    if (const model::Light* found = m_model.lights().find(m_selectedLight)) {
+        model::Light l = *found;
+        if (changes.contains(QStringLiteral("name"))) {
+            l.name = changes.value(QStringLiteral("name")).toString().toStdString();
+        }
+        if (changes.contains(QStringLiteral("lightKind"))) {
+            const auto it = std::find(kLightKinds.begin(), kLightKinds.end(), changes.value(QStringLiteral("lightKind")).toString());
+            if (it != kLightKinds.end()) {
+                l.kind = static_cast<model::Light::Kind>(it - kLightKinds.begin());
+            }
+        }
+        l.position = vec3From(changes.value(QStringLiteral("position")), l.position);
+        const math::Vec3d direction = vec3From(changes.value(QStringLiteral("direction")), l.direction);
+        if (glm::length(direction) > 1e-9) {
+            l.direction = glm::normalize(direction);
+        }
+        if (changes.contains(QStringLiteral("color"))) {
+            const QColor qc(changes.value(QStringLiteral("color")).toString());
+            if (qc.isValid()) {
+                l.color = { static_cast<std::uint8_t>(qc.red()), static_cast<std::uint8_t>(qc.green()),
+                    static_cast<std::uint8_t>(qc.blue()), 255 };
+            }
+        }
+        num("intensity", l.intensity);
+        l.intensity = std::max(l.intensity, 0.0);
+        num("range", l.range);
+        l.range = std::max(l.range, 1.0);
+        num("cone", l.cone);
+        l.cone = std::clamp(l.cone, 1.0, 179.0);
+        num("softness", l.softness);
+        l.softness = std::clamp(l.softness, 0.0, 1.0);
+        num("width", l.width);
+        num("height", l.height);
+        flag("castShadows", l.castShadows);
+        flag("enabled", l.enabled);
+        flag("visible", l.visible);
+        if (l == *found) {
+            return;
+        }
+        const model::LightId id = m_selectedLight;
+        runOnModel("Proprietățile luminii", [&](model::Model& model) { model.setLight(id, l); });
+    }
+}
+
+void Document::deleteSelectedObject()
+{
+    const model::CameraId camera = m_selectedCamera;
+    const model::LightId light = m_selectedLight;
+    if (m_model.cameras().contains(camera)) {
+        runOnModel("Șterge camera", [&](model::Model& model) { model.removeCamera(camera); });
+    } else if (m_model.lights().contains(light)) {
+        runOnModel("Șterge lumina", [&](model::Model& model) { model.removeLight(light); });
+    }
+    selectObject(QString(), 0.0);
+}
+
+QVariantMap Document::cameraView(double cameraId) const
+{
+    const model::CameraObject* c = m_model.cameras().find(model::CameraId { static_cast<std::uint64_t>(cameraId) });
+    if (c == nullptr) {
+        return {};
+    }
+    const view::CameraPose pose = view::poseLookingAt(c->position, c->target);
+    return { { QStringLiteral("tx"), pose.target.x }, { QStringLiteral("ty"), pose.target.y },
+        { QStringLiteral("tz"), pose.target.z }, { QStringLiteral("yaw"), pose.yaw },
+        { QStringLiteral("pitch"), pose.pitch }, { QStringLiteral("distance"), pose.distance },
+        { QStringLiteral("ortho"), c->orthographic }, { QStringLiteral("fov"), c->fov } };
+}
+
+void Document::placeSelectedObjectAtView(const QVariantMap& camera)
+{
+    const auto [eye, target] = eyeAndTarget(camera);
+    if (m_model.cameras().contains(m_selectedCamera)) {
+        setObjectProperties({ { QStringLiteral("position"), vec3List(eye) }, { QStringLiteral("target"), vec3List(target) },
+            { QStringLiteral("orthographic"), camera.value(QStringLiteral("ortho")) } });
+    } else if (const model::Light* l = m_model.lights().find(m_selectedLight)) {
+        // Lumina vine în ținta vederii (la înălțimea ei), îndreptată ca privirea.
+        QVariantMap changes { { QStringLiteral("direction"), vec3List(glm::normalize(target - eye)) } };
+        if (l->kind != model::Light::Kind::Directional) {
+            changes.insert(QStringLiteral("position"), vec3List(eye));
+        }
+        setObjectProperties(changes);
+    }
 }
 
 void Document::structureChanged(const model::Model& model)

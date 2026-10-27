@@ -14,6 +14,7 @@
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
+#include <QVector3D>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
@@ -78,6 +79,11 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QVariantMap currentMaterial READ currentMaterial NOTIFY materialChanged)
 
     // --- Faza 9 ---
+    // Camerele și luminile: { id, name, kind, enabled, visible } (pentru Outliner).
+    Q_PROPERTY(QVariantList cameras READ cameras NOTIFY outlineChanged)
+    Q_PROPERTY(QVariantList lights READ lights NOTIFY outlineChanged)
+    // Obiectul selectat (cameră sau lumină) cu toate proprietățile; { kind: "none" } dacă nu e niciunul.
+    Q_PROPERTY(QVariantMap selectedObject READ selectedObject NOTIFY selectionChanged)
     // Scenele: { id, name, style } (poziția camerei o citește QML prin sceneCamera).
     Q_PROPERTY(QVariantList scenes READ scenes NOTIFY outlineChanged)
     // Timeline-ul: animațiile modelului, cea activă, momentul curent, previzualizarea și redarea.
@@ -159,6 +165,9 @@ public:
     QVariantList modelMaterials() const;
     QVariantMap currentMaterial() const;
     QVariantList scenes() const;
+    QVariantList cameras() const;
+    QVariantList lights() const;
+    QVariantMap selectedObject() const;
     QVariantList sections() const;
     int guideCount() const { return static_cast<int>(m_model.guides().size()); }
     double editingAnnotation() const { return static_cast<double>(m_editingAnnotation.value); }
@@ -252,6 +261,24 @@ public:
     Q_INVOKABLE void renameScene(double sceneId, const QString& name);
     Q_INVOKABLE void removeScene(double sceneId);
     Q_INVOKABLE QVariantMap sceneCamera(double sceneId) const;
+
+    // --- Camere și lumini (obiecte ale modelului) ---
+    // camera: ca la addScene; fov în grade. Camera nouă privește ca vederea curentă și devine selectată.
+    Q_INVOKABLE void addCamera(const QVariantMap& camera, double fovDegrees);
+    // kind: "point", "spot", "directional", "area"; `at` = punctul spre care privește vederea (ținta camerei).
+    Q_INVOKABLE void addLight(const QString& kind, const QVector3D& at);
+    // kind: "camera" sau "light"; id 0 = nimic.
+    Q_INVOKABLE void selectObject(const QString& kind, double id);
+    // Schimbă proprietățile obiectului selectat (aceleași chei ca în selectedObject).
+    Q_INVOKABLE void setObjectProperties(const QVariantMap& changes);
+    Q_INVOKABLE void deleteSelectedObject();
+    // Vederea prin cameră: { tx, ty, tz, yaw, pitch, distance, ortho, fov }.
+    Q_INVOKABLE QVariantMap cameraView(double cameraId) const;
+    // Pune camera selectată (sau lumina) unde e vederea curentă.
+    Q_INVOKABLE void placeSelectedObjectAtView(const QVariantMap& camera);
+    // Pentru gizmo-urile din viewport: obiectul selectat (0 = niciunul).
+    [[nodiscard]] model::CameraId selectedCamera() const { return m_selectedCamera; }
+    [[nodiscard]] model::LightId selectedLight() const { return m_selectedLight; }
 
     // --- Meniul contextual (click dreapta) ---
     // Elementele potrivite selecției: { id, name, shortcut, enabled, destructive } sau { separator: true }.
@@ -395,6 +422,8 @@ private:
         double duration = 1.0;
     };
     std::optional<SceneTransition> m_sceneTransition;
+    model::CameraId m_selectedCamera;
+    model::LightId m_selectedLight;
     std::optional<model::Model> m_runtime;
     model::RuleRuntime m_rules;
     model::InstanceId m_hoverInstance;

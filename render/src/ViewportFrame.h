@@ -35,6 +35,19 @@ struct MeshVertex {
     glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f }; // materialul de pe verso (a < 0 = ca fața / culoarea versoului)
 };
 
+// O lumină a modelului, gata pentru shader (cel mult kMaxLights).
+struct LightData {
+    int kind = 0; // 0 punctuală, 1 spot, 2 direcțională, 3 suprafață
+    glm::vec3 position { 0.0f };
+    glm::vec3 direction { 0.0f, 0.0f, -1.0f }; // încotro bate lumina
+    glm::vec3 color { 1.0f }; // liniar, înmulțit cu intensitatea
+    float range = 6000.0f;
+    float cosOuter = 0.0f; // spot: cosinusul jumătății de con
+    float cosInner = 0.0f; // spot: unde începe marginea estompată
+    float size = 0.0f; // suprafață: latura medie (înmoaie apropierea)
+};
+inline constexpr int kMaxLights = 8;
+
 struct ViewportColors {
     glm::vec4 backgroundTop;
     glm::vec4 backgroundBottom;
@@ -79,6 +92,8 @@ struct ViewportFrame {
     bool shadows = false;
     glm::dvec3 sceneMin { -5000.0, -5000.0, 0.0 };
     glm::dvec3 sceneMax { 5000.0, 5000.0, 3000.0 };
+    // Luminile modelului (în afară de soare).
+    std::vector<LightData> lights;
     // Planul de secțiune activ (n, d cu n·x = d); geometria de partea normalei se ascunde.
     std::optional<glm::dvec4> section;
 };

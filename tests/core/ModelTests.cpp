@@ -394,3 +394,43 @@ TEST_CASE("Scene ca stări: pozițiile obiectelor, ascunderile și tag-urile se 
     REQUIRE(loaded.model);
     CHECK(loaded.model->sameAs(m));
 }
+
+TEST_CASE("Camere și lumini ca obiecte: adăugare, editare și undo", "[core][model][lights]")
+{
+    Doc doc;
+    model::LightId light;
+    model::CameraId camera;
+    REQUIRE(doc.stack.run("Adaugă", [&](Model& m) {
+        light = m.addLight({});
+        model::CameraObject c;
+        c.name = "Cameră 1";
+        camera = m.addCamera(c);
+    }));
+    REQUIRE(doc.model.lights().contains(light));
+    REQUIRE(doc.model.cameras().contains(camera));
+
+    REQUIRE(doc.stack.run("Editează", [&](Model& m) {
+        model::Light l = m.lights().at(light);
+        l.kind = model::Light::Kind::Spot;
+        l.intensity = 3.0;
+        m.setLight(light, l);
+        model::CameraObject c = m.cameras().at(camera);
+        c.fov = 80.0;
+        m.setCamera(camera, c);
+    }));
+    CHECK(doc.model.lights().at(light).kind == model::Light::Kind::Spot);
+    CHECK(doc.model.cameras().at(camera).fov == Approx(80.0));
+
+    REQUIRE(doc.stack.undo());
+    CHECK(doc.model.lights().at(light).intensity == Approx(1.0));
+    CHECK(doc.model.cameras().at(camera).fov == Approx(50.0));
+
+    REQUIRE(doc.stack.run("Șterge", [&](Model& m) {
+        m.removeLight(light);
+        m.removeCamera(camera);
+    }));
+    CHECK(doc.model.lights().empty());
+    REQUIRE(doc.stack.undo());
+    CHECK(doc.model.lights().contains(light));
+    CHECK(doc.model.cameras().contains(camera));
+}

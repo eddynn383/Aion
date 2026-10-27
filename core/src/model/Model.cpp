@@ -73,6 +73,7 @@ bool ChangeSet::empty() const
 {
     return definitions.empty() && instances.empty() && tags.empty() && materials.empty() && guides.empty()
         && annotations.empty() && sections.empty() && scenes.empty() && animations.empty()
+        && cameras.empty() && lights.empty()
         && std::all_of(meshes.begin(), meshes.end(), [](const auto& m) { return m.second.empty(); });
 }
 
@@ -113,6 +114,8 @@ Model& Model::operator=(const Model& other)
     m_sections = other.m_sections;
     m_scenes = other.m_scenes;
     m_animations = other.m_animations;
+    m_cameras = other.m_cameras;
+    m_lights = other.m_lights;
     m_meshes.clear();
     for (const auto& [id, mesh] : other.m_meshes) {
         auto copy = std::make_unique<geom::Mesh>(*mesh);
@@ -486,6 +489,36 @@ void Model::setAnimation(AnimationId id, Animation animation)
     setEntity(m_animations, &ChangeSet::animations, id, std::move(animation));
 }
 
+CameraId Model::addCamera(CameraObject camera)
+{
+    return addEntity(m_cameras, &ChangeSet::cameras, std::move(camera));
+}
+
+void Model::removeCamera(CameraId id)
+{
+    removeEntity(m_cameras, &ChangeSet::cameras, id);
+}
+
+void Model::setCamera(CameraId id, CameraObject camera)
+{
+    setEntity(m_cameras, &ChangeSet::cameras, id, std::move(camera));
+}
+
+LightId Model::addLight(Light light)
+{
+    return addEntity(m_lights, &ChangeSet::lights, std::move(light));
+}
+
+void Model::removeLight(LightId id)
+{
+    removeEntity(m_lights, &ChangeSet::lights, id);
+}
+
+void Model::setLight(LightId id, Light light)
+{
+    setEntity(m_lights, &ChangeSet::lights, id, std::move(light));
+}
+
 void Model::beginRecording()
 {
     assert(!m_recording);
@@ -516,6 +549,8 @@ ChangeSet Model::endRecording()
     finishChanges(changes.sections, m_sections);
     finishChanges(changes.scenes, m_scenes);
     finishChanges(changes.animations, m_animations);
+    finishChanges(changes.cameras, m_cameras);
+    finishChanges(changes.lights, m_lights);
     // O definiție creată și ștearsă în aceeași operație nu lasă nicio urmă.
     for (DefinitionId id : m_createdWhileRecording) {
         if (!changes.definitions.contains(id) && !m_definitions.contains(id)) {
@@ -554,6 +589,8 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.sections, m_sections, direction);
         applyChanges(changes.scenes, m_scenes, direction);
         applyChanges(changes.animations, m_animations, direction);
+        applyChanges(changes.cameras, m_cameras, direction);
+        applyChanges(changes.lights, m_lights, direction);
         for (const auto& [id, change] : changes.definitions) {
             if (change.before && !change.after) {
                 m_definitions.erase(id);
@@ -572,6 +609,8 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.sections, m_sections, direction);
         applyChanges(changes.scenes, m_scenes, direction);
         applyChanges(changes.animations, m_animations, direction);
+        applyChanges(changes.cameras, m_cameras, direction);
+        applyChanges(changes.lights, m_lights, direction);
         applyChanges(changes.instances, m_instances, direction);
         applyChanges(changes.tags, m_tags, direction);
         applyMeshes();
@@ -587,7 +626,8 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
     }
     if (!changes.definitions.empty() || !changes.instances.empty() || !changes.tags.empty()
         || !changes.materials.empty() || !changes.guides.empty() || !changes.annotations.empty()
-        || !changes.sections.empty() || !changes.scenes.empty() || !changes.animations.empty()) {
+        || !changes.sections.empty() || !changes.scenes.empty() || !changes.animations.empty() || !changes.cameras.empty()
+        || !changes.lights.empty()) {
         m_structureDirty = true;
         notifyStructure();
     }
@@ -713,7 +753,8 @@ bool Model::sameAs(const Model& other) const
         || !sameMap(m_instances, other.m_instances) || !sameMap(m_tags, other.m_tags)
         || !sameMap(m_materials, other.m_materials) || !sameMap(m_guides, other.m_guides)
         || !sameMap(m_annotations, other.m_annotations) || !sameMap(m_sections, other.m_sections)
-        || !sameMap(m_scenes, other.m_scenes) || !sameMap(m_animations, other.m_animations)) {
+        || !sameMap(m_scenes, other.m_scenes) || !sameMap(m_animations, other.m_animations)
+        || !sameMap(m_cameras, other.m_cameras) || !sameMap(m_lights, other.m_lights)) {
         return false;
     }
     for (const auto& [id, mesh] : m_meshes) {

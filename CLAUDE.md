@@ -124,8 +124,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `RulesActionList`). Acțiuni de script: `rule:click,moveBy,0,0,800`, `rules.edit`, `mode.interaction`,
   `drags:x1,y1,x2,y2` (tragere în coordonatele ferestrei).
 
+- **Faza 19** (ADR 0022): `model::CameraObject` / `model::Light`, până la 8 lumini în `mesh.frag`, gizmo-uri
+  (`Viewport::appendModelExtras`, `objectHandleAt`), `shell/ObjectInfo.qml`, secțiunea din Outliner. Acțiuni de
+  script: `object.camera`, `object.light.point|spot|directional|area`, `object:intensity=3,color=#EF4444`,
+  `camera.look`.
+
 ## Următorii pași
-1. Faza 19 (camere și lumini), apoi Faza 20 (import `.skp`, după ce descarci SDK-ul).
+1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,
