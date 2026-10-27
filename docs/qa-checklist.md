@@ -146,3 +146,9 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Timeline deschis + hover pe un câmp: eticheta devine ◇; click → keyframe la momentul curent (creează animația dacă lipsește);
       ◆ plin când obiectul are deja keyframe acolo
 - [ ] Salvare / deschidere `.aion` păstrează lacătele
+## Oglindire, array, soften (Fazele 21–23)
+- [ ] Click dreapta / palette → Oglindește pe X / Y / Z: obiectul se întoarce pe loc; geometria liberă are fețele albe în afară
+- [ ] Inspector → butoanele de lângă Scară oglindesc obiectul; ⌘Z revine
+- [ ] Array în linie: 3 copii alăturate implicit; schimbă numărul / axa / pasul → previzualizarea se actualizează; Gata = un pas de undo
+- [ ] Array în cerc: rază, tot cercul sau unghi, rotirea copiilor (de exemplu scaune în jurul unei mese)
+- [ ] Soften pe o cutie cu 95° → muchiile dispar și umbrirea devine netedă; 0° → toate vizibile; Esc anulează
