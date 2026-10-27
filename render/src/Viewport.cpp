@@ -869,17 +869,17 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         const auto [fw, r, u] = basis(c.target - c.position);
         const double h = std::tan(glm::radians(c.fov) * 0.5) * k;
         const double w = h * 1.5;
-        const glm::dvec3 center = eye + fw * k;
-        const std::array<glm::dvec3, 4> q { center + r * w + u * h, center - r * w + u * h, center - r * w - u * h,
-            center + r * w - u * h };
+        const glm::dvec3 frameCenter = eye + fw * k;
+        const std::array<glm::dvec3, 4> q { frameCenter + r * w + u * h, frameCenter - r * w + u * h, frameCenter - r * w - u * h,
+            frameCenter + r * w - u * h };
         for (std::size_t j = 0; j < 4; ++j) {
             line(eye, q[j], color);
             line(q[j], q[(j + 1) % 4], color);
         }
         // Triunghiul de sus arată unde e „sus”.
-        line(center - r * w * 0.4 + u * h * 1.15, center + u * h * 1.6, color);
-        line(center + r * w * 0.4 + u * h * 1.15, center + u * h * 1.6, color);
-        line(center - r * w * 0.4 + u * h * 1.15, center + r * w * 0.4 + u * h * 1.15, color);
+        line(frameCenter - r * w * 0.4 + u * h * 1.15, frameCenter + u * h * 1.6, color);
+        line(frameCenter + r * w * 0.4 + u * h * 1.15, frameCenter + u * h * 1.6, color);
+        line(frameCenter - r * w * 0.4 + u * h * 1.15, frameCenter + r * w * 0.4 + u * h * 1.15, color);
         if (selected) {
             line(eye, c.target, withAlpha(m_accent, 0.6f), 1.0f, 6.0f);
             f.topPoints.push_back({ glm::vec3(c.target), withAlpha(m_accent, 0.8f), 6.0f });
