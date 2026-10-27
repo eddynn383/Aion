@@ -397,7 +397,7 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 - [~] Materiale **PBR** (albedo, roughness, metallic, normal map), cu bibliotecă de materiale incluse — fără normal map și texturi
 - [~] Panou Materials modern: grilă de preview-uri randate (sfere), căutare, drag & drop pe fețe — fără drag & drop
 - [x] **Paint Bucket (B):** aplicare pe față; Option = eyedropper
-- [ ] Coordonate UV pentru texturi pe fețe (proiecție planară), poziționarea texturii
+- [x] Coordonate UV pentru texturi pe fețe (proiecție planară), poziționarea texturii _(Faza 24, ADR 0024)_
 - [x] Stiluri de afișare: Wireframe, Hidden Line, Shaded, Shaded with Textures, X-Ray, plus un stil **„Clay”** (alb mat cu AO, pentru prezentări) — „with Textures” vine cu texturile
 - [x] Profiluri (muchii exterioare îngroșate), ceață atmosferică
 - [ ] Preset-uri de calitate în Preferințe: *Performanță*, *Echilibrat*, *Calitate*
@@ -541,7 +541,7 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 6. Ghidaje, cote, note și planuri de secțiune selectabile, cu proprietăți în Inspector
 7. Fără selecție: informațiile modelului (autor, descriere, locație), statistici
 8. Arce și cercuri: raza și numărul de segmente
-9. Texturi: poziționare (după ce există texturi)
+9. ~~Texturi: poziționare~~ — făcut în Faza 24 (Inspector + unealta Poziționează textura)
 10. Vizibilitate avansată: umbre proiectate/primite, vizibil doar în anumite scene
 
 ---
