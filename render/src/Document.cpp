@@ -1,5 +1,6 @@
 #include "aion/render/Document.h"
 
+#include "aion/core/geom/Bevel.h"
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Shapes.h"
 #include "aion/core/inference/Inference.h"
@@ -2678,6 +2679,10 @@ QVariantList Document::contextMenuItems() const
     item(QStringLiteral("edit.mirrorZ"), QStringLiteral("Oglindește pe Z (albastru)"));
     item(QStringLiteral("edit.array"), QStringLiteral("Array (copii în linie sau în cerc)…"));
     item(QStringLiteral("edit.soften"), QStringLiteral("Soften / Smooth…"));
+    if (!m_selection.edges.empty() || m_selection.faces.size() == 1) {
+        item(QStringLiteral("edit.chamfer"), QStringLiteral("Chamfer (teșitură plată)…"));
+        item(QStringLiteral("edit.bevel"), QStringLiteral("Bevel (muchie rotunjită)…"));
+    }
     if (geometry) {
         separator();
         item(QStringLiteral("edit.selectConnected"), QStringLiteral("Selectează ce e conectat"));
@@ -4040,6 +4045,48 @@ void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
         }
     });
     m_selection = source;
+    m_previewApplied = true;
+    emit selectionChanged();
+}
+
+void Document::previewBevel(double distance, int segments)
+{
+    if (!m_previewApplied && m_selection.edges.empty() && m_selection.faces.empty()) {
+        setError(QStringLiteral("Selectează muchiile sau fața de teșit."));
+        return;
+    }
+    if (m_previewApplied) {
+        m_stack.undo();
+        m_selection = m_previewSelection;
+        m_previewApplied = false;
+    } else {
+        m_previewSelection = m_selection;
+    }
+    const geom::Selection source = m_previewSelection;
+    if (source.edges.empty() && source.faces.size() != 1) {
+        setError(QStringLiteral("Bevel pe fețe: alege o singură față (sau muchiile pe care le vrei teșite)."));
+        emit selectionChanged();
+        touch();
+        return;
+    }
+    const auto apply = [&](geom::Mesh& mesh) {
+        return source.edges.empty() ? geom::bevelFace(mesh, *source.faces.begin(), distance, segments)
+                                    : geom::bevelEdges(mesh, source.edges, distance, segments);
+    };
+    // Întâi pe o copie: o eroare nu lasă un pas gol în istoric.
+    geom::Mesh trial = m_model.mesh(activeDefinition());
+    const geom::BevelResult check = apply(trial);
+    if (!check.ok()) {
+        setError(QString::fromStdString(check.error));
+        emit selectionChanged();
+        touch();
+        return;
+    }
+    geom::Selection created;
+    runOnModel(segments > 1 ? "Bevel" : "Chamfer", [&](model::Model& model) {
+        created = apply(model.mesh(activeDefinition())).selection;
+    });
+    m_selection = created;
     m_previewApplied = true;
     emit selectionChanged();
 }

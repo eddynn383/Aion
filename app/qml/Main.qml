@@ -50,6 +50,8 @@ Window {
             { id: "edit.mirrorY", title: "Oglindește pe Y (verde)", category: "Modelare", shortcut: "", icon: "flip-horizontal" },
             { id: "edit.mirrorZ", title: "Oglindește pe Z (albastru)", category: "Modelare", shortcut: "", icon: "flip-vertical" },
             { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
+            { id: "edit.chamfer", title: "Chamfer (teșește plat muchiile sau fața)…", category: "Modelare", shortcut: "", icon: "square" },
+            { id: "edit.bevel", title: "Bevel (rotunjește muchiile sau fața)…", category: "Modelare", shortcut: "", icon: "circle" },
             { id: "edit.soften", title: "Soften / Smooth (muchii netede după unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
             { id: "library.save", title: "Salvează obiectul selectat în bibliotecă", category: "Obiecte", shortcut: "", icon: "book-open" },
             { id: "view.environment:simplu", title: "Mediu: simplu", category: "Vizualizare", shortcut: "", icon: "sun" },
@@ -211,6 +213,8 @@ Window {
         case "edit.mirrorZ": doc.mirrorSelection(2); break
         case "edit.array": arrayPanel.start(); break
         case "edit.soften": softenPanel.start(); break
+        case "edit.chamfer": bevelPanel.start(false); break
+        case "edit.bevel": bevelPanel.start(true); break
         case "library.save": window.saveToLibrary(); break
         case "debug.objectsOnly":
             preferences.leftLibrary = preferences.leftTags = preferences.leftMaterials = false
@@ -580,10 +584,11 @@ Window {
     }
 
     function escapePressed() {
-        if (arrayPanel.visible || softenPanel.visible) {
+        if (arrayPanel.visible || softenPanel.visible || bevelPanel.visible) {
             doc.cancelOperation()
             arrayPanel.close()
             softenPanel.close()
+            bevelPanel.close()
         } else if (doc.interactionMode)
             doc.interactionMode = false
         else if (vcbText.length > 0)
@@ -819,6 +824,13 @@ Window {
     }
     SoftenPanel {
         id: softenPanel
+        parent: viewport
+        x: Theme.space3
+        y: 56
+        document: doc
+    }
+    BevelPanel {
+        id: bevelPanel
         parent: viewport
         x: Theme.space3
         y: 56

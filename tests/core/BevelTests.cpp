@@ -99,7 +99,7 @@ TEST_CASE("Bevel pe o muchie: benzi netede tangente la ambele fețe", "[core][ge
     for (const geom::Edge& e : mesh.edges().values()) {
         soft += e.soft ? 1 : 0;
     }
-    CHECK(soft >= 3);
+    CHECK(soft == 3); // între cele 4 benzi
 }
 
 TEST_CASE("Bevel / chamfer pe o față: toate laturile, colțurile în unghi", "[core][geom][bevel]")
@@ -142,4 +142,20 @@ TEST_CASE("Bevel: cazurile nepermise nu schimbă nimic", "[core][geom][bevel]")
     geom::drawPolygon(flat, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
     CHECK_FALSE(geom::bevelFace(flat, flat.faces().keys().front(), 100, 1).ok());
     CHECK(mesh.faces().size() == faces);
+}
+
+TEST_CASE("Bevel cu multe segmente și distanță mică", "[core][geom][bevel]")
+{
+    for (int segments : { 2, 3, 6, 12 }) {
+        for (double d : { 20.0, 50.0, 300.0 }) {
+            Mesh mesh = box();
+            const geom::EdgeId top = edgeBetween(mesh, { 0, 0, 1000 }, { 1000, 0, 1000 });
+            const geom::BevelResult r = geom::bevelEdges(mesh, { top }, d, segments);
+            INFO("segments " << segments << " d " << d << " " << r.error);
+            REQUIRE(r.ok());
+            CHECK(mesh.faces().size() == std::size_t(6 + segments));
+            CHECK(closed(mesh));
+            CHECK(r.selection.faces.size() == std::size_t(segments)); // doar benzile noi
+        }
+    }
 }

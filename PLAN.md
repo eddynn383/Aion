@@ -627,6 +627,12 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 - [x] Antialiasing mai fin când camera stă pe loc _(MSAA 8× după 0,4 s, nu acumulare de cadre — ADR 0028)_
 - [x] Preset-uri de calitate în Preferințe: Performanță, Echilibrat, Calitate
 
+### Faza 32 – Bevel și chamfer (cerința din 2026-10-27)
+- [x] `geom::bevelEdges` / `bevelFace`: chamfer (1 segment) și bevel rotunjit (mai multe), pe muchii sau pe toate
+      laturile unei fețe, cu teste _(ADR 0029)_
+- [x] Panoul Chamfer / Bevel cu distanță și segmente, previzualizare, Gata / Anulează / Esc; comenzi în palette și în
+      meniul contextual
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |

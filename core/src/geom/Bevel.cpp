@@ -33,6 +33,7 @@ struct NewFace {
     std::vector<Vec3d> points;
     Vec3d normal { 0.0, 0.0, 1.0 };
     FaceStyle style;
+    bool strip = false; // o teșitură nouă (rămâne selectată), nu o față vecină refăcută
 };
 
 // Direcția din muchie spre interiorul feței, în planul ei, perpendiculară pe muchie.
@@ -156,6 +157,7 @@ Selection rebuild(Mesh& mesh, const std::set<FaceId>& faces, const std::set<Vert
     const std::vector<FaceId> before = mesh.faces().keys();
     const std::set<FaceId> existing(before.begin(), before.end());
     Selection out;
+    std::set<FaceId> built;
     for (const NewFace& face : added) {
         const DrawLineResult drawn = drawPolygon(mesh, face.points);
         // Fața poligonului: cea nouă care conține centrul lui.
@@ -171,7 +173,10 @@ Selection rebuild(Mesh& mesh, const std::set<FaceId>& faces, const std::set<Vert
                 mesh.setFaceBackMaterial(oriented, face.style.backMaterial);
                 mesh.setFaceTag(oriented, face.style.tag);
                 mesh.setFaceTexture(oriented, face.style.texture);
-                out.faces.insert(oriented);
+                built.insert(oriented);
+                if (face.strip) {
+                    out.faces.insert(oriented);
+                }
                 break;
             }
         }
@@ -180,7 +185,7 @@ Selection rebuild(Mesh& mesh, const std::set<FaceId>& faces, const std::set<Vert
     // drawPolygon închide singur orice buclă plană; fețele pe care nu le-am cerut (de ex. inelul de muchii
     // coplanare de sub o față teșită) se scot, muchiile rămân.
     for (FaceId f : mesh.faces().keys()) {
-        if (!existing.contains(f) && !out.faces.contains(f)) {
+        if (!existing.contains(f) && !built.contains(f)) {
             eraseFace(mesh, f);
         }
     }
@@ -315,10 +320,11 @@ BevelResult bevelEdges(Mesh& mesh, const std::set<EdgeId>& edges, double distanc
             if (glm::dot(n, mid - a) < 0.0) {
                 n = -n;
             }
-            added.push_back({ { at0[k], at1[k], at1[k + 1], at0[k + 1] }, n, styleOf(mesh.face(f1)) });
+            added.push_back({ { at0[k], at1[k], at1[k + 1], at0[k + 1] }, n, styleOf(mesh.face(f1)), true });
         }
         if (segments > 1) {
-            for (std::size_t k = 0; k < prof.size(); ++k) {
+            // Doar între benzi: o muchie tangentă netezită ar întinde normala medie peste toată fața plană vecină.
+            for (std::size_t k = 1; k + 1 < prof.size(); ++k) {
                 smooth.emplace_back(at0[k], at1[k]);
             }
         }
@@ -402,7 +408,7 @@ BevelResult bevelFace(Mesh& mesh, FaceId face, double distance, int segments)
     for (std::size_t i = 0; i < m; ++i) {
         inset.push_back(corner[i][0]);
     }
-    added.push_back({ inset, f.plane.normal, styleOf(f) });
+    added.push_back({ inset, f.plane.normal, styleOf(f), true });
     std::vector<std::pair<Vec3d, Vec3d>> smooth;
     for (std::size_t i = 0; i < m; ++i) {
         const std::size_t next = (i + 1) % m;
@@ -418,10 +424,10 @@ BevelResult bevelFace(Mesh& mesh, FaceId face, double distance, int segments)
             if (glm::dot(nrm, mid - inside) < 0.0) {
                 nrm = -nrm;
             }
-            added.push_back({ { corner[i][k], corner[next][k], corner[next][k + 1], corner[i][k + 1] }, nrm, styleOf(f) });
+            added.push_back({ { corner[i][k], corner[next][k], corner[next][k + 1], corner[i][k + 1] }, nrm, styleOf(f), true });
         }
         if (segments > 1) {
-            for (std::size_t k = 0; k < n; ++k) {
+            for (std::size_t k = 1; k + 1 < n; ++k) {
                 smooth.emplace_back(corner[i][k], corner[next][k]);
             }
         }

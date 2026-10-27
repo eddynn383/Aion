@@ -17,7 +17,7 @@
 namespace aion::geom {
 
 struct BevelResult {
-    Selection selection; // fețele noi (benzile și fața micșorată)
+    Selection selection; // fețele noi: benzile teșiturii (și fața micșorată, la bevelFace)
     std::string error;   // gol = reușit
 
     [[nodiscard]] bool ok() const { return error.empty(); }

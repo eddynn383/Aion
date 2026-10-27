@@ -152,6 +152,12 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Array în linie: 3 copii alăturate implicit; schimbă numărul / axa / pasul → previzualizarea se actualizează; Gata = un pas de undo
 - [ ] Array în cerc: rază, tot cercul sau unghi, rotirea copiilor (de exemplu scaune în jurul unei mese)
 - [ ] Soften pe o cutie cu 95° → muchiile dispar și umbrirea devine netedă; 0° → toate vizibile; Esc anulează
+## Bevel și chamfer (Faza 32)
+- [ ] Cutie explodată → selectează o muchie de sus → click dreapta → Chamfer: o teșitură plată; schimbă distanța → previzualizarea se actualizează
+- [ ] Tab-ul Bevel: muchia devine rotunjită, netedă (fără gradient pe fețele plane); Segmente schimbă finețea
+- [ ] Selectează fața de sus → Bevel: toate laturile rotunjite, colțurile îmbinate; distanța prea mare → mesaj, fără schimbare
+- [ ] Anulează / Esc → cutia revine; Gata → un pas de undo
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală
