@@ -1307,6 +1307,25 @@ void Viewport::beginOrbitAt(QPointF position)
     m_camera.setOrbitPivot(pivot);
 }
 
+QVector3D Viewport::dropPointAt(const QPointF& position) const
+{
+    view::Vec3d p = m_camera.pose().target;
+    if (m_document) {
+        if (const auto surface = m_document->surfacePoint(m_camera, toVec2(position))) {
+            p = *surface;
+            return QVector3D(float(p.x), float(p.y), float(p.z));
+        }
+    }
+    const math::Ray ray = m_camera.rayAt(toVec2(position));
+    if (std::abs(ray.direction.z) > 1e-9) {
+        const double t = -ray.origin.z / ray.direction.z;
+        if (t > 0.0) {
+            p = ray.origin + ray.direction * t;
+        }
+    }
+    return QVector3D(float(p.x), float(p.y), float(p.z));
+}
+
 view::Vec3d Viewport::zoomAnchor(QPointF position)
 {
     if (m_zoomToSurface && m_document) {

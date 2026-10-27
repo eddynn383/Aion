@@ -249,8 +249,12 @@ TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân lega
     // glTF text: materialele modelului, UV-urile și imaginea texturii (inclusă în buffer).
     const auto text = tempPath("aion-export-texturi.gltf");
     REQUIRE(io::exportGltf(original, text, false, {}, &error));
-    std::ifstream in(text);
-    const std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string json;
+    {
+        // Închis înainte de remove (pe Windows un fișier deschis nu se poate șterge).
+        std::ifstream in(text);
+        json.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
     CHECK(json.find("TEXCOORD_0") != std::string::npos);
     CHECK(json.find("image/png") != std::string::npos);
     CHECK(json.find("Cărămidă") != std::string::npos);

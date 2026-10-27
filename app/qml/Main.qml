@@ -51,6 +51,7 @@ Window {
             { id: "edit.mirrorZ", title: "Oglindește pe Z (albastru)", category: "Modelare", shortcut: "", icon: "flip-vertical" },
             { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
             { id: "edit.soften", title: "Soften / Smooth (muchii netede după unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
+            { id: "library.save", title: "Salvează obiectul selectat în bibliotecă", category: "Obiecte", shortcut: "", icon: "book-open" },
             { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
@@ -129,10 +130,17 @@ Window {
             list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.demos", title: "Galeria animațiilor din ghiduri", category: "Dezvoltare", shortcut: "", icon: "palette" },
                       { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
+        for (const g of doc.generators)
+            list.push({ id: "object.parametric:" + g.id, title: "Obiect dinamic: " + g.name, category: "Obiecte", shortcut: "", icon: "sliders-horizontal" })
         return list
     }
 
     function runCommand(id) {
+        if (id.startsWith("object.parametric:")) {
+            const c = viewport.cameraState()
+            doc.createParametric(id.slice(18), Qt.vector3d(c.tx, c.ty, 0))
+            return
+        }
         if (id.startsWith("file.recent:")) {
             const path = doc.recentFiles[parseInt(id.slice(12))]
             window.confirmDiscard(() => doc.openFile(path))
@@ -180,6 +188,7 @@ Window {
         case "edit.mirrorZ": doc.mirrorSelection(2); break
         case "edit.array": arrayPanel.start(); break
         case "edit.soften": softenPanel.start(); break
+        case "library.save": window.saveToLibrary(); break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
@@ -441,6 +450,56 @@ Window {
         }
     }
 
+    function saveToLibrary() {
+        const info = doc.entityInfo
+        if (info.kind !== "instance") {
+            toast.show("Selectează un obiect ca să-l salvezi în bibliotecă.")
+            return
+        }
+        if (doc.saveSelectionToLibrary(info.name, viewport.captureThumbnail()))
+            toast.show("„" + info.name + "” e acum în bibliotecă.")
+    }
+
+    // Fantoma unui element tras din bibliotecă; lăsată peste viewport, pune obiectul acolo.
+    Rectangle {
+        id: libraryGhost
+        property string itemId: ""
+        property string label: ""
+        property string icon: "box"
+        property point position: Qt.point(-1000, -1000)
+        function finish() {
+            Drag.drop()
+            itemId = ""
+            position = Qt.point(-1000, -1000)
+        }
+        parent: window.contentItem
+        z: 1000
+        visible: itemId.length > 0
+        x: position.x - width / 2
+        y: position.y - height / 2
+        width: ghostRow.implicitWidth + Theme.space3 * 2
+        height: 32
+        radius: 16
+        color: Theme.bgElevated
+        border.color: Theme.accent
+        Drag.active: itemId.length > 0
+        Drag.keys: ["aion-library"]
+        Drag.hotSpot.x: width / 2
+        Drag.hotSpot.y: height / 2
+        Row {
+            id: ghostRow
+            anchors.centerIn: parent
+            spacing: Theme.space2
+            Icon { anchors.verticalCenter: parent.verticalCenter; name: libraryGhost.icon; size: 14; color: Theme.accent }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: libraryGhost.label
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeSm
+            }
+        }
+    }
+
     function openRulesEditor() {
         const info = doc.entityInfo
         if (info.kind !== "instance") {
@@ -561,6 +620,7 @@ Window {
         property bool leftMaterials: true
         property bool leftScenes: false
         property bool leftTags: false
+        property bool leftLibrary: true
         property bool leftInteractions: false
         property real gridStep: 0
     }
@@ -629,6 +689,16 @@ Window {
     AboutDialog {
         id: aboutDialog
         parent: window.contentItem
+    }
+    // Drop din bibliotecă: obiectul se pune pe suprafața (sau solul) de sub cursor.
+    DropArea {
+        parent: viewport
+        anchors.fill: parent
+        keys: ["aion-library"]
+        onDropped: (drop) => {
+            doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
+            drop.accept()
+        }
     }
     ArrayPanel {
         id: arrayPanel
@@ -876,8 +946,9 @@ Window {
             id: accordion
             anchors.fill: parent
             anchors.topMargin: Theme.space1
-            readonly property var sections: [objectsSection, tagsSection, materialsSection, scenesSection, interactionsSection]
-            readonly property real free: height - sections.reduce((sum, s) => sum + s.headerHeight, 0) - Theme.space1 * 4
+            readonly property var sections: [objectsSection, librarySection, tagsSection, materialsSection, scenesSection,
+                interactionsSection]
+            readonly property real free: height - sections.reduce((sum, s) => sum + s.headerHeight, 0) - Theme.space1 * 5
             readonly property real weights: sections.reduce((sum, s) => sum + (s.expanded ? s.weight : 0), 0)
             function share(section) { return weights > 0 ? Math.max(0, free) * section.weight / weights : 0 }
 
@@ -960,6 +1031,36 @@ Window {
                         anchors.fill: parent
                         document: doc
                         viewport: viewport
+                    }
+                }
+                AccordionSection {
+                    id: librarySection
+                    width: parent.width
+                    title: "Bibliotecă"
+                    iconName: "book-open"
+                    weight: 1.5
+                    expanded: preferences.leftLibrary
+                    bodyHeight: accordion.share(this)
+                    onToggled: preferences.leftLibrary = !preferences.leftLibrary
+                    actions: HeaderButton {
+                        iconName: "plus"
+                        tooltip: "Salvează obiectul selectat în bibliotecă"
+                        onClicked: window.saveToLibrary()
+                    }
+                    LibraryPanel {
+                        anchors.fill: parent
+                        document: doc
+                        onPlaceRequested: (id) => {
+                            const c = viewport.cameraState()
+                            doc.placeLibraryItem(id, Qt.vector3d(c.tx, c.ty, 0))
+                        }
+                        onDragStarted: (id, label, icon) => {
+                            libraryGhost.itemId = id
+                            libraryGhost.label = label
+                            libraryGhost.icon = icon
+                        }
+                        onDragMoved: (p) => libraryGhost.position = p
+                        onDragEnded: libraryGhost.finish()
                     }
                 }
                 AccordionSection {

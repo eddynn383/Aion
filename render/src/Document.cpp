@@ -8,6 +8,8 @@
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Interaction.h"
 #include "aion/core/model/Modeling.h"
+#include "aion/core/model/Parametric.h"
+#include "aion/core/model/Transfer.h"
 #include "ProceduralTextures.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
@@ -23,6 +25,7 @@
 #include <QFileInfo>
 #include <QBuffer>
 #include <QImage>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 
@@ -882,6 +885,24 @@ QVariantMap Document::entityInfo() const
         };
         info[QStringLiteral("ruleCount")] = static_cast<int>(inst.rules.size());
         info[QStringLiteral("locks")] = static_cast<int>(inst.placementLocks);
+        // Obiect dinamic: parametrii lui, cu limitele generatorului.
+        const model::Definition& definition = m_model.definition(inst.definition);
+        if (const model::GeneratorInfo* g = model::findGenerator(definition.generator)) {
+            QVariantList parameters;
+            for (const model::ParameterSpec& spec : g->parameters) {
+                const auto it = definition.parameters.find(spec.key);
+                parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
+                    { QStringLiteral("label"), QString::fromStdString(spec.label) },
+                    { QStringLiteral("unit"), QString::fromStdString(spec.unit) },
+                    { QStringLiteral("value"), it != definition.parameters.end() ? it->second : spec.value },
+                    { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max },
+                    { QStringLiteral("step"), spec.step } });
+            }
+            info[QStringLiteral("parametric")] = QVariantMap { { QStringLiteral("generator"), QString::fromStdString(g->id) },
+                { QStringLiteral("name"), QString::fromStdString(g->name) },
+                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("parameters"), parameters } };
+        }
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -3322,6 +3343,159 @@ void Document::setFaceTexture(const QVariantMap& changes)
             mesh.setFaceTexture(f, t);
         }
     });
+}
+
+QVariantList Document::generators() const
+{
+    QVariantList out;
+    for (const model::GeneratorInfo& g : model::generators()) {
+        QVariantList parameters;
+        for (const model::ParameterSpec& spec : g.parameters) {
+            parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
+                { QStringLiteral("label"), QString::fromStdString(spec.label) },
+                { QStringLiteral("unit"), QString::fromStdString(spec.unit) }, { QStringLiteral("value"), spec.value },
+                { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max }, { QStringLiteral("step"), spec.step } });
+        }
+        out.append(QVariantMap { { QStringLiteral("id"), QString::fromStdString(g.id) },
+            { QStringLiteral("name"), QString::fromStdString(g.name) },
+            { QStringLiteral("category"), QString::fromStdString(g.category) }, { QStringLiteral("parameters"), parameters } });
+    }
+    return out;
+}
+
+void Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
+{
+    const model::GeneratorInfo* info = model::findGenerator(generator.toStdString());
+    if (info == nullptr) {
+        return;
+    }
+    std::map<std::string, double> given;
+    for (auto it = parameters.begin(); it != parameters.end(); ++it) {
+        given[it.key().toStdString()] = it.value().toDouble();
+    }
+    // Punctul dat, în coordonatele contextului editat.
+    const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    model::InstanceId created;
+    runOnModel("Obiect dinamic: " + info->name, [&](model::Model& model) {
+        created = model::createParametric(model, activeDefinition(), info->id, given, math::Transform::translation(point));
+    });
+    if (created) {
+        const geom::Selection before = m_selection;
+        m_selection.clear();
+        m_selection.instances.insert(created);
+        afterInteraction(before);
+    }
+}
+
+QString Document::libraryFolder() const
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/Biblioteca");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QVariantList Document::libraryItems() const
+{
+    QVariantList out;
+    for (const model::GeneratorInfo& g : model::generators()) {
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("gen:") + QString::fromStdString(g.id) },
+            { QStringLiteral("name"), QString::fromStdString(g.name) },
+            { QStringLiteral("category"), QString::fromStdString(g.category) }, { QStringLiteral("user"), false },
+            { QStringLiteral("dynamic"), true } });
+    }
+    const QDir dir(libraryFolder());
+    for (const QFileInfo& file : dir.entryInfoList({ QStringLiteral("*.aion") }, QDir::Files, QDir::Name)) {
+        QFile f(file.absoluteFilePath());
+        QString thumbnail;
+        if (f.open(QIODevice::ReadOnly)) {
+            const QByteArray bytes = f.readAll();
+            const std::vector<std::uint8_t> png = io::readThumbnail(
+                std::span(reinterpret_cast<const std::uint8_t*>(bytes.constData()), static_cast<std::size_t>(bytes.size())));
+            if (!png.empty()) {
+                thumbnail = QStringLiteral("data:image/png;base64,")
+                    + QString::fromLatin1(QByteArray(reinterpret_cast<const char*>(png.data()), qsizetype(png.size())).toBase64());
+            }
+        }
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("file:") + file.absoluteFilePath() },
+            { QStringLiteral("name"), file.completeBaseName() }, { QStringLiteral("category"), QStringLiteral("Ale mele") },
+            { QStringLiteral("thumbnail"), thumbnail }, { QStringLiteral("user"), true }, { QStringLiteral("dynamic"), false } });
+    }
+    return out;
+}
+
+void Document::placeLibraryItem(const QString& id, const QVector3D& at)
+{
+    if (id.startsWith(QLatin1String("gen:"))) {
+        createParametric(id.mid(4), at);
+        return;
+    }
+    if (!id.startsWith(QLatin1String("file:"))) {
+        return;
+    }
+    const QString path = id.mid(5);
+    const io::LoadResult loaded = io::loadFile(toPath(path));
+    if (!loaded.model) {
+        setError(QStringLiteral("„%1” nu a putut fi citit. %2").arg(QFileInfo(path).fileName(),
+            QString::fromStdString(loaded.error)));
+        return;
+    }
+    const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    const std::string name = QFileInfo(path).completeBaseName().toStdString();
+    model::InstanceId created;
+    runOnModel("Din bibliotecă: " + name, [&](model::Model& model) {
+        created = model::insertModel(model, activeDefinition(), *loaded.model, name, math::Transform::translation(point));
+    });
+    if (created) {
+        const geom::Selection before = m_selection;
+        m_selection.clear();
+        m_selection.instances.insert(created);
+        afterInteraction(before);
+    }
+}
+
+bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng)
+{
+    if (m_selection.instances.size() != 1 || name.trimmed().isEmpty()) {
+        setError(QStringLiteral("Selectează un singur obiect ca să-l salvezi în bibliotecă."));
+        return false;
+    }
+    const model::Model extracted = model::extractInstance(m_model, *m_selection.instances.begin());
+    QString safe = name.trimmed();
+    safe.replace(QRegularExpression(QStringLiteral("[/\\\\:*?\"<>|]")), QStringLiteral("-"));
+    const QString path = QDir(libraryFolder()).filePath(safe + QStringLiteral(".aion"));
+    std::string error;
+    const bool ok = io::saveFile(toPath(path), extracted,
+        std::span(reinterpret_cast<const std::uint8_t*>(thumbnailPng.constData()), static_cast<std::size_t>(thumbnailPng.size())),
+        &error);
+    if (!ok) {
+        setError(QStringLiteral("Obiectul nu a putut fi salvat în bibliotecă. %1").arg(QString::fromStdString(error)));
+        return false;
+    }
+    emit libraryChanged();
+    return true;
+}
+
+void Document::removeLibraryItem(const QString& id)
+{
+    if (id.startsWith(QLatin1String("file:")) && QFile::remove(id.mid(5))) {
+        emit libraryChanged();
+    }
+}
+
+void Document::setParameter(const QString& key, double value)
+{
+    if (m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    if (m_model.definition(def).generator.empty()) {
+        return;
+    }
+    const auto it = m_model.definition(def).parameters.find(key.toStdString());
+    if (it != m_model.definition(def).parameters.end() && std::abs(it->second - value) < 1e-9) {
+        return;
+    }
+    runOnModel("Parametru", [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), value); });
 }
 
 void Document::mirrorSelection(int axis)
