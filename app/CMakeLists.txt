@@ -184,6 +184,7 @@ target_link_libraries(aion_app PRIVATE
     aion::render
     aion_renderplugin
     Qt6::Quick
+    Qt6::GuiPrivate
     Qt6::QuickControls2
     Qt6::Svg
 )

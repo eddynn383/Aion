@@ -25,12 +25,29 @@ T.TextField {
 
     function format(v) { return Number(v).toFixed(root.decimals) }
 
-    function commit(v) {
+    // Trimite valoarea. `value` rămâne legat de sursa lui (Inspector-ul îl citește din document), ca să urmeze mereu
+    // obiectul selectat; numai dacă nimeni nu-l actualizează (câmp de sine stătător) îl ține câmpul. `keepText`: cât
+    // se tastează, textul rămâne cum l-a scris utilizatorul.
+    function commit(v, keepText) {
         const clamped = Math.max(root.from, Math.min(root.to, v))
-        root.value = clamped
-        root.text = root.format(clamped)
         root.valueModified(clamped)
+        if (Math.abs(root.value - clamped) > 1e-9)
+            root.value = clamped
+        if (!keepText)
+            root.text = root.format(clamped)
     }
+
+    // Valoarea tastată se aplică și singură, după o scurtă pauză (ca săgețile), fără Enter sau click în altă parte.
+    Timer {
+        id: liveCommit
+        interval: 600
+        onTriggered: {
+            const parsed = Number(root.text.replace(",", "."))
+            if (root.activeFocus && root.text.trim().length > 0 && !isNaN(parsed) && Math.abs(parsed - root.value) > 1e-9)
+                root.commit(parsed, true)
+        }
+    }
+    onTextEdited: liveCommit.restart()
 
     implicitWidth: 120
     implicitHeight: Theme.controlHeight
@@ -50,6 +67,7 @@ T.TextField {
     text: format(value)
     onValueChanged: if (!activeFocus) text = format(value)
     onEditingFinished: {
+        liveCommit.stop()
         const parsed = Number(text.replace(",", "."))
         if (isNaN(parsed))
             text = format(value)

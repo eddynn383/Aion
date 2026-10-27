@@ -54,6 +54,9 @@ public:
     // Întoarce un text gol la succes (și șterge cadrele), altfel motivul. Fără encoder, cadrele rămân pe disc.
     Q_INVOKABLE QString encodeVideo(const QString& directory, int fps, const QString& output) const;
     // Rotița mouse-ului (pași de 120 = o treaptă; pozitiv = apropiere).
+    // Tastele ca de la tastatură (prin harta de scurtături a aplicației, ca în realitate): text + o tastă la final
+    // („enter”, „escape”, „up”, „down” sau gol).
+    Q_INVOKABLE void simulateKeys(const QString& text, const QString& finalKey) const;
     Q_INVOKABLE void simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const;
 
     // Fișierele cerute din afară (Finder, Dock, linia de comandă) până să le preia interfața.

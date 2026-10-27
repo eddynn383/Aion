@@ -416,6 +416,12 @@ Window {
                     // Click în coordonatele ferestrei (butoane, câmpuri).
                     const cs = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
+                } else if (action.startsWith("keys:")) {
+                    // „keys:45,enter”: taste ca de la tastatură (cu scurtăturile aplicației), apoi o tastă finală.
+                    const kk = action.slice(5).split(",")
+                    AppInfo.simulateKeys(kk[0], kk[1] ?? "")
+                } else if (action === "debug.rz") {
+                    console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {
                     // „shape:segments=12”: mărimea formei selectate (ca din Inspector).
                     const kv = action.slice(6).split("=")
@@ -613,14 +619,16 @@ Window {
     }
     // Tastele care nu sunt comenzi: Esc (anulează / deselectează), Enter (termină sau aplică valoarea tastată),
     // Backspace (șterge selecția, pe Mac; în timpul tastării, ultimul caracter).
+    // Cât se scrie într-un câmp de text (Inspector, nume), Enter și Esc sunt ale câmpului.
+    readonly property bool typingInField: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
     Shortcut {
         sequence: "Escape"
-        enabled: !palette.opened
+        enabled: !palette.opened && !window.typingInField
         onActivated: window.escapePressed()
     }
     Shortcut {
         sequences: ["Return", "Enter"]
-        enabled: !palette.opened
+        enabled: !palette.opened && !window.typingInField
         onActivated: window.enterPressed()
     }
     Shortcut {

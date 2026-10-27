@@ -1284,6 +1284,11 @@ void Document::clearSelection()
 template <class Fn>
 void Document::runOnModel(const std::string& name, Fn&& fn)
 {
+    // O editare a modelului iese din previzualizarea animației (altfel viewport-ul ar arăta poza animată, nu ce s-a
+    // schimbat); doar keyframe-urile (editAnimation) o păstrează.
+    if (!m_keepPreview) {
+        endPreview();
+    }
     const geom::Selection before = m_selection;
     if (m_macro) {
         // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo).
@@ -1776,11 +1781,13 @@ void Document::editAnimation(const char* name, Fn&& fn)
         return;
     }
     const model::AnimationId id = m_activeAnimation;
+    m_keepPreview = true;
     runOnModel(name, [&](model::Model& model) {
         model::Animation a = model.animations().at(id);
         fn(a);
         model.setAnimation(id, a);
     });
+    m_keepPreview = false;
     ++m_interactionRevision;
     emit timelineChanged();
 }

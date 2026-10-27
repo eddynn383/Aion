@@ -497,6 +497,7 @@ private:
     // Operația cu previzualizare în curs (array, soften): selecția de dinainte și dacă e un pas de anulat.
     bool m_previewApplied = false;
     bool m_macro = false;
+    bool m_keepPreview = false; // editAnimation: keyframe-urile nu ies din previzualizare
     geom::Selection m_previewSelection;
     model::CameraId m_selectedCamera;
     model::LightId m_selectedLight;

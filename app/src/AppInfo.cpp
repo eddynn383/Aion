@@ -15,6 +15,8 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QPointer>
+#include <QGuiApplication>
+#include <qpa/qwindowsysteminterface.h>
 #include <QQuickWindow>
 
 #include <utility>
@@ -168,6 +170,34 @@ QString AppInfo::encodeVideo(const QString& directory, int fps, const QString& o
     }
     dir.removeRecursively();
     return {};
+}
+
+void AppInfo::simulateKeys(const QString& text, const QString& finalKey) const
+{
+    QWindow* window = QGuiApplication::focusWindow();
+    if (window == nullptr) {
+        const auto windows = QGuiApplication::topLevelWindows();
+        window = windows.isEmpty() ? nullptr : windows.front();
+    }
+    if (window == nullptr) {
+        return;
+    }
+    const auto press = [&](int key, const QString& t) {
+        QWindowSystemInterface::handleKeyEvent<QWindowSystemInterface::SynchronousDelivery>(window, QEvent::KeyPress, key, Qt::NoModifier, t);
+        QWindowSystemInterface::handleKeyEvent<QWindowSystemInterface::SynchronousDelivery>(window, QEvent::KeyRelease, key, Qt::NoModifier, t);
+    };
+    for (const QChar c : text) {
+        press(c.isDigit() ? Qt::Key_0 + c.digitValue() : c == QLatin1Char('.') ? Qt::Key_Period : c.toUpper().unicode(), QString(c));
+    }
+    if (finalKey == QLatin1String("enter")) {
+        press(Qt::Key_Return, QStringLiteral("\r"));
+    } else if (finalKey == QLatin1String("escape")) {
+        press(Qt::Key_Escape, {});
+    } else if (finalKey == QLatin1String("up")) {
+        press(Qt::Key_Up, {});
+    } else if (finalKey == QLatin1String("down")) {
+        press(Qt::Key_Down, {});
+    }
 }
 
 void AppInfo::simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const

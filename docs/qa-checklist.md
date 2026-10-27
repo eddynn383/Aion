@@ -195,3 +195,9 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] După Push/Pull, segmentele sunt dezactivate (cu explicație); raza se poate schimba
 - [ ] Click pe un dreptunghi → Lățime (latura pe X / orizontală) și Înălțime
 - [ ] Fiecare schimbare = un pas de undo
+## Câmpurile numerice din Inspector
+- [ ] Tastează o valoare (de exemplu Rotație Z = 45) și nu apăsa nimic: se aplică după ~0,6 s; Enter o aplică imediat
+- [ ] Esc în câmp: revine la valoarea reală, selecția rămâne
+- [ ] După o valoare tastată, săgețile ↑/↓ pornesc de la valoarea reală; selectează alt obiect → câmpurile îl urmează
+- [ ] Timeline deschis, animație cu keyframe-uri, playhead între ele: o schimbare în Inspector se vede imediat în
+      viewport (iese din previzualizare); ◇ pune keyframe-ul fără să iasă
