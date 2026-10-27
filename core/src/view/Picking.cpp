@@ -16,6 +16,47 @@ namespace aion::view {
 
 namespace {
 
+std::set<model::TagId>& hiddenTagSet()
+{
+    static std::set<model::TagId> tags;
+    return tags;
+}
+
+} // namespace
+
+void setHiddenTags(std::set<model::TagId> tags)
+{
+    hiddenTagSet() = std::move(tags);
+}
+
+const std::set<model::TagId>& hiddenTags()
+{
+    return hiddenTagSet();
+}
+
+bool isHidden(const geom::Face& face)
+{
+    return face.tag && hiddenTagSet().contains(face.tag);
+}
+
+bool isHidden(const geom::Edge& edge)
+{
+    return edge.tag && hiddenTagSet().contains(edge.tag);
+}
+
+bool isHidden(const geom::Mesh& mesh, geom::VertexId vertex)
+{
+    if (hiddenTagSet().empty()) {
+        return false;
+    }
+    const geom::Vertex& v = mesh.vertex(vertex);
+    return !v.edges.empty() && std::all_of(v.edges.begin(), v.edges.end(), [&](geom::EdgeId e) {
+        return isHidden(mesh.edge(e));
+    });
+}
+
+namespace {
+
 using geom::EdgeId;
 using geom::FaceId;
 using geom::Mesh;
@@ -30,6 +71,9 @@ FaceHit nearestFace(const Mesh& mesh, const math::Ray& ray)
 {
     FaceHit best;
     for (FaceId f : mesh.faces().keys()) {
+        if (isHidden(mesh.face(f))) {
+            continue;
+        }
         // Testul rapid pe cutia conturului: majoritatea fețelor nu sunt sub cursor.
         Vec3d lo { std::numeric_limits<double>::infinity() };
         Vec3d hi { -std::numeric_limits<double>::infinity() };
@@ -177,7 +221,7 @@ PickResult pick(const Mesh& mesh, const Camera& camera, Vec2d screen, PickOption
     for (std::size_t i = 0; i < mesh.vertices().size(); ++i) {
         const Vec3d& p = mesh.vertices().values()[i].position;
         const auto s = camera.project(p);
-        if (!s) {
+        if (!s || isHidden(mesh, mesh.vertices().keys()[i])) {
             continue;
         }
         const double d = glm::length(*s - screen);
@@ -197,6 +241,9 @@ PickResult pick(const Mesh& mesh, const Camera& camera, Vec2d screen, PickOption
     const math::Segment raySegment { ray.origin, ray.at(camera.farPlane() * 4.0) };
     for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
         const geom::Edge& e = mesh.edges().values()[i];
+        if (isHidden(e)) {
+            continue;
+        }
         const Vec3d a = mesh.position(e.v0);
         const Vec3d b = mesh.position(e.v1);
         const auto projected = projectSegment(camera, a, b);
@@ -238,12 +285,15 @@ geom::Selection pickInRectangle(const Mesh& mesh, const Camera& camera, Vec2d co
     };
 
     for (EdgeId e : mesh.edges().keys()) {
-        if (edgeSelected(e)) {
+        if (!isHidden(mesh.edge(e)) && edgeSelected(e)) {
             out.edges.insert(e);
         }
     }
     for (FaceId f : mesh.faces().keys()) {
         const geom::Face& face = mesh.face(f);
+        if (isHidden(face)) {
+            continue;
+        }
         bool selected = false;
         if (!crossing) {
             selected = std::all_of(face.outer.uses.begin(), face.outer.uses.end(),

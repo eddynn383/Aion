@@ -115,8 +115,10 @@ FaceId orientFace(Mesh& mesh, FaceId id, const Vec3d& wanted)
     }
     mesh.removeFace(id);
     // Fața întoarsă: ce era pe verso ajunge în față (dacă versoul avea material propriu).
-    return mesh.addFace(face.plane.flipped(), reversed(face.outer), std::move(inner),
+    const FaceId flipped = mesh.addFace(face.plane.flipped(), reversed(face.outer), std::move(inner),
         face.backMaterial ? face.backMaterial : face.material, face.backMaterial ? face.material : model::MaterialId {});
+    mesh.setFaceTag(flipped, face.tag);
+    return flipped;
 }
 
 FaceId mergeFacesAcross(Mesh& mesh, EdgeId id)
@@ -133,6 +135,7 @@ FaceId mergeFacesAcross(Mesh& mesh, EdgeId id)
     const Plane plane = f0.plane;
     const model::MaterialId material = f0.material;
     const model::MaterialId backMaterial = f0.backMaterial;
+    const model::TagId tag = f0.tag;
 
     // Regiunea care conține mijlocul muchiei, calculată fără muchie (înainte de orice modificare).
     std::vector<EdgeId> coplanar;
@@ -179,7 +182,9 @@ FaceId mergeFacesAcross(Mesh& mesh, EdgeId id)
         }
     }
     // Regiunile sunt în sens trigonometric față de normala planului, deci au deja orientarea fețelor.
-    return mesh.addFace(plane, merged->outer, merged->holes, material, backMaterial);
+    const FaceId mergedFace = mesh.addFace(plane, merged->outer, merged->holes, material, backMaterial);
+    mesh.setFaceTag(mergedFace, tag);
+    return mergedFace;
 }
 
 bool dissolveVertex(Mesh& mesh, VertexId v)

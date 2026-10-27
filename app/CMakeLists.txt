@@ -74,7 +74,6 @@ qt_add_qml_module(aion_app
         qml/shell/ToolGroupButton.qml
         qml/shell/Toolbar.qml
         qml/shell/Outliner.qml
-        qml/shell/TagsPanel.qml
         qml/shell/EntityInfo.qml
         qml/shell/MaterialsPanel.qml
         qml/shell/ScenesPanel.qml
@@ -87,6 +86,7 @@ qt_add_qml_module(aion_app
         qml/overlays/QuantitiesDialog.qml
         qml/components/DataTable.qml
         qml/components/MaterialSwatch.qml
+        qml/components/AccordionSection.qml
         qml/components/ToolDemo.qml
         qml/components/GuideCard.qml
         qml/components/RichTooltip.qml

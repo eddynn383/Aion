@@ -490,12 +490,12 @@ scenele, animațiile și interacțiunile), apoi animațiile (interacțiunile le 
 - [x] Scurtături: lista completă (personalizarea vine mai târziu)
 
 ### Faza 15 – Panoul din stânga: acordeon; Outliner unit cu Tag-urile
-- [ ] Secțiuni acordeon (Outliner, Materiale, Scene), redimensionabile, starea păstrată
-- [ ] Modelul de organizare de mai sus (core + migrare + teste): grupuri ca foldere, obiecte, forme; tag pe fețe,
+- [x] Secțiuni acordeon (Outliner, Materiale, Scene), redimensionabile, starea păstrată
+- [x] Modelul de organizare de mai sus (core + migrare + teste): grupuri ca foldere, obiecte, forme; tag pe fețe,
       muchii, obiecte, grupuri
-- [ ] Outliner ca în Blender: arbore grupuri → obiecte, ochi (vizibil), lacăt, drag & drop între grupuri,
+- [x] Outliner ca în Blender: arbore grupuri → obiecte, ochi (vizibil), lacăt, drag & drop între grupuri,
       redenumire; sub el, lista tag-urilor (vizibil, „Selectează tot ce are tag-ul”, culoare)
-- [ ] Inspector: tag-ul selecției (inclusiv pentru fețe și muchii)
+- [x] Inspector: tag-ul selecției (inclusiv pentru fețe și muchii)
 
 ### Faza 16 – Scene = stări ale modelului
 - [ ] O scenă reține camera, stilul, tag-urile vizibile, obiectele ascunse și **pozițiile obiectelor**

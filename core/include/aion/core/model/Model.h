@@ -98,7 +98,9 @@ struct Scene {
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
-    bool group = false; // grup (o singură instanță, fără nume în biblioteca de componente)
+    bool group = false; // fără copii legate (o singură instanță); altfel, un obiect cu copii
+    // Un grup în sensul Outliner-ului: colecție de obiecte și alte grupuri (folder), fără geometrie proprie.
+    bool collection = false;
 
     bool operator==(const Definition&) const = default;
 };

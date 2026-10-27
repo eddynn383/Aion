@@ -29,6 +29,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Toolbar: Select/Interact, Desen (Line, Arc, Rectangle, Circle, Polygon), Obiecte (Cub, Sferă, Con, Cilindru), Push/Pull…, Eraser singur
 - [ ] Cub / Sferă / Con / Cilindru: click centru, click mărime; VCB „1000” sau „1000,500”; pe o față: în planul ei; rezultatul e un obiect selectat
 - [ ] Materiale: click pe un material → Paint Bucket activ, cursor găleată; grila umple lățimea panoului; tasta B pornește Paint Bucket
+## Organizare: obiecte, grupuri, tag-uri (Faza 15, ADR 0019)
+- [ ] Forme → ⌘G = obiect; obiecte → ⌥⌘G = grup (folder în Outliner); ⌥D = duplicare legată (×2 în Outliner)
+- [ ] Outliner: săgeată strânge/desface grupurile; ochi, lacăt; dublu-click redenumește; drag pe un grup = mută în el; drag pe zona de jos = scoate din grup (poziția rămâne)
+- [ ] Tag-uri (sub Outliner): +, redenumire, „Atribuie selecției” (și pentru fețe/muchii), „Selectează”, ochi (ascunde tot ce are tag-ul, din orice grup)
+- [ ] Panoul din stânga e acordeon (Outliner, Materiale, Scene); starea se păstrează
 ## Organizare
 - [ ] Creează grup (⌘G) / obiect (⇧⌘G); dublu-click intră, Esc iese; restul se estompează
 - [ ] Copii ale unui obiect se modifică împreună; Fă unic; Desface

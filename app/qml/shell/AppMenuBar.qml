@@ -128,7 +128,7 @@ Platform.MenuBar {
     CommandMenu {
         bar: root
         title: "Organizare"
-        commandIds: ["org.makeGroup", "org.makeComponent", "org.explode", "org.makeUnique", "-",
+        commandIds: ["org.makeGroup", "org.group", "org.duplicateLinked", "org.explode", "org.makeUnique", "-",
                      "org.enter", "org.exit", "-", "org.hide", "org.unhideAll", "org.lock", "org.unlock", "-",
                      "solid.union", "solid.subtract", "solid.intersect"]
     }

@@ -204,11 +204,13 @@ void refacePlane(Mesh& mesh, const Plane& plane, const std::set<EdgeId>& newEdge
     std::map<FaceId, Vec3d> sourceNormals;
     std::map<FaceId, model::MaterialId> sourceMaterials;
     std::map<FaceId, model::MaterialId> sourceBackMaterials;
+    std::map<FaceId, model::TagId> sourceTags;
     for (FaceId f : existing) {
         if (!matched.contains(f)) {
             sourceNormals[f] = mesh.face(f).plane.normal;
             sourceMaterials[f] = mesh.face(f).material;
             sourceBackMaterials[f] = mesh.face(f).backMaterial;
+            sourceTags[f] = mesh.face(f).tag;
             mesh.removeFace(f);
             result.removedFaces.push_back(f);
         }
@@ -230,7 +232,11 @@ void refacePlane(Mesh& mesh, const Plane& plane, const std::set<EdgeId>& newEdge
         // Bucățile unei fețe împărțite își păstrează materialul.
         const model::MaterialId material = nf.source ? sourceMaterials[nf.source] : model::MaterialId {};
         const model::MaterialId backMaterial = nf.source ? sourceBackMaterials[nf.source] : model::MaterialId {};
-        result.createdFaces.push_back(mesh.addFace(facePlane, std::move(outer), std::move(holes), material, backMaterial));
+        const FaceId created = mesh.addFace(facePlane, std::move(outer), std::move(holes), material, backMaterial);
+        if (nf.source) {
+            mesh.setFaceTag(created, sourceTags[nf.source]); // bucățile unei fețe împărțite își păstrează tag-ul
+        }
+        result.createdFaces.push_back(created);
     }
 }
 

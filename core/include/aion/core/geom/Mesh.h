@@ -62,6 +62,8 @@ public:
         model::MaterialId backMaterial = {});
     void setFaceMaterial(FaceId id, model::MaterialId material);
     void setFaceBackMaterial(FaceId id, model::MaterialId material);
+    void setFaceTag(FaceId id, model::TagId tag);
+    void setEdgeTag(EdgeId id, model::TagId tag);
     void removeFace(FaceId id);
     // Mută un vârf (fără verificări: fețele atinse trebuie apoi aduse la zi, vezi transformVertices).
     void setPosition(VertexId id, const Vec3d& position);

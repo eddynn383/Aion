@@ -314,7 +314,7 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         for (std::size_t i = 0; best >= 0.0 && i < mesh.vertices().size(); ++i) {
             const Vec3d& p = mesh.vertices().values()[i].position;
             const double d = screenDistance(camera, p, screen);
-            if (d <= best && visible(ray, facePick, p)) {
+            if (d <= best && visible(ray, facePick, p) && !view::isHidden(mesh, mesh.vertices().keys()[i])) {
                 best = d;
                 bestVertex = mesh.vertices().keys()[i];
             }
@@ -371,6 +371,9 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
             const geom::EdgeId id = mesh.edges().keys()[i];
             const geom::Edge& e = mesh.edges().values()[i];
+            if (view::isHidden(e)) {
+                continue;
+            }
             const Vec3d mid = (mesh.position(e.v0) + mesh.position(e.v1)) * 0.5;
             const bool previous = m_last.kind == Kind::Midpoint && m_last.edge == id;
             const double d = screenDistance(camera, mid, screen);
@@ -459,6 +462,9 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         std::optional<std::pair<Vec3d, geom::EdgeId>> crossing;
         for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
             const geom::Edge& e = mesh.edges().values()[i];
+            if (view::isHidden(e)) {
+                continue;
+            }
             const Vec3d a = mesh.position(e.v0);
             const Vec3d b = mesh.position(e.v1);
             const auto x = intersectLines(*from, dir, a, glm::normalize(b - a), eps);

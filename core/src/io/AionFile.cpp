@@ -50,8 +50,12 @@ json meshToJson(const geom::Mesh& mesh)
     json edges = json::array();
     for (std::size_t i : sortedIndices(mesh.edges())) {
         const geom::Edge& e = mesh.edges().values()[i];
-        edges.push_back({ mesh.edges().keys()[i].value, e.v0.value, e.v1.value, e.soft ? 1 : 0, e.curve,
-            e.smoothCurve ? 1 : 0 });
+        json edge = { mesh.edges().keys()[i].value, e.v0.value, e.v1.value, e.soft ? 1 : 0, e.curve,
+            e.smoothCurve ? 1 : 0 };
+        if (e.tag) {
+            edge.push_back(e.tag.value); // al 7-lea câmp, opțional
+        }
+        edges.push_back(std::move(edge));
     }
     json faces = json::array();
     for (std::size_t i : sortedIndices(mesh.faces())) {
@@ -64,6 +68,7 @@ json meshToJson(const geom::Mesh& mesh)
             { "id", mesh.faces().keys()[i].value },
             { "material", f.material.value },
             { "backMaterial", f.backMaterial.value },
+            { "tag", f.tag.value },
             { "plane", { f.plane.normal.x, f.plane.normal.y, f.plane.normal.z, f.plane.d } },
             { "outer", loopToJson(f.outer) },
             { "inner", inner },
@@ -93,11 +98,15 @@ geom::ChangeSet meshFromJson(const json& j)
             = geom::Vertex { { v.at(1).get<double>(), v.at(2).get<double>(), v.at(3).get<double>() }, {} };
     }
     for (const json& e : j.at("edges")) {
-        geom::Edge edge { geom::VertexId { e.at(1).get<std::uint64_t>() }, geom::VertexId { e.at(2).get<std::uint64_t>() },
-            {} };
+        geom::Edge edge;
+        edge.v0 = geom::VertexId { e.at(1).get<std::uint64_t>() };
+        edge.v1 = geom::VertexId { e.at(2).get<std::uint64_t>() };
         edge.soft = e.at(3).get<int>() != 0;
         edge.curve = e.at(4).get<std::uint32_t>();
         edge.smoothCurve = e.at(5).get<int>() != 0;
+        if (e.size() > 6) {
+            edge.tag = model::TagId { e.at(6).get<std::uint64_t>() };
+        }
         edges[geom::EdgeId { e.at(0).get<std::uint64_t>() }] = edge;
     }
     for (const json& f : j.at("faces")) {
@@ -107,6 +116,7 @@ geom::ChangeSet meshFromJson(const json& j)
         face.outer = loopFromJson(f.at("outer"));
         face.material = model::MaterialId { f.value("material", std::uint64_t { 0 }) };
         face.backMaterial = model::MaterialId { f.value("backMaterial", std::uint64_t { 0 }) };
+        face.tag = model::TagId { f.value("tag", std::uint64_t { 0 }) };
         for (const json& h : f.at("inner")) {
             face.inner.push_back(loopFromJson(h));
         }
@@ -157,6 +167,7 @@ std::string toJson(const model::Model& model)
             { "id", id.value },
             { "name", d.name },
             { "group", d.group },
+            { "collection", d.collection },
             { "mesh", meshToJson(model.mesh(id)) },
         });
     }
@@ -281,7 +292,8 @@ LoadResult fromJson(std::string_view text)
         model::ChangeSet changes;
         for (const json& d : doc.at("definitions")) {
             const model::DefinitionId id { d.at("id").get<std::uint64_t>() };
-            model::Definition def { d.at("name").get<std::string>(), d.at("group").get<bool>() };
+            model::Definition def { d.at("name").get<std::string>(), d.at("group").get<bool>(),
+                d.value("collection", false) };
             auto& change = changes.definitions[id];
             if (id == model.root()) {
                 change.before = model.definition(id);

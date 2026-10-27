@@ -61,8 +61,9 @@ Window {
             { id: "edit.selectAll", title: "Selectează tot", category: "Editare", shortcut: "Ctrl+A",
               icon: "square-dashed-mouse-pointer" },
             { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
-            { id: "org.makeGroup", title: "Creează grup", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
-            { id: "org.makeComponent", title: "Creează obiect", category: "Organizare", shortcut: "Ctrl+Shift+G", icon: "component" },
+            { id: "org.makeGroup", title: "Creează obiect (din formele selectate)", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
+            { id: "org.group", title: "Grupează obiectele", category: "Organizare", shortcut: "Ctrl+Alt+G", icon: "folder" },
+            { id: "org.duplicateLinked", title: "Duplicare legată (copie editată împreună)", category: "Organizare", shortcut: "Alt+D", icon: "component" },
             { id: "org.explode", title: "Desface (grup sau obiect)", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
             { id: "org.enter", title: "Editează grupul sau obiectul selectat", category: "Organizare", shortcut: "", icon: "box" },
@@ -139,7 +140,7 @@ Window {
             if (doc.scenes.length === 0) toast.show("Adaugă întâi scene (panoul Scene).")
             else fileDialog.ask("exportVideo")
             break
-        case "debug.materials": leftTabs.currentIndex = 2; break
+        case "debug.materials": preferences.leftMaterials = true; break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
@@ -158,7 +159,8 @@ Window {
         case "edit.selectAll": doc.selectAll(); break
         case "edit.selectNone": doc.clearSelection(); break
         case "org.makeGroup": doc.makeGroup(); break
-        case "org.makeComponent": doc.makeComponent(""); break
+        case "org.group": doc.groupSelection(); break
+        case "org.duplicateLinked": doc.duplicateLinked(); break
         case "org.explode": doc.explodeSelection(); break
         case "org.makeUnique": doc.makeUniqueSelection(); break
         case "org.enter": doc.enterInstance(0); break
@@ -263,6 +265,13 @@ Window {
                     // „wheelw:x,y,z,trepte”: rotița în punctul 3D dat (trepte pozitive = apropiere).
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
+                } else if (action.startsWith("tag:")) {
+                    // „tag:add,Pereți”, „tag:assign,0” (indexul tag-ului), „tag:hide,0”, „tag:select,0”.
+                    const tg = action.slice(4).split(",")
+                    if (tg[0] === "add") doc.addTag(tg[1])
+                    else if (tg[0] === "assign") doc.assignTag(doc.tags[parseInt(tg[1])].id)
+                    else if (tg[0] === "hide") doc.setTagVisible(doc.tags[parseInt(tg[1])].id, false)
+                    else if (tg[0] === "select") doc.selectByTag(doc.tags[parseInt(tg[1])].id)
                 } else if (action.startsWith("themecolor:")) {
                     // „themecolor:accent=#EC4899” (gol după „=” resetează).
                     const tc = action.slice(11).split("=")
@@ -453,6 +462,9 @@ Window {
         property real animDelay: 1
         property bool animLoop: true
         property int animFps: 30
+        property bool leftOutliner: true
+        property bool leftMaterials: true
+        property bool leftScenes: false
         property real gridStep: 0
     }
     Component.onCompleted: {
@@ -740,46 +752,78 @@ Window {
         width: window.leftPanelVisible ? Theme.sidePanelWidth : 0
         visible: width > 0
         clip: true
+        showHeader: false
 
         Behavior on width { NumberAnimation { duration: Theme.motionNormal; easing.type: Easing.OutCubic } }
 
-        header: Tabs {
-            id: leftTabs
+        // Acordeon: Outliner (cu tag-urile), Materiale, Scene. Spațiul se împarte între secțiunile deschise.
+        Item {
+            id: accordion
             anchors.fill: parent
-            model: ["Outliner", "Tag-uri", "Materiale", "Scene"]
-        }
+            readonly property var sections: [outlinerSection, materialsSection, scenesSection]
+            readonly property real free: height - sections.reduce((sum, s) => sum + s.headerHeight, 0) - Theme.space2 * 2
+            readonly property real weights: sections.reduce((sum, s) => sum + (s.expanded ? s.weight : 0), 0)
+            function share(section) { return weights > 0 ? Math.max(0, free) * section.weight / weights : 0 }
 
-        Outliner {
-            anchors.fill: parent
-            visible: leftTabs.currentIndex === 0
-            document: doc
-        }
-        TagsPanel {
-            anchors.fill: parent
-            visible: leftTabs.currentIndex === 1
-            document: doc
-        }
-        ScenesPanel {
-            id: scenesPanel
-            anchors.fill: parent
-            visible: leftTabs.currentIndex === 3
-            document: doc
-            viewport: viewport
-            transition: preferences.animTransition
-            delay: preferences.animDelay
-            loop: preferences.animLoop
-            fps: preferences.animFps
-            onTransitionChanged: preferences.animTransition = transition
-            onDelayChanged: preferences.animDelay = delay
-            onLoopChanged: preferences.animLoop = loop
-            onFpsChanged: preferences.animFps = fps
-            onExportVideoRequested: fileDialog.ask("exportVideo")
-        }
-        MaterialsPanel {
-            anchors.fill: parent
-            visible: leftTabs.currentIndex === 2
-            document: doc
-            onPaintRequested: window.selectTool("paint")
+            Column {
+                anchors.fill: parent
+                spacing: Theme.space2
+
+                AccordionSection {
+                    id: outlinerSection
+                    width: parent.width
+                    title: "Outliner"
+                    iconName: "folder"
+                    weight: 2
+                    expanded: preferences.leftOutliner
+                    bodyHeight: accordion.share(this)
+                    onToggled: preferences.leftOutliner = !preferences.leftOutliner
+                    Outliner {
+                        anchors.fill: parent
+                        document: doc
+                    }
+                }
+                AccordionSection {
+                    id: materialsSection
+                    width: parent.width
+                    title: "Materiale"
+                    iconName: "palette"
+                    weight: 1.5
+                    expanded: preferences.leftMaterials
+                    bodyHeight: accordion.share(this)
+                    onToggled: preferences.leftMaterials = !preferences.leftMaterials
+                    MaterialsPanel {
+                        anchors.fill: parent
+                        document: doc
+                        onPaintRequested: window.selectTool("paint")
+                    }
+                }
+                AccordionSection {
+                    id: scenesSection
+                    width: parent.width
+                    title: "Scene"
+                    iconName: "monitor"
+                    weight: 1
+                    expanded: preferences.leftScenes
+                    bodyHeight: accordion.share(this)
+                    onToggled: preferences.leftScenes = !preferences.leftScenes
+                    ScenesPanel {
+                        id: scenesPanel
+                        anchors.fill: parent
+                        document: doc
+                        viewport: viewport
+                        transition: preferences.animTransition
+                        delay: preferences.animDelay
+                        loop: preferences.animLoop
+                        fps: preferences.animFps
+                        onTransitionChanged: preferences.animTransition = transition
+                        onDelayChanged: preferences.animDelay = delay
+                        onLoopChanged: preferences.animLoop = loop
+                        onFpsChanged: preferences.animFps = fps
+                        onExportVideoRequested: fileDialog.ask("exportVideo")
+                    }
+                }
+            }
         }
     }
 

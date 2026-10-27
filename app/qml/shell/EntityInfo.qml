@@ -209,9 +209,9 @@ Column {
         }
     }
 
-    // Tag-ul: „pastile” cu tag-urile modelului.
+    // Tag-ul: „pastile” cu tag-urile modelului (pentru obiecte, grupuri, fețe și muchii).
     Column {
-        visible: root.isInstance
+        visible: root.isInstance || root.info.kind === "faces" || root.info.kind === "edges"
         width: parent.width
         spacing: Theme.space2
 
@@ -229,7 +229,7 @@ Column {
                 delegate: Rectangle {
                     id: chip
                     required property var modelData
-                    readonly property bool current: root.isInstance && root.info.tagId === modelData.id
+                    readonly property bool current: root.info.tagId === modelData.id
                     width: chipRow.implicitWidth + Theme.space3 * 2
                     height: 24
                     radius: 12

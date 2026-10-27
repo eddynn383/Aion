@@ -398,7 +398,7 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             break; // wireframe: fără fețe
         }
         const geom::Face* face = mesh.faces().find(faceId);
-        if (face == nullptr) {
+        if (face == nullptr || view::isHidden(*face)) {
             continue;
         }
         const float state = stateOf(faceId);
@@ -437,6 +437,9 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
     for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
         const geom::EdgeId id = mesh.edges().keys()[i];
         const geom::Edge& e = mesh.edges().values()[i];
+        if (view::isHidden(e)) {
+            continue;
+        }
         glm::vec4 color = e.faces.empty() ? toVec4(m_freeEdge) : toVec4(m_edge);
         float width = kEdgeWidth;
         const bool isMarked = active ? marked.contains(id) : style.marked;

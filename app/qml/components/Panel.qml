@@ -9,6 +9,8 @@ Rectangle {
     // Element opțional afișat în antet în locul titlului (de exemplu Tabs).
     property alias header: headerSlot.data
     default property alias content: body.data
+    // Fără antet (de exemplu panoul acordeon, unde fiecare secțiune are antetul ei).
+    property bool showHeader: true
 
     color: Theme.bgPanel
 
@@ -18,7 +20,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: Theme.space3
-        height: Theme.controlHeightSm
+        height: root.showHeader ? Theme.controlHeightSm : 0
+        visible: root.showHeader
 
         Text {
             anchors.left: parent.left
@@ -40,7 +43,7 @@ Rectangle {
     Item {
         id: body
         anchors.top: headerArea.bottom
-        anchors.topMargin: Theme.space3
+        anchors.topMargin: root.showHeader ? Theme.space3 : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

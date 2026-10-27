@@ -844,3 +844,26 @@ TEST_CASE("Obiecte primitive: două clicuri creează un obiect nou, selectat, cu
     CHECK(c.size.x == Approx(600.0).margin(1.0));
     CHECK(c.size.z == Approx(1500.0).margin(1e-6));
 }
+
+TEST_CASE("Tag-uri pe forme: o față cu tag ascuns nu se mai alege", "[core][view][tags]")
+{
+    Mesh mesh;
+    geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } });
+    const geom::FaceId face = mesh.faces().keys().front();
+    const model::TagId walls { 7 };
+    mesh.setFaceTag(face, walls);
+    for (geom::EdgeId e : mesh.edges().keys()) {
+        mesh.setEdgeTag(e, walls);
+    }
+    view::Camera camera;
+    camera.setViewportSize(800, 600);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 1000, 1000, 0 }, 0, 0, 5000 }));
+    const auto center = camera.project({ 1000, 1000, 0 });
+    REQUIRE(center);
+    CHECK(view::pick(mesh, camera, *center).kind == view::PickResult::Kind::Face);
+    view::setHiddenTags({ walls });
+    CHECK_FALSE(view::pick(mesh, camera, *center).hit());
+    CHECK(view::isHidden(mesh, mesh.vertices().keys().front()));
+    view::setHiddenTags({});
+    CHECK(view::pick(mesh, camera, *center).hit());
+}

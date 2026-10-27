@@ -312,3 +312,37 @@ TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni ed
     CHECK(glm::length(m.instance(id).transform.applyToPoint({ hi.x, lo.y, lo.z }) - math::Vec3d { 1000, 1600, 50 }) < 1e-6);
     CHECK(m.validate().ok());
 }
+
+TEST_CASE("Grupuri (colecții): gruparea obiectelor și mutarea între grupuri păstrează poziția", "[core][model]")
+{
+    Model m;
+    geom::Mesh& root = m.mesh(m.root());
+    const auto object = [&](double x) {
+        geom::drawPolygon(root, { { x, 0, 0 }, { x + 100, 0, 0 }, { x + 100, 100, 0 }, { x, 100, 0 } });
+        geom::Selection s;
+        for (geom::FaceId f : root.faces().keys()) {
+            s.faces.insert(f);
+        }
+        return model::makeGroup(m, m.root(), s, false, "Obiect");
+    };
+    const model::InstanceId a = object(0);
+    const model::InstanceId b = object(500);
+    const model::InstanceId room = model::groupInstances(m, m.root(), { a, b }, "Camera 1");
+    REQUIRE(room);
+    CHECK(m.definition(m.instance(room).definition).collection);
+    CHECK(m.instance(a).parent == m.instance(room).definition);
+
+    // Mută grupul, apoi scoate un obiect din el: obiectul rămâne unde se vede.
+    model::Instance r = m.instance(room);
+    r.transform = math::Transform::translation({ 1000, 0, 0 });
+    m.setInstance(room, r);
+    const math::Vec3d before = model::definitionWorldTransform(m, m.instance(b).definition).applyToPoint({ 500, 0, 0 });
+    REQUIRE(model::moveToParent(m, b, m.root()));
+    CHECK(m.instance(b).parent == m.root());
+    const math::Vec3d after = m.instance(b).transform.applyToPoint({ 500, 0, 0 });
+    CHECK(glm::length(after - before) < 1e-9);
+    CHECK(glm::length(after - math::Vec3d { 1500, 0, 0 }) < 1e-9);
+    // Un grup nu poate intra în el însuși.
+    CHECK_FALSE(model::moveToParent(m, room, m.instance(room).definition));
+    CHECK(m.validate().ok());
+}

@@ -4,6 +4,8 @@
 #include "aion/core/math/Transform.h"
 #include "aion/core/model/Model.h"
 
+#include <set>
+
 #include <string>
 #include <vector>
 
@@ -67,6 +69,16 @@ struct Placement {
 // Aplică poziția, rotația și scara cerute; rotațiile în jurul altor axe se păstrează. `size`, dacă e nenul pe o axă,
 // are prioritate față de `scale` pe acea axă (scara se calculează din dimensiunea dorită).
 void setPlacement(Model& model, InstanceId instance, const Placement& wanted);
+
+// Organizarea ca în Blender: un grup (colecție) din obiectele date, în `context`. Transformările lumii nu se schimbă.
+InstanceId groupInstances(Model& model, DefinitionId context, const std::set<InstanceId>& instances, std::string name);
+
+// Mută instanța în alt grup sau obiect (`target`), păstrându-i poziția în lume. `target` trebuie să aibă o singură
+// apariție și să nu fie chiar instanța sau ceva din interiorul ei. Întoarce false dacă mutarea nu e posibilă.
+bool moveToParent(Model& model, InstanceId instance, DefinitionId target);
+
+// Transformarea lumii a (primei apariții a) unei definiții; identitate pentru rădăcină.
+[[nodiscard]] math::Transform definitionWorldTransform(const Model& model, DefinitionId definition);
 
 // Cutia (min, max) a geometriei unei definiții, cu tot ce conține, în coordonatele ei.
 [[nodiscard]] std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition);
