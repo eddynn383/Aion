@@ -177,3 +177,7 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Unealta Poziționează textura (Inspector → Poziția texturii → 🖼 sau palette): trage = mută; Shift = rotește; ⌘ = scalează; ⌘Z
 - [ ] Trage un obiect din bibliotecă peste viewport: cutia lui urmărește cursorul; ieși din viewport → dispare
 - [ ] Plante (copac, brad, tufă) și Om (cu înălțime) din bibliotecă, cu parametri în Inspector
+## Panoul din stânga: înălțimi și scroll
+- [ ] Marginea de jos a unei secțiuni deschise (linia scurtă) se trage în sus / jos; cursorul devine ↕; înălțimea rămâne după repornire
+- [ ] Dublu-click pe margine = înălțimea implicită
+- [ ] Mai multe secțiuni deschise decât încap → bară de scroll în dreapta panoului (trasă sau cu rotița pe antete)
