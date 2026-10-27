@@ -361,6 +361,54 @@ DrawLineResult drawLine(Mesh& mesh, const Vec3d& a, const Vec3d& b)
     return result;
 }
 
+DrawLineResult createFaces(Mesh& mesh, const std::vector<EdgeId>& edges)
+{
+    DrawLineResult result;
+    std::vector<EdgeId> present;
+    for (EdgeId e : edges) {
+        if (mesh.edges().contains(e)) {
+            present.push_back(e);
+        }
+    }
+    if (present.empty()) {
+        return result;
+    }
+    const std::set<EdgeId> edgeSet(present.begin(), present.end());
+    for (const Plane& plane : candidatePlanes(mesh, present)) {
+        refacePlane(mesh, plane, edgeSet, result);
+    }
+    std::erase_if(result.createdFaces, [&](FaceId f) { return !mesh.faces().contains(f); });
+    // Sensul: o muchie comună cu o față vecină trebuie parcursă invers de cele două bucle (ca la un volum închis).
+    for (FaceId& f : result.createdFaces) {
+        bool flip = false;
+        bool decided = false;
+        for (const EdgeUse& use : mesh.face(f).outer.uses) {
+            for (FaceId g : mesh.edge(use.edge).faces) {
+                if (g == f) {
+                    continue;
+                }
+                for (const EdgeUse& other : mesh.face(g).outer.uses) {
+                    if (other.edge == use.edge) {
+                        flip = other.reversed == use.reversed;
+                        decided = true;
+                        break;
+                    }
+                }
+                if (decided) {
+                    break;
+                }
+            }
+            if (decided) {
+                break;
+            }
+        }
+        if (flip) {
+            f = orientFace(mesh, f, -mesh.face(f).plane.normal);
+        }
+    }
+    return result;
+}
+
 DrawLineResult drawPolygon(Mesh& mesh, const std::vector<Vec3d>& points)
 {
     DrawLineResult total;

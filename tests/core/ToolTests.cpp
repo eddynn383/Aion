@@ -929,3 +929,17 @@ TEST_CASE("Poziționează textura: tragerea mută textura cu cursorul, Shift o r
     REQUIRE(stack.undo());
     CHECK(mesh.face(face).texture.isIdentity());
 }
+
+TEST_CASE("Unelte: o muchie redesenată reface fața ștearsă", "[core][tools]")
+{
+    Scene s;
+    s.stack.run("Pătrat", [](Mesh& mesh) { geom::drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } }); });
+    REQUIRE(s.mesh.faces().size() == 1);
+    s.stack.run("Șterge fața", [](Mesh& mesh) { geom::eraseFace(mesh, mesh.faces().keys().front()); });
+    REQUIRE(s.mesh.faces().empty());
+    auto line = tools::makeTool("line");
+    s.click(*line, { 0, 0, 0 });
+    s.click(*line, { 1000, 0, 0 });
+    CHECK(s.mesh.faces().size() == 1);
+    CHECK(s.mesh.edges().size() == 4);
+}

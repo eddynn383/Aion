@@ -340,7 +340,13 @@ private:
         }
         geom::DrawLineResult result;
         const Vec3d a = *m_start;
-        ctx.stack.run("Line", [&](geom::Mesh& mesh) { result = geom::drawLine(mesh, a, b); });
+        ctx.stack.run("Line", [&](geom::Mesh& mesh) {
+            result = geom::drawLine(mesh, a, b);
+            // Ca în SketchUp: o muchie redesenată peste una existentă reface fața care lipsea.
+            if (result.createdFaces.empty()) {
+                result.createdFaces = geom::createFaces(mesh, result.edges).createdFaces;
+            }
+        });
         // Ca în SketchUp: linia continuă din ultimul punct, dar se oprește când a închis o față.
         if (result.createdFaces.empty()) {
             m_start = b;

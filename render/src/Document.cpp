@@ -2686,6 +2686,9 @@ QVariantList Document::contextMenuItems() const
     if (geometry) {
         separator();
         item(QStringLiteral("edit.selectConnected"), QStringLiteral("Selectează ce e conectat"));
+        if (!m_selection.edges.empty()) {
+            item(QStringLiteral("edit.createFaces"), QStringLiteral("Creează fețe din muchii"));
+        }
         if (!m_selection.faces.empty()) {
             item(QStringLiteral("edit.intersectModel"), QStringLiteral("Intersectează cu modelul"));
         }
@@ -3913,6 +3916,27 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
         m_geometryKey = geometrySelectionKey(); // fețele pot primi ID-uri noi: rotirea rămâne a acestei selecții
     }
     emit selectionChanged();
+}
+
+void Document::createFacesFromSelection()
+{
+    // Muchiile selectate și cele ale fețelor selectate (o față vecină ajută la închiderea buclei).
+    std::vector<geom::EdgeId> edges(m_selection.edges.begin(), m_selection.edges.end());
+    if (edges.empty()) {
+        setError(QStringLiteral("Selectează muchiile care închid fața (dublu click pe o față vecină le prinde și pe ele)."));
+        return;
+    }
+    // Încercat întâi pe o copie: fără un pas gol în istoric când nu se închide nimic.
+    geom::Mesh trial = m_model.mesh(activeDefinition());
+    if (geom::createFaces(trial, edges).createdFaces.empty()) {
+        setError(QStringLiteral("Muchiile selectate nu închid nicio buclă plană fără față."));
+        return;
+    }
+    runOnModel("Creează fețe", [&](model::Model& model) {
+        const geom::DrawLineResult r = geom::createFaces(model.mesh(activeDefinition()), edges);
+        m_selection.clear();
+        m_selection.faces.insert(r.createdFaces.begin(), r.createdFaces.end());
+    });
 }
 
 void Document::setSelectedEdgesSoft(bool soft)

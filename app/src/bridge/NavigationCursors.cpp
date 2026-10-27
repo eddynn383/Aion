@@ -47,9 +47,12 @@ void installNavigationCursors(QQuickWindow* window)
     const QCursor zoom = makeCursor(QStringLiteral("zoom-in"));
     // Găleata (Paint Bucket): punctul activ e vârful din care „curge” vopseaua (stânga-jos).
     const QCursor paint = makeCursor(QStringLiteral("paint-bucket"), QPointF(0.12, 0.88));
+    // Guma: punctul activ e colțul care șterge (stânga-jos).
+    const QCursor eraser = makeCursor(QStringLiteral("eraser"), QPointF(0.2, 0.8));
     const auto viewports = window->contentItem()->findChildren<aion::render::Viewport*>();
     for (auto* viewport : viewports) {
         viewport->setNavigationCursors(orbit, zoom);
         viewport->setPaintCursor(paint);
+        viewport->setEraserCursor(eraser);
     }
 }

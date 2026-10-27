@@ -316,6 +316,8 @@ public:
     Q_INVOKABLE void setGeometryPlacement(const QVariantMap& changes);
     // Muchiile selectate devin soft (ascunse, umbrire netedă) sau vizibile.
     Q_INVOKABLE void setSelectedEdgesSoft(bool soft);
+    // Reface fețele în buclele închise ale muchiilor selectate (după ce o față a fost ștearsă).
+    Q_INVOKABLE void createFacesFromSelection();
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
     Q_INVOKABLE double createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);

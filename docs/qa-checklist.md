@@ -158,6 +158,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Selectează fața de sus → Bevel: toate laturile rotunjite, colțurile îmbinate; distanța prea mare → mesaj, fără schimbare
 - [ ] Anulează / Esc → cutia revine; Gata → un pas de undo
 
+## Fețe refăcute, cursorul Eraser
+- [ ] Cutie explodată → șterge fața de sus → selectează cele 4 muchii → click dreapta → Creează fețe: fața revine, albă în afară
+- [ ] La fel cu Line: redesenează una din muchiile de sus → fața revine
+- [ ] Unealta Eraser: cursorul e o gumă (vârful din stânga-jos șterge); la orbit / pan revine cursorul navigării
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală
