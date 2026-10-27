@@ -900,6 +900,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "section") {
         return makeSectionTool();
     }
+    if (id == "texture") {
+        return makeTextureTool();
+    }
     if (id == "paint") {
         return makePaintTool();
     }

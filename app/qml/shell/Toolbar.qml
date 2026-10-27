@@ -51,7 +51,8 @@ Item {
     ]
     // Unelte fără buton în toolbar (pornesc din alt loc): Paint Bucket — din panoul Materiale sau cu tasta B.
     readonly property var hiddenTools: [
-        { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 }
+        { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 },
+        { id: "texture", icon: "image", name: "Poziționează textura", key: "", phase: 24 }
     ]
     readonly property var allTools: groups.reduce((all, g) => all.concat(g.tools), []).concat(navigation).concat(hiddenTools)
 

@@ -427,7 +427,7 @@ Window {
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
-                                         "move", "rotate", "scale", "eraser", "paint",
+                                         "move", "rotate", "scale", "eraser", "paint", "texture",
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
 
@@ -1554,6 +1554,7 @@ Window {
                 document: doc
                 timelineActive: window.timelineVisible
                 onEditRules: window.openRulesEditor()
+                onToolRequested: (id) => window.selectTool(id)
             }
 
             // Fără selecție, Inspector-ul descrie modelul întreg.
