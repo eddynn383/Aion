@@ -395,6 +395,101 @@ Column {
         onToggled: root.document.setSelectedEdgesSoft(checked)
     }
 
+    // Geometria liberă (fețe, muchii, forme): poziția (colțul minim) și dimensiunile cutiei ei; rotirea și scara sunt
+    // relative (geometria nu are o orientare salvată): valoarea tastată se aplică, apoi câmpul revine la 0° / 1×.
+    Column {
+        id: geometryBox
+        readonly property var g: root.info.geometry ?? null
+        readonly property real third: (width - Theme.space1 * 2) / 3
+        visible: g !== null
+        width: parent.width
+        spacing: Theme.space2
+        component GeoCaption: Text {
+            color: Theme.textSecondary
+            font.pixelSize: Theme.fontSizeSm
+        }
+        GeoCaption { text: "Poziție (mm)" }
+        Row {
+            spacing: Theme.space1
+            NumberField { width: geometryBox.third; compact: true; label: "X"; step: 10; value: geometryBox.g ? geometryBox.g.px : 0; onValueModified: (v) => root.document.setGeometryPlacement({ px: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Y"; step: 10; value: geometryBox.g ? geometryBox.g.py : 0; onValueModified: (v) => root.document.setGeometryPlacement({ py: v }) }
+            NumberField { width: geometryBox.third; compact: true; label: "Z"; step: 10; value: geometryBox.g ? geometryBox.g.pz : 0; onValueModified: (v) => root.document.setGeometryPlacement({ pz: v }) }
+        }
+        GeoCaption { text: "Dimensiuni (mm)" }
+        Row {
+            spacing: Theme.space1
+            Repeater {
+                model: [{ key: "dx", label: "X" }, { key: "dy", label: "Y" }, { key: "dz", label: "Z" }]
+                delegate: NumberField {
+                    required property var modelData
+                    readonly property real size: geometryBox.g ? geometryBox.g[modelData.key] : 0
+                    width: geometryBox.third
+                    compact: true
+                    label: modelData.label
+                    step: 10
+                    from: 0.01
+                    value: size
+                    // O axă plată (un dreptunghi pe sol, pe Z) nu se poate întinde prin scară.
+                    readOnly: size < 1e-6
+                    opacity: readOnly ? 0.55 : 1
+                    onValueModified: (v) => {
+                        const c = {}
+                        c[modelData.key] = v
+                        root.document.setGeometryPlacement(c)
+                    }
+                }
+            }
+        }
+        GeoCaption { text: "Rotește cu (°), în jurul centrului" }
+        Row {
+            spacing: Theme.space1
+            Repeater {
+                model: ["X", "Y", "Z"]
+                delegate: NumberField {
+                    required property string modelData
+                    width: geometryBox.third
+                    compact: true
+                    label: modelData
+                    decimals: 1
+                    step: 15
+                    from: -360
+                    to: 360
+                    resetValue: 0
+                    value: 0
+                    onValueModified: (v) => {
+                        const c = {}
+                        c["r" + modelData.toLowerCase()] = v
+                        root.document.setGeometryPlacement(c)
+                    }
+                }
+            }
+        }
+        GeoCaption { text: "Scalează cu (×), față de colțul minim" }
+        Row {
+            spacing: Theme.space1
+            Repeater {
+                model: ["X", "Y", "Z"]
+                delegate: NumberField {
+                    required property string modelData
+                    width: geometryBox.third
+                    compact: true
+                    label: modelData
+                    decimals: 3
+                    step: 0.1
+                    from: -100
+                    to: 100
+                    resetValue: 1
+                    value: 1
+                    onValueModified: (v) => {
+                        const c = {}
+                        c["s" + modelData.toLowerCase()] = v
+                        root.document.setGeometryPlacement(c)
+                    }
+                }
+            }
+        }
+    }
+
     // Poziționarea texturii pe fețele selectate (Position Texture): deplasare, rotație, scară.
     Column {
         id: textureBox

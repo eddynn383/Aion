@@ -309,6 +309,9 @@ public:
     Q_INVOKABLE void mirrorSelection(int axis);
     // Forma selectată (linie, arc, cerc, poligon, dreptunghi): key = "length", "radius", "segments", "width", "height".
     Q_INVOKABLE void setShapeValue(const QString& key, double value);
+    // Geometria liberă selectată (fețe, muchii): px/py/pz = colțul minim nou, dx/dy/dz = mărimea nouă (scară pe axă
+    // față de colțul minim), rx/ry/rz = rotire relativă în grade (în jurul centrului), sx/sy/sz = scară relativă.
+    Q_INVOKABLE void setGeometryPlacement(const QVariantMap& changes);
     // Muchiile selectate devin soft (ascunse, umbrire netedă) sau vizibile.
     Q_INVOKABLE void setSelectedEdgesSoft(bool soft);
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.

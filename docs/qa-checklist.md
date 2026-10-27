@@ -201,3 +201,7 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] După o valoare tastată, săgețile ↑/↓ pornesc de la valoarea reală; selectează alt obiect → câmpurile îl urmează
 - [ ] Timeline deschis, animație cu keyframe-uri, playhead între ele: o schimbare în Inspector se vede imediat în
       viewport (iese din previzualizare); ◇ pune keyframe-ul fără să iasă
+## Plasarea geometriei libere în Inspector
+- [ ] Selectează o formă / fețe / muchii: Poziție (colțul minim) și Dimensiuni editabile; axa plată (Z pe sol) e dezactivată
+- [ ] Rotește cu (°): 90 + Enter rotește în jurul centrului, câmpul revine la 0; Scalează cu (×): 2 → dublu pe axă, revine la 1
+- [ ] Fiecare schimbare = un pas de undo

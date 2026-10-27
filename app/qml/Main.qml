@@ -420,6 +420,8 @@ Window {
                     // „keys:45,enter”: taste ca de la tastatură (cu scurtăturile aplicației), apoi o tastă finală.
                     const kk = action.slice(5).split(",")
                     AppInfo.simulateKeys(kk[0], kk[1] ?? "")
+                } else if (action === "debug.geometry") {
+                    console.info("geometry:", JSON.stringify(doc.entityInfo.geometry), "undo:", doc.undoName)
                 } else if (action === "debug.rz") {
                     console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {
