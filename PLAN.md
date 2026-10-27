@@ -577,7 +577,8 @@ scripturile, care expun tot ce există deja.
 - [x] Biblioteca de materiale primește texturi procedurale (lemn, cărămidă, parchet, beton, gresie) — fără imagini
       binare în repo; import de imagine proprie din editorul de material
 - [x] Poziția texturii pe fețele selectate (Inspector); export glTF / OBJ cu UV și imagini
-- [ ] Mânere de poziționare a texturii direct pe față, în viewport
+- [x] Poziționarea texturii direct pe față, în viewport (unealta „Poziționează textura”: trage = mută, Shift = rotește,
+      ⌘ = scalează, în jurul punctului apăsat) și textura pe verso _(2026-10-27)_
 
 ### Faza 25 – Obiecte dinamice (parametrice)
 - [x] Core: o definiție poate avea un generator (`door`, `window`, `table`, `shelf`, `cabinet`, `stairs`) și parametri
@@ -586,10 +587,10 @@ scripturile, care expun tot ce există deja.
 - [x] Salvate în `.aion` (generatorul și parametrii); „Desface” le transformă în geometrie obișnuită
 
 ### Faza 26 – Bibliotecă de obiecte
-- [x] Secțiune nouă în stânga cu categorii, căutare și miniaturi _(ADR 0026; plante și oameni nu sunt încă)_
+- [x] Secțiune nouă în stânga cu categorii, căutare și miniaturi _(ADR 0026; plante: copac, brad, tufă; oameni)_
 - [x] Conținut: obiectele dinamice din Faza 25 + fișiere `.aion` din dosarul bibliotecii utilizatorului
 - [x] Drag & drop în viewport (se așază pe suprafața de sub cursor sau pe sol) sau click → în centrul vederii
-- [ ] Previzualizarea obiectului care urmează cursorul în timpul tragerii (cu inferență)
+- [x] Previzualizarea obiectului (cutia lui, la mărimea reală) care urmează cursorul în timpul tragerii
 - [x] „Salvează în bibliotecă” pentru obiectul selectat
 
 ### Faza 27 – Plugin-uri și scripturi

@@ -1,5 +1,6 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Texturing.h"
 #include "aion/core/tools/Tool.h"
 #include "aion/core/view/Picking.h"
 
@@ -868,4 +869,53 @@ TEST_CASE("Tag-uri pe forme: o față cu tag ascuns nu se mai alege", "[core][vi
     CHECK(view::isHidden(mesh, mesh.vertices().keys().front()));
     view::setHiddenTags({});
     CHECK(view::pick(mesh, camera, *center).hit());
+}
+
+TEST_CASE("Poziționează textura: tragerea mută textura cu cursorul, Shift o rotește în jurul punctului apăsat", "[core][tools][textures]")
+{
+    model::Model m;
+    commands::CommandStack stack(m);
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 0, 0, 0 }, 0, 0, 6000 }));
+    geom::Mesh& mesh = m.mesh(m.root());
+    geom::drawPolygon(mesh, { { -2000, -2000, 0 }, { 2000, -2000, 0 }, { 2000, 2000, 0 }, { -2000, 2000, 0 } });
+    REQUIRE(mesh.faces().size() == 1);
+    const geom::FaceId face = mesh.faces().keys().front();
+    tools::ToolContext ctx { mesh, stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    auto tool = tools::makeTool("texture");
+    REQUIRE(tool);
+
+    const auto event = [&](Vec3d p, bool shift = false) {
+        tools::PointerEvent e;
+        e.screen = *camera.project(p);
+        e.modifiers.shift = shift;
+        return e;
+    };
+    tool->pointerMove(ctx, event({ 0, 0, 0 }));
+    tool->pointerDown(ctx, event({ 0, 0, 0 }));
+    tool->pointerMove(ctx, event({ 300, 0, 0 }));
+    tool->pointerUp(ctx, event({ 300, 0, 0 }));
+    const geom::TextureTransform moved = mesh.face(face).texture;
+    CHECK(std::hypot(moved.offset.x, moved.offset.y) == Approx(300.0).margin(1.0));
+
+    // Rotire în jurul punctului apăsat: punctul de textură de acolo nu se mută.
+    const Vec3d pivot { 500, 500, 0 };
+    const math::Vec2d before = model::textureCoordinates(mesh.face(face).plane.normal, pivot, mesh.face(face).texture, { 1000, 1000 });
+    tool->pointerMove(ctx, event(pivot, true));
+    tool->pointerDown(ctx, event(pivot, true));
+    tool->pointerMove(ctx, event({ 800, 500, 0 }, true));
+    tool->pointerUp(ctx, event({ 800, 500, 0 }, true));
+    CHECK(mesh.face(face).texture.rotation != Approx(0.0));
+    const math::Vec2d after = model::textureCoordinates(mesh.face(face).plane.normal, pivot, mesh.face(face).texture, { 1000, 1000 });
+    CHECK(after.x == Approx(before.x).margin(1e-3));
+    CHECK(after.y == Approx(before.y).margin(1e-3));
+
+    // Două trageri = doi pași de undo.
+    REQUIRE(stack.undo());
+    REQUIRE(stack.undo());
+    CHECK(mesh.face(face).texture.isIdentity());
 }

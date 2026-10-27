@@ -432,16 +432,20 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             color = *style.colorOverride;
         }
         glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f };
-        if (const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr) {
+        const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr;
+        if (back != nullptr) {
             backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f, back->color.a / 255.0f };
         }
-        // Textura: stratul ei în array și mărimea reală (UV-ul se calculează în coordonatele definiției).
-        float layer = -1.0f;
-        if (material != nullptr && material->texture && !style.colorOverride) {
-            if (const auto it = m_textureLayers.find(material->texture.value); it != m_textureLayers.end()) {
-                layer = static_cast<float>(it->second);
+        // Texturile (față și verso): stratul în array și mărimea reală (UV-ul se calculează în coordonatele definiției).
+        const auto layerOf = [&](const model::Material* m) {
+            if (m != nullptr && m->texture && !style.colorOverride) {
+                if (const auto it = m_textureLayers.find(m->texture.value); it != m_textureLayers.end()) {
+                    return static_cast<float>(it->second);
+                }
             }
-        }
+            return -1.0f;
+        };
+        const glm::vec2 layers { layerOf(material), layerOf(back) };
         const bool transparent = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
         std::vector<MeshVertex>& target = transparent ? f.transparent : f.triangles;
         // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
@@ -452,14 +456,22 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         }
         for (std::uint32_t i : tri.indices) {
             const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
-            glm::vec3 uv { 0.0f, 0.0f, -1.0f };
-            if (layer >= 0.0f) {
+            glm::vec4 uv { 0.0f };
+            if (layers.x >= 0.0f) {
                 const math::Vec2d t = model::textureCoordinates(face->plane.normal, tri.points[i], face->texture,
                     material->textureSize);
-                uv = { static_cast<float>(t.x), static_cast<float>(-t.y), layer };
+                uv.x = static_cast<float>(t.x);
+                uv.y = static_cast<float>(-t.y);
+            }
+            if (layers.y >= 0.0f) {
+                // Versoul se vede din partea cealaltă: proiecția după normala inversă (textura nu apare în oglindă).
+                const math::Vec2d t = model::textureCoordinates(-face->plane.normal, tri.points[i], face->texture,
+                    back->textureSize);
+                uv.z = static_cast<float>(t.x);
+                uv.w = static_cast<float>(-t.y);
             }
             target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
-                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor, uv });
+                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor, uv, layers });
         }
     }
 
@@ -1307,6 +1319,18 @@ void Viewport::beginOrbitAt(QPointF position)
     m_camera.setOrbitPivot(pivot);
 }
 
+void Viewport::setDropPreview(const QVector3D& corner, const QVector3D& size)
+{
+    m_dropPreview = std::pair { corner, size };
+    update();
+}
+
+void Viewport::clearDropPreview()
+{
+    m_dropPreview.reset();
+    update();
+}
+
 QVector3D Viewport::dropPointAt(const QPointF& position) const
 {
     view::Vec3d p = m_camera.pose().target;
@@ -1496,6 +1520,22 @@ ViewportFrame Viewport::frameForRendering() const
         + (m_demoVisible ? 1u : 0u) + (m_cleanCapture ? 0x40000000u : 0u)
         + static_cast<unsigned>(f.textureSignature & 0xFFFFu) * 2654435761u;
 
+    // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.
+    if (m_dropPreview) {
+        const glm::vec3 lo(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z());
+        const glm::vec3 hi = lo + glm::vec3(m_dropPreview->second.x(), m_dropPreview->second.y(), m_dropPreview->second.z());
+        const glm::vec4 color = toVec4(m_accent);
+        std::array<glm::vec3, 8> c {};
+        for (std::size_t k = 0; k < 8; ++k) {
+            c[k] = { (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z };
+        }
+        constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
+            { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+        for (const auto& [a, b] : kEdges) {
+            f.topLines.push_back({ c[std::size_t(a)], c[std::size_t(b)], color, { 1.5f, 0.0f } });
+        }
+        f.topPoints.push_back({ lo, color, 7.0f });
+    }
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     // Pivotul orbitei, cât timp se orbitează în jurul lui.
     if (m_drag == Drag::Orbit && m_camera.orbitPivot()) {

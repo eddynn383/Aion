@@ -17,7 +17,9 @@ Item {
     readonly property string query: search.text.trim().toLowerCase()
     property string category: "" // filtrul (gol = toate)
     readonly property var icons: ({ "gen:door": "door-open", "gen:window": "app-window", "gen:table": "furniture-table",
-                                    "gen:shelf": "library", "gen:cabinet": "archive", "gen:stairs": "stairs" })
+                                    "gen:shelf": "library", "gen:cabinet": "archive", "gen:stairs": "stairs",
+                                    "gen:tree": "tree-deciduous", "gen:conifer": "tree-pine", "gen:bush": "shrub",
+                                    "gen:person": "person-standing" })
     readonly property var items: (root.document ? root.document.libraryItems : [])
         .filter(i => (root.category.length === 0 || i.category === root.category)
                      && (root.query.length === 0 || i.name.toLowerCase().indexOf(root.query) >= 0

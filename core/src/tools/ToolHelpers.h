@@ -29,6 +29,7 @@ void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock);
 [[nodiscard]] std::unique_ptr<Tool> makePrimitiveTool(std::string_view id);
 [[nodiscard]] std::unique_ptr<Tool> makeOffsetTool();
 [[nodiscard]] std::unique_ptr<Tool> makePaintTool();
+[[nodiscard]] std::unique_ptr<Tool> makeTextureTool();
 [[nodiscard]] std::unique_ptr<Tool> makeTapeMeasureTool();
 [[nodiscard]] std::unique_ptr<Tool> makeProtractorTool();
 [[nodiscard]] std::unique_ptr<Tool> makeDimensionTool();

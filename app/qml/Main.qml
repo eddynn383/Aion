@@ -394,6 +394,12 @@ Window {
                     // Click în coordonatele ferestrei (butoane, câmpuri).
                     const cs = action.slice(7).split(",").map(Number)
                     AppInfo.simulateClick(window.contentItem, Qt.point(cs[0], cs[1]))
+                } else if (action.startsWith("droppreview:")) {
+                    // „droppreview:gen:table,700,450”: cutia de previzualizare a obiectului la poziția din viewport.
+                    const dp = action.slice(12).split(",")
+                    const size = doc.libraryItemSize(dp[0])
+                    viewport.setDropPreview(viewport.dropPointAt(Qt.point(parseFloat(dp[1]), parseFloat(dp[2]))),
+                                            Qt.vector3d(size.dx, size.dy, size.dz))
                 } else if (action.startsWith("scriptjs:")) {
                     // Cod JavaScript direct (pentru teste): „scriptjs:aion.box(0,0,0,100,100,100)”.
                     const r = scripts.run(action.slice(9), "Script")
@@ -427,7 +433,7 @@ Window {
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
-                                         "move", "rotate", "scale", "eraser", "paint",
+                                         "move", "rotate", "scale", "eraser", "paint", "texture",
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
 
@@ -716,7 +722,16 @@ Window {
         parent: viewport
         anchors.fill: parent
         keys: ["aion-library"]
+        // Cutia obiectului urmează cursorul (pe suprafața sau solul de sub el).
+        onPositionChanged: (drag) => {
+            const size = doc.libraryItemSize(libraryGhost.itemId)
+            if (size.dx === undefined)
+                return
+            viewport.setDropPreview(viewport.dropPointAt(Qt.point(drag.x, drag.y)), Qt.vector3d(size.dx, size.dy, size.dz))
+        }
+        onExited: viewport.clearDropPreview()
         onDropped: (drop) => {
+            viewport.clearDropPreview()
             doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
             drop.accept()
         }
@@ -1554,6 +1569,7 @@ Window {
                 document: doc
                 timelineActive: window.timelineVisible
                 onEditRules: window.openRulesEditor()
+                onToolRequested: (id) => window.selectTool(id)
             }
 
             // Fără selecție, Inspector-ul descrie modelul întreg.

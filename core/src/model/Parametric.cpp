@@ -40,6 +40,16 @@ const std::vector<GeneratorInfo>& registry()
         { "stairs", "Scară dreaptă", "Scări",
             { { "width", "Lățime", "mm", 1000, 600, 3000, 10 }, { "height", "Înălțime totală", "mm", 2800, 300, 6000, 10 },
                 { "run", "Lungime totală", "mm", 3600, 300, 8000, 10 }, { "steps", "Trepte", "buc.", 16, 2, 40, 1 } } },
+        { "tree", "Copac", "Plante",
+            { { "height", "Înălțime", "mm", 5000, 1000, 20000, 100 }, { "crown", "Diametrul coroanei", "mm", 3000, 500, 12000, 100 },
+                { "trunk", "Diametrul trunchiului", "mm", 300, 50, 1500, 10 } } },
+        { "conifer", "Brad", "Plante",
+            { { "height", "Înălțime", "mm", 6000, 1000, 30000, 100 }, { "width", "Lățime la bază", "mm", 2500, 500, 10000, 100 },
+                { "tiers", "Etaje", "buc.", 3, 1, 6, 1 } } },
+        { "bush", "Tufă", "Plante",
+            { { "width", "Lățime", "mm", 1200, 200, 5000, 50 }, { "height", "Înălțime", "mm", 900, 200, 4000, 50 } } },
+        { "person", "Om", "Oameni",
+            { { "height", "Înălțime", "mm", 1750, 900, 2200, 10 } } },
     };
     return kGenerators;
 }
@@ -81,6 +91,30 @@ struct Parts {
         inst.parent = parent;
         inst.definition = d;
         inst.transform = math::Transform::translation(corner + math::Vec3d { size.x / 2, size.y / 2, 0.0 });
+        inst.name = name;
+        inst.material = material.empty() ? MaterialId {} : libraryMaterial(model, material);
+        model.addInstance(inst);
+    }
+
+    // Un cilindru, con sau sferă cu cutia începând în `corner` (diametrul `diameter`, înălțimea `height`), opțional
+    // turtit / alungit pe Z (scara Z), ca subgrup.
+    void round(const std::string& name, geom::Primitive kind, math::Vec3d corner, double diameter, double height,
+        std::string_view material)
+    {
+        if (diameter < 0.5 || height < 0.5) {
+            return;
+        }
+        Definition def { name, true };
+        def.shape = kind == geom::Primitive::Sphere ? "sphere" : kind == geom::Primitive::Cone ? "cone" : "cylinder";
+        const DefinitionId d = model.addDefinition(def);
+        // Sfera are diametrul X pe toate axele: o scalăm pe Z până la înălțimea cerută.
+        const double built = kind == geom::Primitive::Sphere ? diameter : height;
+        geom::buildPrimitive(model.mesh(d), kind, { diameter, diameter, built }, 24);
+        Instance inst;
+        inst.parent = parent;
+        inst.definition = d;
+        inst.transform = math::Transform::translation(corner + math::Vec3d { diameter / 2, diameter / 2, 0.0 })
+            * math::Transform::scaling(math::Vec3d { 0.0 }, { 1.0, 1.0, height / built });
         inst.name = name;
         inst.material = material.empty() ? MaterialId {} : libraryMaterial(model, material);
         model.addInstance(inst);
@@ -177,6 +211,50 @@ void buildStairs(Parts& p, const std::map<std::string, double>& v)
     }
 }
 
+void buildTree(Parts& p, const std::map<std::string, double>& v)
+{
+    const double h = v.at("height"), crown = v.at("crown"), trunk = std::min(v.at("trunk"), crown * 0.5);
+    const double crownHeight = std::min(crown, h * 0.7);
+    const double c = crown / 2;
+    p.round("Trunchi", geom::Primitive::Cylinder, { c - trunk / 2, c - trunk / 2, 0 }, trunk, h - crownHeight * 0.6, "Lemn de nuc");
+    p.round("Coroană", geom::Primitive::Sphere, { 0, 0, h - crownHeight }, crown, crownHeight, "Iarbă");
+}
+
+void buildConifer(Parts& p, const std::map<std::string, double>& v)
+{
+    const double h = v.at("height"), w = v.at("width");
+    const int tiers = static_cast<int>(std::round(v.at("tiers")));
+    const double trunk = std::max(80.0, w * 0.08);
+    const double c = w / 2;
+    const double trunkHeight = h * 0.2;
+    p.round("Trunchi", geom::Primitive::Cylinder, { c - trunk / 2, c - trunk / 2, 0 }, trunk, trunkHeight + 100, "Lemn de nuc");
+    // Etajele: conuri tot mai mici, suprapuse.
+    const double tierHeight = (h - trunkHeight) / (1.0 + 0.6 * (tiers - 1));
+    for (int i = 0; i < tiers; ++i) {
+        const double d = w * (1.0 - 0.25 * i);
+        const double z = trunkHeight + i * tierHeight * 0.6;
+        p.round("Etaj " + std::to_string(i + 1), geom::Primitive::Cone, { c - d / 2, c - d / 2, z }, d, tierHeight, "Verde brad");
+    }
+}
+
+void buildBush(Parts& p, const std::map<std::string, double>& v)
+{
+    p.round("Tufă", geom::Primitive::Sphere, { 0, 0, 0 }, v.at("width"), v.at("height"), "Iarbă");
+}
+
+// Un om stilizat (proporții medii): picioare, trunchi, brațe, cap.
+void buildPerson(Parts& p, const std::map<std::string, double>& v)
+{
+    const double k = v.at("height") / 1750.0;
+    const auto s = [k](double mm) { return mm * k; };
+    p.box("Picior stâng", { s(80), s(60), 0 }, { s(200), s(200), s(850) }, "Grafit");
+    p.box("Picior drept", { s(240), s(60), 0 }, { s(360), s(200), s(850) }, "Grafit");
+    p.box("Trunchi", { s(60), s(40), s(850) }, { s(380), s(220), s(1450) }, "Albastru");
+    p.box("Braț stâng", { s(-10), s(80), s(820) }, { s(60), s(180), s(1430) }, "Albastru");
+    p.box("Braț drept", { s(380), s(80), s(820) }, { s(450), s(180), s(1430) }, "Albastru");
+    p.round("Cap", geom::Primitive::Sphere, { s(130), s(40), s(1480) }, s(180), s(230), "Teracotă");
+}
+
 using Builder = void (*)(Parts&, const std::map<std::string, double>&);
 
 Builder builderFor(std::string_view id)
@@ -187,6 +265,10 @@ Builder builderFor(std::string_view id)
     if (id == "shelf") return buildShelf;
     if (id == "cabinet") return buildCabinet;
     if (id == "stairs") return buildStairs;
+    if (id == "tree") return buildTree;
+    if (id == "conifer") return buildConifer;
+    if (id == "bush") return buildBush;
+    if (id == "person") return buildPerson;
     return nullptr;
 }
 

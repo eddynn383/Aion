@@ -10,6 +10,7 @@ Column {
     // Timeline-ul e deschis: la hover pe o valoare de plasare, eticheta devine butonul de keyframe.
     property bool timelineActive: false
     signal editRules()
+    signal toolRequested(string id)
 
     readonly property var info: document ? document.entityInfo : ({ kind: "none" })
     readonly property bool isInstance: info.kind === "instance"
@@ -345,13 +346,21 @@ Column {
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSm
             }
-            IconButton {
+            Row {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                width: 24; height: 24; iconSize: Theme.iconSizeSm
-                iconName: "rotate-ccw"
-                tooltip: "Resetează poziția texturii"
-                onClicked: root.document.setFaceTexture({ reset: true })
+                IconButton {
+                    width: 24; height: 24; iconSize: Theme.iconSizeSm
+                    iconName: "image"
+                    tooltip: "Poziționează cu mouse-ul (trage; Shift rotește, ⌘ scalează)"
+                    onClicked: root.toolRequested("texture")
+                }
+                IconButton {
+                    width: 24; height: 24; iconSize: Theme.iconSizeSm
+                    iconName: "rotate-ccw"
+                    tooltip: "Resetează poziția texturii"
+                    onClicked: root.document.setFaceTexture({ reset: true })
+                }
             }
         }
         Row {
