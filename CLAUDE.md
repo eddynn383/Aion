@@ -177,6 +177,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Fețe din muchii**: `geom::createFaces` (comanda `edit.createFaces`; Line o apelează când retrasează o muchie).
   Cursoarele uneltelor se fac în `app/src/bridge/NavigationCursors.cpp` (găleata, guma).
 
+- **Versiunea web publică**: <https://eddynn383.github.io/Aion/> (GitHub Pages). `pages.yml` publică automat
+  artefactul `aion-web` după fiecare CI verde pe `main` (sau manual, cu ID-ul unei rulări CI).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 
