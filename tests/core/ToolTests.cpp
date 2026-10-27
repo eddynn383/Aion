@@ -943,3 +943,59 @@ TEST_CASE("Unelte: o muchie redesenată reface fața ștearsă", "[core][tools]"
     CHECK(s.mesh.faces().size() == 1);
     CHECK(s.mesh.edges().size() == 4);
 }
+
+TEST_CASE("Unelte: Move pornește dintr-un colț sau mijloc al obiectului și se prinde de colțul altuia", "[core][tools][model]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1500, 500, 300 }, 0, 0, 9000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    const auto at = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return *s;
+    };
+    // Două cutii-obiect: A (0..600) și B (2000..2600).
+    const auto makeBox = [&](double x0) {
+        stack.run("Box", [&](geom::Mesh& mesh) {
+            geom::drawPolygon(mesh, { { x0, 0, 0 }, { x0 + 600, 0, 0 }, { x0 + 600, 600, 0 }, { x0, 600, 0 } });
+        });
+        geom::Selection faces;
+        for (geom::FaceId f : m.mesh(m.root()).faces().keys()) {
+            faces.faces.insert(f);
+        }
+        stack.run("Push", [&](geom::Mesh& mesh) { geom::pushPull(mesh, *faces.faces.begin(), -600); });
+        geom::Selection all;
+        all.faces.insert(m.mesh(m.root()).faces().keys().begin(), m.mesh(m.root()).faces().keys().end());
+        model::InstanceId id;
+        stack.run("Group", [&](model::Model& model) { id = model::makeGroup(model, model.root(), all, false); });
+        return id;
+    };
+    const model::InstanceId a = makeBox(0);
+    const model::InstanceId b = makeBox(2000);
+
+    auto move = tools::makeTool("move");
+    // Peste A: 8 colțuri + 12 mijloace; cel de lângă cursor e „fierbinte”.
+    move->pointerMove(ctx, { at({ 300, 300, 600 }), {}, 1 });
+    CHECK(move->overlay().grips.size() == 20);
+    // Mijlocul muchiei de sus din față (300, 0, 600), apoi colțul de jos al lui B (2000, 0, 0).
+    const tools::PointerEvent grab { at({ 300, 0, 600 }) + Vec2d { 3, -2 }, {}, 1 };
+    move->pointerMove(ctx, grab);
+    const tools::Overlay hot = move->overlay();
+    REQUIRE(hot.marker);
+    CHECK(hot.marker->label == "Mijlocul muchiei");
+    move->pointerDown(ctx, grab);
+    move->pointerUp(ctx, grab);
+    const tools::PointerEvent drop { at({ 2000, 0, 0 }) + Vec2d { -4, 3 }, {}, 1 };
+    move->pointerMove(ctx, drop);
+    move->pointerDown(ctx, drop);
+    move->pointerUp(ctx, drop);
+    // Mijlocul (300, 0, 600) al lui A a ajuns în (2000, 0, 0).
+    CHECK(glm::length(m.instance(a).transform.applyToPoint({ 300, 0, 600 }) - Vec3d { 2000, 0, 0 }) < 1e-6);
+    CHECK(m.instances().contains(b));
+}

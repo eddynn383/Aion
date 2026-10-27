@@ -184,6 +184,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `Document::selectionPivot` (marcajul din viewport), cheile `vx/vy/vz` și `pivot: center|base|corner` în
   `setPlacement` / `setGeometryPlacement`. Acțiune de script: `placement:vx=0,vy=0,vz=0`.
 
+- **Move cu puncte de prindere**: `tools::Grip` în `Overlay::grips` (desenate în `Viewport::appendOverlay`),
+  `instanceGrips` / `nearestGrip` în `TransformTools.cpp` (cutia orientată a obiectului, colțuri + mijloace).
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

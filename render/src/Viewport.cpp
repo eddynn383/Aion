@@ -393,6 +393,18 @@ void Viewport::appendDocument(ViewportFrame& f) const
     for (const math::Vec3d& p : overlay.points) {
         f.points.push_back({ w(p), accent, 7.0f });
     }
+    // Punctele de prindere ale obiectelor (Move): discuri mari cu margine, ca în SketchUp; cel de sub cursor mai mare.
+    for (const tools::Grip& g : overlay.grips) {
+        const glm::vec3 p = w(g.point);
+        const glm::vec4 color = markerColor(g.kind, inference::Tint::Neutral);
+        if (g.hidden && !g.hot) {
+            f.topPoints.push_back({ p, glm::vec4(glm::vec3(color), 0.35f), 6.0f }); // în spate: mic și estompat
+            continue;
+        }
+        f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.95f), g.hot ? 19.0f : 13.0f });
+        f.topPoints.push_back({ p, glm::vec4(1.0f), g.hot ? 16.0f : 10.5f });
+        f.topPoints.push_back({ p, color, g.hot ? 12.5f : 8.0f });
+    }
     // Marcajul inferenței: un disc colorat cu margine în culoarea fundalului, peste tot restul.
     if (overlay.marker) {
         const glm::vec3 p = w(overlay.marker->point);

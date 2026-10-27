@@ -170,6 +170,12 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Salvare / deschidere → pivotul ales rămâne; ⌘Z anulează schimbarea pivotului
 - [ ] Un dreptunghi (geometrie liberă): Pivot implicit în centru; rotația și scara se fac în jurul lui
 
+## Move: puncte de prindere
+- [ ] Două cuburi; Move peste primul → colțuri verzi și mijloace de muchii cyan; cele din spate estompate
+- [ ] Cursorul lângă un mijloc → punctul crește, eticheta „Mijlocul muchiei”; click → pornește de acolo
+- [ ] Spre colțul celui de-al doilea cub → se prinde exact („Colț”); click → cuburile se ating în acel punct
+- [ ] Un obiect rotit: punctele sunt pe muchiile lui, nu pe ale cutiei aliniate cu axele
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

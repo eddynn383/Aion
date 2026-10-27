@@ -61,6 +61,14 @@ struct InferenceMarker {
     bool locked = false;
 };
 
+// Un punct de prindere al unui obiect (Move): colț sau mijloc de muchie al cutiei lui, desenat mare și vizibil.
+struct Grip {
+    Vec3d point { 0.0 };
+    inference::Kind kind = inference::Kind::Endpoint; // Endpoint = colț, Midpoint = mijloc de muchie
+    bool hot = false; // sub cursor
+    bool hidden = false; // în spatele obiectului (desenat estompat, prins doar dacă nu e altul vizibil)
+};
+
 // O cotă afișată pe un segment în timpul desenării („2.5 m”).
 struct Dimension {
     Vec3d a;
@@ -79,6 +87,7 @@ struct Overlay {
     std::vector<model::InstanceId> markedInstances;
     std::optional<InferenceMarker> marker;
     std::vector<Dimension> dimensions;
+    std::vector<Grip> grips;
 };
 
 // Ce arată Measurements box: eticheta („Lungime”) și valoarea curentă („2.5 m”, gol dacă nu e nimic de măsurat).
