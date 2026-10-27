@@ -119,6 +119,110 @@ std::vector<PreviewEdge> previewEdges(const ToolContext& ctx, const Target& targ
     return out;
 }
 
+// Punctele de prindere ale obiectelor (Move): colțurile și mijloacele muchiilor cutiei fiecăruia, orientate după
+// obiect (o cutie rotită are punctele pe muchiile ei, nu pe ale cutiei aliniate cu axele).
+std::vector<Grip> instanceGrips(const ToolContext& ctx, const std::set<model::InstanceId>& ids)
+{
+    std::vector<Grip> out;
+    if (ctx.model == nullptr) {
+        return out;
+    }
+    constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 }, { 1, 3 },
+        { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+    for (model::InstanceId id : ids) {
+        if (!ctx.model->instances().contains(id)) {
+            continue;
+        }
+        const model::Instance& inst = ctx.model->instance(id);
+        const auto [lo, hi] = model::bounds(*ctx.model, inst.definition);
+        if (lo.x > hi.x) {
+            continue;
+        }
+        std::array<Vec3d, 8> c {};
+        for (std::size_t k = 0; k < 8; ++k) {
+            c[k] = inst.transform.applyToPoint({ (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z });
+        }
+        // Fețele cutiei văzute de cameră: un punct e vizibil dacă stă pe cel puțin una dintre ele.
+        const Vec3d center = inst.transform.applyToPoint((lo + hi) * 0.5);
+        std::array<bool, 6> facing {}; // −X, +X, −Y, +Y, −Z, +Z (local)
+        bool flat = false;
+        for (int a = 0; a < 3; ++a) {
+            flat = flat || hi[a] - lo[a] < tol::kLength;
+            for (int side = 0; side < 2; ++side) {
+                Vec3d local = (lo + hi) * 0.5;
+                local[a] = side == 0 ? lo[a] : hi[a];
+                const Vec3d p = inst.transform.applyToPoint(local);
+                const Vec3d outward = p - center;
+                const Vec3d toEye = ctx.camera.projection() == view::Projection::Orthographic ? -ctx.camera.forward()
+                                                                                               : ctx.camera.eye() - p;
+                facing[std::size_t(a * 2 + side)] = glm::dot(outward, toEye) > 0.0;
+            }
+        }
+        const auto visible = [&](std::size_t k) { // colțul k (biții = partea pe X, Y, Z)
+            return flat || facing[(k & 1) ? 1 : 0] || facing[(k & 2) ? 3 : 2] || facing[(k & 4) ? 5 : 4];
+        };
+        const std::size_t first = out.size();
+        const auto add = [&](const Vec3d& p, inference::Kind kind, bool hidden) {
+            // O cutie turtită (o placă, o formă plană) are colțuri și mijloace care coincid: fiecare punct o dată.
+            for (std::size_t i = first; i < out.size(); ++i) {
+                if (glm::length(out[i].point - p) < tol::kLength) {
+                    out[i].hidden = out[i].hidden && hidden;
+                    return;
+                }
+            }
+            out.push_back({ p, kind, false, hidden });
+        };
+        for (std::size_t k = 0; k < 8; ++k) {
+            add(c[k], inference::Kind::Endpoint, !visible(k));
+        }
+        for (const auto& [a, b] : kEdges) {
+            // Mijlocul unei muchii e vizibil dacă una dintre cele două fețe ale muchiei e văzută.
+            const auto ka = std::size_t(a);
+            const auto kb = std::size_t(b);
+            bool seen = flat;
+            for (int axis = 0; axis < 3; ++axis) {
+                const std::size_t bit = std::size_t(1) << axis;
+                if ((ka & bit) == (kb & bit)) { // muchia stă pe fața de pe această axă
+                    seen = seen || facing[std::size_t(axis * 2) + ((ka & bit) ? 1 : 0)];
+                }
+            }
+            add((c[ka] + c[kb]) * 0.5, inference::Kind::Midpoint, !seen);
+        }
+    }
+    return out;
+}
+
+// Indexul punctului de prindere cel mai apropiat de cursor (în pixeli), sau -1.
+int nearestGrip(const ToolContext& ctx, const std::vector<Grip>& grips, Vec2d screen, double radiusPx, bool hidden);
+
+// Cel mai apropiat punct vizibil; doar dacă nu e niciunul, unul din spatele obiectului.
+int nearestGrip(const ToolContext& ctx, const std::vector<Grip>& grips, Vec2d screen, double radiusPx)
+{
+    const int visible = nearestGrip(ctx, grips, screen, radiusPx, false);
+    return visible >= 0 ? visible : nearestGrip(ctx, grips, screen, radiusPx, true);
+}
+
+int nearestGrip(const ToolContext& ctx, const std::vector<Grip>& grips, Vec2d screen, double radiusPx, bool hidden)
+{
+    int best = -1;
+    double bestDistance = radiusPx;
+    for (std::size_t i = 0; i < grips.size(); ++i) {
+        if (grips[i].hidden != hidden) {
+            continue;
+        }
+        if (const auto s = ctx.camera.project(grips[i].point)) {
+            const double d = glm::length(*s - screen);
+            // La egalitate (puncte suprapuse pe ecran) câștigă colțul.
+            if (d < bestDistance - 0.5 || (d < bestDistance + 0.5 && best >= 0 && grips[i].kind == inference::Kind::Endpoint
+                    && grips[std::size_t(best)].kind != inference::Kind::Endpoint)) {
+                bestDistance = std::min(d, bestDistance);
+                best = static_cast<int>(i);
+            }
+        }
+    }
+    return best;
+}
+
 void appendPreview(Overlay& o, const std::vector<PreviewEdge>& edges, const Transform& t)
 {
     for (const PreviewEdge& e : edges) {
@@ -306,10 +410,19 @@ public:
         track(ctx, e);
         if (!m_base) {
             m_target = targetAt(ctx, e.screen);
-            if (m_target.empty() || !m_inference.valid()) {
+            // Un punct de prindere al obiectului de sub cursor (fără selecție): obiectul lui e ținta, chiar dacă
+            // punctul e puțin în afara conturului.
+            if (m_hotGrip >= 0 && ctx.selection.empty() && m_gripOwner) {
+                m_target = Target {};
+                m_target.selection.instances.insert(m_gripOwner);
+                if (ctx.model != nullptr && ctx.model->instance(m_gripOwner).locked) {
+                    m_target.selection.instances.clear();
+                }
+            }
+            if (m_target.empty() || (!m_inference.valid() && m_hotGrip < 0)) {
                 return;
             }
-            m_base = m_inference.point;
+            m_base = m_hotGrip >= 0 ? m_grips[std::size_t(m_hotGrip)].point : m_inference.point;
             m_current = *m_base;
             m_preview = previewEdges(ctx, m_target);
             m_engine.restartFrom(*m_base);
@@ -349,6 +462,8 @@ public:
         m_dragging = false;
         m_engine.reset();
         m_shiftLock = false;
+        m_grips.clear();
+        m_hotGrip = -1;
     }
 
     Overlay overlay() const override
@@ -364,6 +479,12 @@ public:
             }
         }
         appendInference(o, m_inference);
+        o.grips = m_grips;
+        if (m_hotGrip >= 0) {
+            const Grip& g = m_grips[std::size_t(m_hotGrip)];
+            o.marker = InferenceMarker { g.point, g.kind, inference::Tint::Neutral,
+                g.kind == inference::Kind::Endpoint ? "Colț" : "Mijlocul muchiei", false };
+        }
         return o;
     }
 
@@ -375,7 +496,7 @@ public:
             return "Alege punctul de destinație sau tastează distanța · Option: copiază · săgeți/Shift: blochează · Esc";
         }
         return m_lastCopy ? "Tastează x3 sau /3 pentru mai multe copii · sau alege ce muți"
-                          : "Alege punctul de pornire (pe selecție sau pe entitatea de mutat)";
+                          : "Alege punctul de pornire: un colț sau mijlocul unei muchii al obiectului, sau orice punct";
     }
 
     std::optional<Measurement> measurement() const override
@@ -409,6 +530,52 @@ private:
             m_current = m_inference.point;
         }
         m_hover = m_base ? view::PickResult {} : targetHover(ctx, e.screen);
+        updateGrips(ctx, e.screen);
+    }
+
+    // Punctele de prindere: înainte de pornire, ale obiectelor selectate (sau al celui de sub cursor); în timpul
+    // mutării, ale obiectului de sub cursor (destinația), fără cele mutate. Cel apropiat de cursor e „fierbinte”.
+    void updateGrips(ToolContext& ctx, Vec2d screen)
+    {
+        std::set<model::InstanceId> ids;
+        m_gripOwner = {};
+        if (!m_base && !ctx.selection.empty()) {
+            ids = ctx.selection.instances;
+        } else {
+            const view::PickResult hit = pickWithInstances(ctx, screen);
+            if (hit.kind == view::PickResult::Kind::Instance && !(m_base && m_target.selection.instances.contains(hit.instance))) {
+                ids.insert(hit.instance);
+                m_gripOwner = hit.instance;
+            } else if (ctx.model != nullptr) {
+                // Cursorul e lângă un obiect, dar nu pe el (un colț văzut din afară): cel mai apropiat punct al
+                // obiectelor vizibile din context.
+                double best = kGripRadiusPx;
+                for (std::size_t i = 0; i < ctx.model->instances().size(); ++i) {
+                    const model::InstanceId id = ctx.model->instances().keys()[i];
+                    const model::Instance& inst = ctx.model->instances().values()[i];
+                    if (inst.parent != ctx.context || inst.hidden || (m_base && m_target.selection.instances.contains(id))) {
+                        continue;
+                    }
+                    const std::vector<Grip> grips = instanceGrips(ctx, { id });
+                    const int k = nearestGrip(ctx, grips, screen, best);
+                    if (k >= 0) {
+                        if (const auto sp = ctx.camera.project(grips[std::size_t(k)].point)) {
+                            best = glm::length(*sp - screen);
+                        }
+                        ids = { id };
+                        m_gripOwner = id;
+                    }
+                }
+            }
+        }
+        m_grips = instanceGrips(ctx, ids);
+        m_hotGrip = nearestGrip(ctx, m_grips, screen, kGripRadiusPx);
+        if (m_hotGrip >= 0) {
+            m_grips[std::size_t(m_hotGrip)].hot = true;
+            if (m_base && !m_shiftLock) {
+                m_current = m_grips[std::size_t(m_hotGrip)].point;
+            }
+        }
     }
 
     void commit(ToolContext& ctx)
@@ -432,7 +599,12 @@ private:
         m_shiftLock = false;
     }
 
+    static constexpr double kGripRadiusPx = 14.0;
+
     Target m_target;
+    std::vector<Grip> m_grips;
+    int m_hotGrip = -1;
+    model::InstanceId m_gripOwner;
     std::optional<Vec3d> m_base;
     Vec3d m_current { 0.0 };
     std::vector<PreviewEdge> m_preview;

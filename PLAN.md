@@ -645,6 +645,12 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 - [x] Marcajul pivotului în viewport; `aion.rotate` folosește pivotul
 - [ ] Pivotul tras direct din viewport
 
+### Move: puncte de prindere ale obiectelor (cerința din 2026-10-27)
+- [x] Move arată colțurile (verde) și mijloacele muchiilor (cyan) cutiei obiectului de sub cursor sau selectat, mari
+      și cu margine ca în SketchUp; cele din spate sunt mici și estompate
+- [x] Punctul de lângă cursor se mărește, are etichetă și devine punctul de pornire; la destinație, cursorul se
+      prinde de punctele altor obiecte (și când e puțin în afara lor)
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |
