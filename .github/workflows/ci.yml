@@ -198,6 +198,8 @@ jobs:
           cp build/wasm-app/app/Aion.html web/index.html
           cp build/wasm-app/app/Aion.js build/wasm-app/app/Aion.wasm build/wasm-app/app/qtloader.js web/
           cp resources/branding/aion-icon.svg web/ 2>/dev/null || true
+          # Ecranul de încărcare al lui Qt cere qtlogo.svg: arătăm iconița Aion în locul lui.
+          cp resources/branding/aion-icon.svg web/qtlogo.svg
           ls -l web
 
       - uses: actions/upload-artifact@v4
