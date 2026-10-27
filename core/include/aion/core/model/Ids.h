@@ -17,6 +17,7 @@ struct SceneTag;
 struct AnimationTag;
 struct CameraTag;
 struct LightTag;
+struct TextureTag;
 
 using DefinitionId = geom::Id<DefinitionTag>;
 using InstanceId = geom::Id<InstanceTag>;
@@ -29,5 +30,6 @@ using SceneId = geom::Id<SceneTag>;
 using AnimationId = geom::Id<AnimationTag>;
 using CameraId = geom::Id<CameraTag>;
 using LightId = geom::Id<LightTag>;
+using TextureId = geom::Id<TextureTag>;
 
 } // namespace aion::model

@@ -5,6 +5,7 @@ layout(location = 2) in float state;
 layout(location = 3) in vec4 color;     // culoarea materialului (a < 0 = fără material)
 layout(location = 4) in vec2 material;  // x = rugozitate, y = metalic
 layout(location = 5) in vec4 backColor; // materialul de pe verso (a < 0 = fără)
+layout(location = 6) in vec3 uv;        // coordonatele texturii, z = stratul (z < 0 = fără textură)
 
 layout(location = 0) out vec3 v_normal;
 layout(location = 1) out vec3 v_world;
@@ -12,6 +13,7 @@ layout(location = 2) out float v_state;
 layout(location = 3) out vec4 v_color;
 layout(location = 4) out vec2 v_material;
 layout(location = 5) out vec4 v_backColor;
+layout(location = 6) out vec3 v_uv;
 
 // Trebuie să corespundă cu FrameUniforms din render/src/ViewportRenderer.cpp.
 layout(std140, binding = 0) uniform Frame {
@@ -43,5 +45,6 @@ void main()
     v_color = color;
     v_material = material;
     v_backColor = backColor;
+    v_uv = uv;
     gl_Position = frame.viewProj * vec4(position, 1.0);
 }

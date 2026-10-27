@@ -6,7 +6,7 @@ namespace aion::model {
 
 std::span<const Material> builtinMaterials()
 {
-    static const std::array<Material, 24> kMaterials { {
+    static const std::array<Material, 29> kMaterials { {
         { "Alb mat", { 242, 241, 236, 255 }, 0.9f, 0.0f },
         { "Gips", { 228, 225, 216, 255 }, 0.95f, 0.0f },
         { "Gri deschis", { 190, 192, 196, 255 }, 0.85f, 0.0f },
@@ -31,8 +31,22 @@ std::span<const Material> builtinMaterials()
         { "Apă", { 60, 120, 160, 160 }, 0.05f, 0.0f },
         { "Albastru", { 59, 130, 246, 255 }, 0.6f, 0.0f },
         { "Verde salvie", { 140, 160, 130, 255 }, 0.8f, 0.0f },
+        // Cu textură (culoarea albă = textura neschimbată; mărimea = o repetiție, în mm).
+        { "Cărămidă aparentă", { 255, 255, 255, 255 }, 0.9f, 0.0f, {}, { 1000.0, 1000.0 } },
+        { "Parchet de stejar", { 255, 255, 255, 255 }, 0.55f, 0.0f, {}, { 1200.0, 1200.0 } },
+        { "Lemn (fibră)", { 255, 255, 255, 255 }, 0.6f, 0.0f, {}, { 800.0, 800.0 } },
+        { "Beton turnat", { 255, 255, 255, 255 }, 0.95f, 0.0f, {}, { 2000.0, 2000.0 } },
+        { "Gresie 30 × 30", { 255, 255, 255, 255 }, 0.4f, 0.0f, {}, { 1200.0, 1200.0 } },
     } };
     return kMaterials;
+}
+
+std::string_view builtinTexture(std::size_t index)
+{
+    static constexpr std::array<std::string_view, 5> kTextures { "brick", "parquet", "wood", "concrete", "tiles" };
+    constexpr std::size_t kFirstTextured = 24;
+    return index >= kFirstTextured && index - kFirstTextured < kTextures.size() ? kTextures[index - kFirstTextured]
+                                                                               : std::string_view {};
 }
 
 } // namespace aion::model

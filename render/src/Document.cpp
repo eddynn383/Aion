@@ -8,6 +8,7 @@
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Interaction.h"
 #include "aion/core/model/Modeling.h"
+#include "ProceduralTextures.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
@@ -20,6 +21,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QBuffer>
+#include <QImage>
 #include <QSettings>
 #include <QStandardPaths>
 
@@ -506,9 +509,15 @@ bool Document::exportFile(const QString& path)
         ok = obj.open(QIODevice::WriteOnly | QIODevice::Truncate) && mtl.open(QIODevice::WriteOnly | QIODevice::Truncate);
         if (ok) {
             const std::string objText = io::exportObj(m_model, {}, mtlName.toStdString());
-            const std::string mtlText = io::exportMtl();
+            const std::string mtlText = io::exportMtl(m_model);
             ok = obj.write(objText.data(), qint64(objText.size())) == qint64(objText.size())
                 && mtl.write(mtlText.data(), qint64(mtlText.size())) == qint64(mtlText.size());
+            // Imaginile texturilor, lângă .mtl (map_Kd le caută acolo).
+            for (const auto& [name, bytes] : io::exportTextureFiles(m_model)) {
+                QFile image(info.dir().filePath(QString::fromStdString(name)));
+                ok = ok && image.open(QIODevice::WriteOnly | QIODevice::Truncate)
+                    && image.write(reinterpret_cast<const char*>(bytes.data()), qint64(bytes.size())) == qint64(bytes.size());
+            }
         }
     } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
         ok = io::exportGltf(m_model, toPath(path), ext == QLatin1String("glb"), {}, &error);
@@ -911,6 +920,18 @@ QVariantMap Document::entityInfo() const
         info[QStringLiteral("tagId")] = faceTags.size() == 1 ? static_cast<double>(faceTags.begin()->value) : -1.0;
         info[QStringLiteral("frontMaterial")] = sideInfo(fronts);
         info[QStringLiteral("backMaterial")] = sideInfo(backs);
+        // Poziționarea texturii (a primei fețe), dacă vreuna are o textură (material propriu sau al obiectului).
+        for (geom::FaceId f : m_selection.faces) {
+            const geom::Face* face = mesh.faces().find(f);
+            const model::Material* material = face && face->material ? m_model.materials().find(face->material) : nullptr;
+            if (material != nullptr && material->texture) {
+                const geom::TextureTransform& t = face->texture;
+                info[QStringLiteral("texture")] = QVariantMap { { QStringLiteral("ox"), t.offset.x },
+                    { QStringLiteral("oy"), t.offset.y }, { QStringLiteral("rotation"), t.rotation },
+                    { QStringLiteral("sx"), t.scale.x }, { QStringLiteral("sy"), t.scale.y } };
+                break;
+            }
+        }
         info[QStringLiteral("kind")] = QStringLiteral("faces");
         info[QStringLiteral("title")]
             = m_selection.faces.size() == 1 ? QStringLiteral("Față") : plural(m_selection.faces.size(), "față", "fețe");
@@ -2617,6 +2638,37 @@ QVariantMap materialEntry(const model::Material& m)
 
 } // namespace
 
+namespace {
+
+// O miniatură (PNG mic, ca data URL) pentru panoul de materiale.
+QString thumbnailUrl(const QImage& image)
+{
+    if (image.isNull()) {
+        return {};
+    }
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    image.scaled(128, 128, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).save(&buffer, "PNG");
+    return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
+}
+
+} // namespace
+
+QString Document::textureThumbnail(model::TextureId id) const
+{
+    const model::Texture* t = m_model.textures().find(id);
+    if (t == nullptr || t->data.empty()) {
+        return {};
+    }
+    const std::size_t key = t->data.size() ^ (id.value << 32);
+    auto& cached = m_thumbnails[id.value];
+    if (cached.first != key) {
+        cached = { key, thumbnailUrl(QImage::fromData(t->data.data(), static_cast<int>(t->data.size()))) };
+    }
+    return cached.second;
+}
+
 QVariantList Document::libraryMaterials() const
 {
     QVariantList out;
@@ -2624,6 +2676,14 @@ QVariantList Document::libraryMaterials() const
     for (std::size_t i = 0; i < library.size(); ++i) {
         QVariantMap entry = materialEntry(library[i]);
         entry[QStringLiteral("index")] = static_cast<int>(i);
+        if (const std::string_view key = model::builtinTexture(i); !key.empty()) {
+            static std::map<std::string_view, QString> thumbnails;
+            auto& url = thumbnails[key];
+            if (url.isEmpty()) {
+                url = thumbnailUrl(proceduralTexture(QString::fromLatin1(key.data(), static_cast<qsizetype>(key.size())), 256));
+            }
+            entry[QStringLiteral("thumbnail")] = url;
+        }
         out.append(entry);
     }
     return out;
@@ -2650,6 +2710,12 @@ QVariantList Document::modelMaterials() const
         QVariantMap entry = materialEntry(m_model.materials().values()[i]);
         entry[QStringLiteral("id")] = static_cast<double>(id.value);
         entry[QStringLiteral("count")] = counts[id];
+        const model::Material& m = m_model.materials().values()[i];
+        entry[QStringLiteral("thumbnail")] = textureThumbnail(m.texture);
+        entry[QStringLiteral("textureSource")] = m.texture && m_model.textures().contains(m.texture)
+            ? QString::fromStdString(m_model.textures().at(m.texture).source) : QString();
+        entry[QStringLiteral("textureWidth")] = m.textureSize.x;
+        entry[QStringLiteral("textureHeight")] = m.textureSize.y;
         out.append(entry);
     }
     return out;
@@ -2723,6 +2789,44 @@ void Document::setPlacement(const QVariantMap& placement)
     runOnModel("Transformare", [&](model::Model& model) { model::setPlacement(model, id, p); });
 }
 
+namespace {
+
+// Textura procedurală din model (o adaugă dacă lipsește): „procedural:brick” etc.
+model::TextureId proceduralTextureIn(model::Model& model, const std::string& key)
+{
+    const std::string source = "procedural:" + key;
+    for (std::size_t i = 0; i < model.textures().size(); ++i) {
+        if (model.textures().values()[i].source == source) {
+            return model.textures().keys()[i];
+        }
+    }
+    const QByteArray png = proceduralTexturePng(QString::fromStdString(key));
+    model::Texture texture;
+    texture.name = key;
+    texture.source = source;
+    texture.data.assign(reinterpret_cast<const std::uint8_t*>(png.constData()),
+        reinterpret_cast<const std::uint8_t*>(png.constData()) + png.size());
+    return model.addTexture(std::move(texture));
+}
+
+// Materialul din bibliotecă, în model (după nume; cu textura lui, dacă are).
+model::MaterialId libraryMaterialIn(model::Model& model, std::size_t index)
+{
+    const model::Material& lib = model::builtinMaterials()[index];
+    for (std::size_t i = 0; i < model.materials().size(); ++i) {
+        if (model.materials().values()[i].name == lib.name) {
+            return model.materials().keys()[i];
+        }
+    }
+    model::Material copy = lib;
+    if (const std::string_view key = model::builtinTexture(index); !key.empty()) {
+        copy.texture = proceduralTextureIn(model, std::string(key));
+    }
+    return model.addMaterial(copy);
+}
+
+} // namespace
+
 void Document::assignMaterial(const QVariantMap& material, const QString& side)
 {
     if (m_selection.empty()) {
@@ -2734,16 +2838,7 @@ void Document::assignMaterial(const QVariantMap& material, const QString& side)
         if (material.contains(QStringLiteral("library"))) {
             const int index = material.value(QStringLiteral("library")).toInt();
             if (index >= 0 && index < static_cast<int>(model::builtinMaterials().size())) {
-                const model::Material& lib = model::builtinMaterials()[static_cast<std::size_t>(index)];
-                id = {};
-                for (std::size_t i = 0; i < model.materials().size(); ++i) {
-                    if (model.materials().values()[i].name == lib.name) {
-                        id = model.materials().keys()[i];
-                    }
-                }
-                if (!id) {
-                    id = model.addMaterial(lib);
-                }
+                id = libraryMaterialIn(model, static_cast<std::size_t>(index));
             }
         }
         if (id && !model.materials().contains(id)) {
@@ -2779,6 +2874,15 @@ void Document::selectLibraryMaterial(int index)
             selectModelMaterial(static_cast<double>(m_model.materials().keys()[i].value));
             return;
         }
+    }
+    // Cu textură: intră în model acum (Paint Bucket vopsește apoi cu un material din model).
+    if (!model::builtinTexture(static_cast<std::size_t>(index)).empty()) {
+        model::MaterialId added;
+        runOnModel("Material din bibliotecă", [&](model::Model& model) {
+            added = libraryMaterialIn(model, static_cast<std::size_t>(index));
+        });
+        selectModelMaterial(static_cast<double>(added.value));
+        return;
     }
     m_libraryMaterial = index;
     m_currentMaterial = {};
@@ -2821,6 +2925,50 @@ void applyMaterialProperties(model::Material& m, const QVariantMap& p)
     if (p.contains(QStringLiteral("metallic"))) {
         m.metallic = static_cast<float>(std::clamp(p.value(QStringLiteral("metallic")).toDouble(), 0.0, 1.0));
     }
+    if (p.contains(QStringLiteral("textureWidth"))) {
+        m.textureSize.x = std::max(1.0, p.value(QStringLiteral("textureWidth")).toDouble());
+    }
+    if (p.contains(QStringLiteral("textureHeight"))) {
+        m.textureSize.y = std::max(1.0, p.value(QStringLiteral("textureHeight")).toDouble());
+    }
+}
+
+// Textura cerută de editor: "" = fără, „procedural:brick”, „file:/cale/imagine.jpg”. nullopt = neschimbată.
+std::optional<model::TextureId> textureFromProperty(model::Model& model, const QVariantMap& p)
+{
+    if (!p.contains(QStringLiteral("texture"))) {
+        return std::nullopt;
+    }
+    const QString value = p.value(QStringLiteral("texture")).toString();
+    if (value.isEmpty()) {
+        return model::TextureId {};
+    }
+    if (value.startsWith(QLatin1String("procedural:"))) {
+        return proceduralTextureIn(model, value.mid(11).toStdString());
+    }
+    QString path = value.startsWith(QLatin1String("file:")) ? value.mid(5) : value;
+    if (path.startsWith(QLatin1String("//"))) {
+        path = QUrl(QStringLiteral("file:") + path).toLocalFile();
+    }
+    for (std::size_t i = 0; i < model.textures().size(); ++i) {
+        if (model.textures().values()[i].source == path.toStdString()) {
+            return model.textures().keys()[i];
+        }
+    }
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return std::nullopt;
+    }
+    const QByteArray bytes = file.readAll();
+    if (QImage::fromData(bytes).isNull()) {
+        return std::nullopt;
+    }
+    model::Texture texture;
+    texture.name = QFileInfo(path).completeBaseName().toStdString();
+    texture.source = path.toStdString();
+    texture.data.assign(reinterpret_cast<const std::uint8_t*>(bytes.constData()),
+        reinterpret_cast<const std::uint8_t*>(bytes.constData()) + bytes.size());
+    return model.addTexture(std::move(texture));
 }
 
 } // namespace
@@ -2832,6 +2980,9 @@ double Document::createMaterial(const QVariantMap& properties)
         model::Material m;
         m.name = "Material " + std::to_string(model.materials().size() + 1);
         applyMaterialProperties(m, properties);
+        if (const auto texture = textureFromProperty(model, properties)) {
+            m.texture = *texture;
+        }
         if (m.name.empty()) {
             m.name = "Material " + std::to_string(model.materials().size() + 1);
         }
@@ -2849,10 +3000,15 @@ void Document::updateMaterial(double materialId, const QVariantMap& properties)
     }
     model::Material m = m_model.material(id);
     applyMaterialProperties(m, properties);
-    if (m.name.empty() || m == m_model.material(id)) {
+    if (m.name.empty() || (m == m_model.material(id) && !properties.contains(QStringLiteral("texture")))) {
         return;
     }
-    runOnModel("Proprietățile materialului", [&](model::Model& model) { model.setMaterial(id, m); });
+    runOnModel("Proprietățile materialului", [&](model::Model& model) {
+        if (const auto texture = textureFromProperty(model, properties)) {
+            m.texture = *texture;
+        }
+        model.setMaterial(id, m);
+    });
     emit materialChanged();
 }
 
@@ -3141,6 +3297,30 @@ void Document::reverseSelectedFaces()
             }
         }
         m_selection.faces = flipped;
+    });
+}
+
+void Document::setFaceTexture(const QVariantMap& changes)
+{
+    if (m_selection.faces.empty()) {
+        return;
+    }
+    runOnModel("Poziționează textura", [&](model::Model& model) {
+        geom::Mesh& mesh = model.mesh(activeDefinition());
+        for (geom::FaceId f : m_selection.faces) {
+            if (!mesh.faces().contains(f)) {
+                continue;
+            }
+            geom::TextureTransform t = changes.value(QStringLiteral("reset")).toBool() ? geom::TextureTransform {}
+                                                                                      : mesh.face(f).texture;
+            const auto value = [&](const char* key, double fallback) {
+                return changes.value(QLatin1String(key), fallback).toDouble();
+            };
+            t.offset = { value("ox", t.offset.x), value("oy", t.offset.y) };
+            t.rotation = value("rotation", t.rotation);
+            t.scale = { std::max(value("sx", t.scale.x), 1e-3), std::max(value("sy", t.scale.y), 1e-3) };
+            mesh.setFaceTexture(f, t);
+        }
     });
 }
 

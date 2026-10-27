@@ -301,6 +301,8 @@ public:
     // --- Modelare pe selecție (ADR 0023) ---
     // Oglindește selecția față de centrul ei, pe axa 0 (X), 1 (Y) sau 2 (Z).
     Q_INVOKABLE void mirrorSelection(int axis);
+    // Poziționarea texturii pe fețele selectate: { ox, oy (mm), rotation (°), sx, sy } sau { reset: true }.
+    Q_INVOKABLE void setFaceTexture(const QVariantMap& changes);
     // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până la
     // commitOperation() / cancelOperation(). options: { mode: "linear"|"polar", count, dx, dy, dz (pasul liniar, mm),
     // axis: 0|1|2, angle (grade între copii), rotate, aroundOrigin (altfel în jurul centrului selecției) }.
@@ -487,6 +489,9 @@ private:
     void dropStaleReferences();
     void updateHiddenTags();
     QVariantMap materialInfo(model::MaterialId id) const;
+    // Miniatura texturii (data URL), păstrată între apeluri.
+    QString textureThumbnail(model::TextureId id) const;
+    mutable std::map<std::uint64_t, std::pair<std::size_t, QString>> m_thumbnails;
     std::size_t validPathLength() const;
     bool m_contextLost = false;
     void setPath(std::vector<model::InstanceId> path);

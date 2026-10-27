@@ -9,6 +9,8 @@
 #include <QByteArray>
 #include <QColor>
 #include <QImage>
+
+#include <map>
 #include <QCursor>
 #include <QElapsedTimer>
 #include <QPointF>
@@ -295,6 +297,10 @@ private:
     // Transformarea (în model) a unei definiții: prin calea editată, dacă e pe ea, altfel prin prima ei instanță.
     math::Transform definitionToWorld(const Document& doc, model::DefinitionId definition) const;
     void appendModelExtras(ViewportFrame& f, const Document& doc) const;
+    // Texturile modelului pentru renderer (straturile array-ului) și stratul fiecărei texturi.
+    void collectTextures(ViewportFrame& f, const Document& doc) const;
+    mutable std::map<std::uint64_t, std::pair<std::size_t, QImage>> m_textureCache;
+    mutable std::map<std::uint64_t, int> m_textureLayers;
     // Camera sau lumina al cărei marcaj e sub cursor: ("camera" | "light", id).
     std::optional<std::pair<QString, double>> objectHandleAt(QPointF position) const;
 

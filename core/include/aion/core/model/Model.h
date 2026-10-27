@@ -37,12 +37,25 @@ struct Tag {
     bool operator==(const Tag&) const = default;
 };
 
-// Un material: culoare (cu opacitate), rugozitate și caracter metalic (PBR simplificat).
+// O imagine folosită ca textură (PNG sau JPG, octeții fișierului), salvată în arhiva `.aion`.
+// `source`: de unde vine („procedural:brick” pentru texturile generate, numele fișierului pentru cele importate).
+struct Texture {
+    std::string name;
+    std::string source;
+    std::vector<std::uint8_t> data;
+
+    bool operator==(const Texture&) const = default;
+};
+
+// Un material: culoare (cu opacitate), rugozitate și caracter metalic (PBR simplificat), opțional cu o textură
+// care se repetă la fiecare `textureSize` mm (culoarea o nuanțează: alb = textura neschimbată).
 struct Material {
     std::string name;
     Color color { 200, 200, 200, 255 };
     float roughness = 0.8f;
     float metallic = 0.0f;
+    TextureId texture {};
+    math::Vec2d textureSize { 1000.0 };
 
     bool operator==(const Material&) const = default;
 };
@@ -283,6 +296,7 @@ struct ChangeSet {
     std::map<AnimationId, geom::EntityChange<Animation>> animations;
     std::map<CameraId, geom::EntityChange<CameraObject>> cameras;
     std::map<LightId, geom::EntityChange<Light>> lights;
+    std::map<TextureId, geom::EntityChange<Texture>> textures;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -323,6 +337,7 @@ public:
     [[nodiscard]] const geom::SlotMap<AnimationId, Animation>& animations() const { return m_animations; }
     [[nodiscard]] const geom::SlotMap<CameraId, CameraObject>& cameras() const { return m_cameras; }
     [[nodiscard]] const geom::SlotMap<LightId, Light>& lights() const { return m_lights; }
+    [[nodiscard]] const geom::SlotMap<TextureId, Texture>& textures() const { return m_textures; }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -368,6 +383,9 @@ public:
     LightId addLight(Light light);
     void removeLight(LightId id);
     void setLight(LightId id, Light light);
+    TextureId addTexture(Texture texture);
+    void removeTexture(TextureId id);
+    void setTexture(TextureId id, Texture texture);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -411,6 +429,7 @@ private:
     geom::SlotMap<AnimationId, Animation> m_animations;
     geom::SlotMap<CameraId, CameraObject> m_cameras;
     geom::SlotMap<LightId, Light> m_lights;
+    geom::SlotMap<TextureId, Texture> m_textures;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;
     // Geometria (goală) a definițiilor șterse, păstrată ca undo să le refacă fără să refolosească ID-uri.
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_graveyard;

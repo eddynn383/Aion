@@ -63,6 +63,7 @@ public:
     void setFaceMaterial(FaceId id, model::MaterialId material);
     void setFaceBackMaterial(FaceId id, model::MaterialId material);
     void setFaceTag(FaceId id, model::TagId tag);
+    void setFaceTexture(FaceId id, const TextureTransform& texture);
     void setEdgeTag(EdgeId id, model::TagId tag);
     void removeFace(FaceId id);
     // Mută un vârf (fără verificări: fețele atinse trebuie apoi aduse la zi, vezi transformVertices).

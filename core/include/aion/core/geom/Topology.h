@@ -54,6 +54,17 @@ struct Loop {
     bool operator==(const Loop&) const = default;
 };
 
+// Poziționarea texturii pe o față (Position Texture): deplasare în mm, rotație în grade, scară (1 = mărimea reală a
+// texturii din material). Aplicată peste proiecția plană implicită (vezi model/Texturing.h).
+struct TextureTransform {
+    math::Vec2d offset { 0.0 };
+    double rotation = 0.0;
+    math::Vec2d scale { 1.0 };
+
+    [[nodiscard]] bool isIdentity() const { return *this == TextureTransform {}; }
+    bool operator==(const TextureTransform&) const = default;
+};
+
 // Față plană: bucla exterioară în sens trigonometric față de normală, găurile în sens orar.
 struct Face {
     math::Plane plane;
@@ -62,6 +73,7 @@ struct Face {
     model::MaterialId material; // nul = materialul implicit (sau al grupului din care face parte)
     model::MaterialId backMaterial; // materialul de pe verso; nul = ca fața (sau culoarea implicită a versoului)
     model::TagId tag; // tag-ul feței (opțional)
+    TextureTransform texture {}; // poziționarea texturii materialului
 
     bool operator==(const Face&) const = default;
 };

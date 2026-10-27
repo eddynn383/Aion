@@ -152,3 +152,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Array în linie: 3 copii alăturate implicit; schimbă numărul / axa / pasul → previzualizarea se actualizează; Gata = un pas de undo
 - [ ] Array în cerc: rază, tot cercul sau unghi, rotirea copiilor (de exemplu scaune în jurul unei mese)
 - [ ] Soften pe o cutie cu 95° → muchiile dispar și umbrirea devine netedă; 0° → toate vizibile; Esc anulează
+## Texturi (Faza 24)
+- [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
+- [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală
+- [ ] Material nou → Textură: procedurală sau „Imagine…” (PNG / JPG); L × H în mm schimbă mărimea pe model
+- [ ] Selectează o față texturată → Inspector → Poziția texturii (X, Y, rotație, scară), ↺ resetează
+- [ ] Salvare / deschidere `.aion`: texturile rămân (și pe alt calculator, fără fișierele originale)
+- [ ] Export GLB / glTF: în Blender sau https://gltf-viewer.donmccurdy.com texturile apar; OBJ + MTL + imaginile alături
+- [ ] Web: texturile se văd în browser
