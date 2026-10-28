@@ -643,7 +643,8 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
       pivotul pe loc, poziția rămâne colțul minim _(ADR 0030)_
 - [x] Inspector → Pivot (mm de la colț) cu presetările Centru / Bază / Colț, pentru obiecte și geometrie liberă
 - [x] Marcajul pivotului în viewport; `aion.rotate` folosește pivotul
-- [ ] Pivotul tras direct din viewport
+- [x] Pivotul tras direct din viewport (cu Select): se prinde de colțuri, mijloace de muchii, centre de fețe și
+      centrul cutiei, altfel de suprafața de sub cursor; un pas de undo
 
 ### Toolbar: grupul Primitive (cerința din 2026-10-28)
 - [x] Line, Arc, Rectangle, Circle, Polygon (2D) și Cub, Sferă, Con, Cilindru (3D) într-un singur grup „Primitive”,

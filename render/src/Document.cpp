@@ -3907,6 +3907,73 @@ std::optional<math::Vec3d> Document::selectionPivot() const
     return (lo + hi) * 0.5;
 }
 
+std::vector<math::Vec3d> Document::pivotSnapPoints() const
+{
+    // Cutia selecției: a obiectului (orientată după el) sau a geometriei (aliniată cu axele).
+    math::Vec3d lo { 0.0 };
+    math::Vec3d hi { 0.0 };
+    math::Transform t;
+    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        if (!m_model.instances().contains(id)) {
+            return {};
+        }
+        const model::Instance& inst = m_model.instance(id);
+        std::tie(lo, hi) = model::bounds(m_model, inst.definition);
+        t = inst.transform;
+    } else if (m_selection.instances.empty()) {
+        const geom::Mesh& mesh = m_model.mesh(activeDefinition());
+        const std::set<geom::VertexId> vertices = geom::verticesOf(mesh, m_selection);
+        lo = math::Vec3d { std::numeric_limits<double>::infinity() };
+        hi = math::Vec3d { -std::numeric_limits<double>::infinity() };
+        for (geom::VertexId v : vertices) {
+            lo = glm::min(lo, mesh.position(v));
+            hi = glm::max(hi, mesh.position(v));
+        }
+    }
+    if (!(lo.x <= hi.x)) {
+        return {};
+    }
+    // Pe fiecare axă: minimul, mijlocul sau maximul (27 de puncte: colțuri, mijloace, centre de fețe, centrul).
+    std::vector<math::Vec3d> out;
+    for (int i = 0; i < 27; ++i) {
+        const int k[3] = { i % 3, (i / 3) % 3, i / 9 };
+        math::Vec3d p;
+        for (int a = 0; a < 3; ++a) {
+            p[a] = k[a] == 0 ? lo[a] : k[a] == 1 ? (lo[a] + hi[a]) * 0.5 : hi[a];
+        }
+        out.push_back(t.applyToPoint(p));
+    }
+    return out;
+}
+
+void Document::setSelectionPivot(const math::Vec3d& point)
+{
+    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        if (!m_model.instances().contains(id)) {
+            return;
+        }
+        runOnModel("Pivot", [&](model::Model& model) {
+            model::Instance inst = model.instance(id);
+            inst.pivot = inst.transform.inverse().applyToPoint(point);
+            model.setInstance(id, inst);
+        });
+        return;
+    }
+    if (!m_selection.instances.empty()) {
+        return;
+    }
+    if (geometrySelectionKey() != m_geometryKey) {
+        m_geometryKey = geometrySelectionKey();
+        m_geometryRotation = math::Vec3d { 0.0 };
+        m_geometryScale = math::Vec3d { 1.0 };
+    }
+    m_geometryPivot = point;
+    emit selectionChanged();
+    touch();
+}
+
 void Document::setGeometryPlacement(const QVariantMap& changes)
 {
     // Rotirea / scara de până acum ale acestei selecții (alta = de la 0° / 1).

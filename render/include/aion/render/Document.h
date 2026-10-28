@@ -374,6 +374,11 @@ public:
     model::DefinitionId activeDefinition() const;
     // Pivotul selecției (un obiect sau geometrie liberă), în coordonatele contextului activ; gol = nimic de arătat.
     [[nodiscard]] std::optional<math::Vec3d> selectionPivot() const;
+    // Punctele de care se prinde pivotul tras (colțurile, mijloacele muchiilor, centrele fețelor și centrul cutiei
+    // selecției), în coordonatele contextului.
+    [[nodiscard]] std::vector<math::Vec3d> pivotSnapPoints() const;
+    // Mută pivotul selecției în punctul dat (coordonatele contextului). Obiectul nu se mișcă.
+    void setSelectionPivot(const math::Vec3d& point);
     const std::vector<model::InstanceId>& path() const { return m_path; }
     // Transformarea contextului editat (local → global).
     math::Transform contextTransform() const;

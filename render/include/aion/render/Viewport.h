@@ -266,6 +266,16 @@ private:
         bool vertical = false; // planul curent (Shift = vertical)
     };
     std::optional<ObjectDrag> m_objectDrag;
+    // Pivotul selecției tras cu Select: se prinde de colțuri / mijloace / centre, altfel de suprafața de sub cursor.
+    struct PivotDrag {
+        QPointF press;
+        math::Vec3d start { 0.0 }; // în lume
+        bool moved = false;
+    };
+    std::optional<PivotDrag> m_pivotDrag;
+    bool m_overPivot = false;
+    [[nodiscard]] bool pivotUnder(QPointF position) const;
+    [[nodiscard]] math::Vec3d pivotDragPoint(QPointF position) const;
     [[nodiscard]] std::optional<math::Vec3d> objectDragPoint(QPointF position, bool vertical) const;
     bool m_exporting = false;
     double m_exportProgress = 0.0;

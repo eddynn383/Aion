@@ -35,6 +35,8 @@ namespace aion::render {
 namespace {
 
 // Radiani de rotație pe pixel de mișcare a mouse-ului (sau a degetelor pe trackpad).
+constexpr double kPivotGrabPx = 10.0; // cât de aproape de marcajul pivotului prinde un click
+constexpr double kPivotSnapPx = 12.0; // pivotul tras se prinde de punctele cutiei
 constexpr double kOrbitRadiansPerPixel = 0.008;
 // Factorul de zoom pentru o „treaptă” de rotiță (120 de unități).
 constexpr double kWheelZoomStep = 0.85;
@@ -275,6 +277,8 @@ void Viewport::updateCursor()
         setCursor(m_zoomCursor);
     } else if (m_navigationTool == QLatin1String("interact")) {
         setCursor(Qt::PointingHandCursor);
+    } else if (m_overPivot || m_pivotDrag) {
+        setCursor(Qt::SizeAllCursor);
     } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("paint")) {
         setCursor(m_paintCursor);
     } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("eraser")) {
@@ -1854,6 +1858,15 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             return;
         }
     }
+    // Marcajul pivotului (cu unealta Select) se trage: un singur pas de undo.
+    if (drag == Drag::None && event->button() == Qt::LeftButton && m_document
+        && m_document->activeTool() == QLatin1String("select") && pivotUnder(event->position())) {
+        const math::Vec3d world = m_document->contextTransform().applyToPoint(*m_document->selectionPivot());
+        m_pivotDrag = PivotDrag { event->position(), world, false };
+        m_document->beginMacro("Pivot");
+        event->accept();
+        return;
+    }
     // Click pe o cameră sau o lumină (cu unealta Select): o selectează.
     if (drag == Drag::None && event->button() == Qt::LeftButton && m_document
         && m_document->activeTool() == QLatin1String("select")) {
@@ -1928,6 +1941,13 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
     } else if (m_drag == Drag::Zoom) {
         m_camera.zoomAbout(std::exp(delta.y() * kDragZoomPerPixel), m_zoomDragAnchor);
         onCameraMoved();
+    } else if (m_pivotDrag && m_document) {
+        if (!m_pivotDrag->moved && QLineF(event->position(), m_pivotDrag->press).length() <= kMultiClickDistancePx) {
+            return;
+        }
+        m_pivotDrag->moved = true;
+        m_document->setSelectionPivot(m_document->contextTransform().inverse().applyToPoint(pivotDragPoint(event->position())));
+        update();
     } else if (m_objectDrag && m_document) {
         const bool vertical = event->modifiers().testFlag(Qt::ShiftModifier);
         if (!m_objectDrag->moved && QLineF(event->position(), m_objectDrag->press).length() <= kMultiClickDistancePx) {
@@ -1957,6 +1977,55 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
         m_document->pointerMove(m_camera, toolEvent(event->position(), event->modifiers(), m_clickCount));
         afterToolEvent();
     }
+}
+
+bool Viewport::pivotUnder(QPointF position) const
+{
+    if (!m_document) {
+        return false;
+    }
+    const auto pivot = m_document->selectionPivot();
+    if (!pivot) {
+        return false;
+    }
+    const auto s = m_camera.project(m_document->contextTransform().applyToPoint(*pivot));
+    return s && glm::length(*s - toVec2(position)) <= kPivotGrabPx;
+}
+
+math::Vec3d Viewport::pivotDragPoint(QPointF position) const
+{
+    const math::Vec2d screen = toVec2(position);
+    const math::Transform toWorld = m_document->contextTransform();
+    // Întâi punctele cutiei selecției (colțuri, mijloace, centre), apoi suprafața de sub cursor, apoi un plan prin
+    // pivot, cu fața spre cameră.
+    double best = kPivotSnapPx;
+    std::optional<math::Vec3d> snapped;
+    for (const math::Vec3d& p : m_document->pivotSnapPoints()) {
+        const math::Vec3d w = toWorld.applyToPoint(p);
+        if (const auto s = m_camera.project(w)) {
+            const double d = glm::length(*s - screen);
+            if (d < best) {
+                best = d;
+                snapped = w;
+            }
+        }
+    }
+    if (snapped) {
+        return *snapped;
+    }
+    if (const auto surface = m_document->surfacePoint(m_camera, screen)) {
+        return *surface;
+    }
+    const math::Ray ray = m_camera.rayAt(screen);
+    const math::Vec3d normal = m_camera.forward();
+    const double denom = glm::dot(normal, ray.direction);
+    if (std::abs(denom) > 1e-9) {
+        const double t = glm::dot(normal, m_pivotDrag->start - ray.origin) / denom;
+        if (t > 0.0) {
+            return ray.at(t);
+        }
+    }
+    return m_pivotDrag->start;
 }
 
 std::optional<math::Vec3d> Viewport::objectDragPoint(QPointF position, bool vertical) const
@@ -2008,6 +2077,14 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
             emit contextMenuRequested(event->position());
         }
         m_rightPress.reset();
+        event->accept();
+        return;
+    }
+    if (m_pivotDrag && event->button() == Qt::LeftButton) {
+        if (m_document) {
+            m_document->endMacro(m_pivotDrag->moved);
+        }
+        m_pivotDrag.reset();
         event->accept();
         return;
     }
@@ -2147,6 +2224,13 @@ void Viewport::hoverMoveEvent(QHoverEvent* event)
         }
         QQuickRhiItem::hoverMoveEvent(event);
         return;
+    }
+    // Peste marcajul pivotului (cu Select): cursorul arată că se poate trage.
+    const bool overPivot = m_drag == Drag::None && m_navigationTool.isEmpty() && m_document
+        && m_document->activeTool() == QLatin1String("select") && pivotUnder(event->position());
+    if (overPivot != m_overPivot) {
+        m_overPivot = overPivot;
+        updateCursor();
     }
     // În timpul navigării cu butonul din mijloc nu actualizăm unealta (evenimentele vin prin mouseMove).
     if (m_document && m_drag == Drag::None && !m_toolPressed) {
