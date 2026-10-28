@@ -206,3 +206,32 @@ TEST_CASE("Fișier: curbele Pen se salvează și se încarcă (v4)", "[core][pen
     REQUIRE(old.model);
     CHECK(old.model->penCurves().empty());
 }
+
+TEST_CASE("Pen: o curbă nouă după gruparea alteia rămâne editabilă (id-ul curbei nu se refolosește)", "[core][pen]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    const model::PenCurveId first = draw(stack, blob({ 0, 0, 0 }, 1000));
+    const auto groupAll = [&] {
+        geom::Selection all;
+        const geom::Mesh& mesh = m.mesh(m.root());
+        all.faces.insert(mesh.faces().keys().begin(), mesh.faces().keys().end());
+        all.edges.insert(mesh.edges().keys().begin(), mesh.edges().keys().end());
+        stack.run("Group", [&](model::Model& model) { model::makeGroup(model, model.root(), all, false); });
+    };
+    groupAll(); // muchiile primei curbe pleacă din rădăcină: entitatea ei rămâne, needitabilă
+    REQUIRE(m.mesh(m.root()).edges().empty());
+    const model::PenCurveId second = draw(stack, sCurve());
+    CHECK(m.penCurves().at(second).curve != m.penCurves().at(first).curve);
+    CHECK(model::penCurveEditable(m, second));
+    const geom::EdgeId edge = m.mesh(m.root()).edges().keys()[0];
+    CHECK(model::penCurveForEdge(m, m.root(), edge) == second);
+
+    // Un arc obișnuit desenat după ce și a doua curbă a plecat nu e luat drept curbă Pen.
+    groupAll();
+    stack.run("Arc", [&](geom::Mesh& mesh) {
+        geom::drawCurve(mesh, { { 0, 0, 0 }, { 500, 300, 0 }, { 1000, 400, 0 }, { 1500, 300, 0 }, { 2000, 0, 0 } }, false, true);
+    });
+    const geom::EdgeId arcEdge = m.mesh(m.root()).edges().keys()[0];
+    CHECK_FALSE(model::penCurveForEdge(m, m.root(), arcEdge));
+}

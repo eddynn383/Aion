@@ -128,6 +128,8 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(bool lockCameraToView READ lockCameraToView WRITE setLockCameraToView NOTIFY lookThroughChanged)
     // Următorul click în viewport alege distanța de focus a camerei selectate (depth of field).
     Q_PROPERTY(bool pickingFocus READ pickingFocus WRITE setPickingFocus NOTIFY pickingFocusChanged)
+    // „Adaugă un obiect pe cale”: următorul click pe un obiect îl ancorează pe calea selectată.
+    Q_PROPERTY(bool pickingAnchor READ pickingAnchor WRITE setPickingAnchor NOTIFY pickingAnchorChanged)
 
     // Cadre pe secundă în ultima secundă (0 când viewport-ul nu se redesenează).
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY framesPerSecondChanged)
@@ -184,6 +186,8 @@ public:
     bool lockCameraToView() const { return m_lockCamera; }
     void setLockCameraToView(bool on);
     bool pickingFocus() const { return m_pickingFocus; }
+    bool pickingAnchor() const { return m_pickingAnchor; }
+    void setPickingAnchor(bool on);
     void setPickingFocus(bool on);
     // Formatul tras de mânerele cadrului: raportul arătat până la eliberare (0 = al camerei).
     Q_INVOKABLE void previewLookAspect(double aspect);
@@ -226,6 +230,7 @@ signals:
     void lookThroughChanged();
     void lookFrameChanged();
     void pickingFocusChanged();
+    void pickingAnchorChanged();
     void reducedMotionChanged();
     void navigationToolChanged();
     void framesPerSecondChanged();
@@ -415,6 +420,10 @@ private:
     bool m_lockNavigating = false; // un gest de navigare mută camera blocată (vederea nu o urmează până la sfârșit)
     QTimer m_lockCommitTimer; // rotița: un singur pas de undo pe gest
     bool m_pickingFocus = false;
+    bool m_pickingAnchor = false;
+    // Dublu click pe o cale (cu Select): editarea curbei ei.
+    qint64 m_lastPathClickNs = 0;
+    QPointF m_lastPathClickPosition;
     view::CameraMotion m_motion;
     QElapsedTimer m_frameClock;
     qint64 m_lastTickNs = 0;

@@ -2,7 +2,8 @@ import QtQuick
 import Aion
 
 // Un rând al timeline-ului: în stânga numele (obiectul cu săgeata ▸ / ▾ și ◆, canalul cu valoarea lui curentă,
-// editabilă), în dreapta pista: romburile cheilor și, pe rândul obiectului și al camerei, barele intervalelor animate.
+// editabilă), în dreapta pista: romburile cheilor și, pe rândul obiectului și al camerei, barele intervalelor animate;
+// pe rândul unei căi de parcurgere, bara ei (startul și durata), care se trage.
 Item {
     id: root
 
@@ -27,7 +28,9 @@ Item {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             // Click dreapta: curba de easing pentru tot canalul (sau toate cheile obiectului / camerei).
             onClicked: (mouse) => {
-                if (mouse.button === Qt.RightButton)
+                if (root.row.kind === "path")
+                    root.doc.selectObject("path", root.row.path.id)
+                else if (mouse.button === Qt.RightButton)
                     root.timeline.editRowEasing(root.row, nameCell)
                 else if (root.row.instance > 0)
                     root.doc.selectInstance(root.row.instance)
@@ -191,6 +194,102 @@ Item {
                     onClicked: root.timeline.segmentClicked(root.row, segment.index, segment)
                 }
                 Tooltip { visible: segmentArea.containsMouse; text: "Curba tranziției (click pentru editor)" }
+            }
+        }
+
+        // Calea: bara de la start la final. Tragerea mută startul, capătul drept schimbă durata (cu snap la cadre; ⇧ fără);
+        // la eliberare, un singur pas de undo. Bara trasă după capătul animației o lungește.
+        Item {
+            id: pathBar
+            visible: root.row.kind === "path"
+            readonly property var p: root.row.path ?? ({ id: 0, start: 0, duration: 0, anchors: [] })
+            property real previewStart: -1
+            property real previewDuration: -1
+            readonly property real start: previewStart >= 0 ? previewStart : p.start
+            readonly property real duration: previewDuration >= 0 ? previewDuration : p.duration
+            x: root.timeline.xAt(start)
+            width: Math.max(8, root.timeline.xAt(start + duration) - x)
+            height: root.height - 6
+            anchors.verticalCenter: parent.verticalCenter
+            function snapped(t, mouse) {
+                return (mouse.modifiers & Qt.ShiftModifier) ? t : Math.round(t * root.timeline.fps) / root.timeline.fps
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: 4
+                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, root.row.selected ? 0.5 : 0.3)
+                border.color: root.row.selected ? Theme.accent : "transparent"
+            }
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 6
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
+                text: (pathBar.p.anchors ?? []).length > 0 ? pathBar.p.anchors.join(", ") : "fără obiecte"
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeXs
+            }
+            MouseArea {
+                id: barArea
+                anchors.fill: parent
+                anchors.rightMargin: 8
+                hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                property real pressX: 0
+                property real pressStart: 0
+                property bool moved: false
+                onPressed: (mouse) => {
+                    pressX = mapToItem(lane, mouse.x, 0).x
+                    pressStart = pathBar.p.start
+                    moved = false
+                    root.doc.selectObject("path", pathBar.p.id)
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed)
+                        return
+                    const dx = mapToItem(lane, mouse.x, 0).x - pressX
+                    moved = moved || Math.abs(dx) > 3
+                    if (moved)
+                        pathBar.previewStart = Math.max(0, pathBar.snapped(pressStart + dx / root.timeline.pxPerSecond, mouse))
+                }
+                onReleased: {
+                    if (moved && pathBar.previewStart >= 0)
+                        root.doc.setPathTiming(pathBar.p.id, pathBar.previewStart, pathBar.p.duration)
+                    pathBar.previewStart = -1
+                }
+                onDoubleClicked: root.timeline.editEasing({ path: pathBar.p.id }, pathBar.p.easing, root.row.name, pathBar)
+            }
+            MouseArea {
+                id: endArea
+                anchors.right: parent.right
+                width: 8
+                height: parent.height
+                hoverEnabled: true
+                cursorShape: Qt.SizeHorCursor
+                property real pressX: 0
+                property real pressEnd: 0
+                onPressed: (mouse) => {
+                    pressX = mapToItem(lane, mouse.x, 0).x
+                    pressEnd = pathBar.p.start + pathBar.p.duration
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed)
+                        return
+                    const end = pathBar.snapped(pressEnd + (mapToItem(lane, mouse.x, 0).x - pressX) / root.timeline.pxPerSecond, mouse)
+                    pathBar.previewDuration = Math.max(1 / root.timeline.fps, end - pathBar.p.start)
+                }
+                onReleased: {
+                    if (pathBar.previewDuration >= 0)
+                        root.doc.setPathTiming(pathBar.p.id, pathBar.p.start, pathBar.previewDuration)
+                    pathBar.previewDuration = -1
+                }
+            }
+            Tooltip {
+                visible: (barArea.containsMouse && !barArea.pressed) || endArea.containsMouse
+                text: endArea.containsMouse ? "Trage: durata parcurgerii"
+                                            : "Trage: startul · capătul drept: durata · dublu click: curba parcurgerii"
             }
         }
 

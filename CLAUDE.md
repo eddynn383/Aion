@@ -241,6 +241,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   Undo / redo trec prin `Document::stepHistory`: animația activă (una readusă devine activă), apoi timeline-ul,
   valorile de la playhead, Inspector-ul și Outliner-ul primesc semnalele lor (pasul poate schimba orice).
 
+- **Pen și căi de parcurgere** (Etapa 7, ADR 0036): `geom/Bezier.h`, `model::PenCurve` + `model/PenCurves.h` (curbe
+  editabile cât muchiile se potrivesc), uneltele `pen` și `penedit` (`Document::beginCurveEdit` / `beginPathEdit`, ca
+  `beginPivotDrag`), `model::MotionPath` + `model/MotionPaths.h` (`attachToPath`, `anchorTransform`, `applyPaths`,
+  `pathTransformAt`, `absorbAnchorEdit`), `Document::paths` / `pathInfo` / `setPathTiming`, `Viewport::pickingAnchor`.
+  Format `.aion` v4. Acțiuni de script: `dragw:x1,y1,z1,x2,y2,z2`, `dblclickw:x,y,z`, `anchor:`, `pathtime:s,d`,
+  `debug.paths`. Web: `Main.qml` fără qmlcachegen (`QT_QML_SKIP_CACHEGEN`, altfel runner-ul CI oprea build-ul).
+
 ## Următorii pași
 0. **Făcut (2026-10-28): Animare, timeline, cameră, rotația față de pivot** — `docs/plans/animatie.md` (și `PLAN.md` →
    Etapa 6). Rămân funcțiile P2 din plan (traiectoria în viewport, faze de construcție, camera pe traseu, însorire,

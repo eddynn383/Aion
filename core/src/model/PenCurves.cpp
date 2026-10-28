@@ -5,6 +5,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <set>
 
 namespace aion::model {
@@ -16,7 +17,8 @@ std::vector<math::Vec3d> samplesOf(const geom::BezierPath& path)
     return geom::sampleBezier(path, geom::defaultTolerance(path));
 }
 
-// Muchiile curbei, în ordine, dacă geometria se potrivește încă exact cu eșantionarea ei; altfel gol.
+// Muchiile curbei, în ordine, dacă geometria se potrivește încă exact cu eșantionarea ei; altfel gol. Se caută doar
+// printre muchiile cu id-ul curbei (nu în toate vârfurile: se apelează la fiecare schimbare a selecției).
 std::vector<geom::EdgeId> intactEdges(const geom::Mesh& mesh, const PenCurve& c)
 {
     const std::vector<math::Vec3d> samples = samplesOf(c.path);
@@ -24,15 +26,26 @@ std::vector<geom::EdgeId> intactEdges(const geom::Mesh& mesh, const PenCurve& c)
     if (samples.size() < 2) {
         return out;
     }
+    std::vector<geom::EdgeId> candidates;
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        if (mesh.edges().values()[i].curve == c.curve) {
+            candidates.push_back(mesh.edges().keys()[i]);
+        }
+    }
     const std::size_t count = c.path.closed ? samples.size() : samples.size() - 1;
     for (std::size_t i = 0; i < count; ++i) {
-        const geom::VertexId a = mesh.findVertexNear(samples[i], tol::kLength);
-        const geom::VertexId b = mesh.findVertexNear(samples[(i + 1) % samples.size()], tol::kLength);
-        const geom::EdgeId e = a && b ? mesh.findEdge(a, b) : geom::EdgeId {};
-        if (!e || mesh.edge(e).curve != c.curve) {
+        const math::Vec3d& a = samples[i];
+        const math::Vec3d& b = samples[(i + 1) % samples.size()];
+        const auto found = std::find_if(candidates.begin(), candidates.end(), [&](geom::EdgeId id) {
+            const geom::Edge& e = mesh.edge(id);
+            const math::Vec3d p0 = mesh.position(e.v0);
+            const math::Vec3d p1 = mesh.position(e.v1);
+            return (tol::samePoint(p0, a) && tol::samePoint(p1, b)) || (tol::samePoint(p0, b) && tol::samePoint(p1, a));
+        });
+        if (found == candidates.end()) {
             return {};
         }
-        out.push_back(e);
+        out.push_back(*found);
     }
     return out;
 }
@@ -42,7 +55,13 @@ std::vector<geom::EdgeId> intactEdges(const geom::Mesh& mesh, const PenCurve& c)
 PenCurveId addPenCurveGeometry(Model& model, DefinitionId definition, const geom::BezierPath& path, const math::Vec3d& normal)
 {
     geom::Mesh& mesh = model.mesh(definition);
-    const std::uint32_t curve = mesh.newCurveId();
+    // Un id nou și față de curbele Pen rămase fără muchii (grupate, șterse), ca să nu se confunde cu ele.
+    std::uint32_t curve = mesh.newCurveId();
+    for (const PenCurve& other : model.penCurves().values()) {
+        if (other.definition == definition) {
+            curve = std::max(curve, other.curve + 1);
+        }
+    }
     geom::drawCurve(mesh, samplesOf(path), path.closed, true, curve);
     return model.addPenCurve({ definition, curve, path, glm::normalize(normal) });
 }
@@ -149,10 +168,14 @@ PenCurveId penCurveForEdge(const Model& model, DefinitionId definition, geom::Ed
     if (e == nullptr || e->curve == 0) {
         return {};
     }
+    // Doar o curbă ale cărei muchii sunt încă ale ei (o entitate rămasă fără muchii nu ia altă curbă cu același id).
     for (std::size_t i = 0; i < model.penCurves().size(); ++i) {
         const PenCurve& c = model.penCurves().values()[i];
         if (c.definition == definition && c.curve == e->curve) {
-            return model.penCurves().keys()[i];
+            const std::vector<geom::EdgeId> edges = intactEdges(mesh, c);
+            if (std::find(edges.begin(), edges.end(), edge) != edges.end()) {
+                return model.penCurves().keys()[i];
+            }
         }
     }
     return {};

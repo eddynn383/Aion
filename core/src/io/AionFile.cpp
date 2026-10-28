@@ -463,6 +463,76 @@ void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector
 }
 
 // formatVersion < 3: „Mută la” ducea colțul minim al țintei în punctul dat; acum duce pivotul.
+json matrixToJson(const math::Transform& t)
+{
+    json m = json::array();
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            m.push_back(t.matrix()[c][r]);
+        }
+    }
+    return m;
+}
+
+math::Transform matrixFromJson(const json& m)
+{
+    math::Mat4d matrix(1.0);
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            matrix[c][r] = m.at(static_cast<std::size_t>(c * 4 + r)).get<double>();
+        }
+    }
+    return math::Transform(matrix);
+}
+
+json motionPathsToJson(const model::Model& model)
+{
+    json out = json::array();
+    for (std::size_t i = 0; i < model.motionPaths().size(); ++i) {
+        const model::MotionPath& p = model.motionPaths().values()[i];
+        json anchors = json::array();
+        for (const model::PathAnchor& a : p.anchors) {
+            anchors.push_back({ { "instance", a.instance.value }, { "along", a.along }, { "lateral", a.lateral },
+                { "up", a.up }, { "yaw", a.yaw }, { "front", a.front }, { "before", matrixToJson(a.before) } });
+        }
+        out.push_back({ { "id", model.motionPaths().keys()[i].value }, { "name", p.name },
+            { "transform", matrixToJson(p.transform) }, { "normal", json { p.normal.x, p.normal.y, p.normal.z } },
+            { "path", bezierToJson(p.curve) }, { "animation", p.animation.value }, { "start", p.start },
+            { "duration", p.duration }, { "easing", easingToJson(p.easing) }, { "visible", p.visible },
+            { "anchors", anchors } });
+    }
+    return out;
+}
+
+void motionPathsFromJson(const json& list, model::ChangeSet& changes)
+{
+    for (const json& j : list) {
+        model::MotionPath p;
+        p.name = j.value("name", std::string());
+        p.transform = matrixFromJson(j.at("transform"));
+        const json& n = j.at("normal");
+        p.normal = { n.at(0).get<double>(), n.at(1).get<double>(), n.at(2).get<double>() };
+        p.curve = bezierFromJson(j.at("path"));
+        p.animation = model::AnimationId { j.at("animation").get<std::uint64_t>() };
+        p.start = j.value("start", 0.0);
+        p.duration = j.value("duration", 5.0);
+        p.easing = easingFromJson(j.at("easing"));
+        p.visible = j.value("visible", true);
+        for (const json& a : j.value("anchors", json::array())) {
+            model::PathAnchor anchor;
+            anchor.instance = model::InstanceId { a.at("instance").get<std::uint64_t>() };
+            anchor.along = a.value("along", 0.0);
+            anchor.lateral = a.value("lateral", 0.0);
+            anchor.up = a.value("up", 0.0);
+            anchor.yaw = a.value("yaw", 0.0);
+            anchor.front = a.value("front", 0);
+            anchor.before = matrixFromJson(a.at("before"));
+            p.anchors.push_back(anchor);
+        }
+        changes.motionPaths[model::MotionPathId { j.at("id").get<std::uint64_t>() }].after = std::move(p);
+    }
+}
+
 void migrateMoveToRules(model::Model& model)
 {
     std::vector<std::pair<model::InstanceId, model::Instance>> changed;
@@ -711,6 +781,7 @@ std::string toJson(const model::Model& model)
         { "lights", lightsToJson(model) },
         { "textures", textures },
         { "penCurves", penCurvesToJson(model) },
+        { "motionPaths", motionPathsToJson(model) },
     };
     return doc.dump(1);
 }
@@ -841,6 +912,7 @@ LoadResult fromJson(std::string_view text)
         animationsFromJson(doc.value("animations", json::array()), changes, legacy);
         camerasAndLightsFromJson(doc, changes);
         penCurvesFromJson(doc.value("penCurves", json::array()), changes);
+        motionPathsFromJson(doc.value("motionPaths", json::array()), changes);
         for (const json& s : doc.value("scenes", json::array())) {
             model::Scene scene;
             scene.name = s.value("name", std::string());

@@ -1,7 +1,7 @@
 # Design: Pen-ul (curbe Bézier) și căile de parcurgere
 
-> Stare: **design de aprobat** (2026-10-28), din discuția cu utilizatorul. Nimic nu e implementat încă. După
-> aprobare urmează planul de implementare (pașii, testele). Comunicarea cu utilizatorul: în română. Contextul general:
+> Stare: **aprobat și implementat** (2026-10-28): planul [`pen-si-cai-implementare.md`](pen-si-cai-implementare.md),
+> ADR 0036, `PLAN.md` → Etapa 7. Comunicarea cu utilizatorul: în română. Contextul general:
 > `CLAUDE.md`; animația de până acum: `docs/plans/animatie.md` și ADR 0034. Pe acolo, „traiectoria obiectului” și
 > „camera pe un traseu” erau P2; acest design le înlocuiește pe prima (pentru obiecte) și pregătește terenul pentru a
 > doua.

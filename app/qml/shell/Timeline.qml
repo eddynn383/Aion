@@ -130,6 +130,9 @@ Rectangle {
             return out
         if ((tl.camera ?? []).length > 0)
             out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", icon: "video", keys: tl.camera, selected: false })
+        // Căile de parcurgere: câte o bară (startul și durata), fără chei.
+        for (const p of (tl.paths ?? []))
+            out.push({ kind: "path", instance: 0, property: "", name: p.name, icon: "route", keys: [], selected: p.selected, path: p })
         for (const t of (tl.tracks ?? [])) {
             const open = expanded[t.instance] === true
             // Pe rândul sumar, fiecare moment arată easing-ul primei chei de la el.
@@ -1024,10 +1027,14 @@ Rectangle {
         onApplied: (e) => {
             if (!root.easingTarget)
                 return
-            if (root.easingTarget.defaultEasing)
+            if (root.easingTarget.defaultEasing) {
                 root.document.setDefaultEasing(e)
-            else
+            } else if (root.easingTarget.path) { // curba de parcurgere a unei căi
+                root.document.selectObject("path", root.easingTarget.path)
+                root.document.setObjectProperties({ easing: e })
+            } else {
                 root.document.setKeysEasing(root.easingTarget.refs, e)
+            }
         }
         onUserPresetsEdited: (list) => root.userEasingsEdited(list)
     }

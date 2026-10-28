@@ -2,6 +2,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/Model.h"
+#include "aion/core/model/Operations.h"
 #include "aion/core/model/PenCurves.h"
 #include "aion/core/tools/Tool.h"
 
@@ -377,5 +378,27 @@ TEST_CASE("Select: dublu click pe o curbă Pen editabilă cere editarea ei", "[c
         select->pointerDown(s.ctx, PenScene::at(onCurve, 2));
         select->pointerUp(s.ctx, PenScene::at(onCurve, 2));
         CHECK_FALSE(s.requests.editPenCurve);
+    }
+}
+
+TEST_CASE("Pen: pe fața unui grup, curba stă pe planul feței", "[core][tools][pen]")
+{
+    PenScene s(view::StandardView::Front, { 1000, 1000, 1000 });
+    s.stack.run("Wall", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 1000, 0 }, { 2000, 1000, 0 }, { 2000, 1000, 2000 }, { 0, 1000, 2000 } });
+    });
+    geom::Selection all;
+    const geom::Mesh& mesh = s.model.mesh(s.model.root());
+    all.faces.insert(mesh.faces().keys().begin(), mesh.faces().keys().end());
+    s.stack.run("Group", [&](model::Model& model) { model::makeGroup(model, model.root(), all, false); });
+    REQUIRE(s.model.mesh(s.model.root()).faces().empty());
+    s.click({ 500, 1000, 500 });
+    s.click({ 1500, 1000, 600 });
+    s.click({ 1000, 1000, 1600 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const model::PenCurve& c = s.onlyCurve();
+    CHECK(std::abs(std::abs(c.normal.y) - 1.0) < 1e-9);
+    for (const geom::BezierPoint& p : c.path.points) {
+        CHECK(std::abs(p.point.y - 1000.0) < 1e-6);
     }
 }
