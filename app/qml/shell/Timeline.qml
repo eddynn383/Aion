@@ -323,7 +323,9 @@ Rectangle {
         anchors.margins: Theme.space2
         height: Theme.controlHeight
 
+        // Stânga: animația și timpul.
         Row {
+            id: leftRow
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space2
@@ -430,7 +432,116 @@ Rectangle {
                 }
             }
 
-            Separator { width: 1; height: 20; anchors.verticalCenter: parent.verticalCenter }
+            Separator { width: 1; height: 20; anchors.verticalCenter: parent.verticalCenter; visible: clockBox.visible }
+
+            // Timpul: mm:ss.cc / durata · cadrul (doar când e loc); click = tastezi un timp („1.5”, „36f”, „00:02.50”).
+            Rectangle {
+                id: clockBox
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.hasAnimation
+                width: clockText.implicitWidth + Theme.space2 * 2
+                height: Theme.controlHeightSm
+                radius: Theme.radiusMd
+                color: clockInput.visible ? Theme.bgInput : clockArea.containsMouse ? Theme.bgHover : "transparent"
+                border.color: clockInput.visible ? Theme.focusRing : "transparent"
+                Text {
+                    id: clockText
+                    visible: !clockInput.visible
+                    anchors.centerIn: parent
+                    text: root.clock(root.document ? root.document.timelineTime : 0) + " / " + root.clock(root.duration)
+                          + (root.narrow ? "" : "  ·  " + Math.round((root.document ? root.document.timelineTime : 0) * root.fps) + "f")
+                    color: Theme.textSecondary
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                MouseArea {
+                    id: clockArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.IBeamCursor
+                    onClicked: {
+                        clockInput.text = root.clock(root.document.timelineTime)
+                        clockInput.visible = true
+                        clockInput.forceActiveFocus()
+                        clockInput.selectAll()
+                    }
+                }
+                Tooltip { visible: clockArea.containsMouse && !clockInput.visible; text: "Tastează un timp: 1.5 · 36f · 00:02.50" }
+                TextInput {
+                    id: clockInput
+                    visible: false
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.space2
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: Theme.textPrimary
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSm
+                    selectByMouse: true
+                    onAccepted: {
+                        const t = root.parseTime(text)
+                        if (!isNaN(t))
+                            root.document.timelineTime = root.clampTime(t)
+                        visible = false
+                    }
+                    onActiveFocusChanged: if (!activeFocus) visible = false
+                    Keys.onEscapePressed: visible = false
+                }
+            }
+        }
+
+        // Mijloc: auto-key, transportul, keyframe-ul. Pe ecrane înguste se dă la o parte din calea celor din margini.
+        Row {
+            id: controlsRow
+            anchors.verticalCenter: parent.verticalCenter
+            x: Math.max(leftRow.x + leftRow.width + Theme.space3,
+                        Math.min((header.width - width) / 2, rightRow.x - Theme.space3 - width))
+            spacing: Theme.space2
+
+            // Auto-key: bulina roșie când e pornit.
+            Rectangle {
+                id: autoKeyButton
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.hasAnimation
+                readonly property bool on: root.document && root.document.autoKey
+                width: autoKeyRow.implicitWidth + Theme.space2 * 2
+                height: Theme.controlHeightSm
+                radius: Theme.radiusMd
+                color: autoKeyArea.containsMouse ? Theme.bgHover : on ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.12) : "transparent"
+                border.color: on ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.45) : Theme.borderSubtle
+                Row {
+                    id: autoKeyRow
+                    anchors.centerIn: parent
+                    spacing: Theme.space1 + 2
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: autoKeyButton.on ? Theme.danger : "transparent"
+                        border.color: autoKeyButton.on ? Theme.danger : Theme.textTertiary
+                        border.width: 1.5
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Auto-key"
+                        color: autoKeyButton.on ? Theme.textPrimary : Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeSm
+                    }
+                }
+                MouseArea {
+                    id: autoKeyArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: root.document.autoKey = !root.document.autoKey
+                }
+                Tooltip {
+                    visible: autoKeyArea.containsMouse
+                    text: autoKeyButton.on ? "Auto-key pornit: Move, Rotate, Scale și Inspector-ul pun keyframe-uri"
+                                           : "Auto-key oprit: schimbările ajustează poza de bază (și toată animația proprietăților animate)"
+                }
+            }
+
+            Separator { width: 1; height: 20; anchors.verticalCenter: parent.verticalCenter; visible: autoKeyButton.visible }
 
             // Transportul: început, cheia anterioară, redare, cheia următoare, sfârșit, buclă.
             Row {
@@ -489,117 +600,17 @@ Rectangle {
                 }
             }
 
-            // Timpul: mm:ss.cc / durata · cadrul; click = tastezi un timp („1.5”, „36f”, „00:02.50”).
-            Rectangle {
-                id: clockBox
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.hasAnimation
-                width: clockText.implicitWidth + Theme.space2 * 2
-                height: Theme.controlHeightSm
-                radius: Theme.radiusMd
-                color: clockInput.visible ? Theme.bgInput : clockArea.containsMouse ? Theme.bgHover : "transparent"
-                border.color: clockInput.visible ? Theme.focusRing : "transparent"
-                Text {
-                    id: clockText
-                    visible: !clockInput.visible
-                    anchors.centerIn: parent
-                    text: root.clock(root.document ? root.document.timelineTime : 0)
-                          + (root.narrow ? "" : " / " + root.clock(root.duration))
-                          + "  ·  " + Math.round((root.document ? root.document.timelineTime : 0) * root.fps) + "f"
-                    color: Theme.textSecondary
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontSizeSm
-                }
-                MouseArea {
-                    id: clockArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.IBeamCursor
-                    onClicked: {
-                        clockInput.text = root.clock(root.document.timelineTime)
-                        clockInput.visible = true
-                        clockInput.forceActiveFocus()
-                        clockInput.selectAll()
-                    }
-                }
-                Tooltip { visible: clockArea.containsMouse && !clockInput.visible; text: "Tastează un timp: 1.5 · 36f · 00:02.50" }
-                TextInput {
-                    id: clockInput
-                    visible: false
-                    anchors.fill: parent
-                    anchors.leftMargin: Theme.space2
-                    verticalAlignment: TextInput.AlignVCenter
-                    color: Theme.textPrimary
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontSizeSm
-                    selectByMouse: true
-                    onAccepted: {
-                        const t = root.parseTime(text)
-                        if (!isNaN(t))
-                            root.document.timelineTime = root.clampTime(t)
-                        visible = false
-                    }
-                    onActiveFocusChanged: if (!activeFocus) visible = false
-                    Keys.onEscapePressed: visible = false
-                }
-            }
-
-            // Auto-key: bulina roșie când e pornit.
-            Rectangle {
-                id: autoKeyButton
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.hasAnimation
-                readonly property bool on: root.document && root.document.autoKey
-                width: autoKeyRow.implicitWidth + Theme.space2 * 2
-                height: Theme.controlHeightSm
-                radius: Theme.radiusMd
-                color: autoKeyArea.containsMouse ? Theme.bgHover : on ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.12) : "transparent"
-                border.color: on ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.45) : Theme.borderSubtle
-                Row {
-                    id: autoKeyRow
-                    anchors.centerIn: parent
-                    spacing: Theme.space1 + 2
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 8
-                        height: 8
-                        radius: 4
-                        color: autoKeyButton.on ? Theme.danger : "transparent"
-                        border.color: autoKeyButton.on ? Theme.danger : Theme.textTertiary
-                        border.width: 1.5
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Auto-key"
-                        color: autoKeyButton.on ? Theme.textPrimary : Theme.textSecondary
-                        font.pixelSize: Theme.fontSizeSm
-                    }
-                }
-                MouseArea {
-                    id: autoKeyArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: root.document.autoKey = !root.document.autoKey
-                }
-                Tooltip {
-                    visible: autoKeyArea.containsMouse
-                    text: autoKeyButton.on ? "Auto-key pornit: Move, Rotate, Scale și Inspector-ul pun keyframe-uri"
-                                           : "Auto-key oprit: schimbările ajustează poza de bază (și toată animația proprietăților animate)"
-                }
-            }
-
             Separator { width: 1; height: 20; anchors.verticalCenter: parent.verticalCenter }
 
-            // ◆ Keyframe (toate canalele de transformare ale selecției) și ▾: culoare, cameră.
+            // ◆ Keyframe, doar iconița (toate canalele de transformare ale selecției), și ▾: culoare, cameră.
             Row {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 1
-                Button {
-                    id: keyButton
-                    small: true
-                    text: root.narrow ? "" : "Keyframe"
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "diamond"
-                    Tooltip { visible: parent.hovered; text: "Keyframe pe selecție: poziție, rotație, scară (K)" }
+                    tooltip: "Keyframe pe selecție: poziție, rotație, scară"
+                    shortcut: "K"
                     enabled: root.hasAnimation
                     onClicked: root.document.keySelection()
                 }
@@ -609,12 +620,13 @@ Rectangle {
                     iconName: "chevron-down"
                     tooltip: "Alte keyframe-uri: culoare, cameră"
                     enabled: root.hasAnimation
-                    onClicked: keyKindMenu.openAt(parent.x + parent.parent.x + x, header.y + header.height)
+                    onClicked: keyKindMenu.openAt(mapToItem(root, 0, 0).x, header.y + header.height)
                 }
             }
         }
 
         Row {
+            id: rightRow
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space2
@@ -924,9 +936,9 @@ Rectangle {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             text: !root.hasAnimation
-                  ? "Creează o animație (meniul din stânga sus), apoi: așază obiectul, apasă „Keyframe”, mută playhead-ul, "
-                    + "schimbă poziția obiectului și apasă din nou „Keyframe”."
-                  : "Selectează un obiect și mută-l, rotește-l sau apasă „Keyframe” (K): fiecare proprietate schimbată "
+                  ? "Creează o animație (meniul din stânga sus), apoi: așază obiectul, apasă ◆ (K), mută playhead-ul, "
+                    + "schimbă poziția obiectului și apasă din nou ◆."
+                  : "Selectează un obiect și mută-l, rotește-l sau apasă ◆ (K): fiecare proprietate schimbată "
                     + "devine un canal, vizibil când deschizi obiectul (▸)."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
@@ -1001,7 +1013,7 @@ Rectangle {
         onUserPresetsEdited: (list) => root.userEasingsEdited(list)
     }
 
-    // Keyframe-urile din meniul ▾ de lângă „Keyframe”.
+    // Keyframe-urile din meniul ▾ de lângă ◆.
     ContextMenu {
         id: keyKindMenu
         items: [
