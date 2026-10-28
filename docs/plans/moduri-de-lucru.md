@@ -149,33 +149,38 @@ grupurile toolbar-ului; implicit toate). Ce nu e permis:
 Bifează aici și în `PLAN.md` → „Etapa 5”.
 
 ### Pasul 1 — Starea modului (C++) ✅ criteriu: teste + palette
-- [ ] `render/include/aion/render/Document.h`: `enum class WorkMode`, `Q_PROPERTY(int workMode …)` (0/1/2), setter cu
+- [x] `render/include/aion/render/Document.h`: `enum class WorkMode`, `Q_PROPERTY(int workMode …)` (0/1/2), setter cu
       efectele din 3.2, `Q_INVOKABLE bool allows(int mode) const`.
-- [ ] `Main.qml`: `preferences.workMode` (persistat), sincronizat cu `doc.workMode`; comenzile `mode.model`,
+- [x] `Main.qml`: `preferences.workMode` (persistat), sincronizat cu `doc.workMode`; comenzile `mode.model`,
       `mode.animate`, `mode.interact` (⌥1/⌥2/⌥3, categoria „Moduri”), acțiunea de script `mode:model|animate|interact`.
 - [ ] Teste: dacă logica de „permis” ajunge în `core/` (de exemplu o funcție pură `allowedInMode(command, mode)`),
       teste Catch2; altfel verificare prin script + captură.
 
 ### Pasul 2 — Toolbar: navigarea în primul grup + comutatorul ✅ criteriu: captură
-- [ ] `Toolbar.qml`: grupul `select` = Select + secțiunea „Navigare” (Orbit, Pan, Zoom); scoate clusterul `navigation`
+- [x] `Toolbar.qml`: grupul `select` = Select + secțiunea „Navigare” (Orbit, Pan, Zoom); scoate clusterul `navigation`
       (păstrează `allTools` pentru scurtături: O, H, Z rămân); Interact devine grupul `interact` (vizibil doar în
       modul Interacțiune).
-- [ ] `shell/ModeSwitch.qml` (nou, înregistrat în `app/CMakeLists.txt`): control segmentat cu 3 iconițe, tooltip-uri
+- [x] `shell/ModeSwitch.qml` (nou, înregistrat în `app/CMakeLists.txt`): control segmentat cu 3 iconițe, tooltip-uri
       cu scurtătura (`Toolbar.keyFor` / `shortcutOverrides`), semnal `modeSelected(int)`.
-- [ ] Fiecare grup primește `modes`; toolbar-ul filtrează grupurile după `doc.workMode`.
-- [ ] Ghidurile animate (`ToolGuides.js`, `ToolTour`) și `RichTooltip` funcționează pentru uneltele mutate.
+- [x] Fiecare grup primește `modes`; toolbar-ul filtrează grupurile după `doc.workMode`.
+- [x] Ghidurile animate (`ToolGuides.js`, `ToolTour`) și `RichTooltip` funcționează pentru uneltele mutate.
 
 ### Pasul 3 — Filtrarea comenzilor, scurtăturilor, meniurilor ✅ criteriu: în Animare, ⇧R / R / P nu fac nimic
-- [ ] `commands` primesc `modes`; `Shortcut.enabled` verifică modul; palette arată doar comenzile modului (sau
+> Făcut: regula e într-un singur loc, `Document::commandModes(id)` / `commandAllowed(id)` (C++). Palette arată doar
+> comenzile modului; scurtăturile se dezactivează; meniul nativ le lasă inactive; meniul contextual le omite.
+> `ui.timeline` (⌥T) a fost scos: timeline-ul ține de modul Animare.
+- [x] `commands` primesc `modes`; `Shortcut.enabled` verifică modul; palette arată doar comenzile modului (sau
       estompate cu mutarea în modul lor — decizie la pasul 3, preferat: doar ale modului curent + cele comune).
-- [ ] `Document::contextMenuItems()` filtrează după mod.
-- [ ] `AppMenuBar.qml`: meniul „Vizualizare” (sau unul nou „Mod”) cu cele 3 moduri bifabile.
+- [x] `Document::contextMenuItems()` filtrează după mod.
+- [x] `AppMenuBar.qml`: meniul „Vizualizare” (sau unul nou „Mod”) cu cele 3 moduri bifabile.
 
 ### Pasul 4 — Gărzile din Document ✅ criteriu: test că o operație de modelare e refuzată în Animare
-- [ ] `allows()` în metodele de modelare (desen prin unelte: `setActiveTool` refuză uneltele altui mod; `pointerDown`
+> Făcut: `Document::require(mode)` la începutul operațiilor publice (modelare, animare, interacțiune) și în
+> `setActiveTool`; `selectTool` din Main revine la Select pentru uneltele altui mod.
+- [x] `allows()` în metodele de modelare (desen prin unelte: `setActiveTool` refuză uneltele altui mod; `pointerDown`
       nu ajunge la ele; metodele publice: `deleteSelection`, `makeGroup`, `previewBevel`, `previewArray`,
       `mirrorSelection`, `assignMaterial`, booleene, `createPrimitive`…). Scripturile (`m_macro`) sunt scutite.
-- [ ] Mesaj clar: „În modul Animare nu se modifică geometria. Treci în Modelare (⌥1).”
+- [x] Mesaj clar: „În modul Animare nu se modifică geometria. Treci în Modelare (⌥1).”
 
 ### Pasul 5 — Layout-ul pe mod (panouri, Inspector) ✅ criteriu: capturi în cele 3 moduri
 - [ ] Panoul stâng: secțiunile vizibile după mod (tabelul din 3.3–3.5); înălțimile și starea deschis/închis rămân

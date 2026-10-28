@@ -38,7 +38,6 @@ Window {
             { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
-            { id: "ui.timeline", title: window.timelineVisible ? "Ascunde timeline-ul" : "Timeline (animații)", category: "Interfață", shortcut: "Alt+T", icon: "film" },
             { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "film" },
             { id: "object.camera", title: "Adaugă o cameră (din vederea curentă)", category: "Obiecte", shortcut: "", icon: "camera" },
             { id: "object.light.point", title: "Adaugă o lumină punctuală (bec)", category: "Obiecte", shortcut: "", icon: "lightbulb" },
@@ -61,6 +60,9 @@ Window {
             { id: "view.ambientOcclusion", title: "Umbrire ambientală (SSAO)", category: "Vizualizare", shortcut: "", icon: "circle" },
             { id: "view.progressiveAA", title: "Antialiasing progresiv (cât camera stă pe loc)", category: "Vizualizare", shortcut: "", icon: "circle" },
             { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
+            { id: "mode.model", title: "Modul Modelare", category: "Moduri", shortcut: "Alt+1", icon: "box" },
+            { id: "mode.animate", title: "Modul Animare", category: "Moduri", shortcut: "Alt+2", icon: "film" },
+            { id: "mode.interact", title: "Modul Interacțiune", category: "Moduri", shortcut: "Alt+3", icon: "hand-pointer" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
@@ -231,6 +233,9 @@ Window {
             else toast.show("Selectează o cameră (în Outliner, la Camere și lumini).")
             break
         case "mode.interaction": doc.interactionMode = !doc.interactionMode; break
+        case "mode.model": window.setWorkMode(0); break
+        case "mode.animate": window.setWorkMode(1); break
+        case "mode.interact": window.setWorkMode(2); break
         case "rules.edit": window.openRulesEditor(); break
         case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
         case "file.exportVideo":
@@ -414,6 +419,9 @@ Window {
                     // „themecolor:accent=#EC4899” (gol după „=” resetează).
                     const tc = action.slice(11).split("=")
                     Theme.setOverride(tc[0], tc[1] || "")
+                } else if (action.startsWith("mode:")) {
+                    // „mode:model|animate|interact”: modul de lucru.
+                    window.setWorkMode(["model", "animate", "interact"].indexOf(action.slice(5)))
                 } else if (action.startsWith("prefs:")) {
                     preferencesPage.active = true
                     preferencesPage.item.category = parseInt(action.slice(6))
@@ -520,7 +528,22 @@ Window {
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
 
+    // Modul de lucru (0 Modelare, 1 Animare, 2 Interacțiune): Document oprește ce era în curs, unealta revine la
+    // Select, iar preferința se păstrează pentru repornire.
+    function setWorkMode(mode) {
+        if (mode < 0 || mode > 2)
+            return
+        doc.workMode = mode
+        preferences.workMode = mode
+        selectTool("select")
+    }
+
     function selectTool(id) {
+        // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare).
+        if (!doc.commandAllowed("tool." + id)) {
+            toast.show("Unealta nu e disponibilă în modul " + ["Modelare", "Animare", "Interacțiune"][doc.workMode] + ".")
+            id = "select"
+        }
         window.activeTool = id
         const tool = toolbar.toolInfo(id)
         const ready = modelingTools.includes(id) || navigationTools.includes(id)
@@ -650,7 +673,7 @@ Window {
             required property var modelData
             sequence: modelData.shortcut
             // Cât timp se tastează în Measurements box, literele sunt unități („m”, „cm”), nu unelte.
-            enabled: modelData.shortcut.length > 0 && !palette.opened
+            enabled: modelData.shortcut.length > 0 && !palette.opened && (doc.workMode, doc.commandAllowed(modelData.id))
                      && !(window.vcbText.length > 0 && modelData.shortcut.indexOf("Ctrl+") < 0 && modelData.shortcut.indexOf("Alt+") < 0)
                      && !(window.nativeMenu && modelData.shortcut.indexOf("Ctrl+") >= 0)
             onActivated: window.runCommand(modelData.id)
@@ -744,8 +767,11 @@ Window {
         property int msaa: 4
         property int shadowQuality: 2048
         property real gridStep: 0
+        property int workMode: 0
     }
     Component.onCompleted: {
+        // Ultimul mod de lucru; rulările automate (scripturi de test) pornesc mereu în Modelare.
+        doc.workMode = AppInfo.startupActions.length > 0 ? 0 : preferences.workMode
         if (AppInfo.themeOverride === 0)
             Theme.mode = preferences.themeMode
         viewport.latitude = preferences.latitude
@@ -1734,6 +1760,9 @@ Window {
             anchors.bottomMargin: Theme.space6
             activeTool: window.activeTool
             keyOverrides: window.shortcutOverrides
+            workMode: doc.workMode
+            shortcutFor: (id) => { const c = window.commands.find(x => x.id === id); return c ? c.shortcut : "" }
+            onModeSelected: (m) => window.setWorkMode(m)
             onToolSelected: (id) => window.selectTool(id)
         }
     }
@@ -1832,7 +1861,8 @@ Window {
     CommandPalette {
         id: palette
         parent: window.contentItem
-        commands: window.commands
+        // Doar comenzile modului de lucru curent (plus cele comune).
+        commands: (doc.workMode, window.commands.filter(c => doc.commandAllowed(c.id)))
         onCommandTriggered: (id) => window.runCommand(id)
     }
 

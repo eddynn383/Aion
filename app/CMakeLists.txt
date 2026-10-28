@@ -76,6 +76,7 @@ qt_add_qml_module(aion_app
         qml/shell/TitleBar.qml
         qml/shell/ToolGroupButton.qml
         qml/shell/Toolbar.qml
+        qml/shell/ModeSwitch.qml
         qml/shell/Outliner.qml
         qml/shell/EntityInfo.qml
         qml/shell/MaterialsPanel.qml

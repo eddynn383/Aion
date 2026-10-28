@@ -44,6 +44,8 @@ Platform.MenuBar {
         readonly property var info: bar ? bar.command(commandId) : null
         separator: commandId === "-"
         text: info ? info.title : ""
+        // Comenzile altui mod de lucru rămân în meniu, dar inactive.
+        enabled: !info || !bar.document || (bar.document.workMode, bar.document.commandAllowed(commandId))
         shortcut: info && info.shortcut.indexOf("Ctrl+") >= 0 ? info.shortcut : ""
         onTriggered: bar.host.runCommand(commandId)
     }
@@ -117,7 +119,7 @@ Platform.MenuBar {
         commandIds: ["view.iso", "view.top", "view.front", "view.right", "view.back", "view.left", "view.bottom", "-",
                      "view.extents", "view.zoomSelection", "view.projection", "view.grid", "view.snapGrid", "-",
                      "nav.pivotView", "nav.pivotSelection", "nav.pivotCursor", "-",
-                     "ui.leftPanel", "ui.rightPanel", "ui.panels", "ui.timeline", "ui.theme"]
+                     "ui.leftPanel", "ui.rightPanel", "ui.panels", "ui.theme"]
     }
     CommandMenu {
         bar: root

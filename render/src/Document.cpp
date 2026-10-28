@@ -478,6 +478,9 @@ bool Document::saveFile(const QString& path, const QByteArray& thumbnailPng)
 
 bool Document::importFile(const QString& path)
 {
+    if (!require(Modeling)) {
+        return false;
+    }
     const QFileInfo info(path);
     const QString ext = info.suffix().toLower();
     io::ImportResult result;
@@ -650,8 +653,11 @@ const std::unordered_map<geom::FaceId, geom::FaceTriangles>& Document::triangles
     return it != m_triangles.end() ? it->second : kEmpty;
 }
 
-void Document::setActiveTool(const QString& id)
+void Document::setActiveTool(const QString& requested)
 {
+    // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare): rămâne Select.
+    const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested) ? requested
+                                                                                                 : QStringLiteral("select");
     if (id == m_toolId) {
         return;
     }
@@ -1288,6 +1294,9 @@ void Document::redo()
 
 void Document::deleteSelection()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selectedCamera || m_selectedLight) {
         deleteSelectedObject();
         return;
@@ -1349,6 +1358,9 @@ void Document::runOnModel(const std::string& name, Fn&& fn)
 
 void Document::makeGroup()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.empty()) {
         return;
     }
@@ -1365,6 +1377,9 @@ void Document::makeGroup()
 
 void Document::groupSelection()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.instances.empty()) {
         setError(QStringLiteral("Selectează unul sau mai multe obiecte ca să le grupezi (formele devin întâi obiect, cu ⌘G)."));
         return;
@@ -1378,6 +1393,9 @@ void Document::groupSelection()
 
 void Document::duplicateLinked()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.instances.empty()) {
         return;
     }
@@ -1447,6 +1465,9 @@ void Document::selectByTag(double tagId)
 
 void Document::makeComponent(const QString& name)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.empty()) {
         return;
     }
@@ -1460,6 +1481,9 @@ void Document::makeComponent(const QString& name)
 
 void Document::explodeSelection()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.instances.empty()) {
         return;
     }
@@ -1476,6 +1500,9 @@ void Document::explodeSelection()
 
 void Document::makeUniqueSelection()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     runOnModel("Fă unic", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
             model::makeUnique(model, id);
@@ -1687,6 +1714,9 @@ void Document::removeTag(double tagId)
 
 void Document::assignTag(double tagId)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     const model::TagId id = toTagId(tagId);
     if (m_selection.empty() || (id && !m_model.tags().contains(id))) {
         return;
@@ -1839,6 +1869,9 @@ void Document::editAnimation(const char* name, Fn&& fn)
 
 void Document::createAnimation()
 {
+    if (!require(Animation)) {
+        return;
+    }
     model::AnimationId created;
     runOnModel("Animație nouă", [&](model::Model& model) {
         model::Animation a;
@@ -1892,6 +1925,9 @@ void Document::setAnimationSettings(double duration, int fps, bool loop)
 
 void Document::keySelection()
 {
+    if (!require(Animation)) {
+        return;
+    }
     if (m_selection.instances.empty()) {
         setError(QStringLiteral("Selectează obiectele pe care vrei să le animezi, apoi pune keyframe-ul."));
         return;
@@ -1906,6 +1942,9 @@ void Document::keySelection()
 
 void Document::keySelectionColor()
 {
+    if (!require(Animation)) {
+        return;
+    }
     if (m_selection.instances.empty()) {
         setError(QStringLiteral("Selectează obiectele, apoi pune keyframe-ul de culoare."));
         return;
@@ -1925,6 +1964,9 @@ void Document::keySelectionColor()
 
 void Document::keyCamera(const QVariantMap& camera)
 {
+    if (!require(Animation)) {
+        return;
+    }
     const double t = m_timelineTime;
     editAnimation("Keyframe cameră", [&](model::Animation& a) {
         model::setCameraKey(a, { t,
@@ -1948,6 +1990,9 @@ model::KeyKind keyKind(const QString& kind)
 
 void Document::removeKey(const QString& kind, double instance, double time)
 {
+    if (!require(Animation)) {
+        return;
+    }
     editAnimation("Șterge keyframe-ul", [&](model::Animation& a) {
         model::removeKey(a, keyKind(kind), toInstanceId(instance), time);
     });
@@ -1955,6 +2000,9 @@ void Document::removeKey(const QString& kind, double instance, double time)
 
 void Document::moveKey(const QString& kind, double instance, double time, double newTime)
 {
+    if (!require(Animation)) {
+        return;
+    }
     editAnimation("Mută keyframe-ul", [&](model::Animation& a) {
         model::moveKey(a, keyKind(kind), toInstanceId(instance), time, newTime);
     });
@@ -1962,6 +2010,9 @@ void Document::moveKey(const QString& kind, double instance, double time, double
 
 void Document::setKeyEasing(const QString& kind, double instance, double time, int easing)
 {
+    if (!require(Animation)) {
+        return;
+    }
     const auto e = static_cast<model::Easing>(std::clamp(easing, 0, 4));
     const double tol = 0.5 / 30.0;
     editAnimation("Easing", [&](model::Animation& a) {
@@ -2047,6 +2098,104 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
     }
     const model::ObjectTrack* t = model::findTrack(*a, instance);
     return t ? model::evaluateColor(*t, m_timelineTime) : std::nullopt;
+}
+
+// --- Modurile de lucru ---
+
+void Document::setWorkMode(int mode)
+{
+    mode = std::clamp(mode, 0, 2);
+    if (mode == m_workMode) {
+        return;
+    }
+    // Ce era în curs în modul vechi se oprește: unealta, un panou cu previzualizare, rularea interacțiunilor,
+    // previzualizarea animației.
+    if (m_tool) {
+        const view::Camera camera;
+        tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        m_tool->cancel(ctx);
+    }
+    cancelOperation();
+    if (mode != Interaction) {
+        setInteractionMode(false);
+    }
+    if (mode != Animation) {
+        endPreview();
+    }
+    m_workMode = mode;
+    emit workModeChanged();
+    emit toolStatusChanged();
+    emit selectionChanged(); // Inspector-ul își schimbă grupurile
+    touch();
+}
+
+bool Document::require(int mode)
+{
+    if (allows(mode)) {
+        return true;
+    }
+    static const char* const kNames[] = { "Modelare", "Animare", "Interacțiune" };
+    static const char* const kVerbs[] = { "nu se modifică geometria", "nu se animă obiectele",
+        "nu se adaugă interacțiuni" };
+    setError(QStringLiteral("În modul %1 %2. Treci în %3 (⌥%4).")
+                 .arg(QString::fromUtf8(kNames[m_workMode]), QString::fromUtf8(kVerbs[mode]),
+                     QString::fromUtf8(kNames[mode]), QString::number(mode + 1)));
+    return false;
+}
+
+bool Document::commandAllowed(const QString& id) const
+{
+    return commandModes(id).contains(m_workMode);
+}
+
+QList<int> Document::commandModes(const QString& id)
+{
+    static const QList<int> all { Modeling, Animation, Interaction };
+    static const QList<int> modeling { Modeling };
+    // Uneltele: desen, modificare, măsurare, ștergere și vopsire doar în Modelare; transformările și în Animare
+    // (acolo scriu keyframe-uri); Interact doar în Interacțiune; selecția și navigarea peste tot.
+    if (id.startsWith(QLatin1String("tool."))) {
+        const QString tool = id.mid(5);
+        static const QStringList common { QStringLiteral("select"), QStringLiteral("orbit"), QStringLiteral("pan"),
+            QStringLiteral("zoom") };
+        static const QStringList transforms { QStringLiteral("move"), QStringLiteral("rotate"), QStringLiteral("scale") };
+        if (common.contains(tool)) {
+            return all;
+        }
+        if (transforms.contains(tool)) {
+            return { Modeling, Animation };
+        }
+        if (tool == QLatin1String("interact")) {
+            return { Interaction };
+        }
+        return modeling;
+    }
+    // Comune: fișierul, vizualizarea, interfața, selecția, undo, modurile, scripturile și plugin-urile.
+    static const QStringList commonEdit { QStringLiteral("edit.undo"), QStringLiteral("edit.redo"),
+        QStringLiteral("edit.selectAll"), QStringLiteral("edit.selectNone"), QStringLiteral("edit.selectConnected"),
+        QStringLiteral("org.exit"), QStringLiteral("org.hide"), QStringLiteral("org.unhideAll"),
+        QStringLiteral("view.zoomSelection") };
+    if (commonEdit.contains(id)) {
+        return all;
+    }
+    if (id == QLatin1String("file.exportVideo") || id.startsWith(QLatin1String("anim."))) {
+        return { Animation };
+    }
+    if (id == QLatin1String("rules.edit")) {
+        return { Interaction };
+    }
+    static const QStringList modelingPrefixes { QStringLiteral("edit."), QStringLiteral("org."), QStringLiteral("solid."),
+        QStringLiteral("guides."), QStringLiteral("material."), QStringLiteral("library."), QStringLiteral("object."),
+        QStringLiteral("texture.") };
+    for (const QString& prefix : modelingPrefixes) {
+        if (id.startsWith(prefix)) {
+            return modeling;
+        }
+    }
+    if (id == QLatin1String("file.import") || id == QLatin1String("view.snapGrid")) {
+        return modeling;
+    }
+    return all;
 }
 
 // --- Modul interacțiune ---
@@ -2314,6 +2463,9 @@ QVariantList Document::rulesOf(double instanceId) const
 
 void Document::setRules(double instanceId, const QVariantList& rules)
 {
+    if (!require(Interaction)) {
+        return;
+    }
     const model::InstanceId id = toInstanceId(instanceId);
     if (!m_model.instances().contains(id)) {
         return;
@@ -2539,6 +2691,9 @@ std::optional<math::Transform> Document::displayTransform(model::InstanceId inst
 
 void Document::setBehavior(const QVariantMap& behavior)
 {
+    if (!require(Interaction)) {
+        return;
+    }
     if (m_selection.instances.size() != 1) {
         return;
     }
@@ -2624,6 +2779,9 @@ QVariantList Document::contextMenuItems() const
     QVariantList items;
     const auto item = [&](const QString& id, const QString& name, const QString& shortcut = {}, bool enabled = true,
                           bool destructive = false) {
+        if (!commandAllowed(id)) {
+            return; // comanda altui mod de lucru
+        }
         items.append(QVariantMap { { QStringLiteral("id"), id }, { QStringLiteral("name"), name },
             { QStringLiteral("shortcut"), shortcut }, { QStringLiteral("enabled"), enabled },
             { QStringLiteral("destructive"), destructive } });
@@ -2732,6 +2890,13 @@ QVariantList Document::contextMenuItems() const
     item(QStringLiteral("view.zoomSelection"), QStringLiteral("Zoom la selecție"));
     separator();
     item(QStringLiteral("edit.delete"), QStringLiteral("Șterge"), QStringLiteral("Delete"), geometry || !allLocked, true);
+    // Fără separatori la capete (după ce comenzile altor moduri au lipsit).
+    while (!items.isEmpty() && items.last().toMap().value(QStringLiteral("separator")).toBool()) {
+        items.removeLast();
+    }
+    while (!items.isEmpty() && items.first().toMap().value(QStringLiteral("separator")).toBool()) {
+        items.removeFirst();
+    }
     return items;
 }
 
@@ -2882,6 +3047,9 @@ bool Document::hasTransformKey(double instanceId) const
 
 void Document::setPlacement(const QVariantMap& placement)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.instances.size() != 1) {
         return;
     }
@@ -2951,6 +3119,9 @@ model::MaterialId libraryMaterialIn(model::Model& model, std::size_t index)
 
 void Document::assignMaterial(const QVariantMap& material, const QString& side)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.empty()) {
         return;
     }
@@ -3217,6 +3388,9 @@ void Document::setEditingAnnotation(double id)
 
 void Document::intersectSelection(bool withModel)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.faces.empty()) {
         setError(QStringLiteral("Selectează fețele de intersectat."));
         return;
@@ -3232,6 +3406,9 @@ void Document::intersectSelection(bool withModel)
 
 void Document::booleanSelection(const QString& kind)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.instances.size() != 2 || !m_selection.faces.empty() || !m_selection.edges.empty()) {
         setError(QStringLiteral("Selectează exact două grupuri sau obiecte."));
         return;
@@ -3257,6 +3434,9 @@ void Document::booleanSelection(const QString& kind)
 
 void Document::deleteGuides()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_model.guides().empty()) {
         return;
     }
@@ -3407,6 +3587,9 @@ QVariantMap Document::sceneCamera(double sceneId) const
 
 void Document::reverseSelectedFaces()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.faces.empty()) {
         return;
     }
@@ -3424,6 +3607,9 @@ void Document::reverseSelectedFaces()
 
 void Document::setFaceTexture(const QVariantMap& changes)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.faces.empty()) {
         return;
     }
@@ -3466,6 +3652,9 @@ QVariantList Document::generators() const
 
 double Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
 {
+    if (!require(Modeling)) {
+        return 0.0;
+    }
     const model::GeneratorInfo* info = model::findGenerator(generator.toStdString());
     if (info == nullptr) {
         return 0.0;
@@ -3726,6 +3915,9 @@ QVariantList Document::libraryItems() const
 
 void Document::placeLibraryItem(const QString& id, const QVector3D& at)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (id.startsWith(QLatin1String("gen:"))) {
         createParametric(id.mid(4), at);
         return;
@@ -3813,6 +4005,9 @@ void Document::removeLibraryItem(const QString& id)
 
 void Document::setParameter(const QString& key, double value)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.instances.size() != 1) {
         return;
     }
@@ -3829,6 +4024,9 @@ void Document::setParameter(const QString& key, double value)
 
 void Document::setShapeValue(const QString& key, double value)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     const auto shape = geom::recognizeShape(m_model.mesh(activeDefinition()), m_selection);
     if (!shape || value <= 0.0) {
         return;
@@ -3976,6 +4174,9 @@ void Document::setSelectionPivot(const math::Vec3d& point)
 
 void Document::setGeometryPlacement(const QVariantMap& changes)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     // Rotirea / scara de până acum ale acestei selecții (alta = de la 0° / 1).
     if (geometrySelectionKey() != m_geometryKey) {
         m_geometryKey = geometrySelectionKey();
@@ -4067,6 +4268,9 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
 
 void Document::createFacesFromSelection()
 {
+    if (!require(Modeling)) {
+        return;
+    }
     // Muchiile selectate și cele ale fețelor selectate (o față vecină ajută la închiderea buclei).
     std::vector<geom::EdgeId> edges(m_selection.edges.begin(), m_selection.edges.end());
     if (edges.empty()) {
@@ -4088,6 +4292,9 @@ void Document::createFacesFromSelection()
 
 void Document::setSelectedEdgesSoft(bool soft)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.edges.empty()) {
         return;
     }
@@ -4103,6 +4310,9 @@ void Document::setSelectedEdgesSoft(bool soft)
 
 void Document::mirrorSelection(int axis)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (m_selection.empty()) {
         setError(QStringLiteral("Selectează ce vrei să oglindești."));
         return;
@@ -4134,6 +4344,9 @@ QVariantMap Document::selectionBox() const
 
 void Document::previewArray(const QVariantMap& options)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (!m_previewApplied && m_selection.empty()) {
         setError(QStringLiteral("Selectează obiectele sau geometria pe care vrei s-o multiplici."));
         return;
@@ -4175,6 +4388,9 @@ void Document::previewArray(const QVariantMap& options)
 
 void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (!m_previewApplied && m_selection.empty()) {
         setError(QStringLiteral("Selectează muchiile, fețele sau obiectele de netezit."));
         return;
@@ -4222,6 +4438,9 @@ void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
 
 void Document::previewBevel(double distance, int segments)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     if (!m_previewApplied && m_selection.edges.empty() && m_selection.faces.empty()) {
         setError(QStringLiteral("Selectează muchiile sau fața de teșit."));
         return;
@@ -4417,6 +4636,9 @@ QVariantMap Document::selectedObject() const
 
 void Document::addCamera(const QVariantMap& camera, double fovDegrees)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     model::CameraId added;
     runOnModel("Cameră nouă", [&](model::Model& model) {
         model::CameraObject c;
@@ -4431,6 +4653,9 @@ void Document::addCamera(const QVariantMap& camera, double fovDegrees)
 
 void Document::addLight(const QString& kind, const QVector3D& at)
 {
+    if (!require(Modeling)) {
+        return;
+    }
     const auto index = static_cast<std::size_t>(std::max<qsizetype>(0, std::find(kLightKinds.begin(), kLightKinds.end(), kind) - kLightKinds.begin()));
     model::LightId added;
     runOnModel("Lumină nouă", [&](model::Model& model) {
