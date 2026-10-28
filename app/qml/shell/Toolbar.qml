@@ -14,16 +14,15 @@ Item {
         { id: "select", tools: [
             { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 },
             { id: "interact", icon: "hand-pointer", name: "Interact", key: "I", phase: 0 } ] },
-        // Desen: primitivele 2D (linii și forme).
-        { id: "draw", tools: [
-            { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3 },
+        // Primitive: formele 2D (linii, contururi) și corpurile 3D, într-un singur grup cu două secțiuni.
+        // Corpurile se creează direct ca obiecte; formele rămân geometrie liberă.
+        { id: "primitives", tools: [
+            { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3, section: "2D" },
             { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 },
             { id: "rectangle", icon: "square",   name: "Rectangle", key: "R", phase: 3 },
             { id: "circle",    icon: "circle",   name: "Circle",    key: "C", phase: 5 },
-            { id: "polygon",   icon: "pentagon", name: "Polygon",   key: "",  phase: 5 } ] },
-        // Obiecte: volume gata făcute, create direct ca obiecte.
-        { id: "objects", tools: [
-            { id: "cube",     icon: "prim-cube",     name: "Cub",      key: "", phase: 13 },
+            { id: "polygon",   icon: "pentagon", name: "Polygon",   key: "",  phase: 5 },
+            { id: "cube",     icon: "prim-cube",     name: "Cub",      key: "", phase: 13, section: "3D" },
             { id: "sphere",   icon: "prim-sphere",   name: "Sferă",    key: "", phase: 13 },
             { id: "cone",     icon: "prim-cone",     name: "Con",      key: "", phase: 13 },
             { id: "cylinder", icon: "prim-cylinder", name: "Cilindru", key: "", phase: 13 } ] },

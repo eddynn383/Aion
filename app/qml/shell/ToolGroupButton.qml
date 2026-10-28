@@ -58,9 +58,13 @@ Row {
             // Toolbar-ul e jos în fereastră, deci meniul se deschide în sus, aliniat cu grupul.
             x: -root.width + chevron.width
             y: -height - Theme.space3
-            items: root.group.tools.map(t => ({
-                id: t.id, icon: t.icon, name: t.name, shortcut: t.key || "", checked: t.id === root.currentTool.id
-            }))
+            // O unealtă cu `section` începe o secțiune nouă (un titlu mic deasupra ei, ca „2D” / „3D”).
+            items: root.group.tools.reduce((all, t) => {
+                if (t.section)
+                    all.push({ id: "", header: t.section, enabled: false })
+                all.push({ id: t.id, icon: t.icon, name: t.name, shortcut: t.key || "", checked: t.id === root.currentTool.id })
+                return all
+            }, [])
             onTriggered: (id) => root.toolSelected(id)
         }
     }
