@@ -55,6 +55,13 @@ Item {
     ]
     readonly property var allTools: groups.reduce((all, g) => all.concat(g.tools), []).concat(navigation).concat(hiddenTools)
 
+    // Scurtăturile personalizate (id comandă „tool.<id>” → secvență), din Preferințe.
+    property var keyOverrides: ({})
+    function keyFor(tool) {
+        const custom = keyOverrides["tool." + tool.id]
+        return custom !== undefined ? custom : (tool.key || "")
+    }
+
     // Ultima unealtă aleasă din fiecare grup (id grup → id unealtă).
     property var groupSelection: ({})
 
@@ -109,6 +116,7 @@ Item {
                     required property var modelData
                     anchors.verticalCenter: parent.verticalCenter
                     group: modelData
+                    keyFor: (t) => root.keyFor(t)
                     currentToolId: root.groupSelection[modelData.id] || modelData.tools[0].id
                     active: modelData.tools.some(t => t.id === root.activeTool)
                     onToolSelected: (id) => root.toolSelected(id)
@@ -143,7 +151,7 @@ Item {
                             iconName: modelData.icon
                             iconSize: Theme.iconSizeMd
                             tooltip: modelData.name
-                            shortcut: modelData.key
+                            shortcut: root.keyFor(modelData)
                             guideId: modelData.id
                             checked: root.activeTool === modelData.id
                             solidChecked: false

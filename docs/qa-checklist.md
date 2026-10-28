@@ -183,6 +183,11 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Un cerc și o linie perpendiculară pe el → selectează linia → Follow Me → cerc: cilindru cu laturile netede
 - [ ] Fără nimic selectat: bara de stare cere traseul; profil paralel cu traseul → mesaj, fără pas în istoric
 
+## Scurtături personalizabile
+- [ ] Preferințe → Scurtături: caută „scena”, click pe „—”, apasă ⇧⌘K → apare; comanda pornește cu ⇧⌘K după închidere
+- [ ] Dă unei comenzi tasta L → mesajul spune că Line a rămas fără scurtătură; toolbar-ul nu mai arată „L” la Line
+- [ ] ↺ pe rând readuce scurtătura implicită; „Resetează toate” le readuce pe toate; repornirea aplicației le păstrează
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

@@ -15,6 +15,11 @@ Rectangle {
     property int category: 0
 
     signal closeRequested()
+    // Scurtăturile personalizate: o secvență nouă ("" = fără), null = revine la cea implicită.
+    signal shortcutChanged(string id, var sequence)
+    signal shortcutsReset()
+    // Mesajul ultimei schimbări de scurtătură (de exemplu combinația luată de la altă comandă).
+    property string shortcutNotice: ""
 
     color: Theme.bgApp
 
@@ -570,27 +575,103 @@ Rectangle {
                 }
             }
 
-            // Scurtături
+            // Scurtături: toate comenzile, cu scurtătura editabilă (click → apasă combinația).
             Column {
                 visible: root.category === 7
                 width: parent.width
-                spacing: 2
-                Repeater {
-                    model: root.commands.filter(c => c.shortcut && c.shortcut.length > 0)
-                    delegate: Item {
-                        required property var modelData
-                        width: parent.width
-                        height: Theme.controlHeightSm
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.title
-                            color: Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeSm
+                spacing: Theme.space3
+
+                Row {
+                    width: parent.width
+                    spacing: Theme.space2
+                    Input {
+                        id: shortcutSearch
+                        width: parent.width - resetAll.width - Theme.space2
+                        iconName: "search"
+                        placeholderText: "Caută o comandă sau o scurtătură"
+                    }
+                    Button {
+                        id: resetAll
+                        text: "Resetează toate"
+                        onClicked: { root.shortcutsReset(); root.shortcutNotice = "Toate scurtăturile au revenit la cele implicite." }
+                    }
+                }
+                Text {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: "Click pe scurtătură și apasă noua combinație. Esc anulează, Backspace o șterge. O combinație folosită deja trece la comanda nouă."
+                    color: Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
+                }
+                Text {
+                    width: parent.width
+                    visible: root.shortcutNotice.length > 0
+                    wrapMode: Text.Wrap
+                    text: root.shortcutNotice
+                    color: Theme.accent
+                    font.pixelSize: Theme.fontSizeSm
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 2
+                    Repeater {
+                        model: {
+                            const q = shortcutSearch.text.toLowerCase()
+                            return root.commands.filter(c => !c.id.startsWith("file.recent:") && !c.id.startsWith("debug.")
+                                && (q.length === 0 || c.title.toLowerCase().indexOf(q) >= 0 || c.category.toLowerCase().indexOf(q) >= 0
+                                    || AppInfo.shortcutText(c.shortcut).toLowerCase().indexOf(q) >= 0))
                         }
-                        Kbd {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            sequence: modelData.shortcut
+                        delegate: Rectangle {
+                            id: shortcutRow
+                            required property var modelData
+                            readonly property bool changed: modelData.shortcut !== modelData.defaultShortcut
+                            width: parent.width
+                            height: Theme.controlHeight
+                            radius: Theme.radiusSm
+                            color: rowHover.hovered ? Theme.bgHover : "transparent"
+                            HoverHandler { id: rowHover }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.space2
+                                anchors.right: categoryText.left
+                                anchors.rightMargin: Theme.space2
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: shortcutRow.modelData.title
+                                elide: Text.ElideRight
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontSizeSm
+                            }
+                            Text {
+                                id: categoryText
+                                anchors.right: recorder.left
+                                anchors.rightMargin: Theme.space3
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: shortcutRow.modelData.category
+                                color: Theme.textTertiary
+                                font.pixelSize: Theme.fontSizeXs
+                            }
+                            ShortcutRecorder {
+                                id: recorder
+                                anchors.right: resetOne.left
+                                anchors.rightMargin: Theme.space1
+                                anchors.verticalCenter: parent.verticalCenter
+                                sequence: shortcutRow.modelData.shortcut
+                                onRecorded: (sequence) => root.shortcutChanged(shortcutRow.modelData.id, sequence)
+                            }
+                            IconButton {
+                                id: resetOne
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.space1
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 24; height: 24; iconSize: 13
+                                iconName: "rotate-ccw"
+                                opacity: shortcutRow.changed ? 1 : 0
+                                enabled: shortcutRow.changed
+                                tooltip: "Înapoi la " + (shortcutRow.modelData.defaultShortcut ? AppInfo.shortcutText(shortcutRow.modelData.defaultShortcut) : "fără scurtătură")
+                                onClicked: root.shortcutChanged(shortcutRow.modelData.id, null)
+                            }
                         }
                     }
                 }
