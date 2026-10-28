@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aion/core/geom/Bezier.h"
 #include "aion/core/geom/ChangeSet.h"
 #include "aion/core/geom/Id.h"
 #include "aion/core/geom/Mesh.h"
@@ -325,6 +326,16 @@ struct Instance {
     bool operator==(const Instance&) const = default;
 };
 
+// O curbă desenată cu Pen-ul în Modelare: muchiile ei sunt geometrie obișnuită (cu `curve` id-ul ei), iar punctele și
+// mânerele rămân aici, ca să se poată edita cât timp muchiile sunt neschimbate (vezi model/PenCurves.h).
+struct PenCurve {
+    DefinitionId definition; // definiția în care s-a desenat (editabilă doar acolo)
+    std::uint32_t curve = 0; // id-ul de pe muchiile ei (Edge::curve)
+    geom::BezierPath path; // în coordonatele definiției
+    math::Vec3d normal { 0.0, 0.0, 1.0 }; // normala planului
+    bool operator==(const PenCurve&) const = default;
+};
+
 // Schimbările unei operații pe tot modelul: structura (înainte/după) și geometria fiecărei definiții.
 struct ChangeSet {
     std::map<DefinitionId, geom::EntityChange<Definition>> definitions;
@@ -339,6 +350,7 @@ struct ChangeSet {
     std::map<CameraId, geom::EntityChange<CameraObject>> cameras;
     std::map<LightId, geom::EntityChange<Light>> lights;
     std::map<TextureId, geom::EntityChange<Texture>> textures;
+    std::map<PenCurveId, geom::EntityChange<PenCurve>> penCurves;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -380,6 +392,7 @@ public:
     [[nodiscard]] const geom::SlotMap<CameraId, CameraObject>& cameras() const { return m_cameras; }
     [[nodiscard]] const geom::SlotMap<LightId, Light>& lights() const { return m_lights; }
     [[nodiscard]] const geom::SlotMap<TextureId, Texture>& textures() const { return m_textures; }
+    [[nodiscard]] const geom::SlotMap<PenCurveId, PenCurve>& penCurves() const { return m_penCurves; }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -428,6 +441,9 @@ public:
     TextureId addTexture(Texture texture);
     void removeTexture(TextureId id);
     void setTexture(TextureId id, Texture texture);
+    PenCurveId addPenCurve(PenCurve curve);
+    void removePenCurve(PenCurveId id);
+    void setPenCurve(PenCurveId id, PenCurve curve);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -470,6 +486,7 @@ private:
     geom::SlotMap<SceneId, Scene> m_scenes;
     geom::SlotMap<AnimationId, Animation> m_animations;
     geom::SlotMap<CameraId, CameraObject> m_cameras;
+    geom::SlotMap<PenCurveId, PenCurve> m_penCurves;
     geom::SlotMap<LightId, Light> m_lights;
     geom::SlotMap<TextureId, Texture> m_textures;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;

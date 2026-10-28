@@ -15,6 +15,7 @@ add_library(aion_core STATIC
     src/geom/Offset.cpp
     src/geom/Operations.cpp
     src/geom/Shapes.cpp
+    src/geom/Bezier.cpp
     src/geom/Bevel.cpp
     src/geom/FaceBuilder.cpp
     src/geom/Sweep.cpp
@@ -27,6 +28,7 @@ add_library(aion_core STATIC
     src/math/Intersect.cpp
     src/model/Model.cpp
     src/model/Operations.cpp
+    src/model/PenCurves.cpp
     src/model/Quantities.cpp
     src/model/Interaction.cpp
     src/model/AnimationEval.cpp
@@ -56,6 +58,8 @@ add_library(aion_core STATIC
     src/tools/ToolHelpers.cpp
     src/tools/TransformTools.cpp
     src/tools/ShapeTools.cpp
+    src/tools/PenTool.cpp
+    src/tools/PenEditTool.cpp
     src/tools/PaintTool.cpp
     src/tools/FollowMeTool.cpp
     src/tools/TextureTool.cpp

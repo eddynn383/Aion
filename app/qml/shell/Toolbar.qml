@@ -35,6 +35,9 @@ Item {
             { id: "sphere",   icon: "prim-sphere",   name: "Sferă",    key: "Shift+O", phase: 13 },
             { id: "cone",     icon: "prim-cone",     name: "Con",      key: "Shift+V", phase: 13 },
             { id: "cylinder", icon: "prim-cylinder", name: "Cilindru", key: "Shift+C", phase: 13 } ] },
+        // Pen (ca în Figma): curbe Bézier editabile în Modelare, căi de parcurgere în Animare.
+        { id: "pen", modes: [0, 1], tools: [
+            { id: "pen", icon: "pen-line", name: "Pen", key: "Shift+P", phase: 34 } ] },
         { id: "modify", modes: [0], tools: [
             { id: "pushpull", icon: "arrow-up-from-line", name: "Push/Pull", key: "P", phase: 5 },
             { id: "offset",   icon: "square-dashed",      name: "Offset",    key: "F", phase: 5 },

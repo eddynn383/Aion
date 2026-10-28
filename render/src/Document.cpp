@@ -16,6 +16,7 @@
 #include "aion/core/model/Transfer.h"
 #include "ProceduralTextures.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/PenCurves.h"
 #include "aion/core/model/Quantities.h"
 #include "aion/core/units/Length.h"
 #include "aion/core/view/ModelPicking.h"
@@ -413,6 +414,7 @@ QString Document::localPath(const QUrl& url) const
 
 void Document::replaceModel(const model::Model& model)
 {
+    finishCurveEdit();
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -665,9 +667,10 @@ void Document::setActiveTool(const QString& requested)
     // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare): rămâne Select.
     const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested) ? requested
                                                                                                  : QStringLiteral("select");
-    if (m_suspendedTool) { // o tragere a pivotului întreruptă: revine unealta de dinainte
+    if (m_suspendedTool) { // o tragere a pivotului sau o editare de curbă întreruptă: revine unealta de dinainte
         m_tool = std::move(m_suspendedTool);
         m_pivotDragPoint.reset();
+        m_editCurve = {};
     }
     if (id == m_toolId) {
         return;
@@ -1040,8 +1043,17 @@ QVariantMap Document::entityInfo() const
                 { QStringLiteral("vz"), pivot.z } };
         }
     }
+    // O curbă Pen (nu un arc): titlul ei; editarea e cu dublu click în viewport.
+    const model::PenCurveId pen
+        = m_selection.edges.empty() ? model::PenCurveId {} : model::penCurveForEdge(m_model, activeDefinition(), *m_selection.edges.begin());
+    if (pen) {
+        info[QStringLiteral("title")] = QStringLiteral("Curbă");
+        if (model::penCurveEditable(m_model, pen)) {
+            details << detail(QStringLiteral("Editare"), QStringLiteral("dublu click pe curbă"));
+        }
+    }
     // Forma recunoscută (linie, arc, cerc, poligon, dreptunghi), cu mărimile ei editabile.
-    if (const auto shape = geom::recognizeShape(mesh, m_selection)) {
+    if (const auto shape = pen ? std::nullopt : geom::recognizeShape(mesh, m_selection)) {
         static const char* const kKinds[] = { "line", "arc", "circle", "polygon", "rectangle" };
         static const char* const kTitles[] = { "Linie", "Arc", "Cerc", "Poligon", "Dreptunghi" };
         info[QStringLiteral("title")] = QString::fromUtf8(kTitles[static_cast<int>(shape->kind)]);
@@ -1101,6 +1113,11 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
     ctx.toWorld = contextTransform();
+    ctx.drawsPaths = m_workMode == Animation; // Pen-ul desenează căi în Animare
+    if (const model::PenCurve* c = m_editCurve ? m_model.penCurves().find(m_editCurve) : nullptr) {
+        ctx.editCurve = c->path;
+        ctx.editNormal = c->normal;
+    }
     ctx.pivot = selectionPivot(); // Rotate pornește din el, Scale cu Option îl ține fix
     // O cameră sau o lumină selectată (în Modelare, la nivelul modelului): ținta lui Move / Rotate / Scale, cu pivotul
     // în poziția ei. Camerele și luminile nu se animă, deci nu și în Animare.
@@ -1164,10 +1181,25 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         exitContext();
     }
     // Tragerea pivotului: previzualizarea, apoi punctul ales (sau anularea).
-    if (requests.pivotDone) {
+    if (requests.pivotDone && pivotDragging()) {
         finishPivotDrag(requests.pivot);
-    } else if (requests.pivot && m_suspendedTool) {
+    } else if (requests.pivot && pivotDragging()) {
         m_pivotDragPoint = requests.pivot;
+    }
+    // Curbele Pen: intrarea în editare (dublu click), fiecare editare (un pas de undo), ieșirea.
+    if (requests.editPenCurve) {
+        beginCurveEdit(requests.editPenCurve);
+    }
+    if (requests.curveEdit && m_editCurve) {
+        const geom::BezierPath path = *requests.curveEdit;
+        bool replaced = false;
+        runOnModel("Editează curba", [&](model::Model& model) { replaced = model::replacePenCurve(model, m_editCurve, path); });
+        if (!replaced) {
+            finishCurveEdit();
+        }
+    }
+    if (requests.curveEditDone) {
+        finishCurveEdit();
     }
     afterInteraction(before);
 }
@@ -1378,6 +1410,9 @@ void Document::stepHistory(Fn&& step)
         m_previewing = true;
     }
     m_timelineTime = std::clamp(m_timelineTime, 0.0, std::max(animationDuration(), 0.0));
+    if (m_editCurve && !model::penCurveEditable(m_model, m_editCurve)) {
+        finishCurveEdit();
+    }
     ++m_interactionRevision;
     afterInteraction(before);
     // Pasul poate schimba orice: cheile din timeline, valorile de la playhead, Inspector-ul, lista obiectelor.
@@ -1390,6 +1425,10 @@ void Document::stepHistory(Fn&& step)
 
 void Document::deleteSelection()
 {
+    if (curveEditing()) { // ⌫ în editarea unei curbe: punctul selectat
+        withTool(m_lastCamera, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Delete, {} }); });
+        return;
+    }
     if (!require(Modeling)) {
         return;
     }
@@ -2611,7 +2650,7 @@ QList<int> Document::commandModes(const QString& id)
         if (common.contains(tool)) {
             return all;
         }
-        if (transforms.contains(tool)) {
+        if (transforms.contains(tool) || tool == QLatin1String("pen")) {
             return { Modeling, Animation };
         }
         if (tool == QLatin1String("interact")) {
@@ -4624,6 +4663,31 @@ void Document::beginPivotDrag()
     m_suspendedTool = std::exchange(m_tool, tools::makeTool("pivot"));
     m_pivotDragPoint = selectionPivot();
     emit toolStatusChanged();
+}
+
+void Document::beginCurveEdit(model::PenCurveId id)
+{
+    if (m_workMode != Modeling || m_suspendedTool || !m_tool || !model::penCurveEditable(m_model, id)) {
+        return;
+    }
+    m_suspendedTool = std::exchange(m_tool, tools::makeTool("penedit"));
+    m_editCurve = id;
+    replayPointer(); // punctele și mânerele apar imediat
+    emit toolStatusChanged();
+    touch();
+}
+
+void Document::finishCurveEdit()
+{
+    if (!m_editCurve) {
+        return;
+    }
+    m_editCurve = {};
+    if (m_suspendedTool) {
+        m_tool = std::move(m_suspendedTool);
+    }
+    emit toolStatusChanged();
+    touch();
 }
 
 void Document::finishPivotDrag(const std::optional<math::Vec3d>& point)

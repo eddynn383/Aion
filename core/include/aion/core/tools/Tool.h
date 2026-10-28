@@ -37,7 +37,7 @@ struct PointerEvent {
 };
 
 // Săgețile blochează inferența pe o axă: → roșie, ← verde, ↑ albastră, ↓ paralel cu muchia de referință.
-enum class Key { Escape, Enter, Left, Right, Up, Down, Other };
+enum class Key { Escape, Enter, Left, Right, Up, Down, Delete, Other };
 
 struct KeyEvent {
     Key key = Key::Other;
@@ -111,6 +111,14 @@ struct ToolRequests {
     // s-a terminat — cu `pivot` = punctul ales, fără = anulată.
     std::optional<math::Vec3d> pivot;
     bool pivotDone = false;
+    // Pen în Animare: curba terminată (în coordonatele contextului) și normala planului ei; Document face din ea o cale.
+    std::optional<geom::BezierPath> penPath;
+    math::Vec3d penNormal { 0.0, 0.0, 1.0 };
+    // Editarea unei curbe (penedit): forma nouă, după o tragere / inserare / ștergere (un pas de undo), și ieșirea.
+    std::optional<geom::BezierPath> curveEdit;
+    bool curveEditDone = false;
+    // Select: dublu click pe o curbă Pen editabilă → Document intră în editarea ei.
+    model::PenCurveId editPenCurve;
 };
 
 struct ToolContext {
@@ -144,6 +152,11 @@ struct ToolContext {
     std::optional<Vec3d> pivot;
     // Camera sau lumina selectată (fără altă selecție): ținta lui Move / Rotate / Scale.
     std::optional<model::SceneObjectRef> object;
+    // Animare: Pen-ul desenează o cale de parcurgere (o cere prin ToolRequests::penPath), nu geometrie.
+    bool drawsPaths = false;
+    // Curba editată (penedit), în coordonatele contextului, și normala planului ei; Document le pune la fiecare apel.
+    std::optional<geom::BezierPath> editCurve;
+    math::Vec3d editNormal { 0.0, 0.0, 1.0 };
 };
 
 class Tool {

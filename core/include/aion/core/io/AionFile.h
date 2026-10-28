@@ -18,7 +18,9 @@ namespace aion::io {
 // 2: animațiile pe canale (ADR 0034); cheile cu matricea întreagă din versiunea 1 se descompun în canale.
 // 3: poziția din plasare e a pivotului (ADR 0030): ținta regulilor „Mută la” din versiunile vechi (colțul minim) se
 //    mută cu diferența pivot − colț.
-inline constexpr int kFormatVersion = 3;
+// 4: curbele Pen (`penCurves`: punctele și mânerele lângă muchiile lor) și căile de parcurgere (ADR 0036); fișierele
+//    mai vechi nu le au.
+inline constexpr int kFormatVersion = 4;
 
 struct LoadResult {
     std::optional<model::Model> model;

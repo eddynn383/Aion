@@ -425,11 +425,15 @@ DrawLineResult drawPolygon(Mesh& mesh, const std::vector<Vec3d>& points)
 
 DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth)
 {
+    return drawCurve(mesh, points, closed, smooth, mesh.newCurveId());
+}
+
+DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth, std::uint32_t curve)
+{
     DrawLineResult total;
     if (points.size() < 2) {
         return total;
     }
-    const std::uint32_t curve = mesh.newCurveId();
     const std::size_t count = closed ? points.size() : points.size() - 1;
     for (std::size_t i = 0; i < count; ++i) {
         DrawLineResult r = drawLine(mesh, points[i], points[(i + 1) % points.size()]);
