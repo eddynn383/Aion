@@ -150,21 +150,40 @@ struct Light {
     bool operator==(const Light&) const = default;
 };
 
-// Animațiile (timeline-ul): keyframe-uri cu valori absolute pe obiecte (transformare, culoare) și pe cameră.
-enum class Easing { Linear, EaseInOut, EaseIn, EaseOut, Step };
+// Animațiile (timeline-ul): keyframe-uri cu valori absolute, pe canale (o proprietate a unui obiect) și pe cameră
+// (ADR 0034).
 
-struct TransformKey {
-    double time = 0.0;
-    math::Transform value;
-    Easing easing = Easing::EaseInOut;
-    bool operator==(const TransformKey&) const = default;
+// Easing-ul dintre o cheie și următoarea: o curbă Bézier cubică, ca `cubic-bezier` din CSS (capetele (0, 0) și (1, 1),
+// mânerele (x1, y1) și (x2, y2)), sau un salt la final (`step`). `name` = presetarea („easeInOut”) sau numele dat de
+// utilizator; cheia ține curba însăși, deci un fișier trimis altcuiva arată la fel. Implicit: ease-in-out.
+struct Easing {
+    std::string name = "easeInOut";
+    double x1 = 0.42;
+    double y1 = 0.0;
+    double x2 = 0.58;
+    double y2 = 1.0;
+    bool step = false;
+    bool operator==(const Easing&) const = default;
 };
 
-struct ColorKey {
+// Proprietățile animabile ale unui obiect, în ordinea din timeline. Valorile sunt ca în Inspector: poziția pivotului
+// (mm, în coordonatele părintelui), rotația (grade, Euler XYZ), scara pe axele proprii; culoarea (RGBA).
+enum class Property { PositionX, PositionY, PositionZ, RotationX, RotationY, RotationZ, ScaleX, ScaleY, ScaleZ, Color };
+inline constexpr int kPropertyCount = 10;
+
+struct Key {
     double time = 0.0;
-    Color value;
-    Easing easing = Easing::EaseInOut;
-    bool operator==(const ColorKey&) const = default;
+    double value = 0.0; // proprietățile numerice
+    Color color {}; // Property::Color
+    Easing easing {};
+    bool operator==(const Key&) const = default;
+};
+
+// Un canal = cheile unei proprietăți, sortate după timp. Canalele există doar pentru proprietățile animate.
+struct Channel {
+    Property property = Property::PositionX;
+    std::vector<Key> keys;
+    bool operator==(const Channel&) const = default;
 };
 
 struct CameraKey {
@@ -173,15 +192,14 @@ struct CameraKey {
     double yaw = 0.0;
     double pitch = 0.0;
     double distance = 10000.0;
-    Easing easing = Easing::EaseInOut;
+    Easing easing {};
     bool operator==(const CameraKey&) const = default;
 };
 
-// Pista unui obiect; cheile sunt sortate după timp.
+// Pista unui obiect: canalele lui, în ordinea proprietăților. Proprietățile fără canal rămân cum sunt în model.
 struct ObjectTrack {
     InstanceId instance;
-    std::vector<TransformKey> transform;
-    std::vector<ColorKey> color;
+    std::vector<Channel> channels;
     bool operator==(const ObjectTrack&) const = default;
 };
 

@@ -1841,6 +1841,63 @@ void Document::setActiveAnimation(double id)
     emit changed();
 }
 
+namespace {
+
+QVariantMap easingToVariant(const model::Easing& e)
+{
+    return { { QStringLiteral("name"), QString::fromStdString(e.name) }, { QStringLiteral("x1"), e.x1 },
+        { QStringLiteral("y1"), e.y1 }, { QStringLiteral("x2"), e.x2 }, { QStringLiteral("y2"), e.y2 },
+        { QStringLiteral("step"), e.step } };
+}
+
+std::optional<model::Easing> easingFromVariant(const QVariant& v)
+{
+    if (v.typeId() == QMetaType::QString) {
+        return model::easingPreset(v.toString().toStdString());
+    }
+    const QVariantMap m = v.toMap();
+    if (m.isEmpty()) {
+        return std::nullopt;
+    }
+    model::Easing e;
+    e.name = m.value(QStringLiteral("name")).toString().toStdString();
+    e.x1 = std::clamp(m.value(QStringLiteral("x1"), e.x1).toDouble(), 0.0, 1.0);
+    e.y1 = m.value(QStringLiteral("y1"), e.y1).toDouble();
+    e.x2 = std::clamp(m.value(QStringLiteral("x2"), e.x2).toDouble(), 0.0, 1.0);
+    e.y2 = m.value(QStringLiteral("y2"), e.y2).toDouble();
+    e.step = m.value(QStringLiteral("step"), false).toBool();
+    return e;
+}
+
+QString colorText(const model::Color& c)
+{
+    return QColor(c.r, c.g, c.b, c.a).name(QColor::HexArgb);
+}
+
+// Numele canalului ca în Inspector și unitatea valorilor.
+std::pair<QString, QString> channelLabel(model::Property p)
+{
+    static const char* const kLabels[] = { "Poziție X", "Poziție Y", "Poziție Z", "Rotație X", "Rotație Y", "Rotație Z",
+        "Scară X", "Scară Y", "Scară Z", "Culoare" };
+    const int i = static_cast<int>(p);
+    return { QString::fromUtf8(kLabels[i]),
+        i < 3 ? QStringLiteral("mm") : i < 6 ? QStringLiteral("°") : i < 9 ? QStringLiteral("×") : QStringLiteral("color") };
+}
+
+} // namespace
+
+QString Document::channelValueText(model::Property p, double value) const
+{
+    const int i = static_cast<int>(p);
+    if (i < 3) {
+        return formatLength(value);
+    }
+    if (i < 6) {
+        return QString::number(value, 'f', std::abs(value - std::round(value)) < 1e-6 ? 0 : 1) + QStringLiteral("°");
+    }
+    return QString::number(value, 'g', 4);
+}
+
 QVariantMap Document::timeline() const
 {
     const model::Animation* a = currentAnimation();
@@ -1855,21 +1912,38 @@ QVariantMap Document::timeline() const
             const model::Definition& def = m_model.definition(inst->definition);
             name = QString::fromStdString(inst->name.empty() ? def.name : inst->name);
         }
-        QVariantList transform;
-        for (const model::TransformKey& k : t.transform) {
-            transform.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), static_cast<int>(k.easing) } });
+        const model::TransformValues now = inst != nullptr ? currentValues(t.instance) : model::TransformValues {};
+        const std::optional<model::Color> color = model::evaluateColor(t, m_timelineTime);
+        QVariantList channels;
+        for (const model::Channel& c : t.channels) {
+            const auto [label, unit] = channelLabel(c.property);
+            const bool isColor = c.property == model::Property::Color;
+            QVariantList keys;
+            for (const model::Key& k : c.keys) {
+                keys.append(QVariantMap { { QStringLiteral("time"), k.time },
+                    { QStringLiteral("value"), isColor ? QVariant(colorText(k.color)) : QVariant(k.value) },
+                    { QStringLiteral("text"), isColor ? colorText(k.color) : channelValueText(c.property, k.value) },
+                    { QStringLiteral("easing"), easingToVariant(k.easing) } });
+            }
+            const double current = now.get(c.property);
+            channels.append(QVariantMap { { QStringLiteral("property"), QString::fromLatin1(model::propertyName(c.property).data(),
+                                                                        qsizetype(model::propertyName(c.property).size())) },
+                { QStringLiteral("label"), label }, { QStringLiteral("unit"), unit }, { QStringLiteral("keys"), keys },
+                { QStringLiteral("current"), isColor ? QVariant(color ? colorText(*color) : QString()) : QVariant(current) },
+                { QStringLiteral("currentText"), isColor ? (color ? colorText(*color) : QString()) : channelValueText(c.property, current) } });
         }
-        QVariantList color;
-        for (const model::ColorKey& k : t.color) {
-            color.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), static_cast<int>(k.easing) } });
+        QVariantList times;
+        std::set<model::InstanceId> one { t.instance };
+        for (double time : model::keyTimes(*a, one)) {
+            times.append(time);
         }
         tracks.append(QVariantMap { { QStringLiteral("instance"), static_cast<double>(t.instance.value) },
-            { QStringLiteral("name"), name }, { QStringLiteral("transform"), transform }, { QStringLiteral("color"), color },
+            { QStringLiteral("name"), name }, { QStringLiteral("times"), times }, { QStringLiteral("channels"), channels },
             { QStringLiteral("selected"), m_selection.instances.contains(t.instance) } });
     }
     QVariantList camera;
     for (const model::CameraKey& k : a->camera) {
-        camera.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), static_cast<int>(k.easing) } });
+        camera.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), easingToVariant(k.easing) } });
     }
     return { { QStringLiteral("name"), QString::fromStdString(a->name) }, { QStringLiteral("duration"), a->duration },
         { QStringLiteral("fps"), a->fps }, { QStringLiteral("loop"), a->loop }, { QStringLiteral("tracks"), tracks },
@@ -1974,9 +2048,13 @@ void Document::keySelection()
         return;
     }
     const double t = m_timelineTime;
+    std::map<model::InstanceId, model::TransformValues> values;
+    for (model::InstanceId id : m_selection.instances) {
+        values[id] = currentValues(id);
+    }
     editAnimation("Keyframe", [&](model::Animation& a) {
-        for (model::InstanceId id : m_selection.instances) {
-            model::setTransformKey(a, id, t, m_model.instance(id).transform);
+        for (const auto& [id, v] : values) {
+            model::keyTransform(a, id, t, v, v, false);
         }
     });
 }
@@ -2014,73 +2092,105 @@ void Document::keyCamera(const QVariantMap& camera)
             { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
                 camera.value(QStringLiteral("tz")).toDouble() },
             camera.value(QStringLiteral("yaw")).toDouble(), camera.value(QStringLiteral("pitch")).toDouble(),
-            camera.value(QStringLiteral("distance")).toDouble(), model::Easing::EaseInOut });
+            camera.value(QStringLiteral("distance")).toDouble(), model::Easing {} });
     });
 }
 
 namespace {
 
-model::KeyKind keyKind(const QString& kind)
+std::vector<model::KeyRef> keyRefs(const QVariantList& list)
 {
-    return kind == QLatin1String("color") ? model::KeyKind::Color
-        : kind == QLatin1String("camera") ? model::KeyKind::Camera
-                                          : model::KeyKind::Transform;
+    std::vector<model::KeyRef> out;
+    for (const QVariant& v : list) {
+        const QVariantMap m = v.toMap();
+        model::KeyRef r;
+        r.instance = model::InstanceId { static_cast<std::uint64_t>(m.value(QStringLiteral("instance")).toDouble()) };
+        r.property = model::propertyFromName(m.value(QStringLiteral("property")).toString().toStdString());
+        r.time = m.value(QStringLiteral("time")).toDouble();
+        out.push_back(r);
+    }
+    return out;
+}
+
+QVariantList keyRefsToVariant(const std::vector<model::KeyRef>& refs)
+{
+    QVariantList out;
+    for (const model::KeyRef& r : refs) {
+        const std::string_view name = r.property ? model::propertyName(*r.property) : std::string_view {};
+        out.append(QVariantMap { { QStringLiteral("instance"), static_cast<double>(r.instance.value) },
+            { QStringLiteral("property"), QString::fromLatin1(name.data(), qsizetype(name.size())) },
+            { QStringLiteral("time"), r.time } });
+    }
+    return out;
 }
 
 } // namespace
 
-void Document::removeKey(const QString& kind, double instance, double time)
+void Document::removeKeys(const QVariantList& keys)
 {
     if (!require(Animation)) {
         return;
     }
-    editAnimation("Șterge keyframe-ul", [&](model::Animation& a) {
-        model::removeKey(a, keyKind(kind), toInstanceId(instance), time);
-    });
+    const std::vector<model::KeyRef> refs = keyRefs(keys);
+    editAnimation(refs.size() > 1 ? "Șterge keyframe-urile" : "Șterge keyframe-ul",
+        [&](model::Animation& a) { model::removeKeys(a, refs); });
 }
 
-void Document::moveKey(const QString& kind, double instance, double time, double newTime)
+QVariantList Document::moveKeys(const QVariantList& keys, double delta)
 {
     if (!require(Animation)) {
-        return;
+        return {};
     }
-    editAnimation("Mută keyframe-ul", [&](model::Animation& a) {
-        model::moveKey(a, keyKind(kind), toInstanceId(instance), time, newTime);
-    });
+    const std::vector<model::KeyRef> refs = keyRefs(keys);
+    std::vector<model::KeyRef> moved;
+    editAnimation(refs.size() > 1 ? "Mută keyframe-urile" : "Mută keyframe-ul",
+        [&](model::Animation& a) { moved = model::moveKeys(a, refs, delta); });
+    return keyRefsToVariant(moved);
 }
 
-void Document::setKeyEasing(const QString& kind, double instance, double time, int easing)
+void Document::setKeysEasing(const QVariantList& keys, const QVariant& easing)
 {
     if (!require(Animation)) {
         return;
     }
-    const auto e = static_cast<model::Easing>(std::clamp(easing, 0, 4));
-    const double tol = 0.5 / 30.0;
-    editAnimation("Easing", [&](model::Animation& a) {
-        if (keyKind(kind) == model::KeyKind::Camera) {
-            for (model::CameraKey& k : a.camera) {
-                if (std::abs(k.time - time) < tol) {
-                    k.easing = e;
-                }
-            }
-            return;
-        }
-        for (model::ObjectTrack& t : a.tracks) {
-            if (t.instance != toInstanceId(instance)) {
-                continue;
-            }
-            for (model::TransformKey& k : t.transform) {
-                if (keyKind(kind) == model::KeyKind::Transform && std::abs(k.time - time) < tol) {
-                    k.easing = e;
-                }
-            }
-            for (model::ColorKey& k : t.color) {
-                if (keyKind(kind) == model::KeyKind::Color && std::abs(k.time - time) < tol) {
-                    k.easing = e;
-                }
-            }
-        }
-    });
+    const std::optional<model::Easing> e = easingFromVariant(easing);
+    if (!e) {
+        return;
+    }
+    const std::vector<model::KeyRef> refs = keyRefs(keys);
+    editAnimation("Easing", [&](model::Animation& a) { model::setKeysEasing(a, refs, *e); });
+}
+
+void Document::setKeyValue(const QVariantMap& key, double value)
+{
+    if (!require(Animation)) {
+        return;
+    }
+    const std::vector<model::KeyRef> refs = keyRefs({ key });
+    editAnimation("Valoarea keyframe-ului", [&](model::Animation& a) { model::setKeyValue(a, refs.front(), value); });
+}
+
+void Document::setChannelValue(double instance, const QString& property, double value)
+{
+    if (!require(Animation)) {
+        return;
+    }
+    const model::InstanceId id { static_cast<std::uint64_t>(instance) };
+    const auto p = model::propertyFromName(property.toStdString());
+    if (!p || !model::isTransform(*p) || !m_model.instances().contains(id)) {
+        return;
+    }
+    const double t = m_timelineTime;
+    editAnimation("Keyframe", [&](model::Animation& a) { model::setChannelKey(a, id, *p, t, value); });
+}
+
+QVariantList Document::easingPresets() const
+{
+    QVariantList out;
+    for (const model::Easing& e : model::easingPresets()) {
+        out.append(easingToVariant(e));
+    }
+    return out;
 }
 
 void Document::play()
@@ -2204,7 +2314,9 @@ model::Model& Document::pose() const
             for (std::size_t i = 0; i < m_model.instances().size(); ++i) {
                 const model::InstanceId id = m_model.instances().keys()[i];
                 if (const model::ObjectTrack* t = model::findTrack(*a, id)) {
-                    if (const auto value = model::evaluateTransform(*t, m_timelineTime)) {
+                    const model::Instance& base = m_model.instances().values()[i];
+                    if (const auto value
+                        = model::evaluateInstance(*t, m_timelineTime, base.transform, model::pivotLocal(m_model, id))) {
                         model::Instance inst = m_pose->instance(id);
                         inst.transform = *value;
                         m_pose->setInstance(id, inst);
@@ -2223,11 +2335,27 @@ void Document::keyTransforms(const std::map<model::InstanceId, math::Transform>&
         createAnimation();
     }
     const double t = m_timelineTime;
+    // Valorile de dinainte (canalele de la timpul curent) și cele noi, față de pivotul fiecărui obiect.
+    std::map<model::InstanceId, std::pair<model::TransformValues, model::TransformValues>> changes;
+    for (const auto& [id, transform] : transforms) {
+        if (m_model.instances().contains(id)) {
+            changes[id] = { currentValues(id), model::transformValues(transform, model::pivotLocal(m_model, id)) };
+        }
+    }
     editAnimation(name, [&](model::Animation& a) {
-        for (const auto& [id, transform] : transforms) {
-            model::setTransformKey(a, id, t, transform);
+        for (const auto& [id, values] : changes) {
+            model::keyTransform(a, id, t, values.first, values.second, true);
         }
     });
+}
+
+model::TransformValues Document::currentValues(model::InstanceId instance) const
+{
+    const math::Vec3d pivot = model::pivotLocal(m_model, instance);
+    const model::TransformValues base = model::transformValues(m_model.instance(instance).transform, pivot);
+    const model::Animation* a = currentAnimation();
+    const model::ObjectTrack* track = a != nullptr ? model::findTrack(*a, instance) : nullptr;
+    return track != nullptr ? model::evaluateValues(*track, m_timelineTime, base) : base;
 }
 
 
@@ -2799,8 +2927,9 @@ std::optional<math::Transform> Document::displayTransform(model::InstanceId inst
 {
     if (m_previewing) {
         if (const model::Animation* a = currentAnimation()) {
-            if (const model::ObjectTrack* t = model::findTrack(*a, instance)) {
-                if (auto value = model::evaluateTransform(*t, m_timelineTime)) {
+            if (const model::ObjectTrack* t = model::findTrack(*a, instance); t && m_model.instances().contains(instance)) {
+                if (auto value = model::evaluateInstance(
+                        *t, m_timelineTime, m_model.instance(instance).transform, model::pivotLocal(m_model, instance))) {
                     return value;
                 }
             }
@@ -3173,13 +3302,15 @@ bool Document::hasTransformKey(double instanceId) const
         return false;
     }
     const model::InstanceId id { static_cast<std::uint64_t>(instanceId) };
-    for (const model::ObjectTrack& track : a->tracks) {
-        if (track.instance == id) {
-            return std::any_of(track.transform.begin(), track.transform.end(),
-                [&](const model::TransformKey& k) { return std::abs(k.time - m_timelineTime) < 1e-3; });
-        }
+    const model::ObjectTrack* track = model::findTrack(*a, id);
+    if (track == nullptr) {
+        return false;
     }
-    return false;
+    return std::any_of(track->channels.begin(), track->channels.end(), [&](const model::Channel& c) {
+        return model::isTransform(c.property) && std::any_of(c.keys.begin(), c.keys.end(), [&](const model::Key& k) {
+            return std::abs(k.time - m_timelineTime) < 1e-3;
+        });
+    });
 }
 
 void Document::setPlacement(const QVariantMap& placement)

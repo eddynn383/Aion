@@ -15,7 +15,8 @@
 namespace aion::io {
 
 // Crește la fiecare schimbare incompatibilă; fișierele vechi se migrează la încărcare.
-inline constexpr int kFormatVersion = 1;
+// 2: animațiile pe canale (ADR 0034); cheile cu matricea întreagă din versiunea 1 se descompun în canale.
+inline constexpr int kFormatVersion = 2;
 
 struct LoadResult {
     std::optional<model::Model> model;

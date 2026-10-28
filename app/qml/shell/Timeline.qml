@@ -21,7 +21,7 @@ Rectangle {
     // Pe un timeline îngust, butoanele de keyframe rămân doar cu iconiță (și tooltip).
     readonly property bool wide: width > 1080
     readonly property real pxPerSecond: Math.max(10, (lanes.width - 16) / Math.max(duration, 0.1))
-    property var selectedKey: null // { kind, instance, time }
+    property var selectedKey: null // { kind, instance, property, time }
 
     function timeAt(x) { return Math.max(0, Math.min(root.duration, (x - 8) / root.pxPerSecond)) }
     function xAt(t) { return 8 + t * root.pxPerSecond }
@@ -39,7 +39,7 @@ Rectangle {
     }
     function deleteSelected() {
         if (root.selectedKey) {
-            root.document.removeKey(root.selectedKey.kind, root.selectedKey.instance, root.selectedKey.time)
+            root.document.removeKeys([root.selectedKey])
             root.selectedKey = null
         }
     }
@@ -313,11 +313,14 @@ Rectangle {
             if (!root.hasAnimation)
                 return out
             if ((root.tl.camera ?? []).length > 0)
-                out.push({ kind: "camera", instance: 0, name: "Cameră", keys: root.tl.camera })
+                out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", keys: root.tl.camera })
             for (const t of (root.tl.tracks ?? [])) {
-                out.push({ kind: "transform", instance: t.instance, name: t.name, keys: t.transform, selected: t.selected })
-                if (t.color.length > 0)
-                    out.push({ kind: "color", instance: t.instance, name: t.name + " · culoare", keys: t.color, selected: t.selected })
+                out.push({ kind: "transform", instance: t.instance, property: "", name: t.name,
+                           keys: t.times.map(time => ({ time: time })), selected: t.selected })
+                const color = t.channels.find(c => c.property === "color")
+                if (color)
+                    out.push({ kind: "color", instance: t.instance, property: "color", name: t.name + " · culoare", keys: color.keys,
+                               selected: t.selected })
             }
             return out
         }
@@ -455,7 +458,7 @@ Rectangle {
                                     onPressed: (mouse) => {
                                         root.forceActiveFocus()
                                         root.selectedKey = { kind: lane.modelData.kind, instance: lane.modelData.instance,
-                                                             time: keyItem.modelData.time }
+                                                             property: lane.modelData.property, time: keyItem.modelData.time }
                                         startX = mouse.x
                                         if (mouse.button === Qt.RightButton) {
                                             easingMenu.key = root.selectedKey
@@ -472,10 +475,11 @@ Rectangle {
                                             return
                                         }
                                         const t = root.timeAt(root.xAt(keyItem.modelData.time) + keyItem.dragX)
-                                        const key = { kind: lane.modelData.kind, instance: lane.modelData.instance }
-                                        root.document.moveKey(key.kind, key.instance, keyItem.modelData.time, t)
+                                        const key = { kind: lane.modelData.kind, instance: lane.modelData.instance,
+                                                      property: lane.modelData.property, time: keyItem.modelData.time }
+                                        root.document.moveKeys([key], t - key.time)
                                         keyItem.dragX = 0
-                                        root.selectedKey = { kind: key.kind, instance: key.instance, time: t }
+                                        root.selectedKey = Object.assign({}, key, { time: t })
                                     }
                                 }
                             }
@@ -535,7 +539,7 @@ Rectangle {
                         hoverEnabled: true
                         onClicked: {
                             const k = easingMenu.key
-                            root.document.setKeyEasing(k.kind, k.instance, k.time, index)
+                            root.document.setKeysEasing([k], ["linear", "easeInOut", "easeIn", "easeOut", "step"][index])
                             easingMenu.close()
                         }
                     }

@@ -679,7 +679,7 @@ Planul detaliat (specificație, design, pași, criterii, decizii de confirmat): 
 Planul detaliat (funcțiile de pe piață, designul, pașii, deciziile de confirmat): [`docs/plans/animatie.md`](docs/plans/animatie.md).
 
 - [x] Pasul 1 — tastatura: Space play / pauză, ← → cadre, ⌥← → chei, Home / End
-- [ ] Pasul 2 — canale pe proprietate (core + migrarea fișierelor)
+- [x] Pasul 2 — canale pe proprietate (core + migrarea fișierelor)
 - [ ] Pasul 3 — timeline: obiecte expandabile, canalele modificate, valorile la chei
 - [ ] Pasul 4 — easing: presetări + editorul de curbă Bézier, curbe proprii salvate
 - [ ] Pasul 5 — UX: selecție multiplă, zoom / scroll, snap, copiere / lipire, Auto-key

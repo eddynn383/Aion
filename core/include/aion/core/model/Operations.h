@@ -4,6 +4,8 @@
 #include "aion/core/math/Transform.h"
 #include "aion/core/model/Model.h"
 
+#include <glm/mat3x3.hpp>
+
 #include <cstdint>
 #include <set>
 
@@ -69,6 +71,17 @@ struct Placement {
 };
 
 [[nodiscard]] Placement placementOf(const Model& model, InstanceId instance);
+
+// M = T · R · S · T(−lo): rotația (coloane ortonormate, o rotație adevărată) și scara (lungimile coloanelor) dintr-o
+// transformare fără forfecare. O oglindire apare ca scară negativă pe X.
+struct Decomposed {
+    glm::dmat3 rotation { 1.0 };
+    math::Vec3d scale { 1.0 };
+};
+[[nodiscard]] Decomposed decompose(const math::Transform& t);
+// Unghiurile Euler (grade) ale rotației R = Rz · Ry · Rx (la ±90° pe Y, gimbal lock, X devine 0) și invers.
+[[nodiscard]] math::Vec3d eulerDegrees(const glm::dmat3& rotation);
+[[nodiscard]] glm::dmat3 rotationFromEuler(const math::Vec3d& degrees);
 
 // Pivotul instanței în coordonatele definiției (cel ales sau centrul cutiei) și în coordonatele părintelui.
 [[nodiscard]] math::Vec3d pivotLocal(const Model& model, InstanceId instance);
