@@ -1,7 +1,6 @@
 # Plan: toolbar nou și cele trei moduri de lucru (Modelare / Animare / Interacțiune)
 
-> Stare: **plan scris pe 2026-10-28; deciziile din secțiunea 5 așteaptă confirmarea utilizatorului** (dacă nu
-> răspunde altfel, se implementează cum sunt scrise). Poate fi continuat de oricine (alt cont,
+> Stare: **aprobat de utilizator pe 2026-10-28**, cu deciziile din secțiunea 5 (două modificate de el: 3 și 6). Poate fi continuat de oricine (alt cont,
 > altă sesiune) fără contextul conversației: citește întâi `CLAUDE.md`, apoi acest fișier, și bifează pașii aici
 > pe măsură ce îi termini (și în `PLAN.md`, secțiunea „Etapa 5”). Comunicarea cu utilizatorul: în română.
 
@@ -46,9 +45,9 @@
    Zoom Z
 ```
 
-- **Primul grup** („Selecție și navigare”): Select, apoi un titlu de secțiune „Navigare” și Orbit, Pan, Zoom
-  (`Menu` acceptă deja `{ header }`). Grupul își amintește ultima unealtă, ca celelalte. **Interact** iese din acest
-  grup (devine unealta modului Interacțiune, vezi 3.4).
+- **Primul grup** („Selecție și navigare”): Select, **Interact (doar în modul Interacțiune)**, apoi un titlu de
+  secțiune „Navigare” și Orbit, Pan, Zoom (`Menu` acceptă deja `{ header }`). Grupul își amintește ultima unealtă,
+  ca celelalte. Uneltele unui grup se filtrează și ele după mod (`modes` pe unealtă).
 - **Comutatorul de mod** în dreapta, în locul clusterului de navigare: un control segmentat cu 3 iconițe + text la
   hover (tooltip cu scurtătura): `box` / `pen-tool` → Modelare, `film` → Animare, `hand-pointer` → Interacțiune.
   Modul activ e evidențiat cu accentul. Nou: `shell/ModeSwitch.qml`.
@@ -79,9 +78,9 @@
 
 ### 3.4 Modul **Animare**
 
-- **Timeline-ul se arată automat** (și rămâne vizibil cât timp modul e activ; butonul de închidere al timeline-ului
-  întoarce în Modelare sau doar ascunde? → *decizie: îl ascunde, modul rămâne*). Dacă documentul nu are animații,
-  timeline-ul oferă „Animație nouă”.
+- **Timeline-ul e mereu vizibil în Animare și nu se poate închide** (decizia utilizatorului): fără butonul de
+  închidere, fără ⌥T în acest mod. În Modelare și Interacțiune timeline-ul nu apare. Dacă documentul nu are
+  animații, timeline-ul oferă „Animație nouă”.
 - Toolbar: Select/Navigare și **Transform (Move, Rotate, Scale)**. Fără desen, Push/Pull, Eraser, Measure.
 - **Auto-key**: în Animare, Move / Rotate / Scale aplicate pe **obiecte** (instanțe) nu schimbă modelul, ci scriu
   keyframe-uri la timpul curent:
@@ -103,16 +102,21 @@
 - Meniul contextual și palette: doar comenzile de animare (keyframe, șterge keyframe, animație nouă, export video,
   redare) plus vizualizarea și selecția.
 
-### 3.5 Modul **Interacțiune**
+### 3.5 Modul **Interacțiune** (decizia utilizatorului: fără două stări separate)
 
-- Două stări în același mod:
-  - **Editare** (implicit): Select alege obiecte; Inspector arată grupul „Interacțiune” (comportament: balama,
-    glisare; „Interacțiuni cu blocuri…” → `RulesEditor`); panoul stâng: Obiecte, Interacțiuni.
-  - **Testare** (rularea pe copia modelului, azi „Modul interacțiune” / F5): un buton ▷ „Testează” în toolbar
-    (în locul grupurilor de modelare) și F5. În testare, unealta activă e **Interact** (click / trage pe obiecte),
-    bannerul de azi rămâne, Esc oprește testarea (rămâi în modul Interacțiune).
-- Toolbar: Select/Navigare, **Interact** (unealta, ca grup propriu, activă doar în testare sau și în editare
-  pentru încercări rapide — *decizie: doar în testare; în editare clicurile aleg obiecte*), ▷ Testează.
+- **Primul grup al toolbar-ului are, sub Select, unealta Interact** (în acest mod; în celelalte moduri Interact nu
+  apare). Implicit e activ **Select**: clicurile aleg obiecte, iar Inspector arată grupul „Interacțiune”
+  (comportament: balama, glisare; „Interacțiuni cu blocuri…” → `RulesEditor`); panoul stâng: Obiecte, Interacțiuni.
+- **Cu Interact activ**, utilizatorul interacționează cu obiectele care au interacțiuni (comportamente sau reguli):
+  click, tragere, hover, ca la rulare. Intern, activarea lui Interact pornește rularea pe copia modelului
+  (`Document::interactionMode = true`, `m_runtime`), iar revenirea la Select (sau schimbarea modului) o oprește și
+  aruncă starea rulării (obiectele revin unde erau). Bannerul de azi se înlocuiește cu indicația din bara de stare.
+- **Un obiect fără interacțiuni**: la click (și la hover prelungit) apare un **tooltip lângă cursor**: „Obiectul nu
+  are interacțiuni. Alege Select și adaugă una din Inspector.” Pe gol (nimic sub cursor) nu apare nimic.
+  Implementare: `Document::interactAt` întoarce dacă a lovit un obiect fără reguli / comportament; `Viewport`
+  emite un semnal cu poziția, iar `Main.qml` arată un `Tooltip` temporar (2,5 s) la acel punct.
+- **F5** = comută între Select și Interact (din alt mod: trece în Interacțiune și activează Interact). Butonul ▷ din
+  `ViewportControls.qml` și din secțiunea Interacțiuni devine același lucru (sau dispare din `ViewportControls`).
 - Fără desen, transformări, materiale.
 
 ### 3.6 Ce e permis unde (tabelul de referință)
@@ -127,7 +131,7 @@
 | Inspector: plasare, dimensiuni, pivot | ✓ | plasare la timpul curent + ◆ | doar citire |
 | Timeline, keyframe-uri, export video | – | ✓ | – |
 | Comportamente, reguli (RulesEditor), Interacțiuni (panou) | – | – | ✓ |
-| Testarea interacțiunilor (F5) | → trece în Interacțiune | → trece în Interacțiune | ✓ |
+| Interact (folosirea interacțiunilor, F5) | → trece în Interacțiune | → trece în Interacțiune | ✓ (sub Select) |
 | Undo / redo, salvare, export, Preferințe, scripturi | ✓ | ✓ | ✓ |
 
 Regula de implementare: **fiecare comandă și unealtă își declară modurile** (`modes: ["model"]` în `commands` și în
@@ -182,17 +186,20 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
 - [ ] Bara de stare: modul curent la stânga indicației (de exemplu „Animare · Click pe un obiect…”).
 
 ### Pasul 6 — Animare: timeline automat și auto-key ✅ criteriu: Move în Animare scrie un keyframe, modelul nu se schimbă
-- [ ] Intrarea în Animare: timeline vizibil, `m_previewing = true` la timpul curent; ieșirea: timeline ascuns,
-      `endPreview`.
+- [ ] Intrarea în Animare: timeline vizibil (fără buton de închidere, ⌥T dezactivat), `m_previewing = true` la
+      timpul curent; ieșirea: timeline ascuns, `endPreview`.
 - [ ] Select doar pe obiecte în Animare (`ToolContext`: `objectsOnly`).
 - [ ] Auto-key pentru Move / Rotate / Scale pe instanțe (callback în `ToolContext`, vezi 3.4), un pas de undo.
 - [ ] Inspector: plasarea la timpul curent; modificarea ei în Animare scrie keyframe (nu `setPlacement` pe model).
 - [ ] Teste în `tests/core/ToolTests.cpp` pentru callback-ul de transformare (unealta Move cu `onInstanceTransform`
       nu schimbă modelul) și în `AnimationTests.cpp` dacă se adaugă funcții noi în `core/model/Animation*`.
 
-### Pasul 7 — Interacțiune: editare vs testare ✅ criteriu: ▷ / F5 pornește testarea, Esc o oprește, modul rămâne
-- [ ] Butonul ▷ „Testează” în toolbar (în modul Interacțiune), F5 îl comută; în testare unealta = Interact.
-- [ ] Din alt mod, F5 trece în Interacțiune și pornește testarea.
+### Pasul 7 — Interacțiune: Select + Interact ✅ criteriu: Interact rulează interacțiunile, Select revine la editare
+- [ ] Interact sub Select în primul grup (doar în modul Interacțiune); activarea lui pornește `interactionMode`,
+      revenirea la Select îl oprește (starea rulării se aruncă).
+- [ ] Tooltip lângă cursor la click pe un obiect fără interacțiuni (semnal din Viewport, `Tooltip` temporar în Main).
+- [ ] F5: comută Select ↔ Interact; din alt mod trece în Interacțiune cu Interact activ. Bannerul vechi dispare
+      (indicația e în bara de stare).
 - [ ] `RulesEditor` și „Interacțiune nouă” doar în acest mod.
 
 ### Pasul 8 — Documentație și verificare ✅ criteriu: CI verde, QA bifat
@@ -201,15 +208,16 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
       `docs/qa-checklist.md` (secțiunea „Moduri de lucru”).
 - [ ] Capturi în cele 3 moduri (dark + light), web (Playwright pe https://eddynn383.github.io/Aion/ după publicare).
 
-## 5. Decizii luate implicit (de confirmat cu utilizatorul; schimbările sunt mici)
+## 5. Decizii (confirmate de utilizator pe 2026-10-28)
 
 1. Scurtăturile modurilor: **⌥1 / ⌥2 / ⌥3**.
 2. În Animare, Move / Rotate / Scale pe obiecte **scriu keyframe-uri automat** (auto-key), nu mută modelul.
-3. În Interacțiune, unealta Interact e activă **doar în testare**; în editare, clicurile aleg obiecte.
+3. ~~Două stări~~ → **modificat de utilizator**: în Interacțiune, sub Select stă unealta **Interact**; cu Select se
+   aleg obiecte și se adaugă interacțiuni, cu Interact se folosesc; un obiect fără interacțiuni arată un tooltip.
 4. Palette arată **doar comenzile modului curent** (plus cele comune); o comandă din alt mod nu e accesibilă fără
    schimbarea modului.
 5. Modul **nu se salvează în fișier**; aplicația repornește în ultimul mod folosit.
-6. Închiderea timeline-ului în Animare doar îl ascunde; modul rămâne.
+6. ~~Închiderea îl ascunde~~ → **modificat de utilizator**: timeline-ul **nu se poate închide** în Animare.
 7. Scenele (vederile salvate) sunt disponibile în toate modurile.
 
 ## 6. Riscuri
