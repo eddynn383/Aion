@@ -134,6 +134,9 @@ struct ToolContext {
     double gridStep = 0.0;
     // Transformarea contextului editat (local → model), pentru ce se păstrează în coordonatele modelului.
     math::Transform toWorld;
+    // Pivotul selecției (marcajul din viewport), în coordonatele contextului: centrul implicit pentru Rotate și
+    // punctul fix pentru Scale cu Option. Gol dacă nu e nimic selectat.
+    std::optional<Vec3d> pivot;
 };
 
 class Tool {

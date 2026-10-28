@@ -21,10 +21,21 @@
 
 ## Limite
 
-- Uneltele Rotate / Scale își aleg centrul ca până acum (pivotul e pentru Inspector și scripturi).
+- ~~Uneltele Rotate / Scale își aleg centrul ca până acum~~ — schimbat pe 2026-10-28, vezi completarea de mai jos.
 
 ## Completare (2026-10-28)
 
 - Marcajul se trage cu Select (`Viewport::m_pivotDrag`, `Document::setSelectionPivot`): se prinde de cele 27 de
   puncte ale cutiei selecției (`pivotSnapPoints`: colțuri, mijloace, centre de fețe, centru), altfel de suprafața de
   sub cursor, altfel de un plan prin pivot cu fața spre cameră. Toată tragerea e un pas de undo (macro).
+
+## Completare (2026-10-28): uneltele Rotate / Scale
+
+- Bug raportat: cu pivotul în colțul unui cub, Rotate din toolbar rotea cubul în jurul punctului ales cu primul click,
+  nu în jurul pivotului (cubul se mișca pe un arc). `ToolContext::pivot` = pivotul selecției (`Document::selectionPivot`).
+- **Rotate**: cu o selecție, centrul e pivotul; raportorul stă pe el de la început, iar primul click alege direct
+  referința (unghiul 0). **Option** la primul click = alege alt centru; colțurile, mijloacele muchiilor obiectelor și
+  pivotul sunt puncte de prindere pentru centru (și pentru referință). Copierea (Option) se decide la ultimul click.
+- **Scale**: punctul fix rămâne mânerul opus; cu **Option**, pivotul selecției (implicit centrul cutiei, deci
+  neschimbat pentru un pivot nemutat).
+- Test: „Unelte: Rotate și Scale pornesc din pivotul selecției” (`tests/core/ToolTests.cpp`).

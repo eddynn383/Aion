@@ -1091,6 +1091,7 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
     ctx.toWorld = contextTransform();
+    ctx.pivot = selectionPivot(); // Rotate pornește din el, Scale cu Option îl ține fix
     m_contextGuides.clear();
     for (const model::Guide& g : m_model.guides().values()) {
         if (g.context == activeDefinition()) {

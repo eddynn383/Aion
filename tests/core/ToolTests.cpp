@@ -1026,3 +1026,109 @@ TEST_CASE("Unelte: Follow Me — traseul selectat, click pe profil", "[core][too
     CHECK(s.stack.undoName() == "Follow Me");
     CHECK_FALSE(s.selection.faces.empty());
 }
+
+namespace {
+
+// O cutie-obiect 600 × 600 × 600 cu colțul minim în (x0, 0, 0), în rădăcina modelului.
+model::InstanceId boxObject(model::Model& m, commands::CommandStack& stack, double x0)
+{
+    stack.run("Box", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { x0, 0, 0 }, { x0 + 600, 0, 0 }, { x0 + 600, 600, 0 }, { x0, 600, 0 } });
+    });
+    const geom::FaceId bottom = *m.mesh(m.root()).faces().keys().begin();
+    stack.run("Push", [&](geom::Mesh& mesh) { geom::pushPull(mesh, bottom, -600); });
+    geom::Selection all;
+    all.faces.insert(m.mesh(m.root()).faces().keys().begin(), m.mesh(m.root()).faces().keys().end());
+    model::InstanceId id;
+    stack.run("Group", [&](model::Model& model) { id = model::makeGroup(model, model.root(), all, false); });
+    return id;
+}
+
+} // namespace
+
+TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în colț ține muchia pe loc)", "[core][tools][transform]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1300, 300, 300 }, 0, 0, 7000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    const auto at = [&](Vec3d p, tools::Modifiers mods = {}) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return tools::PointerEvent { *s, mods, 1 };
+    };
+    const auto click = [&](tools::Tool& tool, Vec3d p, tools::Modifiers mods = {}) {
+        tool.pointerMove(ctx, at(p, mods));
+        tool.pointerDown(ctx, at(p, mods));
+        tool.pointerUp(ctx, at(p, mods));
+    };
+    const model::InstanceId box = boxObject(m, stack, 1000);
+    // Pivotul în colțul minim (1000, 0, 0): distanța de la colț e zero.
+    stack.run("Pivot", [&](model::Model& model) {
+        model::Placement p = model::placementOf(model, box);
+        p.pivot = Vec3d { 0.0 };
+        model::setPlacement(model, box, p);
+    });
+    selection.instances.insert(box);
+    ctx.pivot = model::pivotPoint(m, box);
+    REQUIRE(glm::length(*ctx.pivot - Vec3d { 1000, 0, 0 }) < 1e-9);
+    const math::Transform before = m.instance(box).transform;
+    const auto world = [&](Vec3d local) { return m.instance(box).transform.applyToPoint(before.inverse().applyToPoint(local)); };
+
+    SECTION("Rotate pe Y: centrul e deja pivotul, primul click alege referința")
+    {
+        auto rotate = tools::makeTool("rotate");
+        rotate->pointerMove(ctx, at({ 1300, 0, 300 }));
+        REQUIRE(rotate->key(ctx, { tools::Key::Left, {} })); // axa verde
+        // Raportorul stă pe pivot înainte de orice click.
+        const std::vector<Vec3d> points = rotate->overlay().points;
+        CHECK(std::any_of(points.begin(), points.end(), [](const Vec3d& p) { return glm::length(p - Vec3d { 1000, 0, 0 }) < 1e-9; }));
+        click(*rotate, { 1600, 0, 0 }); // referința: colțul de pe axa roșie
+        rotate->pointerMove(ctx, at({ 1500, 0, 400 }));
+        REQUIRE(rotate->applyMeasurement(ctx, "30"));
+        CHECK(stack.undoName() == "Rotate");
+        // Muchia din colțul pivotului, pe axa verde, nu se mișcă.
+        CHECK(glm::length(world({ 1000, 0, 0 }) - Vec3d { 1000, 0, 0 }) < 1e-6);
+        CHECK(glm::length(world({ 1000, 600, 0 }) - Vec3d { 1000, 600, 0 }) < 1e-6);
+        // Colțul opus de pe axa roșie s-a ridicat pe arc, la 600 mm de pivot.
+        const Vec3d far = world({ 1600, 0, 0 });
+        CHECK(far.y == Approx(0).margin(1e-6));
+        CHECK(glm::length(far - Vec3d { 1000, 0, 0 }) == Approx(600));
+        CHECK(std::abs(far.z) == Approx(300));
+    }
+
+    SECTION("Rotate cu Option: primul click alege alt centru, care se prinde de colțurile obiectului")
+    {
+        auto rotate = tools::makeTool("rotate");
+        rotate->pointerMove(ctx, at({ 1600, 600, 600 }));
+        REQUIRE(rotate->key(ctx, { tools::Key::Up, {} })); // axa albastră
+        const tools::PointerEvent near { at({ 1600, 600, 600 }).screen + Vec2d { 4, -3 }, { false, false, true }, 1 };
+        rotate->pointerMove(ctx, near);
+        rotate->pointerDown(ctx, near);
+        rotate->pointerUp(ctx, near);
+        click(*rotate, { 1000, 600, 600 }); // referința
+        rotate->pointerMove(ctx, at({ 1300, 300, 600 }));
+        REQUIRE(rotate->applyMeasurement(ctx, "90"));
+        // Colțul ales ca centru rămâne pe loc.
+        CHECK(glm::length(world({ 1600, 600, 600 }) - Vec3d { 1600, 600, 600 }) < 1e-6);
+        CHECK(glm::length(world({ 1000, 0, 0 }) - Vec3d { 1000, 0, 0 }) > 100.0);
+    }
+
+    SECTION("Scale cu Option: punctul fix e pivotul")
+    {
+        auto scale = tools::makeTool("scale");
+        const tools::PointerEvent grab = at({ 1600, 600, 600 }, { false, false, true });
+        scale->pointerMove(ctx, grab);
+        scale->pointerDown(ctx, grab);
+        scale->pointerUp(ctx, grab);
+        scale->pointerMove(ctx, at({ 1700, 700, 700 }, { false, false, true }));
+        REQUIRE(scale->applyMeasurement(ctx, "2"));
+        CHECK(glm::length(world({ 1000, 0, 0 }) - Vec3d { 1000, 0, 0 }) < 1e-6);
+        CHECK(glm::length(world({ 1600, 600, 600 }) - Vec3d { 2200, 1200, 1200 }) < 1e-6);
+    }
+}

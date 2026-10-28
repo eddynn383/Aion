@@ -28,6 +28,8 @@ constexpr double kDegree = std::numbers::pi / 180.0;
 // Unghiurile se „prind” de multiplii lui 15° când cursorul e aproape.
 constexpr double kAngleSnapStep = 15.0 * kDegree;
 constexpr double kAngleSnapTolerance = 2.5 * kDegree;
+// Cât de aproape (în pixeli) trebuie să fie cursorul de un punct de prindere al obiectului.
+constexpr double kGripRadiusPx = 14.0;
 
 // Ce transformă unealta: entitățile (pentru copiere) și vârfurile lor (pentru mutare).
 struct Target {
@@ -599,8 +601,6 @@ private:
         m_shiftLock = false;
     }
 
-    static constexpr double kGripRadiusPx = 14.0;
-
     Target m_target;
     std::vector<Grip> m_grips;
     int m_hotGrip = -1;
@@ -631,14 +631,28 @@ public:
         switch (m_phase) {
         case Phase::Center: {
             m_target = targetAt(ctx, e.screen);
-            if (m_target.empty() || !m_inference.valid()) {
+            if (m_target.empty()) {
                 return;
             }
-            m_center = m_inference.point;
             m_normal = m_axisLock ? inference::axisDirection(*m_axisLock) : m_hoverNormal;
             m_preview = previewEdges(ctx, m_target);
+            if (m_fromPivot) {
+                // Centrul e pivotul selecției; click-ul a ales deja referința (unghiul 0).
+                m_center = *ctx.pivot;
+                m_angle = 0.0;
+                m_phase = glm::length(m_reference - m_center) > tol::kLength ? Phase::Angle : Phase::Reference;
+                m_grips.clear();
+                m_hotGrip = -1;
+                return;
+            }
+            if (m_hotGrip < 0 && !m_inference.valid()) {
+                return;
+            }
+            m_center = m_hotGrip >= 0 ? m_grips[std::size_t(m_hotGrip)].point : m_inference.point;
             m_reference = m_center;
             m_phase = Phase::Reference;
+            m_grips.clear();
+            m_hotGrip = -1;
             return;
         }
         case Phase::Reference:
@@ -676,14 +690,23 @@ public:
     {
         m_phase = Phase::Center;
         m_engine.reset();
+        m_grips.clear();
+        m_hotGrip = -1;
     }
 
     Overlay overlay() const override
     {
         Overlay o;
-        const Vec3d center = m_phase == Phase::Center ? m_inference.point : m_center;
+        o.grips = m_grips;
+        if (m_hotGrip >= 0) {
+            const Grip& g = m_grips[std::size_t(m_hotGrip)];
+            o.marker = InferenceMarker { g.point, g.kind, inference::Tint::Neutral, gripLabel(g), false };
+        }
+        const bool choosingCenter = m_phase == Phase::Center && !m_fromPivot;
+        const Vec3d center = !choosingCenter ? m_center : m_hotGrip >= 0 ? m_grips[std::size_t(m_hotGrip)].point
+                                                                         : m_inference.point;
         const Vec3d normal = m_phase == Phase::Center ? m_hoverNormal : m_normal;
-        if (m_phase == Phase::Center && !m_inference.valid()) {
+        if (choosingCenter && !m_inference.valid() && m_hotGrip < 0) {
             return o;
         }
         // Raportorul: un cerc în planul de rotație, în culoarea axei (dacă e paralel cu una).
@@ -698,7 +721,7 @@ public:
             o.lines.push_back({ center + (u * std::cos(a0) + v * std::sin(a0)) * radius,
                 center + (u * std::cos(a1) + v * std::sin(a1)) * radius, false, tint, true });
         }
-        if (m_phase != Phase::Center) {
+        if (!choosingCenter) {
             o.lines.push_back({ m_center, m_reference, true, inference::Tint::Neutral, true });
             o.points.push_back(m_center);
         }
@@ -709,7 +732,7 @@ public:
             o.lines.push_back({ m_center, end, false, inference::Tint::Neutral, true });
             o.dimensions.push_back({ m_center, end, formatAngle(m_angle) });
         }
-        if (m_phase != Phase::Angle) {
+        if (m_phase != Phase::Angle && m_hotGrip < 0) {
             appendInference(o, m_inference);
         }
         return o;
@@ -721,8 +744,12 @@ public:
     {
         switch (m_phase) {
         case Phase::Center:
-            return m_lastCopy ? "Tastează x4 sau /4 pentru copii radiale · sau alege centrul rotației"
-                              : "Alege centrul rotației (pe o față: planul ei) · săgeți: axa X/Y/Z";
+            if (m_lastCopy) {
+                return "Tastează x4 sau /4 pentru copii radiale · sau alege centrul rotației";
+            }
+            return m_fromPivot ? "Centrul e pivotul: alege direcția de referință (unghiul 0) · săgeți: axa X/Y/Z · "
+                                 "Option: alt centru"
+                               : "Alege centrul rotației (pe o față: planul ei) · săgeți: axa X/Y/Z";
         case Phase::Reference:
             return "Alege direcția de referință (unghiul 0)";
         case Phase::Angle:
@@ -775,6 +802,38 @@ private:
 
     [[nodiscard]] Transform rotation() const { return Transform::rotation(m_center, m_normal, m_angle); }
 
+    [[nodiscard]] std::string gripLabel(const Grip& g) const
+    {
+        if (m_pivot && glm::length(g.point - *m_pivot) < tol::kLength) {
+            return "Pivot";
+        }
+        return g.kind == inference::Kind::Endpoint ? "Colț" : "Mijlocul muchiei";
+    }
+
+    // Punctele de prindere pentru centru (sau, când centrul e pivotul, pentru referință): colțurile și mijloacele
+    // obiectelor selectate (sau al celui de sub cursor) și pivotul selecției.
+    void updateGrips(const ToolContext& ctx, Vec2d screen)
+    {
+        std::set<model::InstanceId> ids = ctx.selection.instances;
+        if (ids.empty()) {
+            const view::PickResult hit = pickWithInstances(ctx, screen);
+            if (hit.kind == view::PickResult::Kind::Instance) {
+                ids.insert(hit.instance);
+            }
+        }
+        m_grips = instanceGrips(ctx, ids);
+        if (m_pivot && !m_fromPivot) {
+            const auto same = [&](const Grip& g) { return glm::length(g.point - *m_pivot) < tol::kLength; };
+            if (std::none_of(m_grips.begin(), m_grips.end(), same)) {
+                m_grips.push_back({ *m_pivot, inference::Kind::Endpoint, false, false });
+            }
+        }
+        m_hotGrip = nearestGrip(ctx, m_grips, screen, kGripRadiusPx);
+        if (m_hotGrip >= 0) {
+            m_grips[std::size_t(m_hotGrip)].hot = true;
+        }
+    }
+
     // Punctul de sub cursor, adus în planul de rotație.
     std::optional<Vec3d> onPlane(const ToolContext& ctx, Vec2d screen) const
     {
@@ -795,7 +854,16 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         m_copy = e.modifiers.alt;
-        const std::optional<Vec3d> from = m_phase == Phase::Center ? std::nullopt : std::optional(m_center);
+        if (m_phase == Phase::Center) {
+            // Cu o selecție, centrul e pivotul ei (marcajul din viewport); Option = alege alt centru.
+            m_pivot = ctx.selection.empty() ? std::nullopt : ctx.pivot;
+            m_fromPivot = m_pivot.has_value() && !e.modifiers.alt;
+            if (m_fromPivot) {
+                m_center = *m_pivot;
+            }
+        }
+        const std::optional<Vec3d> from
+            = m_phase == Phase::Center && !m_fromPivot ? std::nullopt : std::optional(m_center);
         m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
         switch (m_phase) {
         case Phase::Center:
@@ -805,7 +873,19 @@ private:
                 m_hoverNormal = face && ctx.mesh.faces().contains(face) ? ctx.mesh.face(face).plane.normal
                                                                         : Vec3d { 0, 0, 1 };
             }
-            if (m_inference.valid()) {
+            updateGrips(ctx, e.screen);
+            if (m_fromPivot) {
+                m_normal = m_hoverNormal;
+                const math::Plane plane = math::Plane::fromPointNormal(m_center, m_normal);
+                if (m_hotGrip >= 0) {
+                    m_reference = plane.project(m_grips[std::size_t(m_hotGrip)].point);
+                } else if (const auto p = onPlane(ctx, e.screen)) {
+                    m_reference = *p;
+                }
+                m_protractorRadius = worldPerPixelAt(ctx.camera, m_center) * 60.0;
+            } else if (m_hotGrip >= 0) {
+                m_protractorRadius = worldPerPixelAt(ctx.camera, m_grips[std::size_t(m_hotGrip)].point) * 60.0;
+            } else if (m_inference.valid()) {
                 m_protractorRadius = worldPerPixelAt(ctx.camera, m_inference.point) * 60.0;
             }
             return;
@@ -855,6 +935,10 @@ private:
 
     Phase m_phase = Phase::Center;
     Target m_target;
+    std::optional<Vec3d> m_pivot; // pivotul selecției
+    bool m_fromPivot = false; // centrul e pivotul (fără Option)
+    std::vector<Grip> m_grips;
+    int m_hotGrip = -1;
     Vec3d m_center { 0.0 };
     Vec3d m_normal { 0, 0, 1 };
     Vec3d m_hoverNormal { 0, 0, 1 };
@@ -873,10 +957,11 @@ private:
 // --- Scale ----------------------------------------------------------------------------------
 
 // Scalare uniformă: punctul fix, un punct de referință, apoi factorul (raportul distanțelor față de punctul fix).
-// Option: punctul fix devine centrul entităților scalate.
+// Option: punctul fix devine pivotul selecției (implicit centrul entităților scalate).
 // Scale (S), ca în SketchUp: în jurul selecției apare cutia ei cu mânere — colțurile scalează uniform, mijloacele
 // muchiilor pe două axe, centrele fețelor pe o singură axă. Click pe un mâner, mișcă, click din nou (sau tastează
-// factorul: „2”, ori „2,1,1.5” pe axele X, Y, Z). Punctul fix e mânerul opus; cu Option, centrul cutiei.
+// factorul: „2”, ori „2,1,1.5” pe axele X, Y, Z). Punctul fix e mânerul opus; cu Option, pivotul selecției (implicit
+// centrul cutiei).
 // Fără selecție, primul click alege entitatea de sub cursor. Scările negative oglindesc.
 class ScaleTool final : public Tool {
 public:
@@ -958,7 +1043,7 @@ public:
     {
         if (m_dragging) {
             return "Mișcă pentru mărimea nouă, click ca să confirmi, sau tastează factorul (2 · 2,1,1.5) · "
-                   "Option: din centru · Esc anulează";
+                   "Option: din pivot · Esc anulează";
         }
         if (m_hasBox) {
             return "Alege un mâner: colțurile scalează uniform, muchiile pe două axe, fețele pe una";
@@ -1040,7 +1125,7 @@ private:
     [[nodiscard]] Vec3d pivot() const
     {
         if (m_fromCenter) {
-            return (m_lo + m_hi) * 0.5;
+            return m_selectionPivot.value_or((m_lo + m_hi) * 0.5);
         }
         const auto idx = handleIndex(m_handle);
         return handlePoint(int(2 - idx[0]) + 3 * int(2 - idx[1]) + 9 * int(2 - idx[2]));
@@ -1111,6 +1196,7 @@ private:
     {
         m_fromCenter = e.modifiers.alt;
         if (!m_dragging) {
+            m_selectionPivot = ctx.selection.empty() ? std::nullopt : ctx.pivot;
             refreshBox(ctx);
             m_hover = targetHover(ctx, e.screen);
             m_hoverHandle = -1;
@@ -1174,7 +1260,8 @@ private:
     int m_hoverHandle = -1;
     int m_handle = -1;
     bool m_dragging = false;
-    bool m_fromCenter = false;
+    bool m_fromCenter = false; // Option: punctul fix e pivotul selecției (implicit centrul cutiei)
+    std::optional<Vec3d> m_selectionPivot;
     Vec3d m_factors { 1.0 };
     Target m_target;
     std::vector<PreviewEdge> m_preview;
