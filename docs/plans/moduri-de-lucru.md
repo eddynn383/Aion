@@ -149,9 +149,9 @@ grupurile toolbar-ului; implicit toate). Ce nu e permis:
 Bifează aici și în `PLAN.md` → „Etapa 5”.
 
 ### Pasul 1 — Starea modului (C++) ✅ criteriu: teste + palette
-- [ ] `render/include/aion/render/Document.h`: `enum class WorkMode`, `Q_PROPERTY(int workMode …)` (0/1/2), setter cu
+- [x] `render/include/aion/render/Document.h`: `enum class WorkMode`, `Q_PROPERTY(int workMode …)` (0/1/2), setter cu
       efectele din 3.2, `Q_INVOKABLE bool allows(int mode) const`.
-- [ ] `Main.qml`: `preferences.workMode` (persistat), sincronizat cu `doc.workMode`; comenzile `mode.model`,
+- [x] `Main.qml`: `preferences.workMode` (persistat), sincronizat cu `doc.workMode`; comenzile `mode.model`,
       `mode.animate`, `mode.interact` (⌥1/⌥2/⌥3, categoria „Moduri”), acțiunea de script `mode:model|animate|interact`.
 - [ ] Teste: dacă logica de „permis” ajunge în `core/` (de exemplu o funcție pură `allowedInMode(command, mode)`),
       teste Catch2; altfel verificare prin script + captură.

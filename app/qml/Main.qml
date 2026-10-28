@@ -61,6 +61,9 @@ Window {
             { id: "view.ambientOcclusion", title: "Umbrire ambientală (SSAO)", category: "Vizualizare", shortcut: "", icon: "circle" },
             { id: "view.progressiveAA", title: "Antialiasing progresiv (cât camera stă pe loc)", category: "Vizualizare", shortcut: "", icon: "circle" },
             { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
+            { id: "mode.model", title: "Modul Modelare", category: "Moduri", shortcut: "Alt+1", icon: "box" },
+            { id: "mode.animate", title: "Modul Animare", category: "Moduri", shortcut: "Alt+2", icon: "film" },
+            { id: "mode.interact", title: "Modul Interacțiune", category: "Moduri", shortcut: "Alt+3", icon: "hand-pointer" },
             { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
@@ -231,6 +234,9 @@ Window {
             else toast.show("Selectează o cameră (în Outliner, la Camere și lumini).")
             break
         case "mode.interaction": doc.interactionMode = !doc.interactionMode; break
+        case "mode.model": window.setWorkMode(0); break
+        case "mode.animate": window.setWorkMode(1); break
+        case "mode.interact": window.setWorkMode(2); break
         case "rules.edit": window.openRulesEditor(); break
         case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
         case "file.exportVideo":
@@ -414,6 +420,9 @@ Window {
                     // „themecolor:accent=#EC4899” (gol după „=” resetează).
                     const tc = action.slice(11).split("=")
                     Theme.setOverride(tc[0], tc[1] || "")
+                } else if (action.startsWith("mode:")) {
+                    // „mode:model|animate|interact”: modul de lucru.
+                    window.setWorkMode(["model", "animate", "interact"].indexOf(action.slice(5)))
                 } else if (action.startsWith("prefs:")) {
                     preferencesPage.active = true
                     preferencesPage.item.category = parseInt(action.slice(6))
@@ -519,6 +528,16 @@ Window {
                                          "followme", "move", "rotate", "scale", "eraser", "paint", "texture",
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
+
+    // Modul de lucru (0 Modelare, 1 Animare, 2 Interacțiune): Document oprește ce era în curs, unealta revine la
+    // Select, iar preferința se păstrează pentru repornire.
+    function setWorkMode(mode) {
+        if (mode < 0 || mode > 2)
+            return
+        doc.workMode = mode
+        preferences.workMode = mode
+        selectTool("select")
+    }
 
     function selectTool(id) {
         window.activeTool = id
@@ -744,8 +763,11 @@ Window {
         property int msaa: 4
         property int shadowQuality: 2048
         property real gridStep: 0
+        property int workMode: 0
     }
     Component.onCompleted: {
+        // Ultimul mod de lucru; rulările automate (scripturi de test) pornesc mereu în Modelare.
+        doc.workMode = AppInfo.startupActions.length > 0 ? 0 : preferences.workMode
         if (AppInfo.themeOverride === 0)
             Theme.mode = preferences.themeMode
         viewport.latitude = preferences.latitude

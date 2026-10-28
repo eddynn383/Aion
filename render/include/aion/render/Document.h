@@ -97,6 +97,9 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(double timelineTime READ timelineTime WRITE setTimelineTime NOTIFY timelineTimeChanged)
     Q_PROPERTY(bool previewing READ previewing NOTIFY timelineChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
+    // Modul de lucru: 0 Modelare, 1 Animare, 2 Interacțiune. Decide ce unelte, comenzi și operații sunt permise
+    // (docs/plans/moduri-de-lucru.md). Nu e un pas de undo și nu se salvează în fișier.
+    Q_PROPERTY(int workMode READ workMode WRITE setWorkMode NOTIFY workModeChanged)
     // Modul interacțiune: modelul nu se mai editează; evenimentele pornesc regulile obiectelor.
     Q_PROPERTY(bool interactionMode READ interactionMode WRITE setInteractionMode NOTIFY interactionModeChanged)
     // Planurile de secțiune: { id, name, active }.
@@ -406,6 +409,12 @@ public:
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
     // --- Modul interacțiune ---
+    enum WorkMode { Modeling = 0, Animation = 1, Interaction = 2 };
+    int workMode() const { return m_workMode; }
+    void setWorkMode(int mode);
+    // Operațiile modului dat sunt permise acum? (Modul curent e acela, sau rulează un script: scripturile sunt
+    // cerute explicit de utilizator și ocolesc regula.)
+    Q_INVOKABLE bool allows(int mode) const { return m_workMode == mode || m_macro; }
     bool interactionMode() const { return m_runtime.has_value(); }
     void setInteractionMode(bool on);
     // Cursorul pentru obiectul de sub mouse: "drag", "click", "context", "hover" sau gol (nimic interactiv).
@@ -487,6 +496,7 @@ signals:
     void animationStarted();
     void timelineChanged();
     void interactionModeChanged();
+    void workModeChanged();
     void libraryChanged();
     // O regulă cere o vedere (mergi la scenă): viewport-ul mută camera.
     void cameraRequested(const QVariantMap& camera);
@@ -526,6 +536,7 @@ private:
     model::CameraId m_selectedCamera;
     model::LightId m_selectedLight;
     std::optional<model::Model> m_runtime;
+    int m_workMode = Modeling;
     model::RuleRuntime m_rules;
     model::InstanceId m_hoverInstance;
     struct DragState {

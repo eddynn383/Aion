@@ -2049,6 +2049,35 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
     return t ? model::evaluateColor(*t, m_timelineTime) : std::nullopt;
 }
 
+// --- Modurile de lucru ---
+
+void Document::setWorkMode(int mode)
+{
+    mode = std::clamp(mode, 0, 2);
+    if (mode == m_workMode) {
+        return;
+    }
+    // Ce era în curs în modul vechi se oprește: unealta, un panou cu previzualizare, rularea interacțiunilor,
+    // previzualizarea animației.
+    if (m_tool) {
+        const view::Camera camera;
+        tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        m_tool->cancel(ctx);
+    }
+    cancelOperation();
+    if (mode != Interaction) {
+        setInteractionMode(false);
+    }
+    if (mode != Animation) {
+        endPreview();
+    }
+    m_workMode = mode;
+    emit workModeChanged();
+    emit toolStatusChanged();
+    emit selectionChanged(); // Inspector-ul își schimbă grupurile
+    touch();
+}
+
 // --- Modul interacțiune ---
 
 void Document::setInteractionMode(bool on)
