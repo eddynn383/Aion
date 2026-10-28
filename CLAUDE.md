@@ -203,7 +203,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `stacked` pentru controale late, `compact` pentru liste). Setările noi folosesc aceleași componente.
 
 ## Următorii pași
-1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
+0. **În lucru: toolbar nou + modurile Modelare / Animare / Interacțiune** — planul complet, cu pașii de bifat:
+   `docs/plans/moduri-de-lucru.md` (și `PLAN.md` → Etapa 5). Continuă de la primul pas nebifat.
+1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic
+   redistribuirea SDK-ului și folosirea lui într-o aplicație terță care replică SketchUp, fără aprobare scrisă.
+   Alternativa propusă utilizatorului: import COLLADA (.dae), fără SDK. SDK-ul NU se pune în repo.
 
 ## Convenții
 C++20, `clang-format` (config în repo), fără `new`/`delete` manual, namespace `aion::`,
