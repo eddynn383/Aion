@@ -111,6 +111,9 @@ struct ToolRequests {
     // s-a terminat — cu `pivot` = punctul ales, fără = anulată.
     std::optional<math::Vec3d> pivot;
     bool pivotDone = false;
+    // Pen în Animare: curba terminată (în coordonatele contextului) și normala planului ei; Document face din ea o cale.
+    std::optional<geom::BezierPath> penPath;
+    math::Vec3d penNormal { 0.0, 0.0, 1.0 };
 };
 
 struct ToolContext {
@@ -144,6 +147,8 @@ struct ToolContext {
     std::optional<Vec3d> pivot;
     // Camera sau lumina selectată (fără altă selecție): ținta lui Move / Rotate / Scale.
     std::optional<model::SceneObjectRef> object;
+    // Animare: Pen-ul desenează o cale de parcurgere (o cere prin ToolRequests::penPath), nu geometrie.
+    bool drawsPaths = false;
 };
 
 class Tool {

@@ -885,6 +885,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "scale") {
         return makeScaleTool();
     }
+    if (id == "pen") {
+        return makePenTool();
+    }
     if (id == "pivot") {
         return makePivotTool(); // doar pentru tragerea marcajului pivotului (nu e în toolbar)
     }
