@@ -237,8 +237,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   prin meniul nativ „Animare”). În scripturi, o comandă necunoscută ca acțiune rulează prin `runCommand` (`anim.fit`).
 
 ## Următorii pași
-0. **În lucru (aprobat, început pe 2026-10-28): Animare, timeline, cameră, rotația față de pivot** —
-   `docs/plans/animatie.md` (și `PLAN.md` → Etapa 6). Ordinea: secțiunea 10, pașii 1–6, camera C1–C6.
+0. **Făcut (2026-10-28): Animare, timeline, cameră, rotația față de pivot** — `docs/plans/animatie.md` (și `PLAN.md` →
+   Etapa 6). Rămân funcțiile P2 din plan (traiectoria în viewport, faze de construcție, camera pe traseu, însorire,
+   vizibilitate / opacitate, editor de curbe, markeri, export video; C7), în ordinea din secțiunea 6, la cerere.
 1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic
    redistribuirea SDK-ului și folosirea lui într-o aplicație terță care replică SketchUp, fără aprobare scrisă.
    Alternativa propusă utilizatorului: import COLLADA (.dae), fără SDK. SDK-ul NU se pune în repo.

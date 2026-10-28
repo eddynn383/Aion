@@ -2,7 +2,8 @@
 
 > Stare: **plan aprobat de utilizator pe 2026-10-28** (cu deciziile implicite din secțiunea 6), **extins** în aceeași zi
 > cu camera (secțiunea 9) și rotația față de pivot (secțiunea 10). **Implementarea a început pe 2026-10-28** (ordinea:
-> secțiunea 10, pașii 1–6, camera C1–C6). Poate fi
+> secțiunea 10, pașii 1–6, camera C1–C6) și **terminată în aceeași zi**: toți pașii P1 sunt bifați; rămân P2 (lista „După”
+> și C7). ADR 0034 (animația), ADR 0035 (camera), ADR 0030 completat (pivotul). Poate fi
 > continuat de oricine (alt cont, altă sesiune): citește `CLAUDE.md`, apoi acest fișier; bifează pașii aici și în
 > `PLAN.md` → „Etapa 6”. Comunicarea cu utilizatorul: în română. Planul precedent (modurile de lucru) e
 > `docs/plans/moduri-de-lucru.md`; acesta îl continuă pe partea de Animare.
