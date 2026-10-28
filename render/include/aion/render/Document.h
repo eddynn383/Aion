@@ -300,6 +300,10 @@ public:
     Q_INVOKABLE void selectObject(const QString& kind, double id);
     // Schimbă proprietățile obiectului selectat (aceleași chei ca în selectedObject).
     Q_INVOKABLE void setObjectProperties(const QVariantMap& changes);
+    // Proprietățile unei camere anume (vederea prin cameră o editează și când nu e selectată).
+    Q_INVOKABLE void setCameraProperties(double cameraId, const QVariantMap& changes);
+    // Proprietățile unei camere (ca selectedObject pentru o cameră); {} dacă nu există.
+    Q_INVOKABLE QVariantMap cameraInfo(double cameraId) const;
     Q_INVOKABLE void deleteSelectedObject();
     // Vederea prin cameră: { tx, ty, tz, yaw, pitch, distance, ortho, fov }.
     Q_INVOKABLE QVariantMap cameraView(double cameraId) const;

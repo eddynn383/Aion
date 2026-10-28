@@ -5057,11 +5057,15 @@ QVariantList Document::lights() const
     return out;
 }
 
-QVariantMap Document::selectedObject() const
+QVariantMap Document::cameraInfo(double cameraId) const
 {
-    if (const model::CameraObject* c = m_model.cameras().find(m_selectedCamera)) {
+    const model::CameraId id { static_cast<std::uint64_t>(cameraId) };
+    const model::CameraObject* c = m_model.cameras().find(id);
+    if (c == nullptr) {
+        return {};
+    }
         return { { QStringLiteral("kind"), QStringLiteral("camera") },
-            { QStringLiteral("id"), static_cast<double>(m_selectedCamera.value) },
+            { QStringLiteral("id"), cameraId },
             { QStringLiteral("name"), QString::fromStdString(c->name) },
             { QStringLiteral("position"), vec3List(c->position) }, { QStringLiteral("target"), vec3List(c->target) },
             { QStringLiteral("focalLength"), c->focalLength }, { QStringLiteral("sensorWidth"), c->sensorWidth },
@@ -5075,6 +5079,12 @@ QVariantMap Document::selectedObject() const
             { QStringLiteral("displaySize"), c->displaySize },
             { QStringLiteral("nearClip"), c->nearClip }, { QStringLiteral("farClip"), c->farClip },
             { QStringLiteral("visible"), c->visible } };
+}
+
+QVariantMap Document::selectedObject() const
+{
+    if (m_model.cameras().contains(m_selectedCamera)) {
+        return cameraInfo(static_cast<double>(m_selectedCamera.value));
     }
     if (const model::Light* l = m_model.lights().find(m_selectedLight)) {
         return { { QStringLiteral("kind"), QStringLiteral("light") },
@@ -5173,8 +5183,9 @@ void Document::selectObject(const QString& kind, double id)
     touch();
 }
 
-void Document::setObjectProperties(const QVariantMap& changes)
+void Document::setCameraProperties(double cameraId, const QVariantMap& changes)
 {
+    const model::CameraId id { static_cast<std::uint64_t>(cameraId) };
     const auto num = [&](const char* key, double& value) {
         if (changes.contains(QLatin1String(key))) {
             value = changes.value(QLatin1String(key)).toDouble();
@@ -5185,7 +5196,7 @@ void Document::setObjectProperties(const QVariantMap& changes)
             value = changes.value(QLatin1String(key)).toBool();
         }
     };
-    if (const model::CameraObject* found = m_model.cameras().find(m_selectedCamera)) {
+    if (const model::CameraObject* found = m_model.cameras().find(id)) {
         model::CameraObject c = *found;
         if (changes.contains(QStringLiteral("name"))) {
             c.name = changes.value(QStringLiteral("name")).toString().toStdString();
@@ -5225,8 +5236,25 @@ void Document::setObjectProperties(const QVariantMap& changes)
         if (c == *found) {
             return;
         }
-        const model::CameraId id = m_selectedCamera;
         runOnModel("Proprietățile camerei", [&](model::Model& model) { model.setCamera(id, c); });
+        return;
+    }
+}
+
+void Document::setObjectProperties(const QVariantMap& changes)
+{
+    const auto num = [&](const char* key, double& value) {
+        if (changes.contains(QLatin1String(key))) {
+            value = changes.value(QLatin1String(key)).toDouble();
+        }
+    };
+    const auto flag = [&](const char* key, bool& value) {
+        if (changes.contains(QLatin1String(key))) {
+            value = changes.value(QLatin1String(key)).toBool();
+        }
+    };
+    if (m_model.cameras().contains(m_selectedCamera)) {
+        setCameraProperties(static_cast<double>(m_selectedCamera.value), changes);
         return;
     }
     if (const model::Light* found = m_model.lights().find(m_selectedLight)) {

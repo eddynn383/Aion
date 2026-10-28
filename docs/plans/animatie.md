@@ -330,12 +330,17 @@ AION_SCREENSHOT_DELAY_MS=5000 AION_SCREENSHOT=$S/anim.png \
 
 ### 9.4 Pașii (după pașii 1–6 ai animației, sau înainte, la alegerea utilizatorului)
 
-- [ ] **C1** — Date noi pentru cameră (format, focală / senzor, shift, roll, DoF), migrare, Inspector. Teste pe
-      conversia focală ↔ fov și pe matricea cu shift (`core/view/Camera` sau un modul nou `model/CameraLens`).
-- [ ] **C2** — Vederea prin cameră: poza exactă (fov, format, shift, roll), cadrul cu exteriorul estompat și eticheta,
-      zborul de intrare / ieșire, Esc. Criteriu: o captură prin cameră arată exact ce arată gizmo-ul camerei.
-- [ ] **C3** — Formatul din mânerele cadrului și presetări; exportul PNG / video folosește formatul camerei.
-- [ ] **C4** — „Blochează camera pe vedere” (navigarea mută camera, un pas de undo pe gest; auto-key în Animare).
+- [x] **C1** — Date noi pentru cameră (format, focală / senzor, shift, roll, scara ortografică, DoF, mărimea
+      gizmo-ului), migrare (`fov` → focala echivalentă), Inspector pe grupuri. `model/CameraLens.h` (+ teste în
+      `tests/core/CameraLensTests.cpp`), roll și shift în `view::Camera`.
+- [x] **C2** — Vederea prin cameră (`Viewport::lookThrough`): poza exactă (fov, format, shift, roll), cadrul cu
+      exteriorul estompat și eticheta (`shell/CameraFrame.qml`), zborul de intrare / ieșire, Esc, navigarea iese din
+      cameră. Gizmo-ul și vederea folosesc aceeași lentilă (`model::lookThrough`, testat pe proiecție și raze).
+- [x] **C3** — Formatul din mânerele cadrului (cu prindere de presetări) și presetări în Inspector; exportul PNG /
+      video prin cameră are formatul și rezoluția camerei (cadrul decupat, cu marginea 1).
+- [x] **C4** — „Blochează camera pe vedere” (navigarea mută camera, un pas de undo pe gest: la eliberarea mouse-ului
+      sau la 350 ms după rotiță; în Animare scrie o cheie a camerei animației, iar prin cameră pistele camerei mută
+      camera, cu lentila ei).
 - [ ] **C5** — Camerele și luminile cu Move / Rotate / Scale și snap (punctele lor de prindere, inferența).
 - [ ] **C6** — Depth of field: pasul de randare, „click pentru focus”, diafragma; doar prin cameră și la export.
 - [ ] **C7 (P2)** — Ghiduri de compoziție, expunere, animarea focalei / focusului.

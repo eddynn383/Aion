@@ -117,6 +117,18 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(QPointF pointerPosition READ pointerPosition NOTIFY pointerPositionChanged)
     Q_PROPERTY(bool pointerInside READ pointerInside NOTIFY pointerPositionChanged)
 
+    // Vederea prin cameră (plan Animare, secțiunea 9): id-ul camerei-obiect (0 = vederea liberă). Intrarea și ieșirea
+    // sunt un zbor (poza, unghiul, roll-ul, shift-ul); cât timp e activă, vederea urmează camera. Cadrul formatului în
+    // viewport (exteriorul se estompează în QML), opacitatea lui (apare după zbor) și eticheta.
+    Q_PROPERTY(double lookThrough READ lookThrough WRITE setLookThrough NOTIFY lookThroughChanged)
+    Q_PROPERTY(QRectF lookFrame READ lookFrame NOTIFY lookFrameChanged)
+    Q_PROPERTY(double lookFade READ lookFade NOTIFY lookFrameChanged)
+    Q_PROPERTY(QString lookLabel READ lookLabel NOTIFY lookFrameChanged)
+    // Navigarea (orbit, pan, zoom) mută camera prin care privești; altfel iese din cameră (zbor înapoi).
+    Q_PROPERTY(bool lockCameraToView READ lockCameraToView WRITE setLockCameraToView NOTIFY lookThroughChanged)
+    // Următorul click în viewport alege distanța de focus a camerei selectate (depth of field).
+    Q_PROPERTY(bool pickingFocus READ pickingFocus WRITE setPickingFocus NOTIFY pickingFocusChanged)
+
     // Cadre pe secundă în ultima secundă (0 când viewport-ul nu se redesenează).
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY framesPerSecondChanged)
 
@@ -163,6 +175,18 @@ public:
     // Poziția camerei pentru scene: { tx, ty, tz, yaw, pitch, distance, ortho }; și tranziția animată spre una.
     Q_INVOKABLE QVariantMap cameraState() const;
     Q_INVOKABLE void animateToCamera(const QVariantMap& state, double seconds = -1.0);
+
+    double lookThrough() const { return m_lookCamera; }
+    void setLookThrough(double cameraId);
+    QRectF lookFrame() const;
+    double lookFade() const { return m_lookFade; }
+    QString lookLabel() const;
+    bool lockCameraToView() const { return m_lockCamera; }
+    void setLockCameraToView(bool on);
+    bool pickingFocus() const { return m_pickingFocus; }
+    void setPickingFocus(bool on);
+    // Formatul tras de mânerele cadrului: raportul arătat până la eliberare (0 = al camerei).
+    Q_INVOKABLE void previewLookAspect(double aspect);
     // `states`: pozițiile scenelor (ca cameraState()). Orice click sau scroll în viewport oprește redarea.
     Q_INVOKABLE void playScenes(const QVariantList& states, double transition, double delay, bool loop);
     Q_INVOKABLE void stopScenes();
@@ -199,6 +223,9 @@ signals:
     void preferredSamplesChanged();
     void appearanceChanged();
     void cameraChanged();
+    void lookThroughChanged();
+    void lookFrameChanged();
+    void pickingFocusChanged();
     void reducedMotionChanged();
     void navigationToolChanged();
     void framesPerSecondChanged();
@@ -353,6 +380,46 @@ private:
     std::optional<std::pair<QString, double>> objectHandleAt(QPointF position) const;
 
     view::Camera m_camera;
+
+    // --- Vederea prin cameră ---
+    struct LensState {
+        view::CameraPose pose;
+        double fovY = view::Camera::kDefaultFovY;
+        double roll = 0.0;
+        view::Vec2d shift { 0.0 };
+        bool orthographic = false;
+    };
+    struct LensFlight {
+        LensState from;
+        LensState to;
+        double elapsed = 0.0;
+        double duration = 0.7;
+    };
+    [[nodiscard]] LensState lensState() const;
+    void applyLensState(const LensState& state);
+    [[nodiscard]] const model::CameraObject* lookedCamera() const;
+    [[nodiscard]] model::CameraObject lookedCameraShown() const; // cu formatul tras (previzualizare)
+    // Vederea camerei în viewport; nullopt dacă nu privim prin una.
+    [[nodiscard]] std::optional<view::Camera> lookLens() const;
+    // Viewport-ul urmează camera (după un zbor, la orice schimbare a ei sau a mărimii ferestrei).
+    void applyLookThrough();
+    // Iese din cameră înainte de o navigare (dacă nu e blocată pe vedere); true dacă a ieșit.
+    bool exitLookForNavigation();
+    // Iese fără zbor (o vedere standard, o scenă): unghiul și proiecția de dinainte, poza rămâne.
+    void leaveLookNow();
+    // Pasul zborului de intrare / ieșire și al apariției cadrului; true cât mai e ceva de animat.
+    bool advanceLookThrough(double dt);
+    void commitLockedView();
+    double m_lookCamera = 0.0;
+    std::optional<LensState> m_beforeLook;
+    std::optional<LensFlight> m_lensFlight;
+    double m_lookFade = 0.0;
+    double m_lookMargin = 0.9;
+    double m_previewAspect = 0.0;
+    bool m_lockCamera = false;
+    bool m_lockNavigating = false; // un gest de navigare mută camera blocată (vederea nu o urmează până la sfârșit)
+    QTimer m_lockCommitTimer; // rotița: un singur pas de undo pe gest
+    bool m_pickingFocus = false;
     view::CameraMotion m_motion;
     QElapsedTimer m_frameClock;
     qint64 m_lastTickNs = 0;

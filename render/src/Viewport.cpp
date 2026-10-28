@@ -29,6 +29,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <numbers>
 #include <set>
 
 namespace aion::render {
@@ -189,6 +190,9 @@ Viewport::Viewport(QQuickItem* parent)
     : QQuickRhiItem(parent)
 {
     setSampleCount(m_preferredSamples);
+    m_lockCommitTimer.setSingleShot(true);
+    m_lockCommitTimer.setInterval(350);
+    connect(&m_lockCommitTimer, &QTimer::timeout, this, &Viewport::commitLockedView);
     m_stillTimer.setSingleShot(true);
     m_stillTimer.setInterval(400);
     connect(&m_stillTimer, &QTimer::timeout, this, [this] {
@@ -304,6 +308,7 @@ void Viewport::setDocument(Document* document)
         // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
         connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
+        connect(m_document, &Document::changed, this, &Viewport::applyLookThrough); // camera privită s-a schimbat
         connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
         connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
         connect(m_document, &Document::animationStarted, this, &Viewport::requestAnimationFrame);
@@ -815,6 +820,7 @@ QVector3D Viewport::cameraForward() const
 
 void Viewport::setStandardView(StandardView v)
 {
+    leaveLookNow();
     const auto target = view::standardViewPose(static_cast<view::StandardView>(v), m_camera.pose());
     m_motion.animateTo(m_camera, target);
     requestAnimationFrame();
@@ -822,6 +828,7 @@ void Viewport::setStandardView(StandardView v)
 
 void Viewport::zoomExtents()
 {
+    leaveLookNow();
     view::Vec3d lo;
     view::Vec3d hi;
     sceneBounds(lo, hi);
@@ -942,7 +949,8 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
     for (std::size_t i = 0; i < model.cameras().size(); ++i) {
         const model::CameraObject& c = model.cameras().values()[i];
         const bool selected = model.cameras().keys()[i] == doc.selectedCamera();
-        if ((!c.visible && !selected) || m_cleanCapture) {
+        // Camera prin care privim nu se desenează (am fi în ea).
+        if ((!c.visible && !selected) || m_cleanCapture || static_cast<double>(model.cameras().keys()[i].value) == m_lookCamera) {
             continue;
         }
         const glm::vec4 color = selected ? selectedColor : gizmoColor;
@@ -1123,11 +1131,266 @@ std::vector<view::CameraPose> posesFromStates(const QVariantList& states)
 
 } // namespace
 
+// --- Vederea prin cameră (plan Animare, secțiunea 9) ---
+
+Viewport::LensState Viewport::lensState() const
+{
+    return { m_camera.pose(), m_camera.fovY(), m_camera.roll(), m_camera.shift(),
+        m_camera.projection() == view::Projection::Orthographic };
+}
+
+void Viewport::applyLensState(const LensState& state)
+{
+    m_camera.setPose(state.pose);
+    m_camera.setFovY(state.fovY);
+    m_camera.setRoll(state.roll);
+    m_camera.setShift(state.shift);
+    m_camera.setProjection(state.orthographic ? view::Projection::Orthographic : view::Projection::Perspective);
+}
+
+const model::CameraObject* Viewport::lookedCamera() const
+{
+    if (!m_document || m_lookCamera <= 0.0) {
+        return nullptr;
+    }
+    return m_document->model().cameras().find(model::CameraId { static_cast<std::uint64_t>(m_lookCamera) });
+}
+
+model::CameraObject Viewport::lookedCameraShown() const
+{
+    model::CameraObject c = *lookedCamera();
+    if (m_previewAspect > 0.0) { // formatul tras de mânerele cadrului
+        c.formatWidth = std::max(16, static_cast<int>(std::lround(c.formatHeight * m_previewAspect)));
+    }
+    return c;
+}
+
+std::optional<view::Camera> Viewport::lookLens() const
+{
+    if (lookedCamera() == nullptr) {
+        return std::nullopt;
+    }
+    view::Camera lens = model::lookThrough(lookedCameraShown(), { width(), height() }, m_lookMargin);
+    // În Animare, pistele camerei animației mută camera; lentila (unghiul, formatul) rămâne a camerei-obiect.
+    if (m_document->previewing()) {
+        const QVariantMap animated = m_document->animationCamera();
+        if (!animated.isEmpty()) {
+            lens.setPose(poseFromState(animated));
+        }
+    }
+    return lens;
+}
+
+void Viewport::applyLookThrough()
+{
+    if (m_lookCamera <= 0.0 || m_lensFlight || m_lockNavigating) {
+        return;
+    }
+    const std::optional<view::Camera> lens = lookLens();
+    if (!lens) { // camera a dispărut (ștearsă, undo)
+        leaveLookNow();
+        return;
+    }
+    const LensState next { lens->pose(), lens->fovY(), lens->roll(), lens->shift(),
+        lens->projection() == view::Projection::Orthographic };
+    const model::CameraObject& c = *lookedCamera();
+    m_camera.setClipOverride(c.nearClip > 0.0 ? c.nearClip : m_clipStart, c.farClip > 0.0 ? c.farClip : m_clipEnd);
+    const LensState now = lensState();
+    const bool same = now.pose.target == next.pose.target && now.pose.yaw == next.pose.yaw && now.pose.pitch == next.pose.pitch
+        && now.pose.distance == next.pose.distance && now.fovY == next.fovY && now.roll == next.roll && now.shift == next.shift
+        && now.orthographic == next.orthographic;
+    if (!same) {
+        applyLensState(next);
+        onCameraMoved();
+    }
+    emit lookFrameChanged();
+}
+
+void Viewport::setLookThrough(double cameraId)
+{
+    cameraId = std::max(cameraId, 0.0);
+    if (cameraId == m_lookCamera) {
+        return;
+    }
+    const LensState from = lensState();
+    m_motion.stop();
+    m_previewAspect = 0.0;
+    if (cameraId > 0.0) {
+        const double previous = m_lookCamera;
+        m_lookCamera = cameraId;
+        const std::optional<view::Camera> lens = lookLens();
+        if (!lens) {
+            m_lookCamera = previous;
+            return;
+        }
+        if (!m_beforeLook) {
+            m_beforeLook = from; // vederea la care se întoarce ieșirea
+        }
+        m_lensFlight = LensFlight { from, { lens->pose(), lens->fovY(), lens->roll(), lens->shift(),
+            lens->projection() == view::Projection::Orthographic } };
+    } else {
+        m_lookCamera = 0.0;
+        m_lockNavigating = false;
+        const LensState back = m_beforeLook.value_or(LensState { from.pose, view::Camera::kDefaultFovY, 0.0, {}, from.orthographic });
+        m_beforeLook.reset();
+        m_lensFlight = LensFlight { from, back };
+        m_camera.setClipOverride(m_clipStart, m_clipEnd);
+    }
+    if (m_reducedMotion) {
+        m_lensFlight->duration = 0.0;
+    }
+    m_lookFade = 0.0;
+    emit lookThroughChanged();
+    emit lookFrameChanged();
+    requestAnimationFrame();
+}
+
+void Viewport::leaveLookNow()
+{
+    if (m_lookCamera <= 0.0 && !m_lensFlight) {
+        return;
+    }
+    // Fără zbor: unghiul, roll-ul, shift-ul și proiecția de dinainte, poza rămâne (o animează apelantul).
+    const LensState before = m_beforeLook.value_or(LensState { m_camera.pose(), view::Camera::kDefaultFovY, 0.0, {}, false });
+    m_lensFlight.reset();
+    m_lookCamera = 0.0;
+    m_lockNavigating = false;
+    m_beforeLook.reset();
+    m_lookFade = 0.0;
+    m_previewAspect = 0.0;
+    m_camera.setFovY(before.fovY);
+    m_camera.setRoll(0.0);
+    m_camera.setShift({});
+    m_camera.setProjection(before.orthographic ? view::Projection::Orthographic : view::Projection::Perspective);
+    m_camera.setClipOverride(m_clipStart, m_clipEnd);
+    onCameraMoved();
+    emit lookThroughChanged();
+    emit lookFrameChanged();
+}
+
+bool Viewport::exitLookForNavigation()
+{
+    if (m_lookCamera <= 0.0 || m_lockCamera) {
+        return false;
+    }
+    setLookThrough(0.0);
+    return true;
+}
+
+bool Viewport::advanceLookThrough(double dt)
+{
+    if (m_lensFlight) {
+        LensFlight& f = *m_lensFlight;
+        f.elapsed += dt;
+        const double k = f.duration > 0.0 ? view::easeInOutCubic(std::min(1.0, f.elapsed / f.duration)) : 1.0;
+        LensState s;
+        s.pose = view::interpolatePose(f.from.pose, f.to.pose, k);
+        // Unghiul se interpolează pe tangentă (zoom-ul optic pare liniar), roll-ul pe drumul scurt.
+        s.fovY = 2.0 * std::atan(std::tan(f.from.fovY * 0.5) + (std::tan(f.to.fovY * 0.5) - std::tan(f.from.fovY * 0.5)) * k);
+        const double dRoll = std::remainder(f.to.roll - f.from.roll, 2.0 * std::numbers::pi);
+        s.roll = f.from.roll + dRoll * k;
+        s.shift = f.from.shift + (f.to.shift - f.from.shift) * k;
+        s.orthographic = k >= 1.0 ? f.to.orthographic : (f.from.orthographic && f.to.orthographic);
+        applyLensState(s);
+        onCameraMoved();
+        if (k >= 1.0) {
+            m_lensFlight.reset();
+            applyLookThrough();
+        }
+        return true;
+    }
+    if (m_lookCamera > 0.0 && m_lookFade < 1.0) {
+        m_lookFade = m_reducedMotion ? 1.0 : std::min(1.0, m_lookFade + dt / 0.25);
+        emit lookFrameChanged();
+        return true;
+    }
+    return false;
+}
+
+QRectF Viewport::lookFrame() const
+{
+    if (lookedCamera() == nullptr || m_lensFlight) {
+        return {};
+    }
+    const model::FrameRect f = model::frameInViewport(lookedCameraShown(), { width(), height() }, m_lookMargin);
+    return { f.min.x, f.min.y, f.max.x - f.min.x, f.max.y - f.min.y };
+}
+
+QString Viewport::lookLabel() const
+{
+    const model::CameraObject* c = lookedCamera();
+    if (c == nullptr) {
+        return {};
+    }
+    const model::CameraObject shown = lookedCameraShown();
+    QString format = QStringLiteral("%1 × %2").arg(shown.formatWidth).arg(shown.formatHeight);
+    for (const model::FormatPreset& p : model::formatPresets()) {
+        if (p.width * shown.formatHeight == p.height * shown.formatWidth) { // același raport
+            const std::string_view name = p.name.substr(0, p.name.find(" ·"));
+            format = QString::fromUtf8(name.data(), qsizetype(name.size()));
+            break;
+        }
+    }
+    const QString lens = c->orthographic ? QStringLiteral("paralelă")
+                                         : QStringLiteral("%1 mm").arg(QString::number(c->focalLength, 'f', c->focalLength < 10 ? 1 : 0));
+    return QString::fromStdString(c->name) + QStringLiteral(" · ") + lens + QStringLiteral(" · ") + format;
+}
+
+void Viewport::setLockCameraToView(bool on)
+{
+    if (on != m_lockCamera) {
+        m_lockCamera = on;
+        emit lookThroughChanged();
+    }
+}
+
+void Viewport::setPickingFocus(bool on)
+{
+    if (on != m_pickingFocus) {
+        m_pickingFocus = on;
+        updateCursor();
+        emit pickingFocusChanged();
+    }
+}
+
+void Viewport::previewLookAspect(double aspect)
+{
+    m_previewAspect = std::max(aspect, 0.0);
+    applyLookThrough();
+    emit lookFrameChanged();
+}
+
+// Navigarea cu camera blocată pe vedere s-a terminat: camera-obiect primește poziția și ținta vederii (un pas de undo);
+// în Animare, vederea devine o cheie a camerei animației.
+void Viewport::commitLockedView()
+{
+    m_lockNavigating = false;
+    const model::CameraObject* c = lookedCamera();
+    if (c == nullptr || !m_document) {
+        return;
+    }
+    if (m_document->workMode() == Document::Animation) {
+        m_document->keyCamera(cameraState());
+        applyLookThrough();
+        return;
+    }
+    const math::Vec3d eye = m_camera.eye();
+    const math::Vec3d target = m_camera.pose().target;
+    QVariantMap changes { { QStringLiteral("position"), QVariantList { eye.x, eye.y, eye.z } },
+        { QStringLiteral("target"), QVariantList { target.x, target.y, target.z } } };
+    if (c->orthographic) { // zoom-ul ortografic schimbă scara cadrului
+        const double before = glm::length(c->target - c->position);
+        changes.insert(QStringLiteral("orthoScale"), c->orthoScale * m_camera.pose().distance / std::max(before, 1e-6));
+    }
+    m_document->setCameraProperties(m_lookCamera, changes);
+}
+
 void Viewport::animateToCamera(const QVariantMap& state, double seconds)
 {
     if (state.isEmpty()) {
         return;
     }
+    leaveLookNow();
     setOrthographic(state.value(QStringLiteral("ortho")).toBool());
     // Vederea prin cameră folosește unghiul ei; celelalte (scene, vederi standard) pe cel implicit.
     m_camera.setFovY(state.contains(QStringLiteral("fov")) ? glm::radians(state.value(QStringLiteral("fov")).toDouble())
@@ -1217,6 +1480,10 @@ void Viewport::exportScenes(const QVariantList& states, double transition, doubl
 void Viewport::applyAnimationCamera()
 {
     if (!m_document || !m_document->previewing()) {
+        return;
+    }
+    if (m_lookCamera > 0.0) { // prin cameră: camera animației mută camera, cu lentila ei
+        applyLookThrough();
         return;
     }
     const QVariantMap camera = m_document->animationCamera();
@@ -1317,20 +1584,39 @@ QImage Viewport::renderImage()
             hidden.append(child);
         }
     }
+    // Prin cameră: cadrul umple viewport-ul pe o latură (marginea 1) și se decupează la format.
+    QRectF captureRect = boundingRect();
+    QSize cameraFormat;
+    const bool throughCamera = lookedCamera() != nullptr && !m_lensFlight;
+    if (throughCamera) {
+        m_lookMargin = 1.0;
+        applyLookThrough();
+        captureRect = lookFrame();
+        cameraFormat = QSize(lookedCamera()->formatWidth, lookedCamera()->formatHeight);
+    }
     // grabWindow sincronizează doar elementele marcate pentru actualizare: cerem un cadru nou în ambele stări.
     m_cleanCapture = true;
     update();
     const QImage frame = window()->grabWindow();
     m_cleanCapture = false;
+    if (throughCamera) {
+        m_lookMargin = 0.9;
+        applyLookThrough();
+    }
     update();
     for (QQuickItem* child : hidden) {
         child->setVisible(true);
     }
     const qreal dpr = frame.devicePixelRatio() > 0 ? frame.devicePixelRatio() : window()->effectiveDevicePixelRatio();
-    const QRectF scene = mapRectToScene(boundingRect());
+    const QRectF scene = mapRectToScene(captureRect);
     const QRect pixels(qRound(scene.x() * dpr), qRound(scene.y() * dpr), qRound(scene.width() * dpr),
         qRound(scene.height() * dpr));
-    return frame.copy(pixels);
+    QImage image = frame.copy(pixels);
+    if (cameraFormat.isValid() && !image.isNull()) {
+        // Prin cameră: imaginea are formatul (și rezoluția) camerei.
+        image = image.scaled(cameraFormat, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    }
+    return image;
 }
 
 bool Viewport::saveImage(const QString& path)
@@ -1712,6 +1998,7 @@ void Viewport::onAfterAnimating()
     if (m_motion.update(m_camera, dt)) {
         onCameraMoved();
     }
+    const bool looking = advanceLookThrough(dt);
     if (m_sceneAnimation && !m_exporting) {
         advanceSceneAnimation(dt);
     }
@@ -1725,7 +2012,7 @@ void Viewport::onAfterAnimating()
         m_turntableSecondsLeft -= dt;
         onCameraMoved();
     }
-    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting) || interacting) {
+    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting) || interacting || looking) {
         update();
     } else {
         m_ticking = false;
@@ -1747,6 +2034,7 @@ void Viewport::geometryChange(const QRectF& newGeometry, const QRectF& oldGeomet
     QQuickRhiItem::geometryChange(newGeometry, oldGeometry);
     m_camera.setViewportSize(newGeometry.width(), newGeometry.height());
     onCameraMoved();
+    applyLookThrough();
 }
 
 void Viewport::timerEvent(QTimerEvent* /*event*/)
@@ -1767,6 +2055,12 @@ bool Viewport::event(QEvent* event)
         case Qt::ZoomNativeGesture: {
             // value() e variația relativă a distanței dintre degete (pozitivă = depărtare = apropiere).
             const double factor = 1.0 / std::max(0.05, 1.0 + gesture->value());
+            if (exitLookForNavigation()) {
+                gesture->accept();
+                return true;
+            }
+            m_lockNavigating = m_lookCamera > 0.0;
+            m_lockCommitTimer.start();
             m_motion.stop();
             m_camera.zoomAbout(factor, zoomAnchor(pos));
             onCameraMoved();
@@ -1927,6 +2221,12 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         event->ignore();
         return;
     }
+    // Prin cameră: navigarea iese din ea (zbor înapoi), sau, blocată pe vedere, mută camera.
+    if (exitLookForNavigation()) {
+        event->accept();
+        return;
+    }
+    m_lockNavigating = m_lookCamera > 0.0;
     beginDrag(drag, event->position());
     if (drag == Drag::Zoom) {
         m_zoomDragAnchor = zoomAnchor(event->position());
@@ -2130,7 +2430,9 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
         event->accept();
         return;
     }
-    if (m_drag == Drag::Orbit) {
+    if (m_lockNavigating && m_drag != Drag::None) {
+        commitLockedView(); // fără inerție: camera rămâne unde a lăsat-o mouse-ul
+    } else if (m_drag == Drag::Orbit) {
         m_motion.setOrbitVelocity(orbitReleaseVelocity());
         requestAnimationFrame();
     }
@@ -2189,6 +2491,14 @@ view::Vec2d Viewport::orbitReleaseVelocity() const
 void Viewport::wheelEvent(QWheelEvent* event)
 {
     stopScenes();
+    if (exitLookForNavigation()) {
+        event->accept();
+        return;
+    }
+    if (m_lookCamera > 0.0) { // blocată pe vedere: gestul mută camera, scrisă la sfârșit
+        m_lockNavigating = true;
+        m_lockCommitTimer.start();
+    }
     const QPointF pos = event->position();
     setPointer(pos, true);
     const auto mods = event->modifiers();
@@ -2228,6 +2538,14 @@ void Viewport::wheelEvent(QWheelEvent* event)
         return;
     }
     const double factor = std::pow(kWheelZoomStep, steps);
+    if (m_lockNavigating) { // camera blocată: pasul se aplică imediat, ca scrierea de la sfârșit să-l prindă întreg
+        m_motion.stop();
+        m_camera.zoomAbout(factor, zoomAnchor(pos));
+        onCameraMoved();
+        showTransientCursor(m_zoomCursor);
+        event->accept();
+        return;
+    }
     m_motion.zoomSmoothly(factor, zoomAnchor(pos));
     showTransientCursor(m_zoomCursor);
     requestAnimationFrame();

@@ -181,7 +181,8 @@ Column {
 
     PropertyGroup {
         visible: root.isCamera
-        title: "Lentilă"
+        title: (root.info.orthographic ?? false) ? "Lentilă · paralelă"
+              : "Lentilă · " + Math.round(root.info.fovH ?? 0) + "° × " + Math.round(root.info.fovV ?? 0) + "°"
         Row {
             width: parent.width
             spacing: Theme.space1
@@ -205,16 +206,13 @@ Column {
                 value: root.info.orthoScale ?? 10000
                 onValueModified: (v) => root.set({ orthoScale: v })
             }
-            Text {
+            NumberField {
                 width: (parent.width - Theme.space1) / 2
-                height: Theme.controlHeightSm
-                verticalAlignment: Text.AlignVCenter
-                horizontalAlignment: Text.AlignRight
-                text: Math.round(root.info.fovH ?? 0) + "° × " + Math.round(root.info.fovV ?? 0) + "°"
-                visible: !(root.info.orthographic ?? false)
-                color: Theme.textTertiary
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeXs
+                label: "Roll"
+                unit: "°"
+                decimals: 1
+                value: root.info.roll ?? 0
+                onValueModified: (v) => root.set({ roll: v })
             }
         }
         // Focalele uzuale.
@@ -273,7 +271,7 @@ Column {
             width: parent.width
             spacing: Theme.space1
             NumberField {
-                width: (parent.width - Theme.space1 * 2) / 3
+                width: (parent.width - Theme.space1) / 2
                 label: "Shift X"
                 decimals: 2
                 step: 0.01
@@ -283,22 +281,14 @@ Column {
                 onValueModified: (v) => root.set({ shiftX: v })
             }
             NumberField {
-                width: (parent.width - Theme.space1 * 2) / 3
-                label: "Y"
+                width: (parent.width - Theme.space1) / 2
+                label: "Shift Y"
                 decimals: 2
                 step: 0.01
                 from: -2
                 to: 2
                 value: root.info.shiftY ?? 0
                 onValueModified: (v) => root.set({ shiftY: v })
-            }
-            NumberField {
-                width: (parent.width - Theme.space1 * 2) / 3
-                label: "Roll"
-                unit: "°"
-                decimals: 1
-                value: root.info.roll ?? 0
-                onValueModified: (v) => root.set({ roll: v })
             }
         }
         Toggle {
