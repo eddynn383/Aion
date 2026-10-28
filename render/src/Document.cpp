@@ -1077,6 +1077,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     // În Animare, uneltele lucrează pe poza de la timpul curent, cu un istoric propriu (aruncat); ce mută ele devine
     // keyframe-uri, mai jos.
     const bool animating = m_workMode == Animation;
+    if (animating && m_model.isRecording()) {
+        return; // o tranzacție deschisă (tragerea pivotului): poza nu se poate face acum
+    }
     model::Model& target = animating ? pose() : m_model;
     std::optional<commands::CommandStack> poseStack;
     std::map<model::InstanceId, math::Transform> posedBefore;
@@ -1973,6 +1976,10 @@ void Document::setTimelineTime(double seconds)
     m_previewing = currentAnimation() != nullptr;
     ++m_interactionRevision;
     emit timelineTimeChanged();
+    emit playheadValuesChanged();
+    if (m_workMode == Animation && !m_playing) {
+        emit selectionChanged(); // Inspector-ul (poziția, pivotul) arată poza de la timpul nou
+    }
     if (wasPreviewing != m_previewing) {
         emit timelineChanged();
     }
@@ -1995,6 +2002,7 @@ void Document::editAnimation(const char* name, Fn&& fn)
     m_keepPreview = false;
     ++m_interactionRevision;
     emit timelineChanged();
+    emit playheadValuesChanged();
 }
 
 void Document::createAnimation()
@@ -2286,6 +2294,7 @@ void Document::pause()
     if (m_playing) {
         m_playing = false;
         emit timelineChanged();
+        emit selectionChanged(); // Inspector-ul, la poza unde s-a oprit
     }
 }
 
@@ -2326,6 +2335,34 @@ void Document::jumpToEdge(bool end)
     }
     pause();
     setTimelineTime(end ? animationDuration() : 0.0);
+}
+
+QVariantMap Document::channelValues() const
+{
+    QVariantMap out;
+    const model::Animation* a = currentAnimation();
+    if (a == nullptr) {
+        return out;
+    }
+    for (const model::ObjectTrack& t : a->tracks) {
+        if (!m_model.instances().contains(t.instance)) {
+            continue;
+        }
+        const model::TransformValues now = currentValues(t.instance);
+        const QString prefix = QString::number(static_cast<double>(t.instance.value)) + QLatin1Char(':');
+        for (const model::Channel& c : t.channels) {
+            const std::string_view name = model::propertyName(c.property);
+            const QString key = prefix + QString::fromLatin1(name.data(), qsizetype(name.size()));
+            if (c.property == model::Property::Color) {
+                if (const auto color = model::evaluateColor(t, m_timelineTime)) {
+                    out.insert(key, colorText(*color));
+                }
+            } else {
+                out.insert(key, now.get(c.property));
+            }
+        }
+    }
+    return out;
 }
 
 bool Document::toolOwnsArrows() const
@@ -2976,9 +3013,11 @@ bool Document::advanceInteractions(double dt)
                     m_timelineTime = a->duration;
                     m_playing = false;
                     emit timelineChanged();
+                    emit selectionChanged();
                 }
             }
             emit timelineTimeChanged();
+            emit playheadValuesChanged();
         } else {
             m_playing = false;
             emit timelineChanged();

@@ -16,7 +16,9 @@ namespace aion::io {
 
 // Crește la fiecare schimbare incompatibilă; fișierele vechi se migrează la încărcare.
 // 2: animațiile pe canale (ADR 0034); cheile cu matricea întreagă din versiunea 1 se descompun în canale.
-inline constexpr int kFormatVersion = 2;
+// 3: poziția din plasare e a pivotului (ADR 0030): ținta regulilor „Mută la” din versiunile vechi (colțul minim) se
+//    mută cu diferența pivot − colț.
+inline constexpr int kFormatVersion = 3;
 
 struct LoadResult {
     std::optional<model::Model> model;

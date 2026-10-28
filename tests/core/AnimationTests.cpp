@@ -334,7 +334,7 @@ TEST_CASE("Animații: un fișier vechi (formatVersion 1) se deschide cu animați
         REQUIRE(at != std::string::npos);
         text.replace(at, from.size(), to);
     };
-    replace("\"formatVersion\": 2", "\"formatVersion\": 1");
+    replace("\"formatVersion\": " + std::to_string(io::kFormatVersion), "\"formatVersion\": 1");
     const auto matrix = [](double x) {
         return "1,0,0,0, 0,1,0,0, 0,0,1,0, " + std::to_string(x) + ",500,0,1";
     };
@@ -456,4 +456,57 @@ TEST_CASE("Animații: un pivot mutat după animare nu mută obiectul (cheile de 
     // La fel cu `setPivot` (pivotul tras în viewport), înapoi în centru.
     model::setPivot(m, box, Vec3d { 500, 500, 500 });
     CHECK(glm::length(posed(2.0).applyToPoint({ 1000, 0, 0 }) - at2.applyToPoint({ 1000, 0, 0 })) < 1e-6);
+}
+
+TEST_CASE("Animații: pivotul nou lasă obiectul pe loc la toate cheile, și cu rotația animată", "[core][model][animation]")
+{
+    using model::Property;
+    const Vec3d oldPivot { 500, 500, 500 };
+    const Vec3d newPivot { 0, 0, 0 };
+    const Transform base;
+    const auto check = [&](Animation a, const model::InstanceId id) {
+        const auto pose = [&](const Animation& anim, double t, const Vec3d& pivot) {
+            return *model::evaluateInstance(*model::findTrack(anim, id), t, base, pivot);
+        };
+        Animation rebased = a;
+        model::rebasePivot(rebased, id, base, oldPivot, newPivot);
+        for (const double t : model::keyTimes(a, {})) {
+            for (const Vec3d q : { Vec3d { 0, 0, 0 }, Vec3d { 1000, 0, 0 }, Vec3d { 1000, 1000, 1000 } }) {
+                CHECK(glm::length(pose(rebased, t, newPivot).applyToPoint(q) - pose(a, t, oldPivot).applyToPoint(q)) < 1e-6);
+            }
+        }
+    };
+    const model::InstanceId box { 1 };
+    // Doar rotație (fără canale de poziție).
+    Animation turn;
+    model::setChannelKey(turn, box, Property::RotationZ, 0.0, 0.0);
+    model::setChannelKey(turn, box, Property::RotationZ, 2.0, 90.0);
+    check(turn, box);
+    // Poziție pe X și rotație de 45°, la momente diferite.
+    Animation both;
+    model::setChannelKey(both, box, Property::PositionX, 0.0, 500.0);
+    model::setChannelKey(both, box, Property::PositionX, 1.0, 2500.0);
+    model::setChannelKey(both, box, Property::RotationZ, 0.0, 0.0);
+    model::setChannelKey(both, box, Property::RotationZ, 2.0, 45.0);
+    check(both, box);
+}
+
+TEST_CASE("Animații: auto-key oprit care trece baza peste 90° pe Y, cu rotația parțial animată", "[core][model][animation]")
+{
+    using model::Property;
+    // Baza rotită 80° pe Y; +20° o duce la 100°, unde descompunerea dă cealaltă soluție Euler (180, 80, 180).
+    const Transform base = Transform::rotation({ 0, 0, 0 }, { 0, 1, 0 }, glm::radians(80.0));
+    const Vec3d pivot { 0, 0, 0 };
+    Animation a;
+    const model::InstanceId box { 1 };
+    model::setChannelKey(a, box, Property::RotationX, 0.0, 0.0);
+    model::setChannelKey(a, box, Property::RotationX, 1.0, 30.0);
+    // Auto-key oprit: +20° pe Y se adaugă bazei (care trece de 90° și se descompune pe cealaltă soluție Euler);
+    // X rămâne animat, iar poza arătată e exact cea cerută.
+    const Transform at0 = *model::evaluateInstance(*model::findTrack(a, box), 0.0, base, pivot);
+    const model::TransformValues before = model::evaluateValues(*model::findTrack(a, box), 0.0, model::transformValues(base, pivot));
+    const Transform turned = Transform::rotation({ 0, 0, 0 }, { 0, 1, 0 }, glm::radians(20.0)) * at0;
+    const Transform newBase = model::adjustWithoutKeys(a, box, before, model::transformValues(turned, pivot), base, pivot);
+    const Transform shown = *model::evaluateInstance(*model::findTrack(a, box), 0.0, newBase, pivot);
+    CHECK(glm::length(shown.applyToPoint({ 100, 200, 300 }) - turned.applyToPoint({ 100, 200, 300 })) < 1e-6);
 }

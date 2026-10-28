@@ -93,7 +93,10 @@ Item {
             unit: root.row.unit === "×" ? "" : (root.row.unit ?? "")
             decimals: root.row.unit === "mm" ? 0 : root.row.unit === "°" ? 1 : 3
             step: root.row.unit === "mm" ? 10 : root.row.unit === "°" ? 1 : 0.05
-            value: typeof root.row.current === "number" ? root.row.current : 0
+            value: {
+                const v = root.timeline.currentValue(root.row)
+                return typeof v === "number" ? v : 0
+            }
             onValueModified: (v) => root.doc.setChannelValue(root.row.instance, root.row.property, v)
         }
         Rectangle {
@@ -104,7 +107,7 @@ Item {
             width: 14
             height: 14
             radius: 3
-            color: root.row.property === "color" && root.row.current ? root.row.current : "transparent"
+            color: root.row.property === "color" ? (root.timeline.currentValue(root.row) || "transparent") : "transparent"
             border.color: Theme.borderStrong
         }
     }

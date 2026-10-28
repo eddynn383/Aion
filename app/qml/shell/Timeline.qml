@@ -165,6 +165,11 @@ Rectangle {
         return false
     }
     function selectKeys(list) { selectedKeys = list }
+    // Valoarea canalului la timpul curent (urmează playhead-ul, fără să refacă rândurile).
+    function currentValue(row) {
+        const v = document ? document.channelValues[row.instance + ":" + row.property] : undefined
+        return v !== undefined ? v : row.current
+    }
     function deleteSelectedKeys() {
         if (selectedKeys.length === 0)
             return false
