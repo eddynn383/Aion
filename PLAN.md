@@ -659,6 +659,21 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 - [x] Punctul de lângă cursor se mărește, are etichetă și devine punctul de pornire; la destinație, cursorul se
       prinde de punctele altor obiecte (și când e puțin în afara lor)
 
+## 6e. Etapa 5 – toolbar nou și moduri de lucru (cerința din 2026-10-28)
+
+Planul detaliat (specificație, design, pași, criterii, decizii de confirmat): [`docs/plans/moduri-de-lucru.md`](docs/plans/moduri-de-lucru.md).
+
+- [ ] Pasul 1 — starea modului în Document (`workMode`), comenzile ⌥1 / ⌥2 / ⌥3, persistarea
+- [ ] Pasul 2 — toolbar: Orbit / Pan / Zoom în primul grup, comutatorul de mod în dreapta (`shell/ModeSwitch.qml`)
+- [ ] Pasul 3 — filtrarea comenzilor, scurtăturilor, palette-ului și meniurilor după mod
+- [ ] Pasul 4 — gărzile din Document (operațiile altui mod sunt refuzate, cu mesaj)
+- [ ] Pasul 5 — layout-ul pe mod: secțiunile din stânga, grupurile din Inspector, bara de vizualizare
+- [ ] Pasul 6 — Animare: timeline automat, selecție doar pe obiecte, auto-key la Move / Rotate / Scale
+- [ ] Pasul 7 — Interacțiune: editare vs testare (▷ / F5), Interact doar în testare
+- [ ] Pasul 8 — ADR 0033, documentație, capturi, CI
+
+---
+
 ## 7. Riscuri principale și cum le reducem
 
 | Risc | Impact | Măsuri |
