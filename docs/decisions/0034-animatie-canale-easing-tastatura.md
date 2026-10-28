@@ -33,6 +33,16 @@
   bate pe cea comună, deci Space nu mai alege Select în Animare (Select are și V). Săgețile rămân ale uneltei cât
   `Tool::ownsArrowKeys()` (Move după primul click, Rotate — săgețile aleg axa, Scale în tragere).
 
+- **Timeline-ul** (`shell/Timeline.qml`, `TimelineRow`, `TimelineKey`, `TimelineRuler`): un rând pe obiect (momentele
+  cu chei, bare pe intervale) care se deschide în canalele lui, cu valoarea la fiecare cheie și valoarea curentă
+  editabilă; vederea în timp proprie (`viewStart`, `pxPerSecond`: zoom, derulare, bara de jos, „încadrează tot”);
+  selecția (`selectedKeys`), tragerea în grup cu snap, dreptunghiul, copierea / lipirea, ceasul editabil.
+- **Editorul de curbă** (`overlays/EasingEditor.qml`): graficul cu mânere, valorile, previzualizarea, presetările;
+  curbele proprii stau în preferințele aplicației (`preferences.easingPresets`), deci în orice document.
+  `Animation::defaultEasing` = easing-ul cheilor noi (în fișier).
+- **Auto-key** (`Document::autoKey`, pornit implicit): oprit, o schimbare din Move / Rotate / Scale / Inspector intră în
+  poza de bază, iar o proprietate deja animată își mută toate cheile cu diferența (`model::adjustWithoutKeys`).
+
 ## Limite
 
 - O transformare cu forfecare (un obiect rotit și scalat neuniform pe axele lumii) se descompune fără forfecare la
