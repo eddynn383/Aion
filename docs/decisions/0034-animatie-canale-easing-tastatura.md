@@ -47,7 +47,9 @@
 
 - O transformare cu forfecare (un obiect rotit și scalat neuniform pe axele lumii) se descompune fără forfecare la
   animare.
-- Un pivot mutat după animare se aplică întregii animații (cheile de poziție rămân pozițiile pivotului; rotația se face
-  în jurul pivotului nou). Nu se recalculează cheile.
+- Un pivot mutat după animare (`model::setPivot`, `setPlacement`): cheile de poziție se recalculează
+  (`model::rebasePivot`), deci la ele obiectul rămâne exact pe loc; rotația animată se face de acum în jurul pivotului
+  nou, așa că drumul dintre chei se poate schimba (un pivot mutat ca să repare o rotație o repară). Pivotul nu se
+  animă: în Animare, Inspector-ul și marcajul tras îl schimbă în model, raportat la poza de la timpul curent.
 - Curbele presetărilor vechi (cubice) diferă puțin de presetările Bézier cu același nume.
 - Camera își păstrează cheile ei (țintă, unghiuri, distanță), cu easing-ul nou.

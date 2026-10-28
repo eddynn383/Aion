@@ -80,6 +80,11 @@ std::vector<Property> keyTransform(Animation& animation, InstanceId instance, do
 [[nodiscard]] math::Transform adjustWithoutKeys(Animation& animation, InstanceId instance, const TransformValues& before,
     const TransformValues& after, const math::Transform& base, const math::Vec3d& pivot);
 
+// Pivotul obiectului s-a mutat (din `oldPivot` în `newPivot`, coordonatele definiției; `base` = transformarea lui din
+// model): cheile de poziție (poziția pivotului) se recalculează, ca la fiecare cheie obiectul să rămână exact unde era.
+void rebasePivot(Animation& animation, InstanceId instance, const math::Transform& base, const math::Vec3d& oldPivot,
+    const math::Vec3d& newPivot);
+
 // O cheie de pe timeline: a camerei (`instance` nul), a unui canal, sau — pe rândul sumar al obiectului
 // (`property` gol) — toate cheile lui de la acel moment.
 struct KeyRef {

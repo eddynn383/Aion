@@ -460,6 +460,27 @@ math::Transform adjustWithoutKeys(Animation& animation, InstanceId instance, con
     return composeTransform(baseValues, pivot);
 }
 
+void rebasePivot(Animation& animation, InstanceId instance, const math::Transform& base, const math::Vec3d& oldPivot,
+    const math::Vec3d& newPivot)
+{
+    ObjectTrack* track = findTrack(animation, instance);
+    if (track == nullptr) {
+        return;
+    }
+    const ObjectTrack before = *track; // evaluarea se face pe cheile vechi
+    const TransformValues baseValues = transformValues(base, oldPivot);
+    for (Channel& c : track->channels) {
+        const int axis = static_cast<int>(c.property);
+        if (axis > 2) {
+            continue; // doar pozițiile depind de pivot
+        }
+        for (Key& k : c.keys) {
+            const math::Transform t = composeTransform(evaluateValues(before, k.time, baseValues), oldPivot);
+            k.value = t.applyToPoint(newPivot)[axis];
+        }
+    }
+}
+
 std::vector<KeyRef> expandKeys(const Animation& animation, std::span<const KeyRef> refs)
 {
     const double tol = tolerance(animation);

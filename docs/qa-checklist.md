@@ -222,6 +222,9 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Click pe ceas → tastezi „1.5”, „36f” sau „00:02.50” → playhead-ul sare acolo
 - [ ] Auto-key oprit → Move schimbă poza de bază (fără chei); pe o proprietate animată, toată animația ei se mută
 - [ ] Marginea de sus a timeline-ului se trage (înălțimea se păstrează)
+- [ ] Un obiect animat (mutat și rotit): în Animare, trage marcajul pivotului în colțul obiectului → în Modelare pivotul
+      e tot în acel colț; Pivot → Colț în Modelare → în Animare, la chei, obiectul e unde era
+- [ ] ⌥G (snap la grid) pornește / oprește snap-ul și în Animare
 
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică

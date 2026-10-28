@@ -387,6 +387,8 @@ public:
     model::DefinitionId activeDefinition() const;
     // Pivotul selecției (un obiect sau geometrie liberă), în coordonatele contextului activ; gol = nimic de arătat.
     [[nodiscard]] std::optional<math::Vec3d> selectionPivot() const;
+    // Marcajul pivotului în coordonatele lumii ([x, y, z]; gol fără selecție), pentru scripturile de verificare.
+    Q_INVOKABLE QVariantList pivotMarker() const;
     // Punctele de care se prinde pivotul tras (colțurile, mijloacele muchiilor, centrele fețelor și centrul cutiei
     // selecției), în coordonatele contextului.
     [[nodiscard]] std::vector<math::Vec3d> pivotSnapPoints() const;
@@ -596,6 +598,9 @@ private:
     void keyTransforms(const std::map<model::InstanceId, math::Transform>& transforms, const char* name);
     // Valorile de transformare ale instanței la timpul curent (canalele animației peste modelul de bază).
     [[nodiscard]] model::TransformValues currentValues(model::InstanceId instance) const;
+    // Transformarea instanței așa cum se vede: în Animare, poza de la timpul curent (fără copia modelului, deci
+    // merge și în timpul unei tranzacții); altfel cea din model.
+    [[nodiscard]] math::Transform shownTransform(model::InstanceId instance) const;
     [[nodiscard]] QString channelValueText(model::Property property, double value) const;
     model::RuleRuntime m_rules;
     model::InstanceId m_hoverInstance;

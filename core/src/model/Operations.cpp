@@ -1,5 +1,7 @@
 #include "aion/core/model/Operations.h"
 
+#include "aion/core/model/AnimationEval.h"
+
 #include "aion/core/geom/Operations.h"
 
 #include <glm/common.hpp>
@@ -283,6 +285,40 @@ math::Vec3d pivotPoint(const Model& model, InstanceId instance)
     return model.instance(instance).transform.applyToPoint(pivotLocal(model, instance));
 }
 
+namespace {
+
+// Animațiile instanței după un pivot nou: obiectul rămâne pe loc la fiecare cheie.
+void rebaseAnimations(Model& model, InstanceId instance, const math::Transform& base, const math::Vec3d& oldPivot,
+    const math::Vec3d& newPivot)
+{
+    if (glm::length(newPivot - oldPivot) < 1e-12) {
+        return;
+    }
+    std::vector<std::pair<AnimationId, Animation>> changed;
+    for (std::size_t i = 0; i < model.animations().size(); ++i) {
+        const Animation& a = model.animations().values()[i];
+        if (findTrack(a, instance) != nullptr) {
+            Animation copy = a;
+            rebasePivot(copy, instance, base, oldPivot, newPivot);
+            changed.emplace_back(model.animations().keys()[i], std::move(copy));
+        }
+    }
+    for (auto& [id, a] : changed) {
+        model.setAnimation(id, std::move(a));
+    }
+}
+
+} // namespace
+
+void setPivot(Model& model, InstanceId instance, const math::Vec3d& local)
+{
+    const math::Vec3d old = pivotLocal(model, instance);
+    Instance inst = model.instance(instance);
+    inst.pivot = local;
+    model.setInstance(instance, inst);
+    rebaseAnimations(model, instance, inst.transform, old, local);
+}
+
 void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
 {
     const Placement current = placementOf(model, instance);
@@ -329,8 +365,11 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
         // Rotație / scară / dimensiuni: pivotul rămâne unde era.
         m[3] = glm::dvec4(pivotWorld - rs * pivot, 1.0);
     }
+    const math::Transform before = inst.transform;
+    const math::Vec3d oldPivot = pivotLocal(model, instance);
     inst.transform = math::Transform(m);
     model.setInstance(instance, inst);
+    rebaseAnimations(model, instance, before, oldPivot, pivot);
 }
 
 void restoreLockedPlacement(Model& model, InstanceId instance, const Placement& before)

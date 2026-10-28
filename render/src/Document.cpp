@@ -2434,6 +2434,21 @@ void Document::keyTransforms(const std::map<model::InstanceId, math::Transform>&
     });
 }
 
+math::Transform Document::shownTransform(model::InstanceId instance) const
+{
+    const model::Instance& inst = m_model.instance(instance);
+    if (m_workMode == Animation) {
+        if (const model::Animation* a = currentAnimation()) {
+            if (const model::ObjectTrack* t = model::findTrack(*a, instance)) {
+                if (const auto v = model::evaluateInstance(*t, m_timelineTime, inst.transform, model::pivotLocal(m_model, instance))) {
+                    return *v;
+                }
+            }
+        }
+    }
+    return inst.transform;
+}
+
 model::TransformValues Document::currentValues(model::InstanceId instance) const
 {
     const math::Vec3d pivot = model::pivotLocal(m_model, instance);
@@ -2537,7 +2552,7 @@ QList<int> Document::commandModes(const QString& id)
             return modeling;
         }
     }
-    if (id == QLatin1String("file.import") || id == QLatin1String("view.snapGrid")) {
+    if (id == QLatin1String("file.import")) {
         return modeling;
     }
     return all;
@@ -3408,6 +3423,23 @@ void Document::setPlacement(const QVariantMap& placement)
         const auto value = [&](const char* key, double fallback) {
             return placement.value(QLatin1String(key), fallback).toDouble();
         };
+        // Pivotul nu se animă: se schimbă în model (obiectul rămâne pe loc, și la cheile animațiilor).
+        if (placement.contains(QStringLiteral("pivot")) || placement.contains(QStringLiteral("vx"))
+            || placement.contains(QStringLiteral("vy")) || placement.contains(QStringLiteral("vz"))) {
+            math::Vec3d v = p.pivot.value_or(math::Vec3d { 0.0 });
+            if (placement.contains(QStringLiteral("pivot"))) {
+                v = pivotPreset(placement.value(QStringLiteral("pivot")).toString(), p.size, v);
+            }
+            v = { value("vx", v.x), value("vy", v.y), value("vz", v.z) };
+            const auto [lo, hi] = model::bounds(m_model, m_model.instance(id).definition);
+            const math::Vec3d scale = model::decompose(posed.instance(id).transform).scale;
+            math::Vec3d local = lo.x <= hi.x ? lo : math::Vec3d { 0.0 };
+            for (int i = 0; i < 3; ++i) {
+                local[i] += v[i] / std::max(std::abs(scale[i]), 1e-9);
+            }
+            runOnModel("Pivot", [&](model::Model& model) { model::setPivot(model, id, local); });
+            return;
+        }
         p.position = { value("px", p.position.x), value("py", p.position.y), value("pz", p.position.z) };
         p.rotation = { value("rx", p.rotation.x), value("ry", p.rotation.y), value("rz", value("rotation", p.rotation.z)) };
         p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
@@ -4453,7 +4485,7 @@ std::optional<math::Vec3d> Document::selectionPivot() const
         if (!m_model.instances().contains(id)) {
             return std::nullopt;
         }
-        return model::pivotPoint(m_workMode == Animation ? pose() : m_model, id); // în Animare: poza de acum
+        return shownTransform(id).applyToPoint(model::pivotLocal(m_model, id)); // în Animare: poza de acum
     }
     if (!m_selection.instances.empty()) {
         return std::nullopt;
@@ -4475,6 +4507,16 @@ std::optional<math::Vec3d> Document::selectionPivot() const
     return (lo + hi) * 0.5;
 }
 
+QVariantList Document::pivotMarker() const
+{
+    const auto p = selectionPivot();
+    if (!p) {
+        return {};
+    }
+    const math::Vec3d w = contextTransform().applyToPoint(*p);
+    return { w.x, w.y, w.z };
+}
+
 std::vector<math::Vec3d> Document::pivotSnapPoints() const
 {
     // Cutia selecției: a obiectului (orientată după el) sau a geometriei (aliniată cu axele).
@@ -4488,7 +4530,7 @@ std::vector<math::Vec3d> Document::pivotSnapPoints() const
         }
         const model::Instance& inst = m_model.instance(id);
         std::tie(lo, hi) = model::bounds(m_model, inst.definition);
-        t = inst.transform;
+        t = shownTransform(id);
     } else if (m_selection.instances.empty()) {
         const geom::Mesh& mesh = m_model.mesh(activeDefinition());
         const std::set<geom::VertexId> vertices = geom::verticesOf(mesh, m_selection);
@@ -4522,11 +4564,9 @@ void Document::setSelectionPivot(const math::Vec3d& point)
         if (!m_model.instances().contains(id)) {
             return;
         }
-        runOnModel("Pivot", [&](model::Model& model) {
-            model::Instance inst = model.instance(id);
-            inst.pivot = inst.transform.inverse().applyToPoint(point);
-            model.setInstance(id, inst);
-        });
+        // În Animare, marcajul e pe obiectul pozat: punctul se raportează la poza lui.
+        const math::Vec3d local = shownTransform(id).inverse().applyToPoint(point);
+        runOnModel("Pivot", [&](model::Model& model) { model::setPivot(model, id, local); });
         return;
     }
     if (!m_selection.instances.empty()) {

@@ -550,6 +550,8 @@ Window {
                     console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
                                      t => t.channels.map(c => c.property + "=" + c.keys.map(k => k.time + ":" + k.text + ":" + k.easing.name).join("|")))))
+                } else if (action === "debug.pivot") {
+                    console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode)
                 } else if (action === "debug.rz") {
                     console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {
