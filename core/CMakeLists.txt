@@ -15,6 +15,7 @@ add_library(aion_core STATIC
     src/geom/Offset.cpp
     src/geom/Operations.cpp
     src/geom/Shapes.cpp
+    src/geom/Bezier.cpp
     src/geom/Bevel.cpp
     src/geom/FaceBuilder.cpp
     src/geom/Sweep.cpp
