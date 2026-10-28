@@ -74,6 +74,12 @@ void setCameraKey(Animation& animation, CameraKey key);
 std::vector<Property> keyTransform(Animation& animation, InstanceId instance, double time, const TransformValues& before,
     const TransformValues& after, bool onlyChanged);
 
+// Auto-key oprit: o schimbare (din `before` în `after`, valorile de la timpul curent) se aplică fără chei noi:
+// proprietățile animate își mută toate cheile cu diferența (toată animația lor se ajustează), celelalte schimbă poza
+// de bază. Întoarce transformarea de bază nouă a instanței.
+[[nodiscard]] math::Transform adjustWithoutKeys(Animation& animation, InstanceId instance, const TransformValues& before,
+    const TransformValues& after, const math::Transform& base, const math::Vec3d& pivot);
+
 // O cheie de pe timeline: a camerei (`instance` nul), a unui canal, sau — pe rândul sumar al obiectului
 // (`property` gol) — toate cheile lui de la acel moment.
 struct KeyRef {

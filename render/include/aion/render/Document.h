@@ -101,6 +101,9 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
     // Săgețile sunt ale uneltei active (o operație în curs); altfel, în Animare, ← → mută playhead-ul.
     Q_PROPERTY(bool toolOwnsArrows READ toolOwnsArrows NOTIFY toolStatusChanged)
+    // Auto-key (Animare): pornit, Move / Rotate / Scale / Inspector pun chei; oprit, schimbă poza de bază (iar
+    // proprietățile animate își mută toate cheile).
+    Q_PROPERTY(bool autoKey READ autoKey WRITE setAutoKey NOTIFY autoKeyChanged)
     // Modul de lucru: 0 Modelare, 1 Animare, 2 Interacțiune. Decide ce unelte, comenzi și operații sunt permise
     // (docs/plans/moduri-de-lucru.md). Nu e un pas de undo și nu se salvează în fișier.
     Q_PROPERTY(int workMode READ workMode WRITE setWorkMode NOTIFY workModeChanged)
@@ -478,6 +481,13 @@ public:
     Q_INVOKABLE void setChannelValue(double instance, const QString& property, double value);
     // Presetările de easing (ale aplicației), ca listă de { name, x1, y1, x2, y2, step }.
     Q_INVOKABLE QVariantList easingPresets() const;
+    // Copiere / lipire de chei: lipirea se face la timpul curent, pe aceleași canale (pe obiectul selectat, dacă
+    // cheile copiate sunt ale unui singur alt obiect). Întoarce referințele cheilor lipite.
+    Q_INVOKABLE void copyKeys(const QVariantList& keys);
+    Q_INVOKABLE QVariantList pasteKeys();
+    Q_INVOKABLE bool hasCopiedKeys() const { return !m_keyClipboard.empty(); }
+    bool autoKey() const { return m_autoKey; }
+    void setAutoKey(bool on);
     Q_INVOKABLE void play();
     Q_INVOKABLE void pause();
     Q_INVOKABLE void togglePlay();
@@ -533,6 +543,7 @@ signals:
     // O regulă cere o vedere (mergi la scenă): viewport-ul mută camera.
     void cameraRequested(const QVariantMap& camera);
     void timelineTimeChanged();
+    void autoKeyChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();
     // Orice schimbare vizibilă în viewport.
@@ -597,6 +608,8 @@ private:
     double m_timelineTime = 0.0;
     bool m_previewing = false;
     bool m_playing = false;
+    bool m_autoKey = true;
+    std::vector<model::ClipboardKey> m_keyClipboard;
     template <class Fn>
     void editAnimation(const char* name, Fn&& fn);
     void finishSceneTransition();

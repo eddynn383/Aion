@@ -2206,6 +2206,44 @@ void Document::setChannelValue(double instance, const QString& property, double 
     editAnimation("Keyframe", [&](model::Animation& a) { model::setChannelKey(a, id, *p, t, value); });
 }
 
+void Document::copyKeys(const QVariantList& keys)
+{
+    if (const model::Animation* a = currentAnimation()) {
+        const std::vector<model::KeyRef> refs = keyRefs(keys);
+        m_keyClipboard = model::copyKeys(*a, refs);
+    }
+}
+
+QVariantList Document::pasteKeys()
+{
+    if (!require(Animation) || m_keyClipboard.empty() || currentAnimation() == nullptr) {
+        return {};
+    }
+    // Cheile unui singur obiect, lipite cu un alt obiect selectat: merg pe acela.
+    std::set<model::InstanceId> sources;
+    for (const model::ClipboardKey& c : m_keyClipboard) {
+        if (c.ref.instance) {
+            sources.insert(c.ref.instance);
+        }
+    }
+    model::InstanceId target;
+    if (sources.size() == 1 && m_selection.instances.size() == 1 && !sources.contains(*m_selection.instances.begin())) {
+        target = *m_selection.instances.begin();
+    }
+    const double t = m_timelineTime;
+    std::vector<model::KeyRef> pasted;
+    editAnimation("Lipește keyframe-urile", [&](model::Animation& a) { pasted = model::pasteKeys(a, m_keyClipboard, t, target); });
+    return keyRefsToVariant(pasted);
+}
+
+void Document::setAutoKey(bool on)
+{
+    if (on != m_autoKey) {
+        m_autoKey = on;
+        emit autoKeyChanged();
+    }
+}
+
 QVariantList Document::easingPresets() const
 {
     QVariantList out;
@@ -2368,6 +2406,25 @@ void Document::keyTransforms(const std::map<model::InstanceId, math::Transform>&
         if (m_model.instances().contains(id)) {
             changes[id] = { currentValues(id), model::transformValues(transform, model::pivotLocal(m_model, id)) };
         }
+    }
+    if (!m_autoKey) {
+        // Fără chei noi: poza de bază și canalele animate se ajustează, într-un singur pas de undo.
+        const model::AnimationId animation = m_activeAnimation;
+        m_keepPreview = true;
+        runOnModel("Ajustează (fără keyframe)", [&](model::Model& model) {
+            model::Animation a = model.animations().at(animation);
+            for (const auto& [id, values] : changes) {
+                model::Instance inst = model.instance(id);
+                inst.transform = model::adjustWithoutKeys(a, id, values.first, values.second, inst.transform,
+                    model::pivotLocal(model, id));
+                model.setInstance(id, inst);
+            }
+            model.setAnimation(animation, a);
+        });
+        m_keepPreview = false;
+        ++m_interactionRevision;
+        emit timelineChanged();
+        return;
     }
     editAnimation(name, [&](model::Animation& a) {
         for (const auto& [id, values] : changes) {

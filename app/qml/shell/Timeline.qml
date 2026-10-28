@@ -4,9 +4,10 @@ import "../components/EasingMath.js" as EasingMath
 
 // Timeline-ul (ca în After Effects / Blender, ADR 0034): animația activă, cu un rând pe obiect (un romb pentru fiecare
 // moment cu chei, bare pe intervalele animate) care se deschide (▸ / ▾) în canalele lui — doar proprietățile animate —,
-// cu valoarea fiecărei chei alături și valoarea curentă, editabilă, în stânga. Cheile se selectează (⇧ / ⌘ adaugă),
-// se trag în grup (cu snap la cadre și la alte chei; ⇧ fără snap), se șterg, au meniu (click dreapta) și valoarea
-// editabilă (dublu click). Rotița derulează rândurile, ⇧ + rotița timpul, ⌘ + rotița face zoom; rigla mută playhead-ul.
+// cu valoarea fiecărei chei alături și valoarea curentă, editabilă, în stânga. Cheile se selectează (⇧ / ⌘ adaugă,
+// tragerea pe gol = dreptunghi), se trag în grup (cu snap la cadre și la alte chei; ⇧ fără snap), se șterg, se copiază
+// și se lipesc (⌘C / ⌘V), au meniu (click dreapta) și valoarea editabilă (dublu click). Rotița derulează rândurile,
+// ⇧ + rotița timpul, ⌘ + rotița face zoom; bara de jos derulează și (de capete) face zoom; rigla mută playhead-ul.
 Rectangle {
     id: root
 
@@ -28,8 +29,9 @@ Rectangle {
     readonly property real namesWidth: 248
     readonly property real rowHeight: 24
     readonly property real lanesWidth: Math.max(0, body.width - namesWidth)
-    // Pe un timeline îngust, butoanele de keyframe rămân doar cu iconiță (și tooltip).
+    // Pe un timeline îngust, butoanele rămân doar cu iconiță (și tooltip), iar ceasul fără durată.
     readonly property bool wide: width > 1080
+    readonly property bool narrow: width < 1000
 
     // --- Vederea în timp: secunda de la marginea din stânga și zoom-ul. Până la primul zoom, toată animația încape. ---
     property real viewStart: 0
@@ -61,6 +63,44 @@ Rectangle {
     function scrubTo(x) {
         if (hasAnimation)
             document.timelineTime = clampTime(Math.round(timeAt(x) * fps) / fps)
+    }
+
+    // Un timp tastat: „1.5” / „1,5 s” (secunde), „36f” (cadre), „01:02.50” (minute și secunde). NaN dacă nu e valid.
+    function parseTime(text) {
+        const t = text.trim().toLowerCase().replace(",", ".")
+        if (t.endsWith("f"))
+            return parseFloat(t) / fps
+        if (t.indexOf(":") >= 0) {
+            const parts = t.split(":")
+            return parseFloat(parts[0]) * 60 + parseFloat(parts[1])
+        }
+        return parseFloat(t.endsWith("s") ? t.slice(0, -1) : t)
+    }
+    function copySelectedKeys() {
+        if (selectedKeys.length === 0)
+            return false
+        document.copyKeys(selectedKeys)
+        return true
+    }
+    function pasteKeys() {
+        const pasted = document.pasteKeys()
+        if (pasted.length > 0)
+            selectKeys(pasted)
+    }
+    // Cheile din dreptunghiul tras (coordonatele pistelor): cele ale căror romburi cad înăuntru.
+    function keysInRect(x0, y0, x1, y1) {
+        const out = []
+        for (let i = 0; i < rows.length; ++i) {
+            const cy = i * rowHeight + rowHeight / 2
+            if (cy < Math.min(y0, y1) || cy > Math.max(y0, y1))
+                continue
+            for (const k of rows[i].keys) {
+                const x = xAt(k.time)
+                if (x >= Math.min(x0, x1) && x <= Math.max(x0, x1))
+                    out.push({ instance: rows[i].instance, property: rows[i].property, time: k.time })
+            }
+        }
+        return out
     }
 
     // Timpul ca `mm:ss.cc`.
@@ -285,7 +325,7 @@ Rectangle {
 
             // Alegerea animației.
             Rectangle {
-                width: 180
+                width: root.narrow ? 140 : 180
                 height: Theme.controlHeightSm
                 radius: Theme.radiusMd
                 color: animArea.containsMouse || animPicker.opened ? Theme.bgHover : Theme.bgInput
@@ -444,45 +484,128 @@ Rectangle {
                 }
             }
 
-            // Timpul: mm:ss.cc / durata · cadrul.
-            Text {
+            // Timpul: mm:ss.cc / durata · cadrul; click = tastezi un timp („1.5”, „36f”, „00:02.50”).
+            Rectangle {
+                id: clockBox
                 anchors.verticalCenter: parent.verticalCenter
                 visible: root.hasAnimation
-                text: root.clock(root.document ? root.document.timelineTime : 0) + " / " + root.clock(root.duration)
-                      + "  ·  " + Math.round((root.document ? root.document.timelineTime : 0) * root.fps) + "f"
-                color: Theme.textSecondary
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeSm
+                width: clockText.implicitWidth + Theme.space2 * 2
+                height: Theme.controlHeightSm
+                radius: Theme.radiusMd
+                color: clockInput.visible ? Theme.bgInput : clockArea.containsMouse ? Theme.bgHover : "transparent"
+                border.color: clockInput.visible ? Theme.focusRing : "transparent"
+                Text {
+                    id: clockText
+                    visible: !clockInput.visible
+                    anchors.centerIn: parent
+                    text: root.clock(root.document ? root.document.timelineTime : 0)
+                          + (root.narrow ? "" : " / " + root.clock(root.duration))
+                          + "  ·  " + Math.round((root.document ? root.document.timelineTime : 0) * root.fps) + "f"
+                    color: Theme.textSecondary
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                MouseArea {
+                    id: clockArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.IBeamCursor
+                    onClicked: {
+                        clockInput.text = root.clock(root.document.timelineTime)
+                        clockInput.visible = true
+                        clockInput.forceActiveFocus()
+                        clockInput.selectAll()
+                    }
+                }
+                Tooltip { visible: clockArea.containsMouse && !clockInput.visible; text: "Tastează un timp: 1.5 · 36f · 00:02.50" }
+                TextInput {
+                    id: clockInput
+                    visible: false
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.space2
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: Theme.textPrimary
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSm
+                    selectByMouse: true
+                    onAccepted: {
+                        const t = root.parseTime(text)
+                        if (!isNaN(t))
+                            root.document.timelineTime = root.clampTime(t)
+                        visible = false
+                    }
+                    onActiveFocusChanged: if (!activeFocus) visible = false
+                    Keys.onEscapePressed: visible = false
+                }
+            }
+
+            // Auto-key: bulina roșie când e pornit.
+            Rectangle {
+                id: autoKeyButton
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.hasAnimation
+                readonly property bool on: root.document && root.document.autoKey
+                width: autoKeyRow.implicitWidth + Theme.space2 * 2
+                height: Theme.controlHeightSm
+                radius: Theme.radiusMd
+                color: autoKeyArea.containsMouse ? Theme.bgHover : on ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.12) : "transparent"
+                border.color: on ? Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.45) : Theme.borderSubtle
+                Row {
+                    id: autoKeyRow
+                    anchors.centerIn: parent
+                    spacing: Theme.space1 + 2
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: autoKeyButton.on ? Theme.danger : "transparent"
+                        border.color: autoKeyButton.on ? Theme.danger : Theme.textTertiary
+                        border.width: 1.5
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Auto-key"
+                        color: autoKeyButton.on ? Theme.textPrimary : Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeSm
+                    }
+                }
+                MouseArea {
+                    id: autoKeyArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: root.document.autoKey = !root.document.autoKey
+                }
+                Tooltip {
+                    visible: autoKeyArea.containsMouse
+                    text: autoKeyButton.on ? "Auto-key pornit: Move, Rotate, Scale și Inspector-ul pun keyframe-uri"
+                                           : "Auto-key oprit: schimbările ajustează poza de bază (și toată animația proprietăților animate)"
+                }
             }
 
             Separator { width: 1; height: 20; anchors.verticalCenter: parent.verticalCenter }
 
-            Button {
+            // ◆ Keyframe (toate canalele de transformare ale selecției) și ▾: culoare, cameră.
+            Row {
                 anchors.verticalCenter: parent.verticalCenter
-                small: true
-                text: root.wide ? "Keyframe" : ""
-                iconName: "diamond"
-                Tooltip { visible: parent.hovered && !root.wide; text: "Keyframe: poziție, rotație, scară (K)" }
-                enabled: root.hasAnimation
-                onClicked: root.document.keySelection()
-            }
-            Button {
-                anchors.verticalCenter: parent.verticalCenter
-                small: true
-                text: root.wide ? "Culoare" : ""
-                iconName: "palette"
-                Tooltip { visible: parent.hovered && !root.wide; text: "Keyframe de culoare" }
-                enabled: root.hasAnimation
-                onClicked: root.document.keySelectionColor()
-            }
-            Button {
-                anchors.verticalCenter: parent.verticalCenter
-                small: true
-                text: root.wide ? "Cameră" : ""
-                iconName: "video"
-                Tooltip { visible: parent.hovered && !root.wide; text: "Keyframe de cameră" }
-                enabled: root.hasAnimation
-                onClicked: root.document.keyCamera(root.viewport.cameraState())
+                spacing: 1
+                Button {
+                    id: keyButton
+                    small: true
+                    text: root.narrow ? "" : "Keyframe"
+                    iconName: "diamond"
+                    Tooltip { visible: parent.hovered; text: "Keyframe pe selecție: poziție, rotație, scară (K)" }
+                    enabled: root.hasAnimation
+                    onClicked: root.document.keySelection()
+                }
+                IconButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 20; height: Theme.controlHeightSm; iconSize: 12
+                    iconName: "chevron-down"
+                    tooltip: "Alte keyframe-uri: culoare, cameră"
+                    enabled: root.hasAnimation
+                    onClicked: keyKindMenu.openAt(parent.x + parent.parent.x + x, header.y + header.height)
+                }
             }
         }
 
@@ -490,6 +613,13 @@ Rectangle {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.space2
+            IconButton {
+                width: 28; height: 28; iconSize: Theme.iconSizeSm
+                iconName: "scan"
+                tooltip: "Încadrează toată animația"
+                enabled: root.hasAnimation
+                onClicked: root.fitAll()
+            }
             IconButton {
                 width: 28; height: 28; iconSize: Theme.iconSizeSm
                 iconName: "settings"
@@ -616,21 +746,59 @@ Rectangle {
             anchors.top: ruler.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.bottom: parent.bottom
+            anchors.bottom: timeBar.top
+            anchors.bottomMargin: 2
             contentWidth: width
             contentHeight: rowsColumn.height
             interactive: false
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
-            // Fundalul pistelor: un click mută playhead-ul și golește selecția cheilor.
+            // Fundalul pistelor: un click mută playhead-ul (și golește selecția cheilor), tragerea face un dreptunghi
+            // de selecție (⇧ / ⌘ = adaugă la selecție).
             MouseArea {
                 id: lanesArea
                 x: root.namesWidth
                 width: root.lanesWidth
                 height: Math.max(rowsColumn.height, rowsFlick.height)
-                onPressed: (mouse) => { root.forceActiveFocus(); root.selectKeys([]); root.scrubTo(mouse.x) }
-                onPositionChanged: (mouse) => { if (pressed) root.scrubTo(mouse.x) }
+                property point start: Qt.point(0, 0)
+                property bool banding: false
+                property var before: []
+                onPressed: (mouse) => {
+                    root.forceActiveFocus()
+                    start = Qt.point(mouse.x, mouse.y)
+                    banding = false
+                    before = (mouse.modifiers & (Qt.ShiftModifier | Qt.ControlModifier)) ? root.selectedKeys : []
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed)
+                        return
+                    if (!banding && Math.hypot(mouse.x - start.x, mouse.y - start.y) > 4)
+                        banding = true
+                    if (banding) {
+                        band.x = Math.min(start.x, mouse.x)
+                        band.y = Math.min(start.y, mouse.y)
+                        band.width = Math.abs(mouse.x - start.x)
+                        band.height = Math.abs(mouse.y - start.y)
+                        const inside = root.keysInRect(start.x, start.y, mouse.x, mouse.y)
+                        root.selectKeys(before.concat(inside.filter(k => !before.some(b => root.sameKey(b, k)))))
+                    }
+                }
+                onReleased: (mouse) => {
+                    if (!banding) {
+                        if (before.length === 0)
+                            root.selectKeys([])
+                        root.scrubTo(mouse.x)
+                    }
+                    banding = false
+                }
+                Rectangle {
+                    id: band
+                    visible: lanesArea.banding
+                    color: Theme.accentSubtle
+                    border.color: Theme.accent
+                    radius: 2
+                }
             }
 
             Column {
@@ -641,6 +809,80 @@ Rectangle {
                         required property var modelData
                         timeline: root
                         row: modelData
+                    }
+                }
+            }
+        }
+
+        // Bara de jos: partea vizibilă din animație; mijlocul se trage (derulare), capetele schimbă zoom-ul.
+        Item {
+            id: timeBar
+            visible: root.hasAnimation
+            anchors.bottom: parent.bottom
+            x: root.namesWidth
+            width: root.lanesWidth
+            height: 10
+            readonly property real visibleSpan: Math.max(0.01, (root.lanesWidth - 24) / root.pxPerSecond)
+            readonly property real total: Math.max(root.duration, root.viewStart + visibleSpan) - Math.min(0, root.viewStart)
+            readonly property real origin: Math.min(0, root.viewStart)
+            Rectangle {
+                anchors.fill: parent
+                anchors.topMargin: 3
+                anchors.bottomMargin: 3
+                radius: 2
+                color: Theme.bgHover
+            }
+            Rectangle {
+                id: thumbBar
+                x: (root.viewStart - timeBar.origin) / timeBar.total * timeBar.width
+                width: Math.max(16, timeBar.visibleSpan / timeBar.total * timeBar.width)
+                height: parent.height
+                radius: 4
+                color: thumbArea.pressed || thumbArea.containsMouse ? Theme.borderStrong : Theme.borderSubtle
+                MouseArea {
+                    id: thumbArea
+                    anchors.fill: parent
+                    anchors.leftMargin: 5
+                    anchors.rightMargin: 5
+                    hoverEnabled: true
+                    property real startX: 0
+                    property real startView: 0
+                    onPressed: (mouse) => { startX = mapToItem(timeBar, mouse.x, 0).x; startView = root.viewStart }
+                    onPositionChanged: (mouse) => {
+                        if (!pressed)
+                            return
+                        const dx = mapToItem(timeBar, mouse.x, 0).x - startX
+                        root.userZoomed = true
+                        root.viewStart = Math.max(-0.5, startView + dx / timeBar.width * timeBar.total)
+                    }
+                }
+                // Capetele: zoom (marginea opusă rămâne pe loc).
+                Repeater {
+                    model: 2
+                    delegate: MouseArea {
+                        required property int index
+                        x: index === 0 ? 0 : thumbBar.width - 6
+                        width: 6
+                        height: thumbBar.height
+                        cursorShape: Qt.SizeHorCursor
+                        property real startX: 0
+                        property real startA: 0
+                        property real startB: 0
+                        onPressed: (mouse) => {
+                            startX = mapToItem(timeBar, mouse.x, 0).x
+                            startA = root.viewStart
+                            startB = root.viewStart + timeBar.visibleSpan
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (!pressed)
+                                return
+                            const dt = (mapToItem(timeBar, mouse.x, 0).x - startX) / timeBar.width * timeBar.total
+                            const a = index === 0 ? Math.min(startB - 0.05, startA + dt) : startA
+                            const b = index === 1 ? Math.max(startA + 0.05, startB + dt) : startB
+                            root.userZoomed = true
+                            root.pxPerSecond = (root.lanesWidth - 24) / (b - a)
+                            root.viewStart = a
+                        }
                     }
                 }
             }
@@ -749,6 +991,24 @@ Rectangle {
         onUserPresetsEdited: (list) => root.userEasingsEdited(list)
     }
 
+    // Keyframe-urile din meniul ▾ de lângă „Keyframe”.
+    ContextMenu {
+        id: keyKindMenu
+        items: [
+            { id: "transform", name: "Poziție, rotație, scară", shortcut: "K" },
+            { id: "color", name: "Culoare" },
+            { id: "camera", name: "Cameră (vederea curentă)" }
+        ]
+        onTriggered: (id) => {
+            if (id === "transform")
+                root.document.keySelection()
+            else if (id === "color")
+                root.document.keySelectionColor()
+            else
+                root.document.keyCamera(root.viewport.cameraState())
+        }
+    }
+
     // Meniul unei chei (click dreapta): curba, easing-uri rapide, mergi la cheie, ștergere.
     ContextMenu {
         id: keyMenu
@@ -763,6 +1023,8 @@ Rectangle {
             { id: "easing:step", name: "Easing: salt (step)" },
             { separator: true },
             { id: "goto", name: "Mergi la cheie" },
+            { id: "copy", name: "Copiază", shortcut: "⌘C" },
+            { id: "paste", name: "Lipește la playhead", shortcut: "⌘V", enabled: root.document ? root.document.hasCopiedKeys() : false },
             { separator: true },
             { id: "delete", name: root.selectedKeys.length > 1 ? "Șterge keyframe-urile" : "Șterge keyframe-ul",
               shortcut: "⌫", destructive: true }
@@ -772,6 +1034,10 @@ Rectangle {
                 root.editSelectedEasing(anchorItem)
             else if (id.startsWith("easing:"))
                 root.document.setKeysEasing(root.selectedKeys, id.slice(7))
+            else if (id === "copy")
+                root.copySelectedKeys()
+            else if (id === "paste")
+                root.pasteKeys()
             else if (id === "goto" && root.selectedKeys.length > 0)
                 root.document.timelineTime = root.selectedKeys[0].time
             else if (id === "delete")
