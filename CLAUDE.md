@@ -209,6 +209,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `commandModes` dacă nu sunt comune; operațiile noi de model încep cu `require(Modeling)`.
 
 ## Următorii pași
+0. **Planificat: modul Animare îmbunătățit** — `docs/plans/animatie.md` (și `PLAN.md` → Etapa 6); deciziile din
+   secțiunea 6 a planului așteaptă confirmarea utilizatorului înainte de implementare.
 1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic
    redistribuirea SDK-ului și folosirea lui într-o aplicație terță care replică SketchUp, fără aprobare scrisă.
    Alternativa propusă utilizatorului: import COLLADA (.dae), fără SDK. SDK-ul NU se pune în repo.
