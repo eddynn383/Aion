@@ -223,6 +223,8 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
       de playhead și de alte chei; ⇧ fără snap); ⌫ / Delete șterg; ⌘C / ⌘V lipesc la playhead (pe alt obiect selectat)
 - [ ] ⌘ + rotița face zoom în jurul cursorului, ⇧ + rotița derulează timpul; bara de jos derulează, capetele ei fac zoom;
       ⤢ încadrează toată animația; rigla trece la cadre la zoom mare
+- [ ] Bara timeline-ului: animația și ceasul (timp / durată) în stânga; Auto-key, redarea și ◆ ▾ pe mijloc; ⤢, ⚙,
+      exportul în dreapta. Pe o fereastră îngustă mijlocul se dă la o parte, fără să se suprapună
 - [ ] Click pe ceas → tastezi „1.5”, „36f” sau „00:02.50” → playhead-ul sare acolo
 - [ ] Auto-key oprit → Move schimbă poza de bază (fără chei); pe o proprietate animată, toată animația ei se mută
 - [ ] Marginea de sus a timeline-ului se trage (înălțimea se păstrează)
