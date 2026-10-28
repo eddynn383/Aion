@@ -17,7 +17,7 @@ Item {
 
     readonly property var groups: [
         { id: "select", tools: [
-            { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 },
+            { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", alias: "V", phase: 3 },
             { id: "interact", icon: "hand-pointer", name: "Interact", key: "I", phase: 0, modes: [2] },
             { id: "orbit", icon: "orbit", name: "Orbit", key: "O", phase: 0, section: "Navigare" },
             { id: "pan", icon: "hand", name: "Pan", key: "H", phase: 0 },
@@ -70,9 +70,14 @@ Item {
 
     // Scurtăturile personalizate (id comandă „tool.<id>” → secvență), din Preferințe.
     property var keyOverrides: ({})
+    // Tasta → comanda care o primește în modul curent (din Main).
+    property var shortcutOwners: ({})
     function keyFor(tool) {
         const custom = keyOverrides["tool." + tool.id]
-        return custom !== undefined ? custom : (tool.key || "")
+        const key = custom !== undefined ? custom : (tool.key || "")
+        // Tasta luată în acest mod de altă comandă (Space = redare în Animare): se arată alternativa (V).
+        const owner = shortcutOwners[key]
+        return owner !== undefined && owner !== "tool." + tool.id && tool.alias ? tool.alias : key
     }
 
     // Ultima unealtă aleasă din fiecare grup (id grup → id unealtă).

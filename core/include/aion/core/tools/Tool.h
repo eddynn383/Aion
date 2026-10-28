@@ -159,6 +159,9 @@ public:
     [[nodiscard]] virtual view::PickResult hover() const { return {}; }
     // Indicația din status bar („Alege punctul de început”).
     [[nodiscard]] virtual std::string status() const = 0;
+    // Săgețile sunt acum ale uneltei (o operație în curs, sau aleg ceva, ca axa la Rotate)? Altfel, în Animare,
+    // merg la timeline (cadre, chei).
+    [[nodiscard]] virtual bool ownsArrowKeys() const { return false; }
 
     // Measurements box: nullopt dacă unealta nu primește valori tastate.
     [[nodiscard]] virtual std::optional<Measurement> measurement() const { return std::nullopt; }

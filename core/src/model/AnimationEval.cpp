@@ -223,4 +223,54 @@ void moveKey(Animation& animation, KeyKind kind, InstanceId instance, double tim
     }
 }
 
+std::vector<double> keyTimes(const Animation& animation, const std::set<InstanceId>& instances)
+{
+    std::vector<double> out;
+    for (const ObjectTrack& t : animation.tracks) {
+        if (!instances.empty() && !instances.contains(t.instance)) {
+            continue;
+        }
+        for (const TransformKey& k : t.transform) {
+            out.push_back(k.time);
+        }
+        for (const ColorKey& k : t.color) {
+            out.push_back(k.time);
+        }
+    }
+    if (instances.empty()) {
+        for (const CameraKey& k : animation.camera) {
+            out.push_back(k.time);
+        }
+    }
+    std::sort(out.begin(), out.end());
+    const double tol = tolerance<TransformKey>(animation);
+    out.erase(std::unique(out.begin(), out.end(), [tol](double a, double b) { return std::abs(a - b) < tol; }), out.end());
+    return out;
+}
+
+std::optional<double> adjacentKeyTime(const Animation& animation, const std::set<InstanceId>& instances, double time,
+    int direction)
+{
+    const double tol = tolerance<TransformKey>(animation);
+    const std::vector<double> times = keyTimes(animation, instances);
+    if (direction > 0) {
+        const auto it = std::find_if(times.begin(), times.end(), [&](double t) { return t > time + tol; });
+        return it != times.end() ? std::optional(*it) : std::nullopt;
+    }
+    const auto it = std::find_if(times.rbegin(), times.rend(), [&](double t) { return t < time - tol; });
+    return it != times.rend() ? std::optional(*it) : std::nullopt;
+}
+
+double stepFrames(const Animation& animation, double time, int frames)
+{
+    const double fps = std::max(animation.fps, 1);
+    const double frame = time * fps;
+    // De pe un cadru (cu o mică toleranță) se pleacă de la el; dintre cadre, de la cel din direcția pasului.
+    double start = std::round(frame);
+    if (std::abs(frame - start) > 1e-6) {
+        start = frames > 0 ? std::floor(frame) : std::ceil(frame);
+    }
+    return std::clamp((start + frames) / fps, 0.0, std::max(animation.duration, 0.0));
+}
+
 } // namespace aion::model

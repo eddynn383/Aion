@@ -166,11 +166,18 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
 ## 5. Pașii (fiecare = commit-uri mici pe o ramură, unite în `main`, CI urmărit)
 
 ### Pasul 1 — Tastatura în Animare ✅ criteriu: Space / ← → / ⌥← → / Home / End funcționează; Space nu mai alege Select în Animare
-- [ ] Comenzi noi `anim.play`, `anim.prevFrame`, `anim.nextFrame`, `anim.back10`, `anim.forward10`, `anim.prevKey`,
-      `anim.nextKey`, `anim.start`, `anim.end` (categoria „Animare”, clasificate în `Document::commandModes`).
-- [ ] `Document`: `stepFrames(n)`, `jumpToKey(direction)` (pe cheile selecției sau ale tuturor), `togglePlay()`.
-- [ ] Select pe V (păstrează Space în Modelare / Interacțiune); prioritatea săgeților (unealtă activă > timeline).
-- [ ] Test în `tests/core/AnimationTests.cpp` pentru „cheia următoare / anterioară” (funcție pură în core).
+- [x] Comenzi noi `anim.play`, `anim.prevFrame`, `anim.nextFrame`, `anim.back10`, `anim.forward10`, `anim.prevKey`,
+      `anim.nextKey`, `anim.start`, `anim.end` (+ `anim.key` pe K) (categoria „Animare”, clasificate în
+      `Document::commandModes` prin prefixul `anim.`).
+- [x] `Document`: `stepFrames(n)`, `jumpToKey(direction)` (pe cheile selecției sau ale tuturor), `togglePlay()`,
+      `jumpToEdge(end)`; în core `keyTimes`, `adjacentKeyTime`, `stepFrames` (`AnimationEval.h`).
+- [x] Select pe V (păstrează Space în Modelare / Interacțiune); prioritatea săgeților (unealtă activă > timeline):
+      `Tool::ownsArrowKeys()` (Move după primul click, Rotate mereu — săgețile aleg axa, Scale în tragere) →
+      `Document::toolOwnsArrows`; în Main.qml `shortcutOwners` (o singură comandă pe tastă în fiecare mod; comanda
+      modului bate una comună) și `activeSequences`.
+- [x] Test în `tests/core/AnimationTests.cpp` pentru „cheia următoare / anterioară” (funcție pură în core).
+- Verificare: `keys:,alt+right` (acțiunea `keys:` primește acum modificatori: `shift+`, `alt+`, `ctrl+`, și
+  `left|right|home|end|space|delete|backspace`; trece prin harta scurtăturilor, ca pe macOS), `debug.anim`.
 
 ### Pasul 2 — Canale pe proprietate (core + fișier) ✅ criteriu: testele vechi și noi trec; fișierele vechi se deschid
 - [ ] `Channel`, `Key` cu easing Bézier (`Easing { name, x1, y1, x2, y2, step }`), `ObjectTrack::channels`.
