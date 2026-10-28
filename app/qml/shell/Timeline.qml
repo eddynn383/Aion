@@ -130,6 +130,9 @@ Rectangle {
             return out
         if ((tl.camera ?? []).length > 0)
             out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", icon: "video", keys: tl.camera, selected: false })
+        // Căile de parcurgere: câte o bară (startul și durata), fără chei.
+        for (const p of (tl.paths ?? []))
+            out.push({ kind: "path", instance: 0, property: "", name: p.name, icon: "route", keys: [], selected: p.selected, path: p })
         for (const t of (tl.tracks ?? [])) {
             const open = expanded[t.instance] === true
             // Pe rândul sumar, fiecare moment arată easing-ul primei chei de la el.

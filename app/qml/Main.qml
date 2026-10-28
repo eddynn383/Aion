@@ -458,6 +458,12 @@ Window {
                     const ps = doc.paths
                     const inst = doc.entityInfo.instanceId ?? 0
                     console.info("anchor:", ps.length > 0 && inst > 0 ? doc.anchorToPath(ps[ps.length - 1].id, inst) : false)
+                } else if (action.startsWith("pathtime:")) {
+                    // „pathtime:start,durată”: timpul ultimei căi (ca tragerea barei ei în timeline).
+                    const pt = action.slice(9).split(",").map(Number)
+                    const pl = doc.paths
+                    if (pl.length > 0)
+                        doc.setPathTiming(pl[pl.length - 1].id, pt[0], pt[1])
                 } else if (action === "debug.paths") {
                     console.info("paths:", doc.pathsDebug(), "undo:", doc.undoName, "time", doc.timelineTime.toFixed(2))
                 } else if (action.startsWith("dragw:")) {
