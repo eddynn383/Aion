@@ -115,14 +115,31 @@ struct Scene {
 };
 
 // O cameră ca obiect: se vede în viewport (gizmo), se poate „privi prin ea” și folosi în scene și pe timeline.
+// Camera ca obiect (ca în Blender): poziția, ținta, lentila (focala pe un senzor; unghiul de vedere se calculează
+// pe latura lungă a cadrului, vezi model/CameraLens.h), formatul cadrului, shift-ul și înclinarea, depth of field.
 struct CameraObject {
+    struct DepthOfField {
+        bool enabled = false;
+        double focusDistance = 5000.0; // mm, de la cameră, pe direcția de privire
+        double fStop = 2.8; // diafragma: mai mică = mai puțină claritate în afara focusului
+        bool operator==(const DepthOfField&) const = default;
+    };
+
     std::string name;
     math::Vec3d position { -6000.0, -6000.0, 4000.0 };
     math::Vec3d target { 0.0 };
-    double fov = 50.0; // grade, pe verticală
+    double focalLength = 35.0; // mm
+    double sensorWidth = 36.0; // mm (full frame), pe latura lungă a cadrului
+    int formatWidth = 1920; // raportul cadrului și rezoluția exportului
+    int formatHeight = 1080;
+    math::Vec2d shift { 0.0 }; // fracțiuni din latura lungă a cadrului (perspectiva cu două puncte de fugă)
+    double roll = 0.0; // grade, în jurul direcției de privire
     bool orthographic = false;
+    double orthoScale = 10000.0; // mm: latura lungă a cadrului ortografic
     double nearClip = 0.0; // 0 = automat
     double farClip = 0.0;
+    DepthOfField dof;
+    double displaySize = 1.0; // mărimea gizmo-ului (Scale pe o cameră în perspectivă)
     bool visible = true; // gizmo-ul în viewport
 
     bool operator==(const CameraObject&) const = default;

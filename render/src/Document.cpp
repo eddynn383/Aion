@@ -9,6 +9,7 @@
 #include "aion/core/geom/Primitives.h"
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/AnimationEval.h"
+#include "aion/core/model/CameraLens.h"
 #include "aion/core/model/Interaction.h"
 #include "aion/core/model/Modeling.h"
 #include "aion/core/model/Parametric.h"
@@ -4984,7 +4985,15 @@ QVariantMap Document::selectedObject() const
             { QStringLiteral("id"), static_cast<double>(m_selectedCamera.value) },
             { QStringLiteral("name"), QString::fromStdString(c->name) },
             { QStringLiteral("position"), vec3List(c->position) }, { QStringLiteral("target"), vec3List(c->target) },
-            { QStringLiteral("fov"), c->fov }, { QStringLiteral("orthographic"), c->orthographic },
+            { QStringLiteral("focalLength"), c->focalLength }, { QStringLiteral("sensorWidth"), c->sensorWidth },
+            { QStringLiteral("fovH"), glm::degrees(model::cameraFov(*c).first) },
+            { QStringLiteral("fovV"), glm::degrees(model::cameraFov(*c).second) },
+            { QStringLiteral("formatWidth"), c->formatWidth }, { QStringLiteral("formatHeight"), c->formatHeight },
+            { QStringLiteral("shiftX"), c->shift.x }, { QStringLiteral("shiftY"), c->shift.y },
+            { QStringLiteral("roll"), c->roll }, { QStringLiteral("orthographic"), c->orthographic },
+            { QStringLiteral("orthoScale"), c->orthoScale }, { QStringLiteral("dofEnabled"), c->dof.enabled },
+            { QStringLiteral("focusDistance"), c->dof.focusDistance }, { QStringLiteral("fStop"), c->dof.fStop },
+            { QStringLiteral("displaySize"), c->displaySize },
             { QStringLiteral("nearClip"), c->nearClip }, { QStringLiteral("farClip"), c->farClip },
             { QStringLiteral("visible"), c->visible } };
     }
@@ -5012,8 +5021,16 @@ void Document::addCamera(const QVariantMap& camera, double fovDegrees)
     runOnModel("Cameră nouă", [&](model::Model& model) {
         model::CameraObject c;
         std::tie(c.position, c.target) = eyeAndTarget(camera);
-        c.fov = fovDegrees > 0.0 ? fovDegrees : camera.value(QStringLiteral("fov"), 35.0).toDouble();
+        // Focala care vede pe verticală cât vederea curentă (formatul implicit, 16:9).
+        const double fov = fovDegrees > 0.0 ? fovDegrees : camera.value(QStringLiteral("fov"), 0.0).toDouble();
+        if (fov > 0.0) {
+            c.focalLength = std::clamp(model::focalForVerticalFov(c, glm::radians(fov)), 8.0, 600.0);
+        }
         c.orthographic = camera.value(QStringLiteral("ortho")).toBool();
+        if (c.orthographic) {
+            c.orthoScale = std::max(1.0, 2.0 * glm::length(c.target - c.position) * std::tan(glm::radians(std::max(fov, 1.0)) * 0.5)
+                    * double(c.formatWidth) / double(c.formatHeight));
+        }
         c.name = "Cameră " + std::to_string(model.cameras().size() + 1);
         added = model.addCamera(c);
     });
@@ -5096,8 +5113,32 @@ void Document::setObjectProperties(const QVariantMap& changes)
         }
         c.position = vec3From(changes.value(QStringLiteral("position")), c.position);
         c.target = vec3From(changes.value(QStringLiteral("target")), c.target);
-        num("fov", c.fov);
-        c.fov = std::clamp(c.fov, 5.0, 150.0);
+        if (changes.contains(QStringLiteral("fov"))) { // unghiul vertical (scripturile vechi)
+            c.focalLength = model::focalForVerticalFov(c, glm::radians(std::clamp(changes.value(QStringLiteral("fov")).toDouble(), 0.5, 170.0)));
+        }
+        num("focalLength", c.focalLength);
+        c.focalLength = std::clamp(c.focalLength, 1.0, 2000.0);
+        num("sensorWidth", c.sensorWidth);
+        c.sensorWidth = std::clamp(c.sensorWidth, 1.0, 100.0);
+        if (changes.contains(QStringLiteral("formatWidth"))) {
+            c.formatWidth = std::clamp(changes.value(QStringLiteral("formatWidth")).toInt(), 16, 16384);
+        }
+        if (changes.contains(QStringLiteral("formatHeight"))) {
+            c.formatHeight = std::clamp(changes.value(QStringLiteral("formatHeight")).toInt(), 16, 16384);
+        }
+        num("shiftX", c.shift.x);
+        num("shiftY", c.shift.y);
+        c.shift = glm::clamp(c.shift, math::Vec2d { -2.0 }, math::Vec2d { 2.0 });
+        num("roll", c.roll);
+        num("orthoScale", c.orthoScale);
+        c.orthoScale = std::max(c.orthoScale, 1.0);
+        flag("dofEnabled", c.dof.enabled);
+        num("focusDistance", c.dof.focusDistance);
+        c.dof.focusDistance = std::max(c.dof.focusDistance, 1.0);
+        num("fStop", c.dof.fStop);
+        c.dof.fStop = std::clamp(c.dof.fStop, 0.5, 64.0);
+        num("displaySize", c.displaySize);
+        c.displaySize = std::clamp(c.displaySize, 0.05, 50.0);
         num("nearClip", c.nearClip);
         num("farClip", c.farClip);
         flag("orthographic", c.orthographic);
@@ -5165,6 +5206,26 @@ void Document::deleteSelectedObject()
     selectObject(QString(), 0.0);
 }
 
+QVariantList Document::cameraFormatPresets() const
+{
+    QVariantList out;
+    for (const model::FormatPreset& p : model::formatPresets()) {
+        out.append(QVariantMap { { QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size())) },
+            { QStringLiteral("width"), p.width }, { QStringLiteral("height"), p.height } });
+    }
+    return out;
+}
+
+QVariantList Document::cameraSensorPresets() const
+{
+    QVariantList out;
+    for (const model::SensorPreset& p : model::sensorPresets()) {
+        out.append(QVariantMap { { QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size())) },
+            { QStringLiteral("width"), p.width } });
+    }
+    return out;
+}
+
 QVariantMap Document::cameraView(double cameraId) const
 {
     const model::CameraObject* c = m_model.cameras().find(model::CameraId { static_cast<std::uint64_t>(cameraId) });
@@ -5175,7 +5236,7 @@ QVariantMap Document::cameraView(double cameraId) const
     return { { QStringLiteral("tx"), pose.target.x }, { QStringLiteral("ty"), pose.target.y },
         { QStringLiteral("tz"), pose.target.z }, { QStringLiteral("yaw"), pose.yaw },
         { QStringLiteral("pitch"), pose.pitch }, { QStringLiteral("distance"), pose.distance },
-        { QStringLiteral("ortho"), c->orthographic }, { QStringLiteral("fov"), c->fov } };
+        { QStringLiteral("ortho"), c->orthographic }, { QStringLiteral("fov"), glm::degrees(model::cameraFov(*c).second) } };
 }
 
 std::optional<math::Vec3d> Document::selectedObjectPosition() const

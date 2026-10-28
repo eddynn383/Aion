@@ -52,8 +52,17 @@ public:
     void setProjection(Projection projection) { m_projection = projection; }
 
     [[nodiscard]] double fovY() const { return m_fovY; }
-    // Unghiul de vedere vertical, în radiani (limitat la 5°–150°).
+    // Unghiul de vedere vertical, în radiani (limitat la 0,25°–170°: încape și un teleobiectiv văzut prin cameră).
     void setFovY(double radians);
+
+    // Înclinarea camerei în jurul direcției de privire (radiani; pozitiv = camera se rotește în sens trigonometric,
+    // privind prin ea, deci imaginea se rotește invers).
+    [[nodiscard]] double roll() const { return m_roll; }
+    void setRoll(double radians) { m_roll = radians; }
+    // Deplasarea lentilei (shift, ca la camerele de arhitectură): centrul proiecției se mută cu atâtea unități NDC
+    // ([−1, 1] pe lățimea / înălțimea viewport-ului); direcția de privire nu se schimbă, deci verticalele rămân drepte.
+    [[nodiscard]] Vec2d shift() const { return m_shift; }
+    void setShift(Vec2d ndc) { m_shift = ndc; }
 
     // Baza camerei în coordonate globale. `right` rămâne orizontal, chiar și privind vertical.
     [[nodiscard]] Vec3d forward() const;
@@ -131,6 +140,8 @@ private:
     CameraPose m_pose;
     Projection m_projection = Projection::Perspective;
     double m_fovY = kDefaultFovY;
+    double m_roll = 0.0;
+    Vec2d m_shift { 0.0 };
     Vec2d m_viewport { 1.0, 1.0 };
 };
 

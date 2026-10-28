@@ -360,9 +360,10 @@ TEST_CASE("Camerele-obiect: poza care privește din ochi spre țintă", "[core][
     CHECK(samePoint(camera.pose().target, target));
     CHECK(glm::dot(camera.forward(), glm::normalize(target - eye)) == Catch::Approx(1.0));
 
-    // Unghiul de vedere e limitat.
+    // Unghiul de vedere e limitat (dar încape și un teleobiectiv de 600 mm văzut prin cameră).
     camera.setFovY(0.0);
-    CHECK(camera.fovY() > 0.08);
+    CHECK(camera.fovY() > 0.004);
+    CHECK(camera.fovY() < 0.01);
     camera.setFovY(0.8);
     CHECK(camera.fovY() == Catch::Approx(0.8));
 }

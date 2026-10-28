@@ -299,6 +299,9 @@ public:
     Q_INVOKABLE void deleteSelectedObject();
     // Vederea prin cameră: { tx, ty, tz, yaw, pitch, distance, ortho, fov }.
     Q_INVOKABLE QVariantMap cameraView(double cameraId) const;
+    // Presetările de format ({ name, width, height }) și de senzor ({ name, width }) ale camerelor.
+    Q_INVOKABLE QVariantList cameraFormatPresets() const;
+    Q_INVOKABLE QVariantList cameraSensorPresets() const;
     // Mută camera sau lumina selectată în punctul dat (camera își mută și ținta, ca direcția să rămână aceeași).
     void moveSelectedObjectTo(const math::Vec3d& position);
     [[nodiscard]] std::optional<math::Vec3d> selectedObjectPosition() const;

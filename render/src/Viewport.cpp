@@ -2,6 +2,7 @@
 
 #include "aion/render/Document.h"
 
+#include "aion/core/model/CameraLens.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/units/Length.h"
@@ -942,15 +943,30 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         }
         const glm::vec4 color = selected ? selectedColor : gizmoColor;
         const glm::dvec3 eye = c.position;
-        const double k = screenScale(eye) * 36.0;
-        const auto [fw, r, u] = basis(c.target - c.position);
-        const double h = std::tan(glm::radians(c.fov) * 0.5) * k;
-        const double w = h * 1.5;
-        const glm::dvec3 frameCenter = eye + fw * k;
+        const double k = screenScale(eye) * 36.0 * c.displaySize;
+        // Baza camerei ca în vederea prin ea (cu roll), iar cadrul după lentilă, format și shift: piramida arată exact
+        // ce vede camera.
+        view::Camera lens;
+        lens.setPose(view::poseLookingAt(c.position, c.target));
+        lens.setRoll(glm::radians(c.roll));
+        const glm::dvec3 fw = lens.forward();
+        const glm::dvec3 r = lens.right();
+        const glm::dvec3 u = lens.up();
+        const auto [fovH, fovV] = model::cameraFov(c);
+        const double aspect = double(c.formatWidth) / double(std::max(c.formatHeight, 1));
+        double w = std::tan(fovH * 0.5) * k;
+        double h = std::tan(fovV * 0.5) * k;
+        if (c.orthographic) {
+            w = aspect >= 1.0 ? k * 0.6 : k * 0.6 * aspect;
+            h = w / aspect;
+        }
+        const double longHalf = std::max(w, h);
+        const glm::dvec3 frameCenter = eye + fw * k + r * (c.shift.x * 2.0 * longHalf) + u * (c.shift.y * 2.0 * longHalf);
         const std::array<glm::dvec3, 4> q { frameCenter + r * w + u * h, frameCenter - r * w + u * h, frameCenter - r * w - u * h,
             frameCenter + r * w - u * h };
         for (std::size_t j = 0; j < 4; ++j) {
-            line(eye, q[j], color);
+            // Ortografică: muchii paralele (din planul camerei); în perspectivă: din ochi.
+            line(c.orthographic ? q[j] - fw * k : eye, q[j], color);
             line(q[j], q[(j + 1) % 4], color);
         }
         // Triunghiul de sus arată unde e „sus”.
