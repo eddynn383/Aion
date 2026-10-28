@@ -43,6 +43,11 @@ DrawLineResult createFaces(Mesh& mesh, const std::vector<EdgeId>& edges);
 
 // Șterge o muchie, fețele care o folosesc și vârfurile rămase fără muchii.
 void eraseEdge(Mesh& mesh, EdgeId edge);
+// Guma și ⌫: muchiile pleacă, iar fețele coplanare de o parte și de alta se unesc (fața pe care sunt desenate
+// rămâne); o muchie de pe marginea unei fețe o ia cu ea.
+void eraseEdgesKeepingFaces(Mesh& mesh, const std::vector<EdgeId>& edges);
+// Delete: muchiile pleacă cu fețele lor; o linie liberă desenată pe o față o ia și pe aceasta.
+void eraseEdgesWithFaces(Mesh& mesh, const std::vector<EdgeId>& edges);
 
 // Șterge o față (muchiile rămân).
 void eraseFace(Mesh& mesh, FaceId face);

@@ -213,7 +213,8 @@ public:
 
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
-    Q_INVOKABLE void deleteSelection();
+    // keepFaces: ⌫ (fața pe care sunt desenate liniile rămâne); fără: Delete (liniile pleacă cu fețele lor).
+    Q_INVOKABLE void deleteSelection(bool keepFaces = false);
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void clearSelection();
     // Esc: anulează operația uneltei; dacă nu era nimic de anulat, unealta decide (Select deselectează sau iese din grup).

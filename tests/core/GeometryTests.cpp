@@ -347,3 +347,80 @@ TEST_CASE("createFaces: fața lipsă a unei cutii se reface, orientată spre ext
     CHECK(createFaces(mesh, rim).createdFaces.empty());
     CHECK(mesh.faces().size() == 6);
 }
+
+namespace {
+
+std::vector<EdgeId> edgesBetween(const Mesh& mesh, const Vec3d& a, const Vec3d& b)
+{
+    // Muchiile de pe segmentul [a, b] (o linie poate fi împărțită în mai multe).
+    std::vector<EdgeId> out;
+    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
+        const Edge& e = mesh.edges().values()[i];
+        const Vec3d p = mesh.position(e.v0);
+        const Vec3d q = mesh.position(e.v1);
+        const auto on = [&](const Vec3d& x) {
+            const Vec3d ab = b - a;
+            const double t = glm::dot(x - a, ab) / glm::dot(ab, ab);
+            return t >= -1e-9 && t <= 1 + 1e-9 && glm::length(a + ab * t - x) < 1e-6;
+        };
+        if (on(p) && on(q)) {
+            out.push_back(mesh.edges().keys()[i]);
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("Guma: o linie care împarte o față o lasă întreagă", "[core][geom][erase]")
+{
+    Mesh mesh;
+    drawPolygon(mesh, { { 0, 0, 0 }, { 4000, 0, 0 }, { 4000, 3000, 0 }, { 0, 3000, 0 } });
+    drawLine(mesh, { 2000, 0, 0 }, { 2000, 3000, 0 });
+    REQUIRE(mesh.faces().size() == 2);
+    eraseEdgesKeepingFaces(mesh, edgesBetween(mesh, { 2000, 0, 0 }, { 2000, 3000, 0 }));
+    REQUIRE(mesh.faces().size() == 1);
+    CHECK(faceContainsPoint(mesh, mesh.faces().keys()[0], { 1000, 1500, 0 }));
+    CHECK(faceContainsPoint(mesh, mesh.faces().keys()[0], { 3000, 1500, 0 }));
+}
+
+TEST_CASE("Guma: o latură a unui dreptunghi desenat pe o față umple gaura", "[core][geom][erase]")
+{
+    Mesh mesh;
+    drawPolygon(mesh, { { 0, 0, 0 }, { 4000, 0, 0 }, { 4000, 3000, 0 }, { 0, 3000, 0 } });
+    drawPolygon(mesh, { { 1000, 1000, 0 }, { 2000, 1000, 0 }, { 2000, 2000, 0 }, { 1000, 2000, 0 } });
+    REQUIRE(mesh.faces().size() == 2);
+    const std::size_t edges = mesh.edges().size();
+    eraseEdgesKeepingFaces(mesh, edgesBetween(mesh, { 1000, 1000, 0 }, { 2000, 1000, 0 }));
+    REQUIRE(mesh.faces().size() == 1);
+    CHECK(mesh.edges().size() == edges - 1); // celelalte trei laturi rămân, ca linii pe față
+    CHECK(faceContainsPoint(mesh, mesh.faces().keys()[0], { 1500, 1500, 0 }));
+}
+
+TEST_CASE("Guma: o latură de pe marginea feței o ia cu ea", "[core][geom][erase]")
+{
+    Mesh mesh;
+    drawPolygon(mesh, { { 0, 0, 0 }, { 4000, 0, 0 }, { 4000, 3000, 0 }, { 0, 3000, 0 } });
+    eraseEdgesKeepingFaces(mesh, edgesBetween(mesh, { 0, 0, 0 }, { 4000, 0, 0 }));
+    CHECK(mesh.faces().empty());
+}
+
+TEST_CASE("Delete: liniile pleacă cu fețele lor și cu fața pe care stau", "[core][geom][erase]")
+{
+    Mesh mesh;
+    drawPolygon(mesh, { { 0, 0, 0 }, { 4000, 0, 0 }, { 4000, 3000, 0 }, { 0, 3000, 0 } });
+    SECTION("o linie care împarte fața")
+    {
+        drawLine(mesh, { 2000, 0, 0 }, { 2000, 3000, 0 });
+        eraseEdgesWithFaces(mesh, edgesBetween(mesh, { 2000, 0, 0 }, { 2000, 3000, 0 }));
+        CHECK(mesh.faces().empty());
+    }
+    SECTION("o linie liberă desenată pe față")
+    {
+        drawLine(mesh, { 1000, 1000, 0 }, { 3000, 2000, 0 });
+        REQUIRE(mesh.faces().size() == 1);
+        eraseEdgesWithFaces(mesh, edgesBetween(mesh, { 1000, 1000, 0 }, { 3000, 2000, 0 }));
+        CHECK(mesh.faces().empty());
+        CHECK(mesh.edges().size() == 4); // marginea feței rămâne
+    }
+}

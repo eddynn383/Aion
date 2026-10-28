@@ -841,7 +841,7 @@ Window {
         sequence: "Backspace"
         enabled: !palette.opened && window.vcbText.length === 0
         // În Animare, cheile selectate pe timeline au prioritate.
-        onActivated: if (!(doc.workMode === 1 && timeline.deleteSelectedKeys())) doc.deleteSelection()
+        onActivated: if (!(doc.workMode === 1 && timeline.deleteSelectedKeys())) doc.deleteSelection(true)
     }
     // Săgețile blochează inferența pe o axă: → roșie, ← verde, ↑ albastră, ↓ paralel cu muchia atinsă.
     Instantiator {

@@ -207,6 +207,8 @@ struct SurfacePoint {
 [[nodiscard]] geom::Selection selectionAt(const ToolContext& ctx, Vec2d screen);
 
 // Șterge selecția: fețele selectate, apoi muchiile selectate (cu fețele lor). O singură comandă.
-bool deleteSelection(ToolContext& ctx);
+// Șterge selecția (un pas de undo). keepFaces (⌫, guma): fața pe care sunt desenate liniile rămâne; altfel (Delete)
+// liniile pleacă cu fețele lor.
+bool deleteSelection(ToolContext& ctx, bool keepFaces = false);
 
 } // namespace aion::tools

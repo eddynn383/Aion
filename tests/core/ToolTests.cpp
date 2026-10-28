@@ -1366,3 +1366,31 @@ TEST_CASE("Unelte: tragerea pivotului se prinde ca la Move (colțul altui obiect
         CHECK_FALSE(requests.pivot);
     }
 }
+
+TEST_CASE("Unelte: guma pe o linie care împarte o față o lasă întreagă; deleteSelection cu fețe o ia", "[core][tools][erase]")
+{
+    Scene s;
+    s.stack.run("Rect", [&](Mesh& mesh) { geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } }); });
+    s.stack.run("Line", [&](Mesh& mesh) { geom::drawLine(mesh, { 1000, 0, 0 }, { 1000, 2000, 0 }); });
+    REQUIRE(s.mesh.faces().size() == 2);
+    SECTION("guma")
+    {
+        auto eraser = tools::makeTool("eraser");
+        s.click(*eraser, { 1000, 1000, 0 });
+        CHECK(s.mesh.faces().size() == 1);
+        CHECK(s.mesh.edges().size() == 4);
+    }
+    SECTION("⌫: deleteSelection păstrând fețele")
+    {
+        s.selection = tools::selectionAt(s.ctx, s.screen({ 1000, 1000, 0 }));
+        REQUIRE(s.selection.edges.size() == 1);
+        CHECK(tools::deleteSelection(s.ctx, true));
+        CHECK(s.mesh.faces().size() == 1);
+    }
+    SECTION("Delete: cu fețe")
+    {
+        s.selection = tools::selectionAt(s.ctx, s.screen({ 1000, 1000, 0 }));
+        CHECK(tools::deleteSelection(s.ctx, false));
+        CHECK(s.mesh.faces().empty());
+    }
+}

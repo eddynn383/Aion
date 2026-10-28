@@ -1491,7 +1491,7 @@ void Document::stepHistory(Fn&& step)
     emit outlineChanged();
 }
 
-void Document::deleteSelection()
+void Document::deleteSelection(bool keepFaces)
 {
     if (curveEditing()) { // ⌫ în editarea unei curbe: punctul selectat
         withTool(m_lastCamera, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Delete, {} }); });
@@ -1509,7 +1509,7 @@ void Document::deleteSelection()
     tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
     ctx.model = &m_model;
     ctx.context = activeDefinition();
-    tools::deleteSelection(ctx);
+    tools::deleteSelection(ctx, keepFaces);
     afterInteraction(before);
 }
 
