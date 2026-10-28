@@ -70,9 +70,9 @@ struct FaceHit {
 FaceHit nearestFace(const Mesh& mesh, const math::Ray& ray)
 {
     FaceHit best;
-    for (FaceId f : mesh.faces().keys()) {
+    forEachFaceAlong(mesh, ray, [&](FaceId f) {
         if (isHidden(mesh.face(f))) {
-            continue;
+            return;
         }
         // Testul rapid pe cutia conturului: majoritatea fețelor nu sunt sub cursor.
         Vec3d lo { std::numeric_limits<double>::infinity() };
@@ -83,7 +83,7 @@ FaceHit nearestFace(const Mesh& mesh, const math::Ray& ray)
             hi = glm::max(hi, p);
         }
         if (!rayHitsBox(ray, lo, hi, tol::kLength)) {
-            continue;
+            return;
         }
         const geom::FaceTriangles tri = geom::triangulateFace(mesh, f);
         for (std::size_t i = 0; i + 2 < tri.indices.size(); i += 3) {
@@ -93,7 +93,7 @@ FaceHit nearestFace(const Mesh& mesh, const math::Ray& ray)
                 best = { f, *t };
             }
         }
-    }
+    });
     return best;
 }
 
@@ -218,19 +218,21 @@ PickResult pick(const Mesh& mesh, const Camera& camera, Vec2d screen, PickOption
 
     // Vârfuri.
     double bestVertex = options.vertexRadiusPx;
-    for (std::size_t i = 0; i < mesh.vertices().size(); ++i) {
-        const Vec3d& p = mesh.vertices().values()[i].position;
-        const auto s = camera.project(p);
-        if (!s || isHidden(mesh, mesh.vertices().keys()[i])) {
-            continue;
-        }
-        const double d = glm::length(*s - screen);
-        if (d <= bestVertex && visible(ray, faceHit, p)) {
-            bestVertex = d;
-            result.kind = PickResult::Kind::Vertex;
-            result.vertex = mesh.vertices().keys()[i];
-            result.point = p;
-        }
+    if (options.vertexRadiusPx >= 0.0) {
+        forEachVertexNear(mesh, camera, screen, options.vertexRadiusPx, [&](VertexId v) {
+            const Vec3d& p = mesh.position(v);
+            const auto s = camera.project(p);
+            if (!s || isHidden(mesh, v)) {
+                return;
+            }
+            const double d = glm::length(*s - screen);
+            if (d <= bestVertex && visible(ray, faceHit, p)) {
+                bestVertex = d;
+                result.kind = PickResult::Kind::Vertex;
+                result.vertex = v;
+                result.point = p;
+            }
+        });
     }
     if (result.kind == PickResult::Kind::Vertex) {
         return result;
@@ -239,30 +241,33 @@ PickResult pick(const Mesh& mesh, const Camera& camera, Vec2d screen, PickOption
     // Muchii.
     double bestEdge = options.edgeRadiusPx;
     const math::Segment raySegment { ray.origin, ray.at(camera.farPlane() * 4.0) };
-    for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
-        const geom::Edge& e = mesh.edges().values()[i];
+    if (options.edgeRadiusPx < 0.0) {
+        return result;
+    }
+    forEachEdgeNear(mesh, camera, screen, options.edgeRadiusPx, [&](EdgeId id) {
+        const geom::Edge& e = mesh.edge(id);
         if (isHidden(e)) {
-            continue;
+            return;
         }
         const Vec3d a = mesh.position(e.v0);
         const Vec3d b = mesh.position(e.v1);
         const auto projected = projectSegment(camera, a, b);
         if (!projected) {
-            continue;
+            return;
         }
         const double d = distanceToSegment2d(screen, projected->first, projected->second);
         if (d > bestEdge) {
-            continue;
+            return;
         }
         const Vec3d onEdge = math::closestPoints(raySegment, { a, b }).onSecond;
         if (!visible(ray, faceHit, onEdge)) {
-            continue;
+            return;
         }
         bestEdge = d;
         result.kind = PickResult::Kind::Edge;
-        result.edge = mesh.edges().keys()[i];
+        result.edge = id;
         result.point = onEdge;
-    }
+    });
     return result;
 }
 

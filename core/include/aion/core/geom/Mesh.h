@@ -79,6 +79,10 @@ public:
     std::pair<EdgeId, EdgeId> splitEdge(EdgeId id, VertexId at);
 
     // --- Înregistrarea schimbărilor ---
+    // Crește (la o valoare nouă, unică în program) la orice schimbare; o copie neschimbată o păstrează. Indexurile
+    // derivate din geometrie (picking) se refac doar când se schimbă.
+    [[nodiscard]] std::uint64_t revision() const { return m_revision; }
+
     void beginRecording();
     [[nodiscard]] bool isRecording() const { return m_recording.has_value(); }
     ChangeSet endRecording();
@@ -100,12 +104,17 @@ private:
     void attachFace(FaceId id, const Face& face);
     void detachFace(FaceId id, const Face& face);
     void notify(const ChangeSummary& summary);
+    void bump();
 
     SlotMap<VertexId, Vertex> m_vertices;
     SlotMap<EdgeId, Edge> m_edges;
     SlotMap<FaceId, Face> m_faces;
     std::optional<ChangeSet> m_recording;
     std::vector<MeshObserver*> m_observers;
+    std::uint64_t m_revision = 0;
+
+public:
+    Mesh();
 };
 
 } // namespace aion::geom
