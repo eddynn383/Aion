@@ -10,6 +10,8 @@ Row {
     property var group: ({ tools: [] })
     property string currentToolId: ""
     property bool active: false
+    // Scurtătura afișată a unei unelte (personalizabilă în Preferințe).
+    property var keyFor: (t) => t.key || ""
 
     readonly property var currentTool: group.tools.find(t => t.id === currentToolId) || group.tools[0]
     readonly property bool hasMenu: group.tools.length > 1
@@ -22,7 +24,7 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
         iconName: root.currentTool.icon
         tooltip: root.currentTool.name
-        shortcut: root.currentTool.key || ""
+        shortcut: root.keyFor(root.currentTool)
         guideId: root.currentTool.id
         checked: root.active
         onClicked: root.toolSelected(root.currentTool.id)
@@ -62,7 +64,7 @@ Row {
             items: root.group.tools.reduce((all, t) => {
                 if (t.section)
                     all.push({ id: "", header: t.section, enabled: false })
-                all.push({ id: t.id, icon: t.icon, name: t.name, shortcut: t.key || "", checked: t.id === root.currentTool.id })
+                all.push({ id: t.id, icon: t.icon, name: t.name, shortcut: root.keyFor(t), checked: t.id === root.currentTool.id })
                 return all
             }, [])
             onTriggered: (id) => root.toolSelected(id)

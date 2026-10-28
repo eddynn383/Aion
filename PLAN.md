@@ -422,7 +422,8 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 - [x] Iconița aplicației, ecran „About”, asociere cu fișierele `.aion` (Info.plist + QFileOpenEvent + linia de comandă)
 - [x] Performanță: modele cu ≥ 100.000 de fețe — BVH pentru picking și inferență (ADR 0032): ~1 ms în loc de ~1,5 s
       pe 100 000 de fețe; reconstruit doar la schimbarea geometriei (`Mesh::revision`)
-- [~] Preferințe: unități, precizie, temă, latitudine (⌘,) — lipsesc scurtăturile personalizabile
+- [x] Preferințe: unități, precizie, temă, latitudine (⌘,) și scurtături personalizabile (Preferințe → Scurtături:
+      click + combinația, conflictele trec la comanda nouă, ↺ / „Resetează toate”; și pentru unelte)
 - [ ] Build **Universal** (arm64 + x86_64) — cere un Qt universal (vezi ADR 0012)
 - [x] `macdeployqt`, **semnare** (Developer ID), **notarizare** Apple, DMG — `scripts/package-macos.sh` / `make package` (semnarea reală cere certificatul tău)
 - [ ] Raportare crash-uri (opțional)

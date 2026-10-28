@@ -145,7 +145,41 @@ Window {
                 list.push({ id: "plugin:" + c.id, title: p.name + ": " + c.title, category: "Plugin-uri", shortcut: "", icon: "code" })
         for (const g of doc.generators)
             list.push({ id: "object.parametric:" + g.id, title: "Obiect dinamic: " + g.name, category: "Obiecte", shortcut: "", icon: "sliders-horizontal" })
-        return list
+        // Scurtăturile alese în Preferințe înlocuiesc pe cele implicite ("" = fără scurtătură).
+        const custom = window.shortcutOverrides
+        return list.map(c => Object.assign({}, c, {
+            defaultShortcut: c.shortcut,
+            shortcut: custom[c.id] !== undefined ? custom[c.id] : c.shortcut
+        }))
+    }
+
+    // Scurtăturile personalizate: id comandă → secvență (păstrate în preferințe).
+    readonly property var shortcutOverrides: {
+        try { return JSON.parse(preferences.customShortcuts) } catch (e) { return {} }
+    }
+    // O scurtătură nouă pentru comandă (null = revine la cea implicită). O combinație deja folosită trece la ea:
+    // comanda care o avea rămâne fără scurtătură (întoarce titlul ei, pentru mesaj).
+    function setShortcut(id, sequence) {
+        const next = Object.assign({}, shortcutOverrides)
+        let taken = ""
+        if (sequence) {
+            for (const c of commands) {
+                if (c.id !== id && c.shortcut === sequence) {
+                    next[c.id] = ""
+                    taken = c.title
+                }
+            }
+        }
+        const command = commands.find(c => c.id === id)
+        if (sequence === null || (command && command.defaultShortcut === sequence))
+            delete next[id]
+        else
+            next[id] = sequence
+        preferences.customShortcuts = JSON.stringify(next)
+        return taken
+    }
+    function resetShortcuts() {
+        preferences.customShortcuts = "{}"
     }
 
     function runCommand(id) {
@@ -703,6 +737,7 @@ Window {
         property bool leftInteractions: false
         // Înălțimile secțiunilor din stânga (JSON: cheie → px), schimbate trăgând de marginea lor.
         property string leftSectionHeights: "{}"
+        property string customShortcuts: "{}"
         property string environment: "simplu"
         property bool ambientOcclusion: true
         property bool progressiveAA: true
@@ -770,6 +805,11 @@ Window {
             viewport: viewport
             settings: preferences
             commands: window.commands
+            onShortcutChanged: (id, sequence) => {
+                const taken = window.setShortcut(id, sequence)
+                shortcutNotice = taken ? "Combinația era folosită de „" + taken + "”, care a rămas fără scurtătură." : ""
+            }
+            onShortcutsReset: window.resetShortcuts()
             onCloseRequested: preferencesPage.active = false
         }
     }
@@ -1693,6 +1733,7 @@ Window {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: Theme.space6
             activeTool: window.activeTool
+            keyOverrides: window.shortcutOverrides
             onToolSelected: (id) => window.selectTool(id)
         }
     }

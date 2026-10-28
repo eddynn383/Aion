@@ -57,6 +57,7 @@ qt_add_qml_module(aion_app
         qml/components/IconButton.qml
         qml/components/Input.qml
         qml/components/Kbd.qml
+        qml/components/ShortcutRecorder.qml
         qml/components/Menu.qml
         qml/components/ContextMenu.qml
         qml/components/Slider.qml
