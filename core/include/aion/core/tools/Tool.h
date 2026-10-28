@@ -187,6 +187,9 @@ public:
     [[nodiscard]] virtual std::optional<Measurement> measurement() const { return std::nullopt; }
     // Aplică o valoare tastată („2500”, „2.5m”, „3000,2000”). Întoarce false dacă textul nu e valid acum.
     virtual bool applyMeasurement(ToolContext& /*ctx*/, std::string_view /*text*/) { return false; }
+    // Undo (⌘Z) cât unealta e în mijlocul unei operații: un pas înapoi în ea (Pen: ultimul punct). false = undo-ul
+    // obișnuit, din istoric.
+    virtual bool undoStep(ToolContext& /*ctx*/) { return false; }
 };
 
 // "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale", "eraser";

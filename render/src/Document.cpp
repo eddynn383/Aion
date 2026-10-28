@@ -1442,6 +1442,14 @@ bool Document::applyMeasurement(const QString& text)
 
 void Document::undo()
 {
+    // În mijlocul unei operații (Pen cu câteva puncte), un pas înapoi în ea, nu în istoric.
+    bool handled = false;
+    withTool(m_lastCamera, [&](tools::Tool& t, tools::ToolContext& ctx) { handled = t.undoStep(ctx); });
+    if (handled) {
+        emit toolStatusChanged();
+        touch();
+        return;
+    }
     stepHistory([this] { m_stack.undo(); });
 }
 
