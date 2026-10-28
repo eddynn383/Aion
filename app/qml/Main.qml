@@ -651,7 +651,7 @@ Window {
             sequence: modelData.shortcut
             // Cât timp se tastează în Measurements box, literele sunt unități („m”, „cm”), nu unelte.
             enabled: modelData.shortcut.length > 0 && !palette.opened
-                     && !(window.vcbText.length > 0 && modelData.shortcut.length === 1)
+                     && !(window.vcbText.length > 0 && modelData.shortcut.indexOf("Ctrl+") < 0 && modelData.shortcut.indexOf("Alt+") < 0)
                      && !(window.nativeMenu && modelData.shortcut.indexOf("Ctrl+") >= 0)
             onActivated: window.runCommand(modelData.id)
         }
