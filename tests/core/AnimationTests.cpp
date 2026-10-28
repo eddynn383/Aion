@@ -77,3 +77,37 @@ TEST_CASE("Animații: se salvează în .aion și au undo ca orice altă schimbar
     REQUIRE(loaded.model->animations().size() == 1);
     CHECK(loaded.model->animations().values().front().name == "Ușa se deschide");
 }
+
+TEST_CASE("Animații: tastatura — cheia următoare / anterioară și pașii de cadre", "[core][model][animation]")
+{
+    Animation a;
+    a.duration = 4.0;
+    a.fps = 10;
+    const model::InstanceId door { 3 };
+    const model::InstanceId car { 4 };
+    model::setTransformKey(a, door, 0.5, Transform {});
+    model::setTransformKey(a, door, 2.0, Transform::translation({ 1000, 0, 0 }));
+    model::setColorKey(a, car, 1.0, { 0, 0, 0, 255 });
+    model::setCameraKey(a, { 3.0, { 0, 0, 0 }, 0.0, 0.0, 1000.0, model::Easing::Linear });
+
+    // Fără selecție: cheile tuturor pistelor și ale camerei, sortate și fără dubluri.
+    CHECK(model::keyTimes(a, {}) == std::vector<double> { 0.5, 1.0, 2.0, 3.0 });
+    CHECK(model::keyTimes(a, { door }) == std::vector<double> { 0.5, 2.0 });
+
+    CHECK(model::adjacentKeyTime(a, {}, 0.0, +1) == 0.5);
+    CHECK(model::adjacentKeyTime(a, {}, 0.5, +1) == 1.0); // cheia de sub playhead nu contează
+    CHECK_FALSE(model::adjacentKeyTime(a, {}, 0.52, -1).has_value()); // la sub jumătate de cadru e „aceeași”
+    CHECK(model::adjacentKeyTime(a, {}, 0.6, -1) == 0.5);
+    CHECK(model::adjacentKeyTime(a, { door }, 1.0, +1) == 2.0);
+    CHECK(model::adjacentKeyTime(a, { door }, 1.0, -1) == 0.5);
+    CHECK_FALSE(model::adjacentKeyTime(a, { door }, 2.0, +1).has_value());
+    CHECK_FALSE(model::adjacentKeyTime(a, {}, 0.5, -1).has_value());
+
+    // Pașii de cadre: rotunjiți la cadru (1/10 s) și ținuți în durata animației.
+    CHECK(model::stepFrames(a, 1.0, 1) == Approx(1.1));
+    CHECK(model::stepFrames(a, 1.0, -10) == Approx(0.0));
+    CHECK(model::stepFrames(a, 1.04, 1) == Approx(1.1)); // de pe un timp între cadre: cadrul următor
+    CHECK(model::stepFrames(a, 1.04, -1) == Approx(1.0));
+    CHECK(model::stepFrames(a, 3.95, 10) == Approx(4.0));
+    CHECK(model::stepFrames(a, 0.0, -1) == Approx(0.0));
+}

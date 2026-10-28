@@ -2105,6 +2105,50 @@ void Document::pause()
     }
 }
 
+void Document::togglePlay()
+{
+    m_playing ? pause() : play();
+}
+
+void Document::stepFrames(int frames)
+{
+    const model::Animation* a = currentAnimation();
+    if (a == nullptr) {
+        return;
+    }
+    pause();
+    setTimelineTime(model::stepFrames(*a, m_timelineTime, frames));
+}
+
+bool Document::jumpToKey(int direction)
+{
+    const model::Animation* a = currentAnimation();
+    if (a == nullptr) {
+        return false;
+    }
+    const auto t = model::adjacentKeyTime(*a, m_selection.instances, m_timelineTime, direction);
+    if (!t) {
+        return false;
+    }
+    pause();
+    setTimelineTime(*t);
+    return true;
+}
+
+void Document::jumpToEdge(bool end)
+{
+    if (currentAnimation() == nullptr) {
+        return;
+    }
+    pause();
+    setTimelineTime(end ? animationDuration() : 0.0);
+}
+
+bool Document::toolOwnsArrows() const
+{
+    return m_tool && m_tool->ownsArrowKeys();
+}
+
 void Document::endPreview()
 {
     if (!m_previewing && !m_playing) {

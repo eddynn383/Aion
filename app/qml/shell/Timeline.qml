@@ -37,7 +37,6 @@ Rectangle {
             event.accepted = true
         }
     }
-    Keys.onSpacePressed: root.document.playing ? root.document.pause() : root.document.play()
     function deleteSelected() {
         if (root.selectedKey) {
             root.document.removeKey(root.selectedKey.kind, root.selectedKey.instance, root.selectedKey.time)

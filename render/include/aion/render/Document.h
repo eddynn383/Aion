@@ -98,6 +98,8 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(double timelineTime READ timelineTime WRITE setTimelineTime NOTIFY timelineTimeChanged)
     Q_PROPERTY(bool previewing READ previewing NOTIFY timelineChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
+    // Săgețile sunt ale uneltei active (o operație în curs); altfel, în Animare, ← → mută playhead-ul.
+    Q_PROPERTY(bool toolOwnsArrows READ toolOwnsArrows NOTIFY toolStatusChanged)
     // Modul de lucru: 0 Modelare, 1 Animare, 2 Interacțiune. Decide ce unelte, comenzi și operații sunt permise
     // (docs/plans/moduri-de-lucru.md). Nu e un pas de undo și nu se salvează în fișier.
     Q_PROPERTY(int workMode READ workMode WRITE setWorkMode NOTIFY workModeChanged)
@@ -465,6 +467,13 @@ public:
     Q_INVOKABLE void setKeyEasing(const QString& kind, double instance, double time, int easing);
     Q_INVOKABLE void play();
     Q_INVOKABLE void pause();
+    Q_INVOKABLE void togglePlay();
+    // Tastatura timeline-ului: `frames` cadre înainte / înapoi (oprește redarea); cheia următoare (+1) sau anterioară
+    // (−1) a selecției (sau a tuturor, fără selecție); începutul / sfârșitul.
+    Q_INVOKABLE void stepFrames(int frames);
+    Q_INVOKABLE bool jumpToKey(int direction);
+    Q_INVOKABLE void jumpToEdge(bool end);
+    bool toolOwnsArrows() const;
     Q_INVOKABLE void endPreview(); // înapoi la model (editare)
     // Camera animației la momentul curent ({} dacă nu are pistă de cameră), ca cameraState().
     Q_INVOKABLE QVariantMap animationCamera() const;

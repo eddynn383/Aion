@@ -66,6 +66,17 @@ Window {
             { id: "mode.animate", title: "Modul Animare", category: "Moduri", shortcut: "Alt+2", icon: "film" },
             { id: "mode.interact", title: "Modul Interacțiune", category: "Moduri", shortcut: "Alt+3", icon: "hand-pointer" },
             { id: "mode.interaction", title: "Interact: folosește interacțiunile (comută cu Select)", category: "Vizualizare", shortcut: "F5", icon: "play" },
+            // Animare: tastatura timeline-ului (doar în modul Animare; Space nu mai alege Select acolo).
+            { id: "anim.play", title: "Redă / pauză", category: "Animare", shortcut: "Space", icon: "play" },
+            { id: "anim.prevFrame", title: "Cadrul anterior", category: "Animare", shortcut: "Left", icon: "arrow-left" },
+            { id: "anim.nextFrame", title: "Cadrul următor", category: "Animare", shortcut: "Right", icon: "arrow-right" },
+            { id: "anim.back10", title: "10 cadre înapoi", category: "Animare", shortcut: "Shift+Left", icon: "arrow-left" },
+            { id: "anim.forward10", title: "10 cadre înainte", category: "Animare", shortcut: "Shift+Right", icon: "arrow-right" },
+            { id: "anim.prevKey", title: "Cheia anterioară", category: "Animare", shortcut: "Alt+Left", icon: "diamond" },
+            { id: "anim.nextKey", title: "Cheia următoare", category: "Animare", shortcut: "Alt+Right", icon: "diamond" },
+            { id: "anim.start", title: "La începutul animației", category: "Animare", shortcut: "Home", icon: "skip-back" },
+            { id: "anim.end", title: "La sfârșitul animației", category: "Animare", shortcut: "End", icon: "skip-back" },
+            { id: "anim.key", title: "Keyframe pe selecție (toate canalele)", category: "Animare", shortcut: "K", icon: "diamond" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
@@ -132,7 +143,7 @@ Window {
         ]
         // Toate uneltele din toolbar, cu scurtăturile lor.
         for (const t of toolbar.allTools)
-            list.push({ id: "tool." + t.id, title: t.name, category: "Unelte", shortcut: t.key || "", icon: t.icon })
+            list.push({ id: "tool." + t.id, title: t.name, category: "Unelte", shortcut: t.key || "", alias: t.alias || "", icon: t.icon })
         // Documentele recente.
         for (let i = 0; i < doc.recentFiles.length; ++i) {
             const path = doc.recentFiles[i]
@@ -155,6 +166,35 @@ Window {
             defaultShortcut: c.shortcut,
             shortcut: custom[c.id] !== undefined ? custom[c.id] : c.shortcut
         }))
+    }
+
+    // Cine primește fiecare tastă în modul curent: o comandă permisă în mod; la aceeași tastă, comanda modului (anim.*)
+    // o bate pe cea comună (Space = redare în Animare, Select în rest). Așa nu există scurtături ambigue.
+    readonly property var shortcutOwners: {
+        const owners = {}
+        const mode = doc.workMode
+        for (const c of commands) {
+            if (!doc.commandAllowed(c.id))
+                continue
+            for (const seq of [c.shortcut, c.alias || ""]) {
+                if (seq.length === 0)
+                    continue
+                const current = owners[seq]
+                if (current === undefined || (!current.startsWith("anim.") && c.id.startsWith("anim.")))
+                    owners[seq] = c.id
+            }
+        }
+        return owners
+    }
+    // Săgețile simple sunt ale uneltei cât are o operație în curs (sau se tastează o valoare); altfel ale comenzii
+    // care le are în acest mod (în Animare: cadrele).
+    readonly property bool toolKeepsArrows: doc.toolOwnsArrows || vcbText.length > 0
+    function plainArrow(seq) {
+        return seq === "Left" || seq === "Right" || seq === "Up" || seq === "Down"
+    }
+    function activeSequences(c) {
+        return [c.shortcut, c.alias || ""].filter(s => s.length > 0 && shortcutOwners[s] === c.id
+                                                  && !(plainArrow(s) && toolKeepsArrows))
     }
 
     // Scurtăturile personalizate: id comandă → secvență (păstrate în preferințe).
@@ -243,6 +283,16 @@ Window {
                 window.selectTool(window.activeTool === "interact" ? "select" : "interact")
             }
             break
+        case "anim.play": doc.togglePlay(); break
+        case "anim.prevFrame": doc.stepFrames(-1); break
+        case "anim.nextFrame": doc.stepFrames(1); break
+        case "anim.back10": doc.stepFrames(-10); break
+        case "anim.forward10": doc.stepFrames(10); break
+        case "anim.prevKey": doc.jumpToKey(-1); break
+        case "anim.nextKey": doc.jumpToKey(1); break
+        case "anim.start": doc.jumpToEdge(false); break
+        case "anim.end": doc.jumpToEdge(true); break
+        case "anim.key": doc.keySelection(); break
         case "mode.model": window.setWorkMode(0); break
         case "mode.animate": window.setWorkMode(1); break
         case "mode.interact": window.setWorkMode(2); break
@@ -479,6 +529,10 @@ Window {
                     AppInfo.simulateKeys(kk[0], kk[1] ?? "")
                 } else if (action === "debug.geometry") {
                     console.info("geometry:", JSON.stringify(doc.entityInfo.geometry), "undo:", doc.undoName)
+                } else if (action === "debug.anim") {
+                    console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
+                                 "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
+                                     t => t.transform.map(k => k.time))))
                 } else if (action === "debug.rz") {
                     console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {
@@ -683,9 +737,9 @@ Window {
         model: window.commands
         delegate: Shortcut {
             required property var modelData
-            sequence: modelData.shortcut
+            sequences: window.activeSequences(modelData)
             // Cât timp se tastează în Measurements box, literele sunt unități („m”, „cm”), nu unelte.
-            enabled: modelData.shortcut.length > 0 && !palette.opened && (doc.workMode, doc.commandAllowed(modelData.id))
+            enabled: sequences.length > 0 && !palette.opened && (doc.workMode, doc.commandAllowed(modelData.id))
                      && !(window.vcbText.length > 0 && modelData.shortcut.indexOf("Ctrl+") < 0 && modelData.shortcut.indexOf("Alt+") < 0)
                      && !(window.nativeMenu && modelData.shortcut.indexOf("Ctrl+") >= 0)
             onActivated: window.runCommand(modelData.id)
@@ -720,7 +774,9 @@ Window {
         delegate: Shortcut {
             required property string modelData
             sequence: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+            // În Animare, ← → sunt ale timeline-ului, dacă unealta nu are o operație în curs.
             enabled: doc.hasMeasurement && !palette.opened
+                     && (window.toolKeepsArrows || window.shortcutOwners[sequence] === undefined)
             onActivated: doc.arrowKey(modelData)
         }
     }
@@ -1775,6 +1831,7 @@ Window {
             anchors.bottomMargin: Theme.space6
             activeTool: window.activeTool
             keyOverrides: window.shortcutOverrides
+            shortcutOwners: window.shortcutOwners
             workMode: doc.workMode
             shortcutFor: (id) => { const c = window.commands.find(x => x.id === id); return c ? c.shortcut : "" }
             onModeSelected: (m) => window.setWorkMode(m)

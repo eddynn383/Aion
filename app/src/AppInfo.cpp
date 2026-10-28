@@ -16,6 +16,7 @@
 #include <QWheelEvent>
 #include <QPointer>
 #include <QGuiApplication>
+#include <QHash>
 #include <qpa/qwindowsysteminterface.h>
 #include <QQuickWindow>
 
@@ -182,21 +183,51 @@ void AppInfo::simulateKeys(const QString& text, const QString& finalKey) const
     if (window == nullptr) {
         return;
     }
-    const auto press = [&](int key, const QString& t) {
-        QWindowSystemInterface::handleKeyEvent<QWindowSystemInterface::SynchronousDelivery>(window, QEvent::KeyPress, key, Qt::NoModifier, t);
-        QWindowSystemInterface::handleKeyEvent<QWindowSystemInterface::SynchronousDelivery>(window, QEvent::KeyRelease, key, Qt::NoModifier, t);
+    // Scurtăturile (QShortcut) lucrează doar în fereastra activă; pornită din terminal, aplicația poate fi în spate.
+    if (QGuiApplication::focusWindow() != window) {
+        QWindowSystemInterface::handleFocusWindowChanged<QWindowSystemInterface::SynchronousDelivery>(window);
+    }
+    const auto press = [&](int key, const QString& t, Qt::KeyboardModifiers mods = Qt::NoModifier) {
+        // Pe macOS plugin-ul Cocoa întreabă singur harta scurtăturilor; un eveniment injectat trebuie s-o întrebe.
+        if (QWindowSystemInterface::handleShortcutEvent(window, 0, key, mods, 0, 0, 0, t)) {
+            return;
+        }
+        QWindowSystemInterface::handleKeyEvent<QWindowSystemInterface::SynchronousDelivery>(window, QEvent::KeyPress, key, mods, t);
+        QWindowSystemInterface::handleKeyEvent<QWindowSystemInterface::SynchronousDelivery>(window, QEvent::KeyRelease, key, mods, t);
     };
     for (const QChar c : text) {
         press(c.isDigit() ? Qt::Key_0 + c.digitValue() : c == QLatin1Char('.') ? Qt::Key_Period : c.toUpper().unicode(), QString(c));
     }
-    if (finalKey == QLatin1String("enter")) {
-        press(Qt::Key_Return, QStringLiteral("\r"));
-    } else if (finalKey == QLatin1String("escape")) {
-        press(Qt::Key_Escape, {});
-    } else if (finalKey == QLatin1String("up")) {
-        press(Qt::Key_Up, {});
-    } else if (finalKey == QLatin1String("down")) {
-        press(Qt::Key_Down, {});
+    // Tasta finală, cu modificatori opționali: „enter”, „alt+right”, „shift+left”, „space”, „home”.
+    QStringList parts = finalKey.toLower().split(QLatin1Char('+'), Qt::SkipEmptyParts);
+    if (parts.isEmpty()) {
+        return;
+    }
+    const QString name = parts.takeLast();
+    Qt::KeyboardModifiers mods;
+    for (const QString& m : parts) {
+        mods |= m == QLatin1String("shift") ? Qt::ShiftModifier
+            : m == QLatin1String("alt")     ? Qt::AltModifier
+            : m == QLatin1String("ctrl")    ? Qt::ControlModifier
+                                            : Qt::NoModifier;
+    }
+    static const QHash<QString, std::pair<int, QString>> kKeys {
+        { QStringLiteral("enter"), { Qt::Key_Return, QStringLiteral("\r") } },
+        { QStringLiteral("escape"), { Qt::Key_Escape, {} } },
+        { QStringLiteral("up"), { Qt::Key_Up, {} } },
+        { QStringLiteral("down"), { Qt::Key_Down, {} } },
+        { QStringLiteral("left"), { Qt::Key_Left, {} } },
+        { QStringLiteral("right"), { Qt::Key_Right, {} } },
+        { QStringLiteral("home"), { Qt::Key_Home, {} } },
+        { QStringLiteral("end"), { Qt::Key_End, {} } },
+        { QStringLiteral("space"), { Qt::Key_Space, QStringLiteral(" ") } },
+        { QStringLiteral("delete"), { Qt::Key_Delete, {} } },
+        { QStringLiteral("backspace"), { Qt::Key_Backspace, {} } },
+    };
+    if (const auto it = kKeys.find(name); it != kKeys.end()) {
+        press(it->first, it->second, mods);
+    } else if (name.size() == 1) {
+        press(name.at(0).toUpper().unicode(), mods & ~Qt::ShiftModifier ? QString() : name, mods);
     }
 }
 

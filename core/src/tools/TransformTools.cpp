@@ -492,6 +492,8 @@ public:
 
     view::PickResult hover() const override { return m_base ? view::PickResult {} : m_hover; }
 
+    bool ownsArrowKeys() const override { return m_base.has_value(); }
+
     std::string status() const override
     {
         if (m_base) {
@@ -739,6 +741,9 @@ public:
     }
 
     view::PickResult hover() const override { return m_phase == Phase::Center ? m_hover : view::PickResult {}; }
+
+    // Înainte de centru săgețile aleg axa; după, rotația e în curs.
+    bool ownsArrowKeys() const override { return true; }
 
     std::string status() const override
     {
@@ -1038,6 +1043,8 @@ public:
     }
 
     view::PickResult hover() const override { return m_hasBox ? view::PickResult {} : m_hover; }
+
+    bool ownsArrowKeys() const override { return m_dragging; }
 
     std::string status() const override
     {
