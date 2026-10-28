@@ -117,7 +117,12 @@ Document::Document(QObject* parent)
         display.decimals = std::clamp(settings.value(QStringLiteral("units/decimals"), -1).toInt(), -1, 6);
         units::setDisplaySettings(display);
     }
-    m_stack.setOnChanged([this] { emit historyChanged(); });
+    // Orice schimbare a istoricului (și cele făcute direct de unelte, nu doar prin runOnModel) schimbă modelul: copia
+    // pozată din Animare trebuie refăcută.
+    m_stack.setOnChanged([this] {
+        ++m_modelRevision;
+        emit historyChanged();
+    });
     // În debug, un model invalid oprește aplicația (CommandStack); în release nu se verifică.
     retriangulate(m_model.root());
     setActiveTool(QStringLiteral("select"));
