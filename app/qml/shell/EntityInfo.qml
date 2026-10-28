@@ -163,6 +163,9 @@ Column {
 
         readonly property var p: root.isInstance && root.info.placement ? root.info.placement : ({})
         readonly property int locks: root.isInstance ? (root.info.locks ?? 0) : 0
+        // Obiectul e pe o cale de parcurgere a animației active: poziția și rotirea vin de la ea (ADR 0036).
+        readonly property var anchor: root.isInstance ? (root.info.anchor ?? null) : null
+        readonly property real fourth: (width - Theme.space1 * 3) / 4
         property bool linkProportions: false
         readonly property real third: (width - Theme.space1 * 2) / 3
         // Keyframe la momentul curent pentru obiect (diamantul plin).
@@ -256,6 +259,34 @@ Column {
         }
 
         PropertyGroup {
+            visible: transformBox.anchor !== null
+            title: "Față de cale (mm, °)"
+            Row {
+                spacing: Theme.space1
+                NumberField { width: transformBox.fourth; compact: true; label: "↑"; step: 50; value: transformBox.anchor ? transformBox.anchor.along : 0; onValueModified: (v) => root.document.setAnchorOffsets({ along: v }) }
+                NumberField { width: transformBox.fourth; compact: true; label: "←"; step: 50; value: transformBox.anchor ? transformBox.anchor.lateral : 0; onValueModified: (v) => root.document.setAnchorOffsets({ lateral: v }) }
+                NumberField { width: transformBox.fourth; compact: true; label: "Z"; step: 50; value: transformBox.anchor ? transformBox.anchor.up : 0; onValueModified: (v) => root.document.setAnchorOffsets({ up: v }) }
+                NumberField { width: transformBox.fourth; compact: true; label: "⟳"; decimals: 1; step: 15; value: transformBox.anchor ? transformBox.anchor.yaw : 0; onValueModified: (v) => root.document.setAnchorOffsets({ yaw: v }) }
+            }
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: "Pe „" + (transformBox.anchor ? transformBox.anchor.pathName : "") + "”: înainte (de-a lungul căii), la stânga, "
+                      + "în sus și rotirea față de direcția de mers. Move / Rotate mută obiectul tot față de cale."
+                color: Theme.textTertiary
+                font.pixelSize: Theme.fontSizeXs
+            }
+            Button {
+                width: parent.width
+                small: true
+                variant: "secondary"
+                text: "Scoate de pe cale"
+                onClicked: root.document.detachFromPath(transformBox.anchor.path, root.info.instanceId)
+            }
+        }
+
+        PropertyGroup {
+        visible: transformBox.anchor === null
         title: "Poziție (mm) · a pivotului"
         Row {
             spacing: Theme.space1
@@ -285,6 +316,7 @@ Column {
         }
 
         PropertyGroup {
+        visible: transformBox.anchor === null
         title: "Rotație (°)"
         Row {
             spacing: Theme.space1

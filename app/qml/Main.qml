@@ -1939,6 +1939,7 @@ Window {
                 width: parent.width
                 document: doc
                 viewport: viewport
+                timeline: timeline
             }
             EntityInfo {
                 visible: doc.selectedObject.kind === "none"

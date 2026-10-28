@@ -1,17 +1,21 @@
 import QtQuick
 import Aion
+import "../components/EasingMath.js" as EasingMath
 
-// Inspector-ul pentru o cameră sau o lumină selectată: poziția, ținta / direcția și setările fiecărui tip.
+// Inspector-ul pentru o cameră, o lumină sau o cale de parcurgere selectată: poziția, ținta / direcția și setările
+// fiecărui tip.
 Column {
     id: root
 
     property var document
     property var viewport
+    property var timeline // editorul de curbă (easing) e al timeline-ului
 
     readonly property var info: document ? document.selectedObject : ({ kind: "none" })
     readonly property bool isCamera: info.kind === "camera"
     readonly property bool isLight: info.kind === "light"
     readonly property string lightKind: isLight ? info.lightKind : ""
+    readonly property bool isPath: info.kind === "path"
 
     visible: info.kind !== "none"
     spacing: Theme.space3
@@ -60,13 +64,14 @@ Column {
         spacing: Theme.space2
         Icon {
             anchors.verticalCenter: parent.verticalCenter
-            name: root.isCamera ? "camera" : ({ point: "lightbulb", spot: "light-spot", directional: "sun", area: "light-area" })[root.lightKind] ?? "lightbulb"
+            name: root.isCamera ? "camera" : root.isPath ? "route"
+                : ({ point: "lightbulb", spot: "light-spot", directional: "sun", area: "light-area" })[root.lightKind] ?? "lightbulb"
             size: Theme.iconSizeMd
             color: root.isLight ? root.info.color : Theme.textPrimary
         }
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.isCamera ? "Cameră" : "Lumină"
+            text: root.isCamera ? "Cameră" : root.isPath ? "Cale" : "Lumină"
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
@@ -105,7 +110,161 @@ Column {
         step: 0.05
     }
 
+    // --- Calea de parcurgere (ADR 0036): transformarea, parcurgerea și obiectele ancorate ---
+    Text {
+        visible: root.isPath && !(root.info.active ?? true)
+        width: parent.width
+        wrapMode: Text.Wrap
+        text: "Calea animației „" + (root.info.animationName ?? "") + "”: obiectele ei se mișcă doar când e animația activă."
+        color: Theme.textTertiary
+        font.pixelSize: Theme.fontSizeXs
+    }
+    PropertyGroup {
+        visible: root.isPath
+        width: parent.width
+        title: "Rotație (°)"
+        VectorFields { key: "rotation"; decimals: 1; step: 15 }
+    }
+    PropertyGroup {
+        visible: root.isPath
+        width: parent.width
+        title: "Dimensiuni (mm)"
+        VectorFields { key: "size" }
+    }
+    PropertyGroup {
+        visible: root.isPath
+        width: parent.width
+        title: "Parcurgere"
+        Row {
+            width: parent.width
+            spacing: Theme.space1
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Start"
+                unit: "s"
+                decimals: 2
+                step: 0.1
+                from: 0
+                value: root.info.start ?? 0
+                onValueModified: (v) => root.set({ start: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Durată"
+                unit: "s"
+                decimals: 2
+                step: 0.5
+                from: 0.05
+                value: root.info.duration ?? 5
+                onValueModified: (v) => root.set({ duration: v })
+            }
+        }
+        // Curba de tranziție a parcurgerii: același editor ca la chei.
+        Rectangle {
+            id: pathEasingButton
+            width: parent.width
+            height: Theme.controlHeightSm
+            radius: Theme.radiusMd
+            color: pathEasingArea.containsMouse ? Theme.bgHover : Theme.bgInput
+            EasingCurve {
+                id: pathCurve
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.space2
+                anchors.verticalCenter: parent.verticalCenter
+                width: 18
+                height: 18
+                easing: root.info.easing ?? null
+            }
+            Text {
+                anchors.left: pathCurve.right
+                anchors.leftMargin: Theme.space2
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
+                text: "Curbă: " + EasingMath.title(root.info.easing)
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            MouseArea {
+                id: pathEasingArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: if (root.timeline) root.timeline.editEasing({ path: root.info.id }, root.info.easing, "calea", pathEasingButton)
+            }
+        }
+    }
+    PropertyGroup {
+        visible: root.isPath
+        width: parent.width
+        title: "Obiecte ancorate"
+        actions: IconButton {
+            width: 20; height: 20; iconSize: 13
+            iconName: "plus"
+            tooltip: "Adaugă: click pe un obiect în viewport"
+            checked: root.viewport && root.viewport.pickingAnchor
+            solidChecked: false
+            onClicked: if (root.viewport) root.viewport.pickingAnchor = !root.viewport.pickingAnchor
+        }
+        Repeater {
+            model: root.isPath ? (root.info.anchors ?? []) : []
+            delegate: Rectangle {
+                id: anchorRow
+                required property var modelData
+                width: parent.width
+                height: Theme.controlHeightSm
+                radius: Theme.radiusSm
+                color: anchorHover.hovered ? Theme.bgHover : "transparent"
+                HoverHandler { id: anchorHover }
+                Icon {
+                    id: anchorIcon
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.space1
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "box"
+                    size: 13
+                    color: Theme.textSecondary
+                }
+                Text {
+                    anchors.left: anchorIcon.right
+                    anchors.leftMargin: Theme.space2
+                    anchors.right: anchorActions.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    elide: Text.ElideRight
+                    text: anchorRow.modelData.name
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Row {
+                    id: anchorActions
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    RowAction {
+                        shown: anchorHover.hovered
+                        iconName: "x"
+                        tooltip: "Scoate de pe cale (revine unde era)"
+                        onClicked: root.document.detachFromPath(root.info.id, anchorRow.modelData.instance)
+                    }
+                    RowAction {
+                        shown: anchorHover.hovered
+                        iconName: "rotate-cw"
+                        tooltip: "Rotește fața cu 90°"
+                        onClicked: root.document.rotateAnchor(root.info.id, anchorRow.modelData.instance)
+                    }
+                }
+            }
+        }
+        Text {
+            visible: root.isPath && (root.info.anchors ?? []).length === 0
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Niciun obiect. Apasă + și dă click pe un obiect. Mai multe obiecte merg în coloană; mută-le ca să stea altfel."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
     Button {
+        visible: !root.isPath
         width: parent.width
         text: root.isCamera ? "Pune camera în vederea curentă" : "Pune lumina în vederea curentă"
         onClicked: root.document.placeSelectedObjectAtView(root.viewport.cameraState())
@@ -493,14 +652,14 @@ Column {
     }
     Toggle {
         width: parent.width
-        text: "Marcaj în viewport"
+        text: root.isPath ? "Calea în viewport" : "Marcaj în viewport"
         checked: root.info.visible ?? true
         onToggled: root.set({ visible: checked })
     }
     Button {
         width: parent.width
         variant: "secondary"
-        text: root.isCamera ? "Șterge camera" : "Șterge lumina"
+        text: root.isCamera ? "Șterge camera" : root.isPath ? "Șterge calea" : "Șterge lumina"
         onClicked: root.document.deleteSelectedObject()
     }
 }

@@ -1024,10 +1024,14 @@ Rectangle {
         onApplied: (e) => {
             if (!root.easingTarget)
                 return
-            if (root.easingTarget.defaultEasing)
+            if (root.easingTarget.defaultEasing) {
                 root.document.setDefaultEasing(e)
-            else
+            } else if (root.easingTarget.path) { // curba de parcurgere a unei căi
+                root.document.selectObject("path", root.easingTarget.path)
+                root.document.setObjectProperties({ easing: e })
+            } else {
                 root.document.setKeysEasing(root.easingTarget.refs, e)
+            }
         }
         onUserPresetsEdited: (list) => root.userEasingsEdited(list)
     }

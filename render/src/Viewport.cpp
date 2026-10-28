@@ -2,6 +2,8 @@
 
 #include "aion/render/Document.h"
 
+#include "aion/core/geom/Bezier.h"
+#include "aion/core/view/ModelPicking.h"
 #include "aion/core/model/CameraLens.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Texturing.h"
@@ -258,7 +260,7 @@ void Viewport::showTransientCursor(const QCursor& cursor)
 
 void Viewport::updateCursor()
 {
-    if (m_pickingFocus) { // „Alege punctul de focus”: următorul click
+    if (m_pickingFocus || m_pickingAnchor) { // „Alege punctul de focus” / „obiectul de pus pe cale”: următorul click
         setCursor(Qt::CrossCursor);
         return;
     }
@@ -1073,6 +1075,43 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         }
         f.topPoints.push_back({ glm::vec3(p), color, selected ? 11.0f : 9.0f });
     }
+
+    // Căile de parcurgere: curba, startul și o săgeată la final; estompate dacă sunt ale altei animații. Nu se văd în
+    // redare și nici în export.
+    if (!cleanView()) {
+        for (std::size_t i = 0; i < model.motionPaths().size(); ++i) {
+            const model::MotionPath& path = model.motionPaths().values()[i];
+            const bool selected = model.motionPaths().keys()[i] == doc.selectedPath();
+            if (!path.visible && !selected) {
+                continue;
+            }
+            const bool active = path.animation.value == static_cast<std::uint64_t>(doc.activeAnimation());
+            const glm::vec4 color = selected ? toVec4(m_accent) : active ? withAlpha(m_accent, 0.6f) : withAlpha(m_preview, 0.3f);
+            const std::vector<math::Vec3d> samples = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
+            if (samples.size() < 2) {
+                continue;
+            }
+            std::vector<glm::dvec3> world;
+            for (const math::Vec3d& v : samples) {
+                world.push_back(path.transform.applyToPoint(v));
+            }
+            const std::size_t count = path.curve.closed ? world.size() : world.size() - 1;
+            for (std::size_t k = 0; k < count; ++k) {
+                f.topLines.push_back({ glm::vec3(world[k]), glm::vec3(world[(k + 1) % world.size()]), color,
+                    { selected ? 2.5f : 2.0f, 0.0f } });
+            }
+            f.topPoints.push_back({ glm::vec3(world.front()), color, selected ? 9.0f : 7.0f });
+            if (!path.curve.closed) {
+                const glm::dvec3 end = world.back();
+                const glm::dvec3 dir = glm::normalize(end - world[world.size() - 2]);
+                const glm::dvec3 n = glm::normalize(path.transform.applyToVector(path.normal));
+                const glm::dvec3 side = glm::normalize(glm::cross(n, dir));
+                const double k = screenScale(end) * 12.0;
+                f.topLines.push_back({ glm::vec3(end), glm::vec3(end - dir * k + side * k * 0.6), color, { 2.0f, 0.0f } });
+                f.topLines.push_back({ glm::vec3(end), glm::vec3(end - dir * k - side * k * 0.6), color, { 2.0f, 0.0f } });
+            }
+        }
+    }
 }
 
 std::optional<std::pair<QString, double>> Viewport::objectHandleAt(QPointF position) const
@@ -1102,6 +1141,33 @@ std::optional<std::pair<QString, double>> Viewport::objectHandleAt(QPointF posit
         if (model.lights().values()[i].visible) {
             consider(model.lights().values()[i].position, QStringLiteral("light"),
                 static_cast<double>(model.lights().keys()[i].value));
+        }
+    }
+    // O cale: la ≤ 8 px de linia ei (o cameră sau o lumină mai apropiată câștigă).
+    if (!best) {
+        double bestPath = 8.0;
+        const math::Vec2d cursor = toVec2(position);
+        for (std::size_t i = 0; i < model.motionPaths().size(); ++i) {
+            const model::MotionPath& path = model.motionPaths().values()[i];
+            if (!path.visible) {
+                continue;
+            }
+            const std::vector<math::Vec3d> samples = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
+            for (std::size_t k = 0; k + 1 < samples.size(); ++k) {
+                const auto a = m_camera.project(path.transform.applyToPoint(samples[k]));
+                const auto b = m_camera.project(path.transform.applyToPoint(samples[k + 1]));
+                if (!a || !b) {
+                    continue;
+                }
+                const math::Vec2d ab = *b - *a;
+                const double len2 = glm::dot(ab, ab);
+                const double t = len2 > 1e-12 ? std::clamp(glm::dot(cursor - *a, ab) / len2, 0.0, 1.0) : 0.0;
+                const double d = glm::length(cursor - (*a + ab * t));
+                if (d < bestPath) {
+                    bestPath = d;
+                    best = std::pair { QStringLiteral("path"), static_cast<double>(model.motionPaths().keys()[i].value) };
+                }
+            }
         }
     }
     return best;
@@ -1350,6 +1416,15 @@ void Viewport::setLockCameraToView(bool on)
     if (on != m_lockCamera) {
         m_lockCamera = on;
         emit lookThroughChanged();
+    }
+}
+
+void Viewport::setPickingAnchor(bool on)
+{
+    if (on != m_pickingAnchor) {
+        m_pickingAnchor = on;
+        updateCursor();
+        emit pickingAnchorChanged();
     }
 }
 
@@ -2172,6 +2247,16 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         return;
     }
     stopScenes(); // ca în SketchUp: orice click oprește animația
+    // „Adaugă pe cale”: obiectul de sub cursor se ancorează pe calea selectată.
+    if (m_pickingAnchor && event->button() == Qt::LeftButton && m_document) {
+        const model::Model& model = m_document->model();
+        if (const auto hit = view::pickInstance(model, model.root(), m_camera, toVec2(event->position()))) {
+            m_document->anchorToPath(static_cast<double>(m_document->selectedPath().value), static_cast<double>(hit->instance.value));
+        }
+        setPickingAnchor(false);
+        event->accept();
+        return;
+    }
     // „Alege punctul de focus” (depth of field): distanța de la cameră la punctul de sub cursor, pe direcția privirii.
     if (m_pickingFocus && event->button() == Qt::LeftButton && m_document) {
         const model::CameraId id = m_lookCamera > 0.0 ? model::CameraId { static_cast<std::uint64_t>(m_lookCamera) }
@@ -2221,14 +2306,29 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     // Marcajul pivotului (cu unealta Select) se trage: până la eliberare lucrează unealta „pivot” (mai jos, ca orice
     // unealtă), care se prinde ca Move; un singur pas de undo.
     const bool pivotPress = drag == Drag::None && event->button() == Qt::LeftButton && m_document
-        && m_document->activeTool() == QLatin1String("select") && pivotUnder(event->position());
+        && m_document->activeTool() == QLatin1String("select") && !m_document->curveEditing()
+        && pivotUnder(event->position());
     if (pivotPress) {
         m_document->beginPivotDrag();
     }
     // Click pe o cameră sau o lumină (cu unealta Select): o selectează.
     if (!pivotPress && drag == Drag::None && event->button() == Qt::LeftButton && m_document
-        && m_document->activeTool() == QLatin1String("select")) {
+        && m_document->activeTool() == QLatin1String("select") && !m_document->curveEditing()) {
         if (const auto handle = objectHandleAt(event->position())) {
+            // Dublu click pe o cale: editarea curbei ei.
+            if (handle->first == QLatin1String("path")) {
+                const qint64 now = m_frameClock.nsecsElapsed();
+                const qint64 interval = qint64(QGuiApplication::styleHints()->mouseDoubleClickInterval()) * 1'000'000;
+                const bool twice = now - m_lastPathClickNs <= interval
+                    && QLineF(event->position(), m_lastPathClickPosition).length() <= kMultiClickDistancePx;
+                m_lastPathClickNs = twice ? 0 : now;
+                m_lastPathClickPosition = event->position();
+                if (twice) {
+                    m_document->beginPathEdit(handle->second);
+                    event->accept();
+                    return;
+                }
+            }
             m_document->selectObject(handle->first, handle->second);
             // Se poate și trage: mutarea întreagă e un singur pas de undo.
             if (const auto start = m_document->selectedObjectPosition()) {

@@ -24,10 +24,12 @@ Item {
         }
         if (root.document) {
             const selected = root.document.selectedObject
-            for (const o of root.document.cameras.concat(root.document.lights))
-                out.push(Object.assign({}, o, { lightKind: o.kind, kind: o.kind === "camera" ? "camera" : "light", depth: 0,
+            for (const o of root.document.cameras.concat(root.document.lights).concat(root.document.paths)) {
+                const kind = o.kind === "camera" || o.kind === "path" ? o.kind : "light"
+                out.push(Object.assign({}, o, { lightKind: o.kind, kind: kind, depth: 0,
                     hasChildren: false, copies: 1, hidden: !o.visible, locked: false,
-                    selected: selected.id === o.id && selected.kind === (o.kind === "camera" ? "camera" : "light") }))
+                    selected: selected.id === o.id && selected.kind === kind }))
+            }
         }
         return out
     }
@@ -36,6 +38,7 @@ Item {
     readonly property var lightIcons: ({ point: "lightbulb", spot: "light-spot", directional: "sun", area: "light-area" })
     function iconFor(r) {
         if (r.kind === "camera") return "camera"
+        if (r.kind === "path") return "route"
         if (r.kind === "light") return root.lightIcons[r.lightKind] ?? "lightbulb"
         if (r.kind === "group") return "folder"
         if (r.copies > 1) return "component"
@@ -104,7 +107,7 @@ Item {
             required property var modelData
             property bool editing: false
             readonly property bool isGroup: modelData.kind === "group"
-            readonly property bool isSceneObject: modelData.kind === "camera" || modelData.kind === "light"
+            readonly property bool isSceneObject: modelData.kind === "camera" || modelData.kind === "light" || modelData.kind === "path"
 
             width: ListView.view.width
             height: Theme.controlHeightSm
