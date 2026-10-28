@@ -235,6 +235,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Auto-key** (`Document::autoKey`, `anim.autoKey`): oprit, schimbările intră în poza de bază, iar canalele animate își
   mută toate cheile (`model::adjustWithoutKeys`). Copiere / lipire de chei: `anim.copyKeys` / `anim.pasteKeys` (⌘C / ⌘V,
   prin meniul nativ „Animare”). În scripturi, o comandă necunoscută ca acțiune rulează prin `runCommand` (`anim.fit`).
+  Cât rulează animația (și la export), `Viewport::cleanView()` desenează doar modelul (fără selecție, pivot, hover,
+  ce desenează unealta, cutia grupului editat).
   Undo / redo trec prin `Document::stepHistory`: animația activă (una readusă devine activă), apoi timeline-ul,
   valorile de la playhead, Inspector-ul și Outliner-ul primesc semnalele lor (pasul poate schimba orice).
 
