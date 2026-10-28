@@ -191,3 +191,158 @@ TEST_CASE("Pen: în Animare cere o cale în loc de geometrie", "[core][tools][pe
     CHECK(s.requests.penPath->points.size() == 3);
     CHECK(tol::samePoint(s.requests.penNormal, { 0, 0, 1 }));
 }
+
+namespace {
+
+// Editarea unei curbe: Document pune curba în context la fiecare apel; aici o actualizăm după fiecare cerere.
+struct EditScene : PenScene {
+    std::unique_ptr<tools::Tool> edit = tools::makeTool("penedit");
+
+    EditScene()
+    {
+        REQUIRE(edit);
+        geom::BezierPoint a { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, false };
+        geom::BezierPoint b { { 1000, 800, 0 }, { 500, 800, 0 }, { 1500, 800, 0 }, true };
+        geom::BezierPoint c { { 2000, 0, 0 }, { 2000, 0, 0 }, { 2000, 0, 0 }, false };
+        ctx.editCurve = geom::BezierPath { { a, b, c }, false };
+        ctx.editNormal = { 0, 0, 1 };
+    }
+
+    // Aplică cererea uneltei (ca Document) și o golește.
+    geom::BezierPath applied()
+    {
+        REQUIRE(requests.curveEdit);
+        ctx.editCurve = *requests.curveEdit;
+        requests = {};
+        return *ctx.editCurve;
+    }
+
+    void press(Vec2d a, tools::Modifiers mods = {})
+    {
+        tools::PointerEvent e = at(a);
+        e.modifiers = mods;
+        edit->pointerMove(ctx, e);
+        edit->pointerDown(ctx, e);
+    }
+
+    void release(Vec2d a, tools::Modifiers mods = {})
+    {
+        tools::PointerEvent e = at(a);
+        e.modifiers = mods;
+        edit->pointerUp(ctx, e);
+    }
+
+    void tap(Vec3d world, tools::Modifiers mods = {})
+    {
+        press(screen(world), mods);
+        release(screen(world), mods);
+    }
+
+    void dragFrom(Vec3d from, Vec3d to, tools::Modifiers mods = {})
+    {
+        const Vec2d a = screen(from);
+        const Vec2d b = screen(to);
+        press(a, mods);
+        tools::PointerEvent e = at((a + b) * 0.5);
+        e.modifiers = mods;
+        edit->pointerMove(ctx, e);
+        e.screen = b;
+        edit->pointerMove(ctx, e);
+        release(b, mods);
+    }
+};
+
+} // namespace
+
+TEST_CASE("Pen edit: tragerea unui punct îl mută cu mânerele lui", "[core][tools][pen]")
+{
+    EditScene s;
+    s.dragFrom({ 1000, 800, 0 }, { 1200, 900, 0 });
+    const geom::BezierPath p = s.applied();
+    CHECK(glm::length(p.points[1].point - Vec3d { 1200, 900, 0 }) < 1.0);
+    CHECK(glm::length(p.points[1].out - Vec3d { 1700, 900, 0 }) < 1.0);
+    CHECK(glm::length(p.points[1].in - Vec3d { 700, 900, 0 }) < 1.0);
+    CHECK(tol::samePoint(p.points[0].point, { 0, 0, 0 }));
+}
+
+TEST_CASE("Pen edit: tragerea unui mâner neted îl oglindește pe celălalt", "[core][tools][pen]")
+{
+    EditScene s;
+    s.tap({ 1000, 800, 0 }); // selectează punctul: mânerele lui se pot trage
+    CHECK_FALSE(s.requests.curveEdit);
+    s.dragFrom({ 1500, 800, 0 }, { 1500, 1100, 0 });
+    const geom::BezierPath p = s.applied();
+    CHECK(glm::length(p.points[1].out - Vec3d { 1500, 1100, 0 }) < 1.0);
+    CHECK(glm::length(p.points[1].in - Vec3d { 500, 500, 0 }) < 1.0);
+    CHECK(p.points[1].smooth);
+}
+
+TEST_CASE("Pen edit: Option pe un mâner rupe perechea", "[core][tools][pen]")
+{
+    EditScene s;
+    s.tap({ 1000, 800, 0 });
+    s.dragFrom({ 1500, 800, 0 }, { 1500, 1100, 0 }, { false, false, true });
+    const geom::BezierPath p = s.applied();
+    CHECK(glm::length(p.points[1].out - Vec3d { 1500, 1100, 0 }) < 1.0);
+    CHECK(tol::samePoint(p.points[1].in, { 500, 800, 0 }));
+    CHECK_FALSE(p.points[1].smooth);
+}
+
+TEST_CASE("Pen edit: Option + click comută între colț și neted", "[core][tools][pen]")
+{
+    EditScene s;
+    s.tap({ 1000, 800, 0 }, { false, false, true });
+    geom::BezierPath p = s.applied();
+    CHECK_FALSE(p.points[1].smooth);
+    CHECK(tol::samePoint(p.points[1].in, p.points[1].point));
+    CHECK(tol::samePoint(p.points[1].out, p.points[1].point));
+    s.tap({ 1000, 800, 0 }, { false, false, true });
+    p = s.applied();
+    CHECK(p.points[1].smooth);
+    // Mânerele pe direcția vecinilor (de la primul spre ultimul), la o treime din distanța până la ei.
+    const Vec3d dir = glm::normalize(Vec3d { 2000, 0, 0 } - Vec3d { 0, 0, 0 });
+    CHECK(glm::length(p.points[1].out - (p.points[1].point + dir * (glm::length(Vec3d { 1000, -800, 0 }) / 3.0))) < 1e-6);
+    CHECK(glm::length(p.points[1].in - (p.points[1].point - dir * (glm::length(Vec3d { 1000, 800, 0 }) / 3.0))) < 1e-6);
+}
+
+TEST_CASE("Pen edit: click pe curbă adaugă un punct fără să schimbe forma", "[core][tools][pen]")
+{
+    EditScene s;
+    const geom::BezierPath before = *s.ctx.editCurve;
+    const Vec3d onCurve = geom::bezierPoint(before, 0, 0.5);
+    s.tap(onCurve);
+    const geom::BezierPath p = s.applied();
+    REQUIRE(p.points.size() == 4);
+    CHECK(glm::length(p.points[1].point - onCurve) < 30.0); // unde e cursorul, pe curbă
+    const geom::ArcLength a(before);
+    const geom::ArcLength b(p);
+    CHECK(std::abs(a.length() - b.length()) < 1.0);
+    for (int i = 0; i <= 10; ++i) {
+        CHECK(glm::length(a.at(a.length() * i / 10.0).point - b.at(b.length() * i / 10.0).point) < 1.0);
+    }
+}
+
+TEST_CASE("Pen edit: Delete șterge punctul selectat", "[core][tools][pen]")
+{
+    EditScene s;
+    s.tap({ 1000, 800, 0 });
+    CHECK(s.edit->key(s.ctx, { tools::Key::Delete, {} }));
+    const geom::BezierPath p = s.applied();
+    REQUIRE(p.points.size() == 2);
+    CHECK(tol::samePoint(p.points[1].point, { 2000, 0, 0 }));
+    // Sub două puncte nu se mai șterge nimic.
+    s.tap({ 2000, 0, 0 });
+    s.edit->key(s.ctx, { tools::Key::Delete, {} });
+    CHECK_FALSE(s.requests.curveEdit);
+}
+
+TEST_CASE("Pen edit: Esc și click în afară termină editarea", "[core][tools][pen]")
+{
+    EditScene s;
+    CHECK(s.edit->key(s.ctx, { tools::Key::Escape, {} }));
+    CHECK(s.requests.curveEditDone);
+    s.requests = {};
+    s.tap({ 1000, -1500, 0 });
+    CHECK(s.requests.curveEditDone);
+    CHECK_FALSE(s.requests.curveEdit);
+}

@@ -59,6 +59,7 @@ add_library(aion_core STATIC
     src/tools/TransformTools.cpp
     src/tools/ShapeTools.cpp
     src/tools/PenTool.cpp
+    src/tools/PenEditTool.cpp
     src/tools/PaintTool.cpp
     src/tools/FollowMeTool.cpp
     src/tools/TextureTool.cpp

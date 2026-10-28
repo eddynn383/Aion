@@ -888,6 +888,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "pen") {
         return makePenTool();
     }
+    if (id == "penedit") {
+        return makePenEditTool(); // editarea unei curbe Pen sau a unei căi (pusă de Document, nu e în toolbar)
+    }
     if (id == "pivot") {
         return makePivotTool(); // doar pentru tragerea marcajului pivotului (nu e în toolbar)
     }
