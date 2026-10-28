@@ -888,6 +888,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "circle") {
         return makeCircleTool();
     }
+    if (id == "followme") {
+        return makeFollowMeTool();
+    }
     if (id == "polygon") {
         return makePolygonTool();
     }

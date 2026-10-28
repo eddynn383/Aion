@@ -1,5 +1,7 @@
 #include "aion/core/geom/Bevel.h"
 
+#include "FaceBuilder.h"
+
 #include "aion/core/geom/Operations.h"
 #include "aion/core/math/Tolerance.h"
 
@@ -14,27 +16,6 @@
 namespace aion::geom {
 
 namespace {
-
-// Atributele unei fețe, păstrate când e refăcută.
-struct FaceStyle {
-    model::MaterialId material;
-    model::MaterialId backMaterial;
-    model::TagId tag;
-    TextureTransform texture;
-};
-
-FaceStyle styleOf(const Face& f)
-{
-    return { f.material, f.backMaterial, f.tag, f.texture };
-}
-
-// O față nouă de desenat: poligonul, normala dorită (spre exterior) și stilul.
-struct NewFace {
-    std::vector<Vec3d> points;
-    Vec3d normal { 0.0, 0.0, 1.0 };
-    FaceStyle style;
-    bool strip = false; // o teșitură nouă (rămâne selectată), nu o față vecină refăcută
-};
 
 // Direcția din muchie spre interiorul feței, în planul ei, perpendiculară pe muchie.
 Vec3d inwardDirection(const Mesh& mesh, FaceId face, const Vec3d& a, const Vec3d& b)
@@ -154,54 +135,7 @@ Selection rebuild(Mesh& mesh, const std::set<FaceId>& faces, const std::set<Vert
             eraseEdge(mesh, e);
         }
     }
-    const std::vector<FaceId> before = mesh.faces().keys();
-    const std::set<FaceId> existing(before.begin(), before.end());
-    Selection out;
-    std::set<FaceId> built;
-    for (const NewFace& face : added) {
-        const DrawLineResult drawn = drawPolygon(mesh, face.points);
-        // Fața poligonului: cea nouă care conține centrul lui.
-        Vec3d centroid { 0.0 };
-        for (const Vec3d& p : face.points) {
-            centroid += p;
-        }
-        centroid /= static_cast<double>(face.points.size());
-        for (FaceId f : mesh.faces().keys()) {
-            if (faceContainsPoint(mesh, f, centroid) && std::abs(glm::dot(mesh.face(f).plane.normal, face.normal)) > 0.999) {
-                const FaceId oriented = orientFace(mesh, f, face.normal);
-                mesh.setFaceMaterial(oriented, face.style.material);
-                mesh.setFaceBackMaterial(oriented, face.style.backMaterial);
-                mesh.setFaceTag(oriented, face.style.tag);
-                mesh.setFaceTexture(oriented, face.style.texture);
-                built.insert(oriented);
-                if (face.strip) {
-                    out.faces.insert(oriented);
-                }
-                break;
-            }
-        }
-        (void)drawn;
-    }
-    // drawPolygon închide singur orice buclă plană; fețele pe care nu le-am cerut (de ex. inelul de muchii
-    // coplanare de sub o față teșită) se scot, muchiile rămân.
-    const std::vector<FaceId> after = mesh.faces().keys(); // o copie: eraseFace schimbă lista
-    for (FaceId f : after) {
-        if (!existing.contains(f) && !built.contains(f)) {
-            eraseFace(mesh, f);
-        }
-    }
-    // Muchiile dintre benzile unei rotunjiri (și cele tangente) sunt netede.
-    for (const auto& [a, b] : smoothEdges) {
-        const VertexId va = mesh.findVertexNear(a, tol::kLength * 10);
-        const VertexId vb = mesh.findVertexNear(b, tol::kLength * 10);
-        if (va && vb) {
-            if (const EdgeId e = mesh.findEdge(va, vb)) {
-                mesh.setEdgeStyle(e, true, 0, true);
-            }
-        }
-    }
-    out.prune(mesh);
-    return out;
+    return buildFaces(mesh, added, smoothEdges);
 }
 
 // Fața cealaltă a muchiei (exact două fețe).

@@ -999,3 +999,30 @@ TEST_CASE("Unelte: Move pornește dintr-un colț sau mijloc al obiectului și se
     CHECK(glm::length(m.instance(a).transform.applyToPoint({ 300, 0, 600 }) - Vec3d { 2000, 0, 0 }) < 1e-6);
     CHECK(m.instances().contains(b));
 }
+
+TEST_CASE("Unelte: Follow Me — traseul selectat, click pe profil", "[core][tools][sweep]")
+{
+    Scene s;
+    s.camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 500, 500, 50 }, 0, 0, 5000 }));
+    std::set<geom::EdgeId> path;
+    s.stack.run("Desen", [&](Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, -50, 0 }, { 0, 50, 0 }, { 0, 50, 100 }, { 0, -50, 100 } });
+        for (geom::EdgeId e : geom::drawLine(mesh, { 0, 0, 0 }, { 1000, 0, 0 }).edges) {
+            path.insert(e);
+        }
+        for (geom::EdgeId e : geom::drawLine(mesh, { 1000, 0, 0 }, { 1000, 1000, 0 }).edges) {
+            path.insert(e);
+        }
+    });
+    auto tool = tools::makeTool("followme");
+    REQUIRE(tool);
+    // Fără traseu: un click pe profil nu face nimic și spune ce lipsește.
+    s.click(*tool, { 0, 0, 50 });
+    CHECK(s.mesh.faces().size() == 1);
+    CHECK(tool->status().find("traseul") != std::string::npos);
+    s.selection.edges = path;
+    s.click(*tool, { 0, 0, 50 });
+    CHECK(s.mesh.faces().size() >= 10);
+    CHECK(s.stack.undoName() == "Follow Me");
+    CHECK_FALSE(s.selection.faces.empty());
+}
