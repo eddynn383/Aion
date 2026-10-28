@@ -1,6 +1,7 @@
 # Plan: toolbar nou și cele trei moduri de lucru (Modelare / Animare / Interacțiune)
 
-> Stare: **aprobat de utilizator pe 2026-10-28**, cu deciziile din secțiunea 5 (două modificate de el: 3 și 6). Poate fi continuat de oricine (alt cont,
+> Stare: **implementat (pașii 1–8) pe 2026-10-28**; deciziile din secțiunea 5 (două modificate de utilizator: 3 și 6).
+> Rămân de făcut doar capturile web după publicare (pasul 8, ultima bulină). Poate fi continuat de oricine (alt cont,
 > altă sesiune) fără contextul conversației: citește întâi `CLAUDE.md`, apoi acest fișier, și bifează pașii aici
 > pe măsură ce îi termini (și în `PLAN.md`, secțiunea „Etapa 5”). Comunicarea cu utilizatorul: în română.
 
@@ -217,8 +218,8 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
 - [x] `RulesEditor` și „Interacțiune nouă” doar în acest mod.
 
 ### Pasul 8 — Documentație și verificare ✅ criteriu: CI verde, QA bifat
-- [ ] ADR nou `docs/decisions/0033-moduri-de-lucru.md` (deciziile din 3.x).
-- [ ] `PLAN.md` (Etapa 5 bifată), `CLAUDE.md` (o notă despre `workMode`, `ModeSwitch`, `modes` pe comenzi),
+- [x] ADR nou `docs/decisions/0033-moduri-de-lucru.md` (deciziile din 3.x).
+- [x] `PLAN.md` (Etapa 5 bifată), `CLAUDE.md` (o notă despre `workMode`, `ModeSwitch`, `modes` pe comenzi),
       `docs/qa-checklist.md` (secțiunea „Moduri de lucru”).
 - [ ] Capturi în cele 3 moduri (dark + light), web (Playwright pe https://eddynn383.github.io/Aion/ după publicare).
 
