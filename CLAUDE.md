@@ -138,6 +138,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `overlays/ArrayPanel.qml` și `SoftenPanel.qml` (previzualizare prin undo: `Document::previewArray` /
   `previewSoften` / `commitOperation` / `cancelOperation`). Comenzi: `edit.mirrorX|Y|Z`, `edit.array`, `edit.soften`.
   Atenție în QML: un Popover nu poate avea proprietăți proprii numite `opacity` sau `spacing` (FINAL în Popup).
+  Tot în QML: nu folosi `long`, `int`, `short`, `byte`, `char`, `float`, `double` etc. ca nume de variabile JS —
+  Qt-ul din CI (qmlcachegen) le respinge („Expected token identifier”), deși Qt 6.12 local le acceptă.
 
 - **Faza 24** (ADR 0024): `model::Texture` (octeții imaginii, în arhivă), `Material::texture` / `textureSize`,
   `geom::TextureTransform` pe fețe, `model/Texturing.h` (UV), array de texturi pe binding 2 în `mesh.frag`,

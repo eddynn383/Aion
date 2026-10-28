@@ -166,10 +166,10 @@ Item {
                 if (!info)
                     return
                 // Latura lungă rămâne; cealaltă urmează raportul.
-                const long = Math.max(info.formatWidth, info.formatHeight)
-                const width = aspect >= 1 ? long : Math.round(long * aspect)
-                const height = aspect >= 1 ? Math.round(long / aspect) : long
-                root.document.setCameraProperties(cameraId, { formatWidth: width, formatHeight: height })
+                const longSide = Math.max(info.formatWidth, info.formatHeight)
+                const w = aspect >= 1 ? longSide : Math.round(longSide * aspect)
+                const h = aspect >= 1 ? Math.round(longSide / aspect) : longSide
+                root.document.setCameraProperties(cameraId, { formatWidth: w, formatHeight: h })
             }
         }
     }
