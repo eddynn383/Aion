@@ -461,6 +461,7 @@ public:
     // Keyframe-uri la momentul curent: toate canalele de transformare / culoarea obiectelor selectate, camera dată
     // (cameraState()).
     Q_INVOKABLE void keySelection();
+    Q_INVOKABLE void keyInstance(double instance);
     Q_INVOKABLE void keySelectionColor();
     Q_INVOKABLE void keyCamera(const QVariantMap& camera);
     // Cheile de pe timeline, ca liste de referințe { instance, property, time }: instance 0 = camera; property ""

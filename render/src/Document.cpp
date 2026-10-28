@@ -2059,6 +2059,17 @@ void Document::keySelection()
     });
 }
 
+void Document::keyInstance(double instance)
+{
+    const model::InstanceId id { static_cast<std::uint64_t>(instance) };
+    if (!require(Animation) || !m_model.instances().contains(id)) {
+        return;
+    }
+    const double t = m_timelineTime;
+    const model::TransformValues v = currentValues(id);
+    editAnimation("Keyframe", [&](model::Animation& a) { model::keyTransform(a, id, t, v, v, false); });
+}
+
 void Document::keySelectionColor()
 {
     if (!require(Animation)) {
@@ -2308,6 +2319,11 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
 model::Model& Document::pose() const
 {
     const auto key = std::make_tuple(m_modelRevision, m_timelineTime, m_activeAnimation.value);
+    // Într-o tranzacție deschisă (un script) modelul nu se poate copia: până la sfârșitul ei, poza e modelul de bază
+    // (îl citesc doar legăturile QML; editările pe poză nu rulează în scripturi).
+    if (m_model.isRecording()) {
+        return const_cast<model::Model&>(m_model);
+    }
     if (!m_pose || key != m_poseKey) {
         m_pose = m_model;
         if (const model::Animation* a = currentAnimation()) {

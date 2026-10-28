@@ -189,9 +189,15 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
       începutul pistei); `timeline` (QVariantMap) expune canalele, valorile și textul lor. ADR 0034.
 
 ### Pasul 3 — Timeline: obiecte expandabile, canale, valori la chei ✅ criteriu: captură cu un obiect deschis
-- [ ] Rândul sumar + rândurile canalelor (doar cele existente), nume ca în Inspector, valoarea lângă fiecare cheie.
-- [ ] Editarea valorii unei chei (dublu click) și a valorii curente din coloana stângă.
-- [ ] Starea deschis / închis ținută per obiect (în sesiune).
+- [x] Rândul sumar + rândurile canalelor (doar cele existente), nume ca în Inspector, valoarea lângă fiecare cheie.
+      Componentele: `shell/Timeline.qml` (starea, vederea în timp, selecția, tragerea), `TimelineRow.qml`,
+      `TimelineKey.qml`, `TimelineRuler.qml`.
+- [x] Editarea valorii unei chei (dublu click) și a valorii curente din coloana stângă (`Document::setKeyValue`,
+      `setChannelValue`); ◆ pe rândul obiectului = cheie pe toate canalele (`keyInstance`).
+- [x] Starea deschis / închis ținută per obiect (în sesiune); înălțimea timeline-ului se trage de marginea de sus
+      (`preferences.timelineHeight`). ⌫ / Delete șterg cheile selectate (`anim.deleteKeys`).
+- Reparat pe drum: un script care creează obiecte în Animare (tranzacție deschisă) făcea `pose()` să copieze modelul
+  în timpul înregistrării (assert în `Model::operator=`); acum, cât durează tranzacția, poza e modelul de bază.
 
 ### Pasul 4 — Easing: presetări și editorul de curbă ✅ criteriu: o curbă proprie salvată apare în alt document
 - [ ] `ease(Easing, t)` pentru Bézier (rezolvarea lui x → t cu Newton + bisecție), teste.

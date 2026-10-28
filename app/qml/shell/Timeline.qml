@@ -1,52 +1,228 @@
 import QtQuick
 import Aion
 
-// Timeline-ul (ca în Figma / Blender): animațiile modelului, cu keyframe-uri pe obiecte (poziție, rotație, mărime,
-// culoare) și pe cameră. Romburile se trag pentru a muta cheia în timp, click dreapta alege easing-ul, Delete o
-// șterge. Click pe riglă sau pe piste mută playhead-ul și arată animația; un click de editare în viewport revine
-// la model.
+// Timeline-ul (ca în After Effects / Blender, ADR 0034): animația activă, cu un rând pe obiect (un romb pentru fiecare
+// moment cu chei, bare pe intervalele animate) care se deschide (▸ / ▾) în canalele lui — doar proprietățile animate —,
+// cu valoarea fiecărei chei alături și valoarea curentă, editabilă, în stânga. Cheile se selectează (⇧ / ⌘ adaugă),
+// se trag în grup (cu snap la cadre și la alte chei; ⇧ fără snap), se șterg, au meniu (click dreapta) și valoarea
+// editabilă (dublu click). Rotița derulează rândurile, ⇧ + rotița timpul, ⌘ + rotița face zoom; rigla mută playhead-ul.
 Rectangle {
     id: root
 
     property var document
     property var viewport
 
-    signal closeRequested()
     signal exportRequested()
+    // Înălțimea nouă cerută prin tragerea marginii de sus.
+    signal resizeRequested(real height)
 
     readonly property var tl: document ? document.timeline : ({})
     readonly property bool hasAnimation: document && document.activeAnimation > 0
     readonly property real duration: tl.duration ?? 5
-    readonly property real namesWidth: 170
+    readonly property int fps: tl.fps ?? 30
+    readonly property real namesWidth: 248
+    readonly property real rowHeight: 24
+    readonly property real lanesWidth: Math.max(0, body.width - namesWidth)
     // Pe un timeline îngust, butoanele de keyframe rămân doar cu iconiță (și tooltip).
     readonly property bool wide: width > 1080
-    readonly property real pxPerSecond: Math.max(10, (lanes.width - 16) / Math.max(duration, 0.1))
-    property var selectedKey: null // { kind, instance, property, time }
 
-    function timeAt(x) { return Math.max(0, Math.min(root.duration, (x - 8) / root.pxPerSecond)) }
-    function xAt(t) { return 8 + t * root.pxPerSecond }
-    function fmt(t) { return Number(t).toLocaleString(Qt.locale("ro_RO"), "f", 2) }
+    // --- Vederea în timp: secunda de la marginea din stânga și zoom-ul. Până la primul zoom, toată animația încape. ---
+    property real viewStart: 0
+    property real pxPerSecond: 100
+    property bool userZoomed: false
+    readonly property real fitScale: Math.max(2, (lanesWidth - 28) / Math.max(duration, 0.1))
+    onFitScaleChanged: if (!userZoomed) { pxPerSecond = fitScale; viewStart = 0 }
+
+    function xAt(t) { return 12 + (t - viewStart) * pxPerSecond }
+    function timeAt(x) { return viewStart + (x - 12) / pxPerSecond }
+    function clampTime(t) { return Math.max(0, Math.min(duration, t)) }
+    function fitAll() {
+        userZoomed = false
+        viewStart = 0
+        pxPerSecond = fitScale
+    }
+    // Zoom în jurul punctului `x` din pistă (factor > 1 = apropiere).
+    function zoomAt(x, factor) {
+        const t = timeAt(x)
+        userZoomed = true
+        pxPerSecond = Math.max(fitScale / 4, Math.min(4000, pxPerSecond * factor))
+        viewStart = Math.max(-1, t - (x - 12) / pxPerSecond)
+    }
+    function scrollTime(seconds) {
+        userZoomed = true
+        const visible = Math.max(0.1, (lanesWidth - 24) / pxPerSecond)
+        viewStart = Math.max(-0.5, Math.min(Math.max(0, duration - visible) + 0.5, viewStart + seconds))
+    }
+    function scrubTo(x) {
+        if (hasAnimation)
+            document.timelineTime = clampTime(Math.round(timeAt(x) * fps) / fps)
+    }
+
+    // Timpul ca `mm:ss.cc`.
+    function clock(t) {
+        const m = Math.floor(t / 60)
+        const s = t - m * 60
+        return String(m).padStart(2, "0") + ":" + (s < 10 ? "0" : "") + s.toFixed(2)
+    }
+
+    // --- Rândurile: camera, apoi fiecare obiect și (deschis) canalele lui ---
+    // Obiectele deschise (id instanță → true), ținute cât e deschisă aplicația.
+    property var expanded: ({})
+    function toggleExpanded(id) {
+        const e = Object.assign({}, expanded)
+        e[id] = !e[id]
+        expanded = e
+    }
+    function expandAll(open) {
+        const e = {}
+        for (const t of (tl.tracks ?? []))
+            e[t.instance] = open
+        expanded = e
+    }
+    readonly property var rows: {
+        const out = []
+        if (!hasAnimation)
+            return out
+        if ((tl.camera ?? []).length > 0)
+            out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", icon: "video", keys: tl.camera, selected: false })
+        for (const t of (tl.tracks ?? [])) {
+            const open = expanded[t.instance] === true
+            out.push({ kind: "object", instance: t.instance, property: "", name: t.name, icon: "box",
+                       keys: t.times.map(time => ({ time: time })), selected: t.selected, open: open })
+            if (!open)
+                continue
+            for (const c of t.channels)
+                out.push({ kind: "channel", instance: t.instance, property: c.property, name: c.label, unit: c.unit,
+                           keys: c.keys, current: c.current, currentText: c.currentText, selected: t.selected })
+        }
+        return out
+    }
+
+    // --- Cheile selectate: { instance, property, time } (instance 0 = camera, property "" = rândul sumar) ---
+    property var selectedKeys: []
+    function sameTime(a, b) { return Math.abs(a - b) < 0.5 / Math.max(1, fps) }
+    function sameKey(a, b) { return a.instance === b.instance && a.property === b.property && sameTime(a.time, b.time) }
+    // O cheie e selectată dacă e chiar ea în listă, sau rândul sumar al obiectului ei la același moment.
+    function isSelected(ref) {
+        for (const s of selectedKeys) {
+            if (s.instance === ref.instance && sameTime(s.time, ref.time) && (s.property === ref.property || s.property === ""))
+                return true
+        }
+        return false
+    }
+    function selectKeys(list) { selectedKeys = list }
+    function deleteSelectedKeys() {
+        if (selectedKeys.length === 0)
+            return false
+        document.removeKeys(selectedKeys)
+        selectKeys([])
+        return true
+    }
+
+    // Tragerea cheilor: toate cele selectate se mută cu `dragDelta` (secunde), cu snap la cadre, la playhead și la
+    // celelalte chei (⇧ = fără snap); timpul se scrie la eliberare (un pas de undo).
+    property real dragDelta: 0
+    property bool dragging: false
+    property var dragStart: null // { time, x, additive, ref }
+    function cursorX(item, mouse) { return item.mapToItem(lanesArea, mouse.x, 0).x }
+    function snapTime(t) {
+        let best = null
+        let bestDx = 8
+        const consider = (time) => {
+            const dx = Math.abs((time - t) * pxPerSecond)
+            if (dx < bestDx) {
+                bestDx = dx
+                best = time
+            }
+        }
+        consider(document.timelineTime)
+        for (const r of rows) {
+            for (const k of r.keys) {
+                if (!isSelected({ instance: r.instance, property: r.property, time: k.time }))
+                    consider(k.time)
+            }
+        }
+        return best !== null ? best : Math.round(t * fps) / fps
+    }
+    function keyPressed(item, mouse) {
+        root.forceActiveFocus()
+        const ref = item.ref
+        if (mouse.button === Qt.RightButton) {
+            if (!isSelected(ref))
+                selectKeys([ref])
+            const p = item.mapToItem(root, mouse.x, mouse.y)
+            keyMenu.openAt(p.x, p.y)
+            return
+        }
+        const additive = (mouse.modifiers & (Qt.ShiftModifier | Qt.ControlModifier)) !== 0
+        if (additive) {
+            const exact = selectedKeys.findIndex(s => sameKey(s, ref))
+            selectKeys(exact >= 0 ? selectedKeys.filter((s, i) => i !== exact) : selectedKeys.concat([ref]))
+        } else if (!isSelected(ref)) {
+            selectKeys([ref])
+        }
+        dragStart = { time: ref.time, x: cursorX(item, mouse), additive: additive, ref: ref }
+        dragging = false
+    }
+    function keyDragged(item, mouse) {
+        if (!dragStart || !isSelected(dragStart.ref))
+            return
+        const dx = cursorX(item, mouse) - dragStart.x
+        if (!dragging && Math.abs(dx) < 3)
+            return
+        dragging = true
+        const raw = dragStart.time + dx / pxPerSecond
+        const target = (mouse.modifiers & Qt.ShiftModifier) ? raw : snapTime(raw)
+        // Grupul rămâne în durata animației.
+        let lo = Infinity
+        let hi = -Infinity
+        for (const s of selectedKeys) {
+            lo = Math.min(lo, s.time)
+            hi = Math.max(hi, s.time)
+        }
+        dragDelta = Math.max(-lo, Math.min(duration - hi, target - dragStart.time))
+    }
+    function keyReleased(item, mouse) {
+        if (dragging && Math.abs(dragDelta) > 1e-9) {
+            const delta = dragDelta
+            document.moveKeys(selectedKeys, delta)
+            selectKeys(selectedKeys.map(s => Object.assign({}, s, { time: s.time + delta })))
+        } else if (!dragging && mouse.button === Qt.LeftButton && dragStart && !dragStart.additive) {
+            selectKeys([dragStart.ref])
+            document.timelineTime = dragStart.time
+        }
+        dragDelta = 0
+        dragging = false
+        dragStart = null
+    }
+    function keyDoubleClicked(item) {
+        if (item.row.kind !== "channel" || item.row.property === "color")
+            return
+        valueEditor.open(item)
+    }
 
     color: Theme.bgPanel
     focus: true
 
-    Keys.onDeletePressed: deleteSelected()
-    Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_Backspace) {
-            deleteSelected()
-            event.accepted = true
-        }
-    }
-    function deleteSelected() {
-        if (root.selectedKey) {
-            root.document.removeKeys([root.selectedKey])
-            root.selectedKey = null
-        }
-    }
-
     Separator { width: parent.width; anchors.top: parent.top }
+    // Marginea de sus se trage (înălțimea timeline-ului).
+    MouseArea {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        y: -3
+        height: 7
+        z: 5
+        cursorShape: Qt.SizeVerCursor
+        property real startY: 0
+        property real startHeight: 0
+        onPressed: (mouse) => { startY = mapToItem(null, mouse.x, mouse.y).y; startHeight = root.height }
+        onPositionChanged: (mouse) => {
+            if (pressed)
+                root.resizeRequested(startHeight - (mapToItem(null, mouse.x, mouse.y).y - startY))
+        }
+    }
 
-    // --- Antetul: animația, redarea, keyframe-urile, setările ---
+    // --- Antetul: animația, redarea, timpul, keyframe-urile, setările ---
     Item {
         id: header
         anchors.top: parent.top
@@ -164,36 +340,69 @@ Rectangle {
 
             Separator { width: 1; height: 20; anchors.verticalCenter: parent.verticalCenter }
 
-            IconButton {
+            // Transportul: început, cheia anterioară, redare, cheia următoare, sfârșit, buclă.
+            Row {
                 anchors.verticalCenter: parent.verticalCenter
-                width: 28; height: 28; iconSize: Theme.iconSizeSm
-                iconName: "skip-back"
-                tooltip: "La început"
-                enabled: root.hasAnimation
-                onClicked: root.document.timelineTime = 0
+                spacing: 2
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
+                    iconName: "skip-back"
+                    tooltip: "La început"
+                    shortcut: "Home"
+                    enabled: root.hasAnimation
+                    onClicked: root.document.jumpToEdge(false)
+                }
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
+                    iconName: "arrow-left"
+                    tooltip: "Cheia anterioară"
+                    shortcut: "Alt+Left"
+                    enabled: root.hasAnimation
+                    onClicked: root.document.jumpToKey(-1)
+                }
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
+                    iconName: root.document && root.document.playing ? "pause" : "play"
+                    tooltip: root.document && root.document.playing ? "Pauză" : "Redă"
+                    shortcut: "Space"
+                    enabled: root.hasAnimation
+                    checked: root.document && root.document.playing
+                    onClicked: root.document.togglePlay()
+                }
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
+                    iconName: "arrow-right"
+                    tooltip: "Cheia următoare"
+                    shortcut: "Alt+Right"
+                    enabled: root.hasAnimation
+                    onClicked: root.document.jumpToKey(1)
+                }
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
+                    iconName: "skip-back"
+                    rotation: 180
+                    tooltip: "La sfârșit"
+                    shortcut: "End"
+                    enabled: root.hasAnimation
+                    onClicked: root.document.jumpToEdge(true)
+                }
+                IconButton {
+                    width: 28; height: 28; iconSize: Theme.iconSizeSm
+                    iconName: "repeat"
+                    tooltip: "În buclă"
+                    enabled: root.hasAnimation
+                    checked: root.tl.loop === true
+                    solidChecked: false
+                    onClicked: root.document.setAnimationSettings(root.duration, root.fps, !root.tl.loop)
+                }
             }
-            IconButton {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 28; height: 28; iconSize: Theme.iconSizeSm
-                iconName: root.document && root.document.playing ? "pause" : "play"
-                tooltip: root.document && root.document.playing ? "Pauză (Space)" : "Redă (Space)"
-                enabled: root.hasAnimation
-                checked: root.document && root.document.playing
-                onClicked: root.document.playing ? root.document.pause() : root.document.play()
-            }
-            IconButton {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 28; height: 28; iconSize: Theme.iconSizeSm
-                iconName: "repeat"
-                tooltip: "În buclă"
-                enabled: root.hasAnimation
-                checked: root.tl.loop === true
-                solidChecked: false
-                onClicked: root.document.setAnimationSettings(root.duration, root.tl.fps, !root.tl.loop)
-            }
+
+            // Timpul: mm:ss.cc / durata · cadrul.
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.hasAnimation ? root.fmt(root.document.timelineTime) + " / " + root.fmt(root.duration) + " s" : ""
+                visible: root.hasAnimation
+                text: root.clock(root.document ? root.document.timelineTime : 0) + " / " + root.clock(root.duration)
+                      + "  ·  " + Math.round((root.document ? root.document.timelineTime : 0) * root.fps) + "f"
                 color: Theme.textSecondary
                 font.family: Theme.fontMono
                 font.pixelSize: Theme.fontSizeSm
@@ -206,7 +415,7 @@ Rectangle {
                 small: true
                 text: root.wide ? "Keyframe" : ""
                 iconName: "diamond"
-                Tooltip { visible: parent.hovered && !root.wide; text: "Keyframe: poziție, rotație, mărime" }
+                Tooltip { visible: parent.hovered && !root.wide; text: "Keyframe: poziție, rotație, scară (K)" }
                 enabled: root.hasAnimation
                 onClicked: root.document.keySelection()
             }
@@ -259,14 +468,14 @@ Rectangle {
                             step: 0.5
                             decimals: 1
                             value: root.duration
-                            onValueModified: (v) => root.document.setAnimationSettings(v, root.tl.fps, root.tl.loop)
+                            onValueModified: (v) => root.document.setAnimationSettings(v, root.fps, root.tl.loop)
                         }
                         NumberField {
                             width: 174
                             label: "fps"
                             from: 1
                             to: 120
-                            value: root.tl.fps ?? 30
+                            value: root.fps
                             onValueModified: (v) => root.document.setAnimationSettings(root.duration, Math.round(v), root.tl.loop)
                         }
                     }
@@ -298,202 +507,107 @@ Rectangle {
         }
     }
 
-    // --- Pistele ---
+    // --- Rigla, rândurile, playhead-ul ---
     Item {
         id: body
         anchors.top: header.bottom
-        anchors.topMargin: Theme.space2
+        anchors.topMargin: Theme.space1
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: Theme.space2
+        anchors.leftMargin: Theme.space2
+        anchors.rightMargin: Theme.space2
+        anchors.bottomMargin: Theme.space1
 
-        readonly property var rows: {
-            const out = []
-            if (!root.hasAnimation)
-                return out
-            if ((root.tl.camera ?? []).length > 0)
-                out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", keys: root.tl.camera })
-            for (const t of (root.tl.tracks ?? [])) {
-                out.push({ kind: "transform", instance: t.instance, property: "", name: t.name,
-                           keys: t.times.map(time => ({ time: time })), selected: t.selected })
-                const color = t.channels.find(c => c.property === "color")
-                if (color)
-                    out.push({ kind: "color", instance: t.instance, property: "color", name: t.name + " · culoare", keys: color.keys,
-                               selected: t.selected })
-            }
-            return out
+        TimelineRuler {
+            id: ruler
+            visible: root.hasAnimation
+            x: root.namesWidth
+            width: root.lanesWidth
+            height: 20
+            timeline: root
         }
 
-        // Numele pistelor.
-        Column {
-            id: names
-            anchors.top: parent.top
-            anchors.topMargin: 24
-            width: root.namesWidth
-            spacing: 2
-            Repeater {
-                model: body.rows
-                delegate: Item {
-                    required property var modelData
-                    width: names.width
-                    height: 22
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: Theme.space1 + 2
-                        Icon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            name: modelData.kind === "camera" ? "video" : modelData.kind === "color" ? "palette" : "box"
-                            size: 12
-                            color: Theme.textTertiary
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: names.width - 24
-                            elide: Text.ElideRight
-                            text: modelData.name
-                            color: modelData.selected ? Theme.textPrimary : Theme.textSecondary
-                            font.pixelSize: Theme.fontSizeXs
-                        }
+        Flickable {
+            id: rowsFlick
+            anchors.top: ruler.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            contentWidth: width
+            contentHeight: rowsColumn.height
+            interactive: false
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
+            // Fundalul pistelor: un click mută playhead-ul și golește selecția cheilor.
+            MouseArea {
+                id: lanesArea
+                x: root.namesWidth
+                width: root.lanesWidth
+                height: Math.max(rowsColumn.height, rowsFlick.height)
+                onPressed: (mouse) => { root.forceActiveFocus(); root.selectKeys([]); root.scrubTo(mouse.x) }
+                onPositionChanged: (mouse) => { if (pressed) root.scrubTo(mouse.x) }
+            }
+
+            Column {
+                id: rowsColumn
+                Repeater {
+                    model: root.rows
+                    delegate: TimelineRow {
+                        required property var modelData
+                        timeline: root
+                        row: modelData
                     }
+                }
+            }
+        }
+
+        // Rotița: rândurile; ⇧ (sau gestul orizontal) = timpul; ⌘ / Ctrl = zoom în jurul cursorului.
+        WheelHandler {
+            target: null
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: (event) => {
+                const lanesX = event.x - root.namesWidth
+                const horizontal = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y)
+                if (event.modifiers & Qt.ControlModifier) {
+                    root.zoomAt(Math.max(0, lanesX), Math.pow(1.0015, event.angleDelta.y))
+                } else if ((event.modifiers & Qt.ShiftModifier) || horizontal) {
+                    const d = horizontal ? event.angleDelta.x : event.angleDelta.y
+                    root.scrollTime(-d / 120 * 60 / root.pxPerSecond)
+                } else {
+                    rowsFlick.contentY = Math.max(0, Math.min(rowsFlick.contentHeight - rowsFlick.height,
+                                                              rowsFlick.contentY - event.angleDelta.y / 2))
                 }
             }
         }
 
         Text {
-            visible: !root.hasAnimation || body.rows.length === 0
-            anchors.left: lanes.left
+            visible: !root.hasAnimation || root.rows.length === 0
+            x: root.namesWidth + Theme.space3
             anchors.verticalCenter: parent.verticalCenter
-            anchors.leftMargin: Theme.space3
-            width: lanes.width - Theme.space6
+            width: root.lanesWidth - Theme.space6
             wrapMode: Text.Wrap
             text: !root.hasAnimation
                   ? "Creează o animație (meniul din stânga sus), apoi: așază obiectul, apasă „Keyframe”, mută playhead-ul, "
                     + "schimbă poziția obiectului și apasă din nou „Keyframe”."
-                  : "Selectează un obiect și apasă „Keyframe” (poziție, rotație, mărime), „Culoare” sau „Cameră”."
+                  : "Selectează un obiect și mută-l, rotește-l sau apasă „Keyframe” (K): fiecare proprietate schimbată "
+                    + "devine un canal, vizibil când deschizi obiectul (▸)."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
 
-        // Rigla, pistele și playhead-ul.
+        // Playhead-ul, peste riglă și piste.
         Item {
-            id: lanes
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.left: names.right
-            anchors.right: parent.right
-            clip: true
             visible: root.hasAnimation
-
-            // Click / drag pe zona goală: mută playhead-ul.
-            MouseArea {
-                anchors.fill: parent
-                onPressed: (mouse) => { root.selectedKey = null; root.forceActiveFocus(); root.document.timelineTime = root.timeAt(mouse.x) }
-                onPositionChanged: (mouse) => { if (pressed) root.document.timelineTime = root.timeAt(mouse.x) }
-            }
-
-            // Rigla: o gradație pe secundă (sau mai rară, dacă nu încape).
-            Repeater {
-                model: Math.floor(root.duration / Math.max(1, Math.ceil(40 / root.pxPerSecond))) + 1
-                delegate: Item {
-                    required property int index
-                    readonly property real step: Math.max(1, Math.ceil(40 / root.pxPerSecond))
-                    x: root.xAt(index * step)
-                    height: lanes.height
-                    Rectangle { width: 1; height: lanes.height; color: Theme.borderSubtle }
-                    Text {
-                        x: 3
-                        text: index * parent.step + " s"
-                        color: Theme.textTertiary
-                        font.pixelSize: 10
-                    }
-                }
-            }
-
-            Column {
-                anchors.top: parent.top
-                anchors.topMargin: 24
-                width: parent.width
-                spacing: 2
-                Repeater {
-                    model: body.rows
-                    delegate: Rectangle {
-                        id: lane
-                        required property var modelData
-                        width: lanes.width
-                        height: 22
-                        radius: Theme.radiusSm
-                        color: modelData.selected ? Theme.accentSubtle : Theme.bgHover
-                        Repeater {
-                            model: lane.modelData.keys
-                            delegate: Item {
-                                id: keyItem
-                                required property var modelData
-                                readonly property bool selected: root.selectedKey !== null
-                                    && root.selectedKey.kind === lane.modelData.kind
-                                    && root.selectedKey.instance === lane.modelData.instance
-                                    && Math.abs(root.selectedKey.time - modelData.time) < 1e-6
-                                property real dragX: 0
-                                x: root.xAt(modelData.time) - 7 + dragX
-                                y: 4
-                                width: 14
-                                height: 14
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: 10
-                                    height: 10
-                                    rotation: 45
-                                    radius: 2
-                                    color: lane.modelData.kind === "color" ? Theme.danger
-                                         : lane.modelData.kind === "camera" ? Theme.axisY : Theme.accent
-                                    border.color: keyItem.selected ? Theme.textPrimary : "transparent"
-                                    border.width: 2
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    anchors.margins: -3
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    cursorShape: Qt.SizeHorCursor
-                                    property real startX: 0
-                                    onPressed: (mouse) => {
-                                        root.forceActiveFocus()
-                                        root.selectedKey = { kind: lane.modelData.kind, instance: lane.modelData.instance,
-                                                             property: lane.modelData.property, time: keyItem.modelData.time }
-                                        startX = mouse.x
-                                        if (mouse.button === Qt.RightButton) {
-                                            easingMenu.key = root.selectedKey
-                                            easingMenu.x = keyItem.x
-                                            easingMenu.open()
-                                        } else {
-                                            root.document.timelineTime = keyItem.modelData.time
-                                        }
-                                    }
-                                    onPositionChanged: (mouse) => { if (pressed && mouse.buttons & Qt.LeftButton) keyItem.dragX += mouse.x - startX }
-                                    onReleased: (mouse) => {
-                                        if (mouse.button !== Qt.LeftButton || Math.abs(keyItem.dragX) < 2) {
-                                            keyItem.dragX = 0
-                                            return
-                                        }
-                                        const t = root.timeAt(root.xAt(keyItem.modelData.time) + keyItem.dragX)
-                                        const key = { kind: lane.modelData.kind, instance: lane.modelData.instance,
-                                                      property: lane.modelData.property, time: keyItem.modelData.time }
-                                        root.document.moveKeys([key], t - key.time)
-                                        keyItem.dragX = 0
-                                        root.selectedKey = Object.assign({}, key, { time: t })
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Playhead.
+            x: root.namesWidth
+            width: root.lanesWidth
+            height: parent.height
+            clip: true
             Rectangle {
-                visible: root.hasAnimation
-                x: root.xAt(root.document ? root.document.timelineTime : 0)
+                x: root.xAt(root.document ? root.document.timelineTime : 0) - 1
                 width: 2
-                height: lanes.height
+                height: parent.height
                 color: Theme.accent
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -508,63 +622,57 @@ Rectangle {
         }
     }
 
-    Popover {
-        id: easingMenu
-        property var key: null
-        y: header.height + Theme.space2
-        width: 180
-        padding: Theme.space1
-        contentItem: Column {
-            spacing: 1
-            Repeater {
-                model: ["Liniar", "Lin (in-out)", "Accelerează (in)", "Încetinește (out)", "Salt (step)"]
-                delegate: Rectangle {
-                    required property string modelData
-                    required property int index
-                    width: 172
-                    height: Theme.controlHeightSm
-                    radius: Theme.radiusSm
-                    color: easingArea.containsMouse ? Theme.bgHover : "transparent"
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.space2
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: modelData
-                        color: Theme.textPrimary
-                        font.pixelSize: Theme.fontSizeSm
-                    }
-                    MouseArea {
-                        id: easingArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: {
-                            const k = easingMenu.key
-                            root.document.setKeysEasing([k], ["linear", "easeInOut", "easeIn", "easeOut", "step"][index])
-                            easingMenu.close()
-                        }
-                    }
-                }
-            }
-            Rectangle {
-                width: 172
-                height: Theme.controlHeightSm
-                radius: Theme.radiusSm
-                color: deleteKeyArea.containsMouse ? Theme.bgHover : "transparent"
-                Text {
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.space2
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Șterge keyframe-ul"
-                    color: Theme.danger
-                    font.pixelSize: Theme.fontSizeSm
-                }
-                MouseArea {
-                    id: deleteKeyArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: { root.deleteSelected(); easingMenu.close() }
-                }
-            }
+    // Editarea valorii unei chei (dublu click pe ea).
+    NumberField {
+        id: valueEditor
+        property var ref: null
+        function open(item) {
+            ref = item.ref
+            const unit = item.row.unit
+            valueEditor.unit = unit === "×" ? "" : unit
+            valueEditor.decimals = unit === "mm" ? 0 : unit === "°" ? 1 : 3
+            valueEditor.value = item.key.value
+            valueEditor.text = valueEditor.format(item.key.value)
+            const p = item.mapToItem(root, item.width / 2, item.height / 2)
+            x = Math.max(0, Math.min(root.width - width, p.x - width / 2))
+            y = p.y - height / 2
+            visible = true
+            forceActiveFocus()
+            selectAll()
+        }
+        visible: false
+        z: 10
+        width: 104
+        height: 22
+        compact: true
+        labelVisible: false
+        onValueModified: (v) => { if (ref) root.document.setKeyValue(ref, v) }
+        onActiveFocusChanged: if (!activeFocus) visible = false
+        Keys.onEscapePressed: visible = false
+    }
+
+    // Meniul unei chei (click dreapta): easing, mergi la cheie, ștergere.
+    ContextMenu {
+        id: keyMenu
+        items: [
+            { id: "easing:linear", name: "Easing: liniar" },
+            { id: "easing:easeInOut", name: "Easing: lin (in-out)" },
+            { id: "easing:easeIn", name: "Easing: accelerează (in)" },
+            { id: "easing:easeOut", name: "Easing: încetinește (out)" },
+            { id: "easing:step", name: "Easing: salt (step)" },
+            { separator: true },
+            { id: "goto", name: "Mergi la cheie" },
+            { separator: true },
+            { id: "delete", name: root.selectedKeys.length > 1 ? "Șterge keyframe-urile" : "Șterge keyframe-ul",
+              shortcut: "⌫", destructive: true }
+        ]
+        onTriggered: (id) => {
+            if (id.startsWith("easing:"))
+                root.document.setKeysEasing(root.selectedKeys, id.slice(7))
+            else if (id === "goto" && root.selectedKeys.length > 0)
+                root.document.timelineTime = root.selectedKeys[0].time
+            else if (id === "delete")
+                root.deleteSelectedKeys()
         }
     }
 }
