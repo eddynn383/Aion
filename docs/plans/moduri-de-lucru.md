@@ -183,12 +183,12 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
 - [x] Mesaj clar: „În modul Animare nu se modifică geometria. Treci în Modelare (⌥1).”
 
 ### Pasul 5 — Layout-ul pe mod (panouri, Inspector) ✅ criteriu: capturi în cele 3 moduri
-- [ ] Panoul stâng: secțiunile vizibile după mod (tabelul din 3.3–3.5); înălțimile și starea deschis/închis rămân
+- [x] Panoul stâng: secțiunile vizibile după mod (tabelul din 3.3–3.5); înălțimile și starea deschis/închis rămân
       pe secțiune.
-- [ ] `EntityInfo.qml`: grupurile după mod (Interacțiune doar în modul Interacțiune; ◆ mereu vizibile în Animare;
+- [x] `EntityInfo.qml`: grupurile după mod (Interacțiune doar în modul Interacțiune; ◆ mereu vizibile în Animare;
       plasarea doar-citire în Interacțiune).
-- [ ] `ViewportControls.qml`: ▷ (testarea interacțiunilor) doar în modul Interacțiune (sau scos, dacă e în toolbar).
-- [ ] Bara de stare: modul curent la stânga indicației (de exemplu „Animare · Click pe un obiect…”).
+- [x] `ViewportControls.qml`: ▷ (testarea interacțiunilor) doar în modul Interacțiune (sau scos, dacă e în toolbar).
+- [x] Bara de stare: modul curent la stânga indicației (de exemplu „Animare · Click pe un obiect…”).
 
 ### Pasul 6 — Animare: timeline automat și auto-key ✅ criteriu: Move în Animare scrie un keyframe, modelul nu se schimbă
 - [ ] Intrarea în Animare: timeline vizibil (fără buton de închidere, ⌥T dezactivat), `m_previewing = true` la

@@ -1254,6 +1254,7 @@ Window {
                 }
                 AccordionSection {
                     id: librarySection
+                    visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
                     title: "Bibliotecă"
                     iconName: "book-open"
@@ -1285,6 +1286,7 @@ Window {
                 }
                 AccordionSection {
                     id: tagsSection
+                    visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
                     title: "Tag-uri"
                     iconName: "tag"
@@ -1309,6 +1311,7 @@ Window {
                 }
                 AccordionSection {
                     id: materialsSection
+                    visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
                     title: "Materiale"
                     iconName: "palette"
@@ -1346,6 +1349,7 @@ Window {
                 }
                 AccordionSection {
                     id: scenesSection
+                    visible: doc.workMode !== 2 // după modul de lucru
                     width: parent.width
                     title: "Scene"
                     iconName: "monitor"
@@ -1382,6 +1386,7 @@ Window {
                 }
                 AccordionSection {
                     id: interactionsSection
+                    visible: doc.workMode === 2 // după modul de lucru
                     width: parent.width
                     title: "Interacțiuni"
                     iconName: "hand-pointer"
@@ -1793,6 +1798,7 @@ Window {
                 width: parent.width
                 document: doc
                 timelineActive: window.timelineVisible
+                workMode: doc.workMode
                 onEditRules: window.openRulesEditor()
                 onToolRequested: (id) => window.selectTool(id)
             }
@@ -1848,8 +1854,10 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         framesPerSecond: UserPrefs.showFps ? viewport.framesPerSecond : 0
-        message: window.pendingToolMessage.length > 0 ? window.pendingToolMessage
-               : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata"
+        // Modul de lucru, apoi indicația uneltei.
+        message: ["Modelare", "Animare", "Interacțiune"][doc.workMode] + "  ·  "
+               + (window.pendingToolMessage.length > 0 ? window.pendingToolMessage
+                  : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata")
         selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
         unitText: ["Auto", "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"
