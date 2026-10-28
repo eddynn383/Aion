@@ -221,8 +221,9 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
 - Antetul urmează schița: „◆ Keyframe ▾” (▾ = culoare, cameră), pe timeline-uri înguste doar iconițe.
 
 ### Pasul 6 — Documentație și verificare ✅ criteriu: CI verde, QA bifat
-- [ ] ADR (canale + easing Bézier + tastatura), `CLAUDE.md`, `docs/qa-checklist.md` (secțiunea „Animare”), `PLAN.md`.
-- [ ] Capturi (dark + light, web după publicare).
+- [x] ADR 0034 (canale + easing Bézier + tastatura + timeline + Auto-key), `CLAUDE.md`, `docs/qa-checklist.md`
+      (secțiunile „Rotate / Scale din pivot” și „Animare”), `PLAN.md`.
+- [x] Capturi (dark + light în aplicație; web după publicare).
 
 ### După (P2, câte un pas fiecare, în ordinea utilizatorului)
 - [ ] Traiectoria obiectului în viewport · [ ] Editorul de curbe pe canal · [ ] Interval de redare și markeri

@@ -197,6 +197,32 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Interacțiune: Select alege obiecte, Inspector arată doar Interacțiune; Interact (F5) → click pe o ușă cu balama
       o deschide; click pe un obiect fără interacțiuni → tooltip; Select (sau Esc) revine la editare
 
+## Rotate / Scale din pivot (plan Animare, secțiunea 10)
+- [ ] Cub selectat, Pivot → Colț; Rotate (Q), ← (axa verde), click pe un colț de pe axa roșie, tastează 30 → cubul se
+      rotește pe muchia din colțul pivotului (raportorul stă pe pivot de la început)
+- [ ] Rotate cu Option la primul click → alegi alt centru; colțurile, mijloacele și pivotul se prind („Pivot”)
+- [ ] Scale: mânerul unui colț + Option → punctul fix e pivotul (fără Option, mânerul opus)
+
+## Animare: tastatura, canalele, easing-ul, timeline-ul (ADR 0034)
+- [ ] Animare: Space redă / oprește (nu mai alege Select; Select e și pe V); în Modelare Space = Select
+- [ ] ← / → un cadru, ⇧← / ⇧→ 10 cadre, ⌥← / ⌥→ cheia anterioară / următoare (ale selecției sau ale tuturor),
+      Home / End; cu Rotate activ, săgețile aleg axa (nu mută playhead-ul); K = keyframe pe selecție
+- [ ] Move pe X la 1 s → în timeline, obiectul deschis (▸) are doar „Poziție X”, cu valorile la chei („500 mm”, „2.5 m”);
+      o rotație pe Z la 2 s adaugă doar „Rotație Z” (pornind din valoarea de la începutul pistei)
+- [ ] Valoarea curentă din stânga (tastată) scrie o cheie; dublu click pe o cheie îi schimbă valoarea
+- [ ] Un fișier vechi cu animații se deschide: pozele la chei sunt aceleași, canalele apar doar pe ce variază
+- [ ] Click pe miniatura curbei dintre două chei → editorul: mânerele se trag, valorile x1…y2, previzualizarea în
+      buclă; o presetare aplicată schimbă mișcarea; „Salvează” o curbă proprie → apare la „Ale mele” și într-un document
+      nou (⌘N); ✎ o redenumește, × o șterge; click dreapta pe un canal → curba pentru tot canalul
+- [ ] ⚙ → „Implicit: …” → cheile noi primesc curba aleasă
+- [ ] Cheile: ⇧ / ⌘ click adaugă, tragerea pe gol = dreptunghi, tragerea unei chei mută tot grupul (se prinde de cadre,
+      de playhead și de alte chei; ⇧ fără snap); ⌫ / Delete șterg; ⌘C / ⌘V lipesc la playhead (pe alt obiect selectat)
+- [ ] ⌘ + rotița face zoom în jurul cursorului, ⇧ + rotița derulează timpul; bara de jos derulează, capetele ei fac zoom;
+      ⤢ încadrează toată animația; rigla trece la cadre la zoom mare
+- [ ] Click pe ceas → tastezi „1.5”, „36f” sau „00:02.50” → playhead-ul sare acolo
+- [ ] Auto-key oprit → Move schimbă poza de bază (fără chei); pe o proprietate animată, toată animația ei se mută
+- [ ] Marginea de sus a timeline-ului se trage (înălțimea se păstrează)
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

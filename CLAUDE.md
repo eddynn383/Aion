@@ -220,6 +220,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `preferences.easingPresets`), `components/EasingCurve.qml` (miniaturi), `components/EasingMath.js`.
   `Animation::defaultEasing` pentru cheile noi. În Popover, delegații Repeater-ului nu văd id-ul fișierului la creare
   (conținut amânat): câmpurile editorului sunt scrise explicit. Acțiuni: `anim:savecurve,…`, `anim:curve,N`, `anim:curves`.
+- **Auto-key** (`Document::autoKey`, `anim.autoKey`): oprit, schimbările intră în poza de bază, iar canalele animate își
+  mută toate cheile (`model::adjustWithoutKeys`). Copiere / lipire de chei: `anim.copyKeys` / `anim.pasteKeys` (⌘C / ⌘V,
+  prin meniul nativ „Animare”). În scripturi, o comandă necunoscută ca acțiune rulează prin `runCommand` (`anim.fit`).
 
 ## Următorii pași
 0. **În lucru (aprobat, început pe 2026-10-28): Animare, timeline, cameră, rotația față de pivot** —
