@@ -1756,6 +1756,9 @@ Window {
             anchors.bottomMargin: Theme.space6
             activeTool: window.activeTool
             keyOverrides: window.shortcutOverrides
+            workMode: doc.workMode
+            shortcutFor: (id) => { const c = window.commands.find(x => x.id === id); return c ? c.shortcut : "" }
+            onModeSelected: (m) => window.setWorkMode(m)
             onToolSelected: (id) => window.selectTool(id)
         }
     }
