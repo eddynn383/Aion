@@ -651,6 +651,9 @@ private:
     template <class Fn>
     void withTool(const view::Camera& camera, Fn&& fn);
     void afterInteraction(const geom::Selection& before);
+    // Undo / redo: pasul din istoric și tot ce depinde de model (animația activă, timeline-ul, panourile).
+    template <class Fn>
+    void stepHistory(Fn&& step);
     // După undo/redo sau ștergeri: calea și selecția nu trebuie să indice entități dispărute.
     void repairContext();
     // Varianta sigură în mijlocul unei notificări de la model (fără să anuleze unealta).

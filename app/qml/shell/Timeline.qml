@@ -165,6 +165,25 @@ Rectangle {
         return false
     }
     function selectKeys(list) { selectedKeys = list }
+    // O cheie selectată care nu mai există (undo / redo, ștergere) iese din selecție. Amânat: după o tragere, selecția
+    // trece întâi la timpii noi.
+    function keyExists(ref) {
+        if (ref.instance === 0)
+            return (tl.camera ?? []).some(k => sameTime(k.time, ref.time))
+        const t = (tl.tracks ?? []).find(t => t.instance === ref.instance)
+        if (!t)
+            return false
+        if (ref.property === "")
+            return t.times.some(time => sameTime(time, ref.time))
+        const c = t.channels.find(c => c.property === ref.property)
+        return c !== undefined && c.keys.some(k => sameTime(k.time, ref.time))
+    }
+    function pruneSelectedKeys() {
+        const kept = selectedKeys.filter(keyExists)
+        if (kept.length !== selectedKeys.length)
+            selectKeys(kept)
+    }
+    onTlChanged: if (selectedKeys.length > 0) Qt.callLater(pruneSelectedKeys)
     // Valoarea canalului la timpul curent (urmează playhead-ul, fără să refacă rândurile).
     function currentValue(row) {
         const v = document ? document.channelValues[row.instance + ":" + row.property] : undefined

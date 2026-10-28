@@ -1333,20 +1333,49 @@ bool Document::applyMeasurement(const QString& text)
 
 void Document::undo()
 {
-    const geom::Selection before = m_selection;
-    m_geometryKey.clear(); // rotirea / scara afișate pentru geometria liberă pornesc din nou de la 0° / 1
-    ++m_modelRevision;
-    m_stack.undo();
-    afterInteraction(before);
+    stepHistory([this] { m_stack.undo(); });
 }
 
 void Document::redo()
 {
+    stepHistory([this] { m_stack.redo(); });
+}
+
+template <class Fn>
+void Document::stepHistory(Fn&& step)
+{
     const geom::Selection before = m_selection;
-    m_geometryKey.clear();
+    const std::vector<model::AnimationId> animationsBefore = m_model.animations().keys();
+    m_geometryKey.clear(); // rotirea / scara afișate pentru geometria liberă pornesc din nou de la 0° / 1
     ++m_modelRevision;
-    m_stack.redo();
+    step();
+    // O animație readusă (ștergere anulată, creare refăcută) devine cea activă; dacă cea activă a dispărut, rămâne
+    // prima care există.
+    const std::vector<model::AnimationId>& animations = m_model.animations().keys();
+    for (model::AnimationId id : animations) {
+        if (std::ranges::find(animationsBefore, id) == animationsBefore.end()) {
+            m_activeAnimation = id;
+            break;
+        }
+    }
+    if (!currentAnimation()) {
+        m_activeAnimation = animations.empty() ? model::AnimationId {} : animations.front();
+    }
+    if (!currentAnimation()) {
+        m_playing = false;
+        m_previewing = false;
+    } else if (m_workMode == Animation) {
+        m_previewing = true;
+    }
+    m_timelineTime = std::clamp(m_timelineTime, 0.0, std::max(animationDuration(), 0.0));
+    ++m_interactionRevision;
     afterInteraction(before);
+    // Pasul poate schimba orice: cheile din timeline, valorile de la playhead, Inspector-ul, lista obiectelor.
+    emit timelineTimeChanged();
+    emit timelineChanged();
+    emit playheadValuesChanged();
+    emit selectionChanged();
+    emit outlineChanged();
 }
 
 void Document::deleteSelection()
