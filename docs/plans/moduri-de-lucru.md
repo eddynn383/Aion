@@ -206,12 +206,15 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
 > (`window.timelineVisible`), fără butonul de închidere. Fețele / muchiile se scot din selecție în Animare.
 
 ### Pasul 7 — Interacțiune: Select + Interact ✅ criteriu: Interact rulează interacțiunile, Select revine la editare
-- [ ] Interact sub Select în primul grup (doar în modul Interacțiune); activarea lui pornește `interactionMode`,
+> Făcut: `selectTool` din Main pune `doc.interactionMode = (id === "interact")`; Interact nu mai e unealtă de
+> navigare în viewport (rularea primește clicurile direct). `Viewport::noInteractionAt` → tooltip în Main
+> (deschis cu `Qt.callLater`, altfel release-ul îl închide). Bannerul vechi a fost scos.
+- [x] Interact sub Select în primul grup (doar în modul Interacțiune); activarea lui pornește `interactionMode`,
       revenirea la Select îl oprește (starea rulării se aruncă).
-- [ ] Tooltip lângă cursor la click pe un obiect fără interacțiuni (semnal din Viewport, `Tooltip` temporar în Main).
-- [ ] F5: comută Select ↔ Interact; din alt mod trece în Interacțiune cu Interact activ. Bannerul vechi dispare
+- [x] Tooltip lângă cursor la click pe un obiect fără interacțiuni (semnal din Viewport, `Tooltip` temporar în Main).
+- [x] F5: comută Select ↔ Interact; din alt mod trece în Interacțiune cu Interact activ. Bannerul vechi dispare
       (indicația e în bara de stare).
-- [ ] `RulesEditor` și „Interacțiune nouă” doar în acest mod.
+- [x] `RulesEditor` și „Interacțiune nouă” doar în acest mod.
 
 ### Pasul 8 — Documentație și verificare ✅ criteriu: CI verde, QA bifat
 - [ ] ADR nou `docs/decisions/0033-moduri-de-lucru.md` (deciziile din 3.x).

@@ -2337,6 +2337,11 @@ model::InstanceId Document::ruleTargetAt(const view::Camera& camera, math::Vec2d
     return found;
 }
 
+bool Document::objectWithoutInteractionsAt(const view::Camera& camera, math::Vec2d screen) const
+{
+    return view::pickInstance(model(), model().root(), camera, screen).has_value() && !ruleTargetAt(camera, screen);
+}
+
 QString Document::interactionHover(const view::Camera& camera, math::Vec2d screen)
 {
     if (!m_runtime) {

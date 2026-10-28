@@ -669,7 +669,7 @@ Planul detaliat (specificație, design, pași, criterii, decizii de confirmat): 
 - [x] Pasul 4 — gărzile din Document (operațiile altui mod sunt refuzate, cu mesaj)
 - [x] Pasul 5 — layout-ul pe mod: secțiunile din stânga, grupurile din Inspector, bara de vizualizare
 - [x] Pasul 6 — Animare: timeline mereu vizibil (nu se închide), selecție doar pe obiecte, auto-key la Move / Rotate / Scale
-- [ ] Pasul 7 — Interacțiune: Interact sub Select (rulează interacțiunile), tooltip la obiecte fără interacțiuni, F5
+- [x] Pasul 7 — Interacțiune: Interact sub Select (rulează interacțiunile), tooltip la obiecte fără interacțiuni, F5
 - [ ] Pasul 8 — ADR 0033, documentație, capturi, CI
 
 ---

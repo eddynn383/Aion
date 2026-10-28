@@ -206,6 +206,8 @@ signals:
     void selectionRectChanged();
     // Click dreapta (fără tragere): ce era sub cursor a devenit selecția; QML deschide meniul contextual.
     void contextMenuRequested(QPointF position);
+    // Interact: un click pe un obiect fără interacțiuni (Main arată un tooltip acolo).
+    void noInteractionAt(QPointF position);
     void annotationsChanged();
     void pointerPositionChanged();
     void navigationSettingsChanged();

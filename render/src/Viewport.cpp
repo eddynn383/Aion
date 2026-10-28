@@ -2064,6 +2064,8 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
             && QLineF(event->position(), m_interactionPress).length() <= kMultiClickDistancePx) {
             if (m_document->interactionEvent(m_camera, toVec2(event->position()), QStringLiteral("click"))) {
                 requestAnimationFrame();
+            } else if (m_document->objectWithoutInteractionsAt(m_camera, toVec2(event->position()))) {
+                emit noInteractionAt(event->position());
             }
         }
         updateInteractionCursor(event->position());

@@ -429,6 +429,8 @@ public:
     QString interactionHover(const view::Camera& camera, math::Vec2d screen);
     // event: "click", "rightClick", "doubleClick", "longPress". Întoarce true dacă a pornit ceva.
     bool interactionEvent(const view::Camera& camera, math::Vec2d screen, const QString& event);
+    // Sub cursor e un obiect, dar nici el, nici cele din care face parte nu au interacțiuni (pentru un mesaj).
+    bool objectWithoutInteractionsAt(const view::Camera& camera, math::Vec2d screen) const;
     bool interactionDragStart(const view::Camera& camera, math::Vec2d screen);
     void interactionDragMove(const view::Camera& camera, math::Vec2d screen);
     void interactionDragEnd();
