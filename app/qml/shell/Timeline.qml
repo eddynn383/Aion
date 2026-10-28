@@ -913,10 +913,15 @@ Rectangle {
         }
 
         Text {
+            // Fără animație, textul stă în mijlocul timeline-ului; cu una (dar fără rânduri), în mijlocul pistelor, ca
+            // rigla și playhead-ul de la 0 s să nu treacă prin el.
             visible: !root.hasAnimation || root.rows.length === 0
-            x: root.namesWidth + Theme.space3
+            readonly property real areaX: root.hasAnimation ? root.namesWidth : 0
+            readonly property real areaWidth: root.hasAnimation ? root.lanesWidth : parent.width
+            width: Math.min(areaWidth - Theme.space6 * 2, 560)
+            x: areaX + (areaWidth - width) / 2
             anchors.verticalCenter: parent.verticalCenter
-            width: root.lanesWidth - Theme.space6
+            horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             text: !root.hasAnimation
                   ? "Creează o animație (meniul din stânga sus), apoi: așază obiectul, apasă „Keyframe”, mută playhead-ul, "
