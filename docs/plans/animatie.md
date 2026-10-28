@@ -227,7 +227,7 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
 - [x] Capturi (dark + light în aplicație; web după publicare).
 
 ### După (P2, câte un pas fiecare, în ordinea utilizatorului)
-- [ ] Traiectoria obiectului în viewport · [ ] Editorul de curbe pe canal · [ ] Interval de redare și markeri
+- [x] Traiectoria obiectului în viewport (prin căile de parcurgere, ADR 0036) · [ ] Editorul de curbe pe canal · [ ] Interval de redare și markeri
 - [ ] Vizibilitate / opacitate · [ ] Faze de construcție · [ ] Studiu de însorire · [ ] Camera pe traseu / turntable
 - [ ] Setările exportului video
 

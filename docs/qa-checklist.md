@@ -304,3 +304,17 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Selectează o formă / fețe / muchii: Poziție (colțul minim) și Dimensiuni editabile; axa plată (Z pe sol) e dezactivată
 - [ ] Rotește cu (°): 90 + Enter rotește în jurul centrului, câmpul revine la 0; Scalează cu (×): 2 → dublu pe axă, revine la 1
 - [ ] Fiecare schimbare = un pas de undo
+
+## Pen și căi de parcurgere (ADR 0036)
+- [ ] Pen (⇧P) în Modelare: click = colț, tragere = punct neted, click pe primul punct = închide (o față), Enter / Esc /
+      dublu click = termină deschisă; pe fața unui obiect, curba stă pe planul feței
+- [ ] Inspector-ul unei curbe Pen: „Curbă” (nu „Arc”); dublu click pe ea → punctele și mânerele; tragerea unui punct, a
+      unui mâner (Option rupe perechea), Option + click (colț ↔ neted), click pe curbă (punct nou), ⌫ (șterge), Esc
+- [ ] O curbă închisă pe o față-gazdă se editează și fața-gazdă rămâne (cu materialul ei); după Push/Pull nu mai e editabilă
+- [ ] Pen în Animare: o cale nouă (și animația, dacă lipsește), în Obiecte și ca bară în timeline (de la 0, cât animația)
+- [ ] Inspector-ul căii: poziție, rotație, dimensiuni, start, durată, curba (editorul de easing), „+” = click pe un obiect
+- [ ] Obiectul ancorat sare la start, cu fața înainte și baza pe sol; la redare merge pe cale; scos, revine exact unde era
+- [ ] Două obiecte pe aceeași cale merg în coloană, fără să se suprapună; Move pe unul (în Animare) → „Față de cale”
+- [ ] Bara căii trasă în timeline mută startul; capătul ei schimbă durata; trasă după capăt, animația se lungește
+- [ ] Redarea și exportul nu arată căile; o cale a altei animații e estompată și nu mișcă nimic
+

@@ -688,6 +688,17 @@ Planul detaliat (funcțiile de pe piață, designul, pașii, deciziile de confir
       [x] C4 „blochează camera pe vedere” · [x] C5 Move / Rotate / Scale + snap pe camere și lumini · [x] C6 depth of field
 - [x] Rotația cu pivotul mutat (secțiunea 10 din plan): reproducere, Rotate / Scale din pivot (axele globale: doar la cerere)
 
+## 6g. Etapa 7 – Pen-ul și căile de parcurgere (cerința din 2026-10-28)
+
+Designul aprobat: [`docs/plans/pen-si-cai.md`](docs/plans/pen-si-cai.md); planul: [`docs/plans/pen-si-cai-implementare.md`](docs/plans/pen-si-cai-implementare.md);
+ADR 0036.
+
+- [x] Matematica Bézier (core) · [x] curbele Pen în model, editabile, fișierul v4 · [x] unealta Pen · [x] editarea curbei
+- [x] Pen în Modelare (toolbar, dublu click, Inspector)
+- [x] Căile în model (ancore, coloană, decalaj, evaluare) · [x] în Document (Pen în Animare, poza, ancore, timp)
+- [x] Căile în viewport, Obiecte, Inspector · [x] bara lor în timeline
+- [x] Documentație (ADR 0036, `CLAUDE.md`, `docs/qa-checklist.md`)
+
 ---
 
 ## 7. Riscuri principale și cum le reducem
