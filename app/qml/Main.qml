@@ -77,6 +77,7 @@ Window {
             { id: "anim.start", title: "La începutul animației", category: "Animare", shortcut: "Home", icon: "skip-back" },
             { id: "anim.end", title: "La sfârșitul animației", category: "Animare", shortcut: "End", icon: "skip-back" },
             { id: "anim.key", title: "Keyframe pe selecție (toate canalele)", category: "Animare", shortcut: "K", icon: "diamond" },
+            { id: "anim.deleteKeys", title: "Șterge keyframe-urile selectate", category: "Animare", shortcut: "Delete", icon: "trash-2" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
@@ -293,6 +294,7 @@ Window {
         case "anim.start": doc.jumpToEdge(false); break
         case "anim.end": doc.jumpToEdge(true); break
         case "anim.key": doc.keySelection(); break
+        case "anim.deleteKeys": timeline.deleteSelectedKeys(); break
         case "mode.model": window.setWorkMode(0); break
         case "mode.animate": window.setWorkMode(1); break
         case "mode.interact": window.setWorkMode(2); break
@@ -454,7 +456,7 @@ Window {
                     const wh = action.slice(7).split(",").map(Number)
                     AppInfo.simulateWheel(viewport, viewport.projectToScreen(Qt.vector3d(wh[0], wh[1], wh[2])), wh[3] * 120)
                 } else if (action.startsWith("anim:")) {
-                    // „anim:new”, „anim:key”, „anim:color”, „anim:camera”, „anim:time,1.5”, „anim:play”.
+                    // „anim:new”, „anim:key”, „anim:color”, „anim:camera”, „anim:time,1.5”, „anim:play”, „anim:expand”.
                     const an = action.slice(5).split(",")
                     if (an[0] === "new") { window.setWorkMode(1); doc.createAnimation() }
                     else if (an[0] === "key") doc.keySelection()
@@ -462,6 +464,7 @@ Window {
                     else if (an[0] === "camera") doc.keyCamera(viewport.cameraState())
                     else if (an[0] === "time") doc.timelineTime = parseFloat(an[1])
                     else if (an[0] === "play") doc.play()
+                    else if (an[0] === "expand") timeline.expandAll(true)
                 } else if (action.startsWith("scene:")) {
                     // „scene:0” aplică scena cu indexul dat (camera și obiectele).
                     const sc = doc.scenes[parseInt(action.slice(6))]
@@ -766,7 +769,8 @@ Window {
     Shortcut {
         sequence: "Backspace"
         enabled: !palette.opened && window.vcbText.length === 0
-        onActivated: doc.deleteSelection()
+        // În Animare, cheile selectate pe timeline au prioritate.
+        onActivated: if (!(doc.workMode === 1 && timeline.deleteSelectedKeys())) doc.deleteSelection()
     }
     // Săgețile blochează inferența pe o axă: → roșie, ← verde, ↑ albastră, ↓ paralel cu muchia atinsă.
     Instantiator {
@@ -816,6 +820,8 @@ Window {
         property real clipEnd: 0
         property bool snapToGrid: false
         property real animTransition: 2
+        // Înălțimea timeline-ului (trasă de marginea lui de sus).
+        property real timelineHeight: 260
         property real animDelay: 1
         property bool animLoop: true
         property int animFps: 30
@@ -1908,7 +1914,8 @@ Window {
         anchors.bottom: statusBar.top
         anchors.left: leftPanel.right
         anchors.right: rightPanel.left
-        height: 200
+        height: Math.max(140, Math.min(window.height * 0.6, preferences.timelineHeight))
+        onResizeRequested: (h) => preferences.timelineHeight = Math.max(140, Math.min(window.height * 0.6, h))
         document: doc
         viewport: viewport
         onExportRequested: fileDialog.ask("exportVideo")

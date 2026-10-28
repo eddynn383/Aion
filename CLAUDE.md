@@ -212,6 +212,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `window.shortcutOwners` dă fiecare tastă unei singure comenzi pe mod (cea a modului bate una comună; Select are și
   V); săgețile rămân ale uneltei cât `Tool::ownsArrowKeys()`. Acțiunea `keys:,alt+right` simulează taste cu
   modificatori (prin harta scurtăturilor); `debug.anim` afișează timpul și cheile.
+- **Timeline-ul** (ADR 0034): `shell/Timeline.qml` (vederea în timp `viewStart` / `pxPerSecond`, `selectedKeys` ca
+  `{ instance, property, time }`, tragerea în grup cu snap), `TimelineRow` (obiect ▸ / ▾, canal cu valoarea curentă),
+  `TimelineKey`, `TimelineRuler`. Datele vin din `Document::timeline` (pistele cu `times` și `channels`). Acțiune de
+  script: `anim:expand` (deschide toate obiectele).
 
 ## Următorii pași
 0. **În lucru (aprobat, început pe 2026-10-28): Animare, timeline, cameră, rotația față de pivot** —

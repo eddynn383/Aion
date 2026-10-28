@@ -680,7 +680,7 @@ Planul detaliat (funcțiile de pe piață, designul, pașii, deciziile de confir
 
 - [x] Pasul 1 — tastatura: Space play / pauză, ← → cadre, ⌥← → chei, Home / End
 - [x] Pasul 2 — canale pe proprietate (core + migrarea fișierelor)
-- [ ] Pasul 3 — timeline: obiecte expandabile, canalele modificate, valorile la chei
+- [x] Pasul 3 — timeline: obiecte expandabile, canalele modificate, valorile la chei
 - [ ] Pasul 4 — easing: presetări + editorul de curbă Bézier, curbe proprii salvate
 - [ ] Pasul 5 — UX: selecție multiplă, zoom / scroll, snap, copiere / lipire, Auto-key
 - [ ] Pasul 6 — documentație, capturi, CI
