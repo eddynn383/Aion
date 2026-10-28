@@ -98,3 +98,36 @@ TEST_CASE("Interacțiuni: înlănțuire, așteptare, alternare, cereri către ap
     REQUIRE(loaded.model);
     CHECK(loaded.model->sameAs(m));
 }
+
+TEST_CASE("Reguli: „Mută la” din fișierele vechi (colțul minim) se migrează la poziția pivotului", "[core][model][rules][io]")
+{
+    model::Model m;
+    model::Definition def { "Cutie", true };
+    const model::DefinitionId d = m.addDefinition(def);
+    geom::Mesh& mesh = m.mesh(d);
+    geom::drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
+    geom::pushPull(mesh, mesh.faces().keys().front(), -1000);
+    model::Instance inst;
+    inst.parent = m.root();
+    inst.definition = d;
+    model::Rule rule;
+    model::Action move;
+    move.kind = model::ActionKind::MoveTo;
+    move.vector = { 3000, 0, 0 }; // în formatul vechi: unde ajunge colțul minim
+    rule.actions.push_back(move);
+    inst.rules.push_back(rule);
+    const model::InstanceId id = m.addInstance(inst);
+    std::string text = io::toJson(m);
+    const std::string version = "\"formatVersion\": " + std::to_string(io::kFormatVersion);
+    const auto at = text.find(version);
+    REQUIRE(at != std::string::npos);
+    text.replace(at, version.size(), "\"formatVersion\": 2");
+    const io::LoadResult loaded = io::fromJson(text);
+    REQUIRE(loaded.model);
+    // Acum ținta e a pivotului (centrul): colțul tot la (3000, 0, 0) → pivotul la (3500, 500, 500).
+    const model::Action& migrated = loaded.model->instance(id).rules.front().actions.front();
+    CHECK(glm::length(migrated.vector - math::Vec3d { 3500, 500, 500 }) < 1e-6);
+    // Un fișier nou rămâne cum e.
+    const io::LoadResult same = io::fromJson(io::toJson(m));
+    CHECK(glm::length(same.model->instance(id).rules.front().actions.front().vector - math::Vec3d { 3000, 0, 0 }) < 1e-6);
+}

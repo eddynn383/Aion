@@ -101,6 +101,9 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
     // Săgețile sunt ale uneltei active (o operație în curs); altfel, în Animare, ← → mută playhead-ul.
     Q_PROPERTY(bool toolOwnsArrows READ toolOwnsArrows NOTIFY toolStatusChanged)
+    // Valoarea fiecărui canal la timpul curent („id:proprietate” → număr sau culoare), urmând playhead-ul (fără să
+    // refacă tot timeline-ul la fiecare cadru).
+    Q_PROPERTY(QVariantMap channelValues READ channelValues NOTIFY playheadValuesChanged)
     // Pivotul selectat (click pe marcajul lui, ținut cât rămâne aceeași selecție): Inspector-ul îi arată coordonatele
     // (ca Poziția: în coordonatele contextului), editabile — mută doar pivotul, obiectul rămâne pe loc.
     Q_PROPERTY(bool pivotSelected READ pivotSelected WRITE setPivotSelected NOTIFY selectionChanged)
@@ -515,6 +518,7 @@ public:
     Q_INVOKABLE bool jumpToKey(int direction);
     Q_INVOKABLE void jumpToEdge(bool end);
     bool toolOwnsArrows() const;
+    QVariantMap channelValues() const;
     Q_INVOKABLE void endPreview(); // înapoi la model (editare)
     // Camera animației la momentul curent ({} dacă nu are pistă de cameră), ca cameraState().
     Q_INVOKABLE QVariantMap animationCamera() const;
@@ -561,6 +565,7 @@ signals:
     // O regulă cere o vedere (mergi la scenă): viewport-ul mută camera.
     void cameraRequested(const QVariantMap& camera);
     void timelineTimeChanged();
+    void playheadValuesChanged();
     void autoKeyChanged();
     // Un model nou a înlocuit documentul (deschidere, document nou, recuperare): viewport-ul îl încadrează.
     void documentReplaced();

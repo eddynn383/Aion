@@ -1374,6 +1374,9 @@ void Viewport::commitLockedView()
         return;
     }
     if (m_document->workMode() == Document::Animation) {
+        if (m_document->currentAnimation() == nullptr) {
+            m_document->createAnimation(); // ca la Move în Animare: animația apare la prima cheie
+        }
         m_document->keyCamera(cameraState());
         applyLookThrough();
         return;
@@ -1412,6 +1415,7 @@ void Viewport::playScenes(const QVariantList& states, double transition, double 
     if (states.isEmpty() || m_exporting) {
         return;
     }
+    leaveLookNow();
     m_motion.stop();
     m_sceneAnimation.emplace(posesFromStates(states), transition, delay, loop);
     m_loopScenes = loop;
@@ -1777,12 +1781,14 @@ void Viewport::zoomToSelection()
         zoomExtents();
         return;
     }
+    leaveLookNow();
     m_motion.animateTo(m_camera, m_camera.framing(bounds->first, bounds->second));
     requestAnimationFrame();
 }
 
 void Viewport::toggleProjection()
 {
+    leaveLookNow(); // proiecția camerei e a ei; schimbarea e pentru vederea liberă
     setOrthographic(!isOrthographic());
 }
 
@@ -1794,6 +1800,7 @@ QPointF Viewport::projectToScreen(const QVector3D& world) const
 
 void Viewport::startTurntable(double seconds)
 {
+    leaveLookNow();
     m_motion.stop();
     m_turntableSecondsLeft = seconds;
     requestAnimationFrame();
@@ -2255,7 +2262,11 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         event->ignore();
         return;
     }
-    // Prin cameră: navigarea iese din ea (zbor înapoi), sau, blocată pe vedere, mută camera.
+    // Prin cameră: navigarea iese din ea (zbor înapoi), sau, blocată pe vedere, mută camera. În timpul zborului nu.
+    if (m_lensFlight) {
+        event->accept();
+        return;
+    }
     if (exitLookForNavigation()) {
         event->accept();
         return;
@@ -2485,7 +2496,8 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
         return;
     }
     // Dublu-click cu butonul din mijloc centrează vederea pe punctul de sub cursor (ca în SketchUp).
-    if (event->button() == Qt::MiddleButton) {
+    if (event->button() == Qt::MiddleButton && !(m_lookCamera > 0.0 && m_lockCamera)) {
+        leaveLookNow();
         auto pose = m_camera.pose();
         const auto surface = m_document ? m_document->surfacePoint(m_camera, toVec2(event->position())) : std::nullopt;
         pose.target = surface ? *surface : m_camera.zoomAnchorAt(toVec2(event->position()));
@@ -2525,6 +2537,10 @@ view::Vec2d Viewport::orbitReleaseVelocity() const
 void Viewport::wheelEvent(QWheelEvent* event)
 {
     stopScenes();
+    if (m_lensFlight) { // inclusiv inerția trackpad-ului după o ieșire din cameră
+        event->accept();
+        return;
+    }
     if (exitLookForNavigation()) {
         event->accept();
         return;

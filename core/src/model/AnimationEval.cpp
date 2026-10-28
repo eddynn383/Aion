@@ -457,7 +457,37 @@ math::Transform adjustWithoutKeys(Animation& animation, InstanceId instance, con
             baseValues.set(p, baseValues.get(p) + delta);
         }
     }
-    return composeTransform(baseValues, pivot);
+    const math::Transform result = composeTransform(baseValues, pivot);
+    // Baza se citește înapoi descompusă (|Y| ≤ 90°). Dacă rotația ei nouă trece pe cealaltă soluție Euler, iar o parte
+    // din rotație e animată, axele neanimate ar căpăta alte unghiuri: rotația trece atunci toată pe canale (valorile
+    // de bază, ținute constante), ca poza să rămână exact cea cerută.
+    if (track != nullptr) {
+        const math::Vec3d read = transformValues(result, pivot).rotation;
+        const math::Vec3d intended = baseValues.rotation;
+        bool rotationChannel = false;
+        double start = 0.0;
+        for (const Channel& c : track->channels) {
+            const int i = static_cast<int>(c.property);
+            if (i >= 3 && i < 6 && !c.keys.empty()) {
+                start = rotationChannel ? std::min(start, c.keys.front().time) : c.keys.front().time;
+                rotationChannel = true;
+            }
+        }
+        bool flipped = false;
+        for (int i = 0; i < 3; ++i) {
+            flipped = flipped || std::abs(unwrapDegrees(read[i], intended[i]) - intended[i]) > 1e-6;
+        }
+        if (rotationChannel && flipped) {
+            for (int i = 0; i < 3; ++i) {
+                const auto p = static_cast<Property>(3 + i);
+                if (findChannel(*track, p) == nullptr) {
+                    setChannelKey(animation, instance, p, start, intended[i]);
+                    track = findTrack(animation, instance); // setChannelKey poate muta pista
+                }
+            }
+        }
+    }
+    return result;
 }
 
 void rebasePivot(Animation& animation, InstanceId instance, const math::Transform& base, const math::Vec3d& oldPivot,
@@ -468,15 +498,62 @@ void rebasePivot(Animation& animation, InstanceId instance, const math::Transfor
         return;
     }
     const ObjectTrack before = *track; // evaluarea se face pe cheile vechi
-    const TransformValues baseValues = transformValues(base, oldPivot);
-    for (Channel& c : track->channels) {
-        const int axis = static_cast<int>(c.property);
-        if (axis > 2) {
-            continue; // doar pozițiile depind de pivot
+    const TransformValues baseOld = transformValues(base, oldPivot);
+    const TransformValues baseNew = transformValues(base, newPivot);
+    const double tol = tolerance(animation);
+    // Momentele tuturor cheilor de transformare, cu easing-ul primei chei de la fiecare (pentru cheile noi).
+    std::vector<std::pair<double, Easing>> times;
+    bool rotatesOrScales = false;
+    for (const Channel& c : before.channels) {
+        if (!isTransform(c.property)) {
+            continue;
         }
-        for (Key& k : c.keys) {
-            const math::Transform t = composeTransform(evaluateValues(before, k.time, baseValues), oldPivot);
-            k.value = t.applyToPoint(newPivot)[axis];
+        rotatesOrScales = rotatesOrScales || static_cast<int>(c.property) >= static_cast<int>(Property::RotationX);
+        for (const Key& k : c.keys) {
+            if (std::none_of(times.begin(), times.end(), [&](const auto& t) { return std::abs(t.first - k.time) < tol; })) {
+                times.emplace_back(k.time, k.easing);
+            }
+        }
+    }
+    std::sort(times.begin(), times.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    // Poziția nouă a pivotului la un moment: unde ajunge pivotul nou în poza veche.
+    const auto positionAt = [&](double t) {
+        return composeTransform(evaluateValues(before, t, baseOld), oldPivot).applyToPoint(newPivot);
+    };
+    for (int axis = 0; axis < 3; ++axis) {
+        const auto property = static_cast<Property>(axis);
+        Channel* existing = findChannel(*track, property);
+        if (existing != nullptr && !rotatesOrScales) {
+            // Fără rotație / scară animate, diferența e aceeași peste tot: cheile rămân la momentele lor.
+            for (Key& k : existing->keys) {
+                k.value = positionAt(k.time)[axis];
+            }
+            continue;
+        }
+        if (!rotatesOrScales) {
+            continue; // fără canal și fără rotație: poza de bază (cu pivotul nou) e deja corectă
+        }
+        // Cu rotație / scară animate, poziția pivotului nou variază: o cheie la fiecare moment cu chei, ca poza să
+        // rămână exact aceeași la toate (canalul se creează doar dacă e nevoie).
+        bool needed = existing != nullptr;
+        std::vector<double> values;
+        for (const auto& [t, easing] : times) {
+            values.push_back(positionAt(t)[axis]);
+            needed = needed || std::abs(values.back() - baseNew.position[axis]) > valueTolerance(property);
+        }
+        if (!needed) {
+            continue;
+        }
+        Channel& channel = channelFor(*track, property);
+        for (std::size_t i = 0; i < times.size(); ++i) {
+            Key key;
+            key.time = times[i].first;
+            key.value = values[i];
+            key.easing = times[i].second;
+            upsert(channel.keys, key, tol, true); // o cheie existentă își păstrează easing-ul
+        }
+        for (Key& k : channel.keys) { // cheile existente de la alte momente: tot la pivotul nou
+            k.value = positionAt(k.time)[axis];
         }
     }
 }

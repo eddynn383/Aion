@@ -47,9 +47,13 @@
 
 - O transformare cu forfecare (un obiect rotit și scalat neuniform pe axele lumii) se descompune fără forfecare la
   animare.
-- Un pivot mutat după animare (`model::setPivot`, `setPlacement`): cheile de poziție se recalculează
-  (`model::rebasePivot`), deci la ele obiectul rămâne exact pe loc; rotația animată se face de acum în jurul pivotului
-  nou, așa că drumul dintre chei se poate schimba (un pivot mutat ca să repare o rotație o repară). Pivotul nu se
+- Un pivot mutat după animare (`model::setPivot`, `setPlacement`) nu mută obiectul nici la cheile animațiilor
+  (`model::rebasePivot`): fără rotație / scară animate, cheile de poziție se deplasează cu aceeași diferență; cu ele, cele
+  trei canale de poziție primesc chei la toate momentele cu chei. Drumul dintre chei se poate schimba puțin. Pentru
+  altă axă de rotație a unei animații existente, pivotul se mută înainte de chei (sau se refac cheile). Pivotul nu se
   animă: în Animare, Inspector-ul și marcajul tras îl schimbă în model, raportat la poza de la timpul curent.
+- Rotația animată doar pe unele axe se combină cu unghiurile bazei (descompunerea cu |Y| ≤ 90°). Cu Auto-key oprit, o
+  schimbare care trece baza pe cealaltă soluție Euler mută toată rotația pe canale. Baza schimbată în Modelare peste
+  ±90° pe Y, sub un canal de rotație parțial, poate schimba poza (limită cunoscută).
 - Curbele presetărilor vechi (cubice) diferă puțin de presetările Bézier cu același nume.
 - Camera își păstrează cheile ei (țintă, unghiuri, distanță), cu easing-ul nou.

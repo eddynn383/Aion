@@ -114,6 +114,23 @@ void ViewportRenderer::initialize(QRhiCommandBuffer* /*cb*/)
     if (m_rhi != rhi()) {
         releaseMaskTarget();
         m_maskSampler.reset();
+        // Resursele DoF aparțin vechiului QRhi.
+        m_dofSceneTarget.reset();
+        m_dofScenePass.reset();
+        m_dofScene.reset();
+        m_dofSceneMsaa.reset();
+        m_dofSceneDepth.reset();
+        m_dofBlurTarget.reset();
+        m_dofBlurPass.reset();
+        m_dofBlur.reset();
+        m_dofPipelineH.reset();
+        m_dofPipelineV.reset();
+        m_dofBindingsH.reset();
+        m_dofBindingsV.reset();
+        m_dofUniformsH.reset();
+        m_dofUniformsV.reset();
+        m_dofGbuffer = nullptr;
+        m_dofSize = {};
         m_rhi = rhi();
         m_backgroundPipeline.reset();
         m_uniforms.reset();
@@ -450,7 +467,10 @@ namespace {
 struct DofUniforms {
     float lens[4]; // focus (mm), focala (mm), f/N, pixeli pe mm de senzor
     float pass[4]; // direcția, raza maximă (px)
-    float size[4]; // mărimea țintei
+    float size[4]; // mărimea țintei; z = 1 dacă y-ul NDC e inversat față de framebuffer
+    float invViewProj[16]; // pentru adâncimea solului (desenat fără gbuffer)
+    float eye[4];
+    float forward[4];
 };
 
 } // namespace
@@ -972,7 +992,24 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         const auto& d = m_frame.dof;
         const float maxRadius = 16.0f;
         DofUniforms h { { d.focus, d.focal, d.fStop, d.pixelsPerMm }, { 1.0f, 0.0f, maxRadius, 0.0f },
-            { float(size.width()), float(size.height()), 0.0f, 0.0f } };
+            { float(size.width()), float(size.height()), m_rhi->isYUpInNDC() != m_rhi->isYUpInFramebuffer() ? 1.0f : 0.0f, 0.0f },
+            {}, { float(m_frame.eye.x), float(m_frame.eye.y), float(m_frame.eye.z), 1.0f },
+            { float(m_frame.forward.x), float(m_frame.forward.y), float(m_frame.forward.z), 0.0f } };
+        {
+            const QMatrix4x4 corr = m_rhi->clipSpaceCorrMatrix();
+            glm::dmat4 corrD(1.0);
+            for (int c = 0; c < 4; ++c) {
+                for (int r = 0; r < 4; ++r) {
+                    corrD[c][r] = corr(r, c);
+                }
+            }
+            const glm::dmat4 inv = glm::inverse(corrD * m_frame.projection * m_frame.view);
+            for (int c = 0; c < 4; ++c) {
+                for (int r = 0; r < 4; ++r) {
+                    h.invViewProj[c * 4 + r] = static_cast<float>(inv[c][r]);
+                }
+            }
+        }
         DofUniforms v = h;
         v.pass[0] = 0.0f;
         v.pass[1] = 1.0f;

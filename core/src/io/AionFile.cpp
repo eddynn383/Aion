@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <system_error>
 
@@ -414,6 +415,41 @@ void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector
     }
 }
 
+// formatVersion < 3: „Mută la” ducea colțul minim al țintei în punctul dat; acum duce pivotul.
+void migrateMoveToRules(model::Model& model)
+{
+    std::vector<std::pair<model::InstanceId, model::Instance>> changed;
+    for (std::size_t i = 0; i < model.instances().size(); ++i) {
+        const model::InstanceId self = model.instances().keys()[i];
+        model::Instance inst = model.instances().values()[i];
+        bool any = false;
+        const std::function<void(std::vector<model::Action>&)> fix = [&](std::vector<model::Action>& actions) {
+            for (model::Action& a : actions) {
+                const model::InstanceId target = a.target ? a.target : self;
+                if (a.kind == model::ActionKind::MoveTo && model.instances().contains(target)) {
+                    const model::Instance& t = model.instance(target);
+                    const auto [lo, hi] = model::bounds(model, t.definition);
+                    if (lo.x <= hi.x) {
+                        a.vector += model::pivotPoint(model, target) - t.transform.applyToPoint(lo);
+                        any = true;
+                    }
+                }
+                fix(a.first);
+                fix(a.second);
+            }
+        };
+        for (model::Rule& r : inst.rules) {
+            fix(r.actions);
+        }
+        if (any) {
+            changed.emplace_back(self, std::move(inst));
+        }
+    }
+    for (auto& [id, inst] : changed) {
+        model.setInstance(id, std::move(inst));
+    }
+}
+
 // Cheile vechi devin canale, față de pivotul și poza din model ale fiecărui obiect.
 void migrateLegacyTracks(model::Model& model, const std::vector<LegacyTrack>& legacy)
 {
@@ -787,6 +823,9 @@ LoadResult fromJson(std::string_view text)
         }
         model.apply(changes, geom::ChangeDirection::Forward);
         migrateLegacyTracks(model, legacy);
+        if (doc.value("formatVersion", 0) < 3) {
+            migrateMoveToRules(model);
+        }
         const geom::ValidationReport report = model.validate(geom::ValidationLevel::Topology);
         if (!report.ok()) {
             result.error = "Fișierul e deteriorat: " + report.errors.front();

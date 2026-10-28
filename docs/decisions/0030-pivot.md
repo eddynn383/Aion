@@ -51,7 +51,8 @@
 
 - Utilizatorul a văzut valori diferite în timeline (poziția pivotului) și în Inspector (colțul minim) pentru același
   obiect și a ales: **Poziția din Inspector e a pivotului** (ca în Blender), pentru obiecte și pentru geometria liberă;
-  o poziție nouă mută obiectul ca pivotul să ajungă acolo. Scripturile (`place(id, { x, y, z })`) la fel.
+  o poziție nouă mută obiectul ca pivotul să ajungă acolo. Scripturile (`place(id, { x, y, z })`) și regulile
+  „Mută la” la fel; `formatVersion` 3 migrează ținta regulilor din fișierele vechi (colțul minim → pivotul).
 - **Pivotul se selectează**: click pe marcaj (fără tragere) → `Document::pivotSelected`; marcajul primește un inel, iar
   Inspector-ul arată „Pivot selectat” cu coordonatele lui (ca Poziția), editabile: mută doar pivotul
   (`Document::setPivotPosition`). Esc, ✕ sau un click în altă parte îl deselectează. Grupul „Pivot” rămâne distanța de
