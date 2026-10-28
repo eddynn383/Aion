@@ -3,10 +3,12 @@
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/PenCurves.h"
+#include "aion/core/view/Picking.h"
 
 #include "ToolHelpers.h"
 
 #include <glm/geometric.hpp>
+#include <glm/matrix.hpp>
 
 namespace aion::tools {
 
@@ -160,13 +162,17 @@ private:
         if (ctx.model == nullptr) {
             return;
         }
+        // Fața unui obiect (grup, componentă): se caută în geometria lui, cu camera în coordonatele lui; normala trece
+        // prin inversa transpusă (scara neuniformă).
         const view::PickResult hit = pickWithInstances(ctx, screen);
-        if (hit.kind == view::PickResult::Kind::Instance && hit.face && ctx.model->instances().contains(hit.instance)) {
+        if (hit.kind == view::PickResult::Kind::Instance && ctx.model->instances().contains(hit.instance)) {
             const model::Instance& inst = ctx.model->instance(hit.instance);
             const geom::Mesh& mesh = ctx.model->mesh(inst.definition);
-            if (mesh.faces().contains(hit.face)) {
-                m_normal = glm::normalize(inst.transform.applyToVector(mesh.face(hit.face).plane.normal));
-                m_origin = hit.point;
+            const view::PickResult local = view::pick(mesh, ctx.camera.inContext(inst.transform), screen);
+            if (local.face && mesh.faces().contains(local.face)) {
+                const glm::dmat3 linear(inst.transform.matrix());
+                m_normal = glm::normalize(glm::transpose(glm::inverse(linear)) * mesh.face(local.face).plane.normal);
+                m_origin = inst.transform.applyToPoint(local.point);
             }
         }
     }

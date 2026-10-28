@@ -2,6 +2,7 @@
 
 #include "aion/core/model/Model.h"
 
+#include <map>
 #include <optional>
 
 // Căile de parcurgere (ADR 0036): obiectele ancorate merg pe curbă cu fața înainte, cu baza (centrul feței de jos a
@@ -16,6 +17,8 @@ namespace aion::model {
 // Transformarea unui obiect ancorat pe o cale a animației, la `time` (scara din pista lui, dacă o animă); gol dacă nu e
 // pe nicio cale a animației.
 [[nodiscard]] std::optional<math::Transform> pathTransformAt(const Model& model, AnimationId animation, InstanceId instance, double time);
+// Toate obiectele ancorate pe căile animației, la `time`, dintr-o trecere (o tabelă de lungime pe cale).
+[[nodiscard]] std::map<InstanceId, math::Transform> pathTransformsAt(const Model& model, AnimationId animation, double time);
 // Pune obiectele ancorate pe căile animației în poza `posed` (o copie a lui `source`), la `time`. Poziția și rotirea vin
 // de la cale; scara din pista obiectului, dacă o animă, altfel cea de dinainte de ancorare.
 void applyPaths(Model& posed, const Model& source, AnimationId animation, double time);

@@ -72,6 +72,9 @@ Vec3d frontLocal(int front)
 // Lungimea obiectului pe direcția feței (cu scara).
 double lengthAlongFront(const Model& model, const PathAnchor& a)
 {
+    if (!model.instances().contains(a.instance)) {
+        return 0.0;
+    }
     const auto [lo, hi] = bounds(model, model.instance(a.instance).definition);
     if (lo.x > hi.x) {
         return 0.0;
@@ -85,15 +88,15 @@ Vec3d scaleOf(const PathAnchor& a)
     return decompose(a.before).scale;
 }
 
-// Poza obiectului pe cale la `time`, doar din decalajele ancorei (fără mutările din Modelare).
-math::Transform pathPose(const Model& model, const MotionPath& path, const PathAnchor& anchor, double time, const Vec3d& scale)
+// Poza obiectului pe cale la `time`, doar din decalajele ancorei (fără mutările din Modelare); tabela de lungime și
+// baza obiectului vin calculate (se refolosesc pentru start și pentru timp, și pentru toate ancorele unei căi).
+math::Transform poseOn(const MotionPath& path, const geom::ArcLength& arc, const PathAnchor& anchor, double time,
+    const Vec3d& scale, const Vec3d& base)
 {
-    const geom::ArcLength arc(path.curve);
     const Frame f = frameAt(path, arc, travelled(path, arc, time) + anchor.along);
     // Orientarea vine numai din tangentă (decalajul lateral nu o schimbă, chiar pe curbe strânse).
     const glm::dmat3 basis(f.t, f.l, f.n);
     const glm::dmat3 rotation = basis * rotationZ(anchor.yaw) * rotationZ(-90.0 * anchor.front);
-    const Vec3d base = model.instances().contains(anchor.instance) ? baseLocal(model, anchor.instance) : Vec3d { 0.0 };
     const Vec3d at = f.point + f.l * anchor.lateral + f.n * anchor.up;
     math::Mat4d m(1.0);
     const glm::dmat3 linear = rotation * glm::dmat3(scale.x, 0, 0, 0, scale.y, 0, 0, 0, scale.z);
@@ -102,6 +105,44 @@ math::Transform pathPose(const Model& model, const MotionPath& path, const PathA
     }
     m[3] = glm::dvec4(at - linear * base, 1.0);
     return math::Transform(m);
+}
+
+Vec3d baseOf(const Model& model, const PathAnchor& anchor)
+{
+    return model.instances().contains(anchor.instance) ? baseLocal(model, anchor.instance) : Vec3d { 0.0 };
+}
+
+math::Transform pathPose(const Model& model, const MotionPath& path, const PathAnchor& anchor, double time, const Vec3d& scale)
+{
+    return poseOn(path, geom::ArcLength(path.curve), anchor, time, scale, baseOf(model, anchor));
+}
+
+// Poza la `time` plus mutările din Modelare (transformarea de bază față de poza de start a căii).
+math::Transform evaluateAnchor(const Model& model, const MotionPath& path, const geom::ArcLength& arc, const PathAnchor& anchor,
+    double time, const Vec3d& scale)
+{
+    const Vec3d base = baseOf(model, anchor);
+    math::Transform relative;
+    if (model.instances().contains(anchor.instance)) {
+        relative = poseOn(path, arc, anchor, path.start, scaleOf(anchor), base).inverse() * model.instance(anchor.instance).transform;
+    }
+    return poseOn(path, arc, anchor, time, scale, base) * relative;
+}
+
+// Scara obiectului la `time`: din pista lui, dacă o animă, altfel cea de dinainte de ancorare.
+Vec3d animatedScale(const Model& model, AnimationId animation, const PathAnchor& anchor, double time)
+{
+    const Animation* anim = model.animations().find(animation);
+    if (const ObjectTrack* track = anim != nullptr ? findTrack(*anim, anchor.instance) : nullptr) {
+        const bool scaled = std::any_of(track->channels.begin(), track->channels.end(), [](const Channel& c) {
+            return c.property == Property::ScaleX || c.property == Property::ScaleY || c.property == Property::ScaleZ;
+        });
+        if (scaled) {
+            const math::Vec3d pivot = pivotLocal(model, anchor.instance);
+            return evaluateValues(*track, time, transformValues(model.instance(anchor.instance).transform, pivot)).scale;
+        }
+    }
+    return scaleOf(anchor);
 }
 
 // Ce s-a schimbat în Modelare (Move, Rotate, Scale, Inspector) pe obiectul ancorat: transformarea lui de bază față de
@@ -135,7 +176,7 @@ PathAnchor* findAnchor(MotionPath& path, InstanceId instance)
 math::Transform anchorTransform(const Model& model, const MotionPath& path, const PathAnchor& anchor, double time,
     const math::Vec3d& scale)
 {
-    return pathPose(model, path, anchor, time, scale) * relativeOf(model, path, anchor);
+    return evaluateAnchor(model, path, geom::ArcLength(path.curve), anchor, time, scale);
 }
 
 std::optional<math::Transform> pathTransformAt(const Model& model, AnimationId animation, InstanceId instance, double time)
@@ -146,35 +187,33 @@ std::optional<math::Transform> pathTransformAt(const Model& model, AnimationId a
     }
     const MotionPath& path = model.motionPaths().at(*id);
     const auto a = std::find_if(path.anchors.begin(), path.anchors.end(), [&](const PathAnchor& x) { return x.instance == instance; });
-    Vec3d scale = scaleOf(*a);
-    const Animation* anim = model.animations().find(animation);
-    if (const ObjectTrack* track = anim != nullptr ? findTrack(*anim, instance) : nullptr) {
-        const bool scaled = std::any_of(track->channels.begin(), track->channels.end(), [](const Channel& c) {
-            return c.property == Property::ScaleX || c.property == Property::ScaleY || c.property == Property::ScaleZ;
-        });
-        if (scaled) {
-            const math::Vec3d pivot = pivotLocal(model, instance);
-            scale = evaluateValues(*track, time, transformValues(model.instance(instance).transform, pivot)).scale;
+    return evaluateAnchor(model, path, geom::ArcLength(path.curve), *a, time, animatedScale(model, animation, *a, time));
+}
+
+std::map<InstanceId, math::Transform> pathTransformsAt(const Model& model, AnimationId animation, double time)
+{
+    std::map<InstanceId, math::Transform> out;
+    for (const MotionPath& path : model.motionPaths().values()) {
+        if (path.animation != animation || path.anchors.empty()) {
+            continue;
+        }
+        const geom::ArcLength arc(path.curve);
+        for (const PathAnchor& a : path.anchors) {
+            if (model.instances().contains(a.instance)) {
+                out[a.instance] = evaluateAnchor(model, path, arc, a, time, animatedScale(model, animation, a, time));
+            }
         }
     }
-    return anchorTransform(model, path, *a, time, scale);
+    return out;
 }
 
 void applyPaths(Model& posed, const Model& source, AnimationId animation, double time)
 {
-    for (const MotionPath& path : source.motionPaths().values()) {
-        if (path.animation != animation) {
-            continue;
-        }
-        for (const PathAnchor& a : path.anchors) {
-            if (!posed.instances().contains(a.instance)) {
-                continue;
-            }
-            if (const auto t = pathTransformAt(source, animation, a.instance, time)) {
-                Instance inst = posed.instance(a.instance);
-                inst.transform = *t;
-                posed.setInstance(a.instance, inst);
-            }
+    for (const auto& [id, transform] : pathTransformsAt(source, animation, time)) {
+        if (posed.instances().contains(id)) {
+            Instance inst = posed.instance(id);
+            inst.transform = transform;
+            posed.setInstance(id, inst);
         }
     }
 }
@@ -204,9 +243,11 @@ bool attachToPath(Model& model, MotionPathId id, InstanceId instance)
             a.front = k;
         }
     }
-    // În coloană, în urma ultimului ancorat, ca să nu se suprapună.
-    if (!path.anchors.empty()) {
-        const PathAnchor& last = path.anchors.back();
+    // În coloană, în urma ultimului ancorat care încă există, ca să nu se suprapună.
+    const auto live = std::find_if(path.anchors.rbegin(), path.anchors.rend(),
+        [&](const PathAnchor& x) { return model.instances().contains(x.instance); });
+    if (live != path.anchors.rend()) {
+        const PathAnchor& last = *live;
         const double lenLast = lengthAlongFront(model, last);
         const double lenNew = lengthAlongFront(model, a);
         a.along = last.along - (lenLast * 0.5 + lenNew * 0.5 + std::max(200.0, 0.2 * std::max(lenLast, lenNew)));

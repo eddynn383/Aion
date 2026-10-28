@@ -349,6 +349,10 @@ TEST_CASE("Căi: poza la un timp pune obiectele pe cale", "[core][paths]")
     model::Model posed = m;
     model::applyPaths(posed, m, m.motionPaths().at(path).animation, 3.0);
     CHECK(sameTransform(posed.instance(car).transform, at(m, path, car, 3.0)));
+    // Toate dintr-o trecere (o tabelă de lungime pe cale): aceleași transformări.
+    const auto all = model::pathTransformsAt(m, m.motionPaths().at(path).animation, 3.0);
+    REQUIRE(all.size() == 1);
+    CHECK(sameTransform(all.at(car), posed.instance(car).transform));
     model::Model other = m;
     model::applyPaths(other, m, model::AnimationId { 999 }, 3.0); // altă animație: nimic
     CHECK(sameTransform(other.instance(car).transform, m.instance(car).transform));
@@ -403,4 +407,20 @@ TEST_CASE("Căi: o mutare în Modelare se păstrează relativ la cale", "[core][
         model::updatePath(model, path, p);
     });
     CHECK(glm::length(basePoint(m, car, at(m, path, car, 2.0)) - Vec3d { -500, 5000, 0 }) < 1e-6);
+}
+
+TEST_CASE("Căi: ancorarea după ștergerea unui obiect ancorat", "[core][paths]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    const model::InstanceId first = box(m, stack, { 0, 0, 0 }, { 600, 600, 600 });
+    const model::MotionPathId path = addPath(stack, straight(10000));
+    REQUIRE(attach(stack, path, first));
+    stack.run("Erase", [&](model::Model& model) { model::eraseInstance(model, first); });
+    const model::InstanceId second = box(m, stack, { 3000, 3000, 0 }, { 600, 600, 600 });
+    REQUIRE(attach(stack, path, second));
+    const model::PathAnchor& anchor = m.motionPaths().at(path).anchors.back();
+    CHECK(anchor.instance == second);
+    CHECK(anchor.along == 0.0); // nu mai e nimeni în fața lui
+    CHECK(glm::length(basePoint(m, second, at(m, path, second, 4.0)) - Vec3d { 10000, 0, 0 }) < 1e-3);
 }
