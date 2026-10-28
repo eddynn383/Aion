@@ -5,6 +5,7 @@
 #include "aion/core/geom/Selection.h"
 #include "aion/core/inference/Inference.h"
 #include "aion/core/model/Model.h"
+#include "aion/core/model/Operations.h"
 #include "aion/core/math/Vec.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/Picking.h"
@@ -137,6 +138,8 @@ struct ToolContext {
     // Pivotul selecției (marcajul din viewport), în coordonatele contextului: centrul implicit pentru Rotate și
     // punctul fix pentru Scale cu Option. Gol dacă nu e nimic selectat.
     std::optional<Vec3d> pivot;
+    // Camera sau lumina selectată (fără altă selecție): ținta lui Move / Rotate / Scale.
+    std::optional<model::SceneObjectRef> object;
 };
 
 class Tool {

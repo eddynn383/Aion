@@ -1,6 +1,7 @@
 #include "aion/core/model/Operations.h"
 
 #include "aion/core/model/AnimationEval.h"
+#include "aion/core/view/Camera.h"
 
 #include "aion/core/geom/Operations.h"
 
@@ -508,6 +509,73 @@ void applySceneState(Model& model, const Scene& scene)
             model.setTag(id, tag);
         }
     }
+}
+
+void transformSceneObject(Model& model, const SceneObjectRef& object, const math::Transform& transform)
+{
+    if (const CameraObject* found = model.cameras().find(object.camera)) {
+        CameraObject c = *found;
+        // „Sus”-ul camerei (cu roll), dus de transformare; roll-ul nou e unghiul lui față de „sus”-ul fără înclinare.
+        view::Camera before;
+        before.setPose(view::poseLookingAt(c.position, c.target));
+        before.setRoll(glm::radians(c.roll));
+        const math::Vec3d up = transform.applyToVector(before.up());
+        c.position = transform.applyToPoint(c.position);
+        c.target = transform.applyToPoint(c.target);
+        view::Camera level;
+        level.setPose(view::poseLookingAt(c.position, c.target));
+        const double roll = glm::degrees(std::atan2(-glm::dot(up, level.right()), glm::dot(up, level.up())));
+        c.roll = std::abs(roll) < 1e-9 ? 0.0 : roll;
+        model.setCamera(object.camera, c);
+    } else if (const Light* light = model.lights().find(object.light)) {
+        Light l = *light;
+        l.position = transform.applyToPoint(l.position);
+        const math::Vec3d d = transform.applyToVector(l.direction);
+        if (glm::length(d) > 1e-12) {
+            l.direction = glm::normalize(d);
+        }
+        model.setLight(object.light, l);
+    }
+}
+
+void scaleSceneObject(Model& model, const SceneObjectRef& object, const math::Vec3d& factors)
+{
+    const double uniform = std::cbrt(std::abs(factors.x * factors.y * factors.z));
+    if (const CameraObject* found = model.cameras().find(object.camera)) {
+        CameraObject c = *found;
+        if (c.orthographic) {
+            c.orthoScale = std::max(c.orthoScale * uniform, 1.0);
+        } else {
+            c.displaySize = std::clamp(c.displaySize * uniform, 0.05, 50.0);
+        }
+        model.setCamera(object.camera, c);
+    } else if (const Light* light = model.lights().find(object.light)) {
+        Light l = *light;
+        switch (l.kind) {
+        case Light::Kind::Area:
+            l.width = std::max(l.width * std::abs(factors.x), 1.0);
+            l.height = std::max(l.height * std::abs(factors.y), 1.0);
+            break;
+        case Light::Kind::Spot:
+            l.cone = std::clamp(l.cone * uniform, 1.0, 179.0);
+            break;
+        default:
+            l.range = std::max(l.range * uniform, 1.0);
+            break;
+        }
+        model.setLight(object.light, l);
+    }
+}
+
+std::vector<math::Vec3d> sceneObjectPoints(const Model& model, const SceneObjectRef& object)
+{
+    if (const CameraObject* c = model.cameras().find(object.camera)) {
+        return { c->position, c->target };
+    }
+    if (const Light* l = model.lights().find(object.light)) {
+        return { l->position };
+    }
+    return {};
 }
 
 } // namespace aion::model

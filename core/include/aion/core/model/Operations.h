@@ -90,6 +90,21 @@ struct Decomposed {
 // animațiilor (poziția pivotului) se recalculează.
 void setPivot(Model& model, InstanceId instance, const math::Vec3d& local);
 
+// O cameră sau o lumină (obiectele scenei), ca țintă a uneltelor Move / Rotate / Scale.
+struct SceneObjectRef {
+    CameraId camera;
+    LightId light;
+    bool operator==(const SceneObjectRef&) const = default;
+};
+// Move / Rotate: poziția și ținta (camera) sau direcția (lumina) urmează transformarea; înclinarea camerei se păstrează
+// față de ea, deci o rotație în jurul direcției de privire schimbă roll-ul.
+void transformSceneObject(Model& model, const SceneObjectRef& object, const math::Transform& transform);
+// Scale (factorii uneltei pe X, Y, Z): camera în perspectivă — mărimea gizmo-ului; ortografică — scara cadrului; panoul
+// luminos — laturile; spotul — conul; celelalte lumini — raza. Poziția nu se schimbă.
+void scaleSceneObject(Model& model, const SceneObjectRef& object, const math::Vec3d& factors);
+// Punctele de prindere ale obiectului (Move): poziția și, la cameră, ținta. Gol dacă obiectul nu există.
+[[nodiscard]] std::vector<math::Vec3d> sceneObjectPoints(const Model& model, const SceneObjectRef& object);
+
 // Biții din Instance::placementLocks.
 enum PlacementLock : std::uint16_t {
     LockPositionX = 1 << 0, LockPositionY = 1 << 1, LockPositionZ = 1 << 2,

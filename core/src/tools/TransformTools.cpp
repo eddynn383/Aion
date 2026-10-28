@@ -35,13 +35,18 @@ constexpr double kGripRadiusPx = 14.0;
 struct Target {
     geom::Selection selection;
     std::set<geom::VertexId> vertices;
+    std::optional<model::SceneObjectRef> object; // o cameră sau o lumină (selectată, fără altă selecție)
 
-    [[nodiscard]] bool empty() const { return vertices.empty() && selection.instances.empty(); }
+    [[nodiscard]] bool empty() const { return vertices.empty() && selection.instances.empty() && !object; }
 };
 
 Target targetAt(const ToolContext& ctx, Vec2d screen)
 {
     Target t;
+    if (ctx.selection.empty() && ctx.object && ctx.model != nullptr) {
+        t.object = ctx.object;
+        return t;
+    }
     if (!ctx.selection.empty()) {
         t.selection = ctx.selection;
     } else {
@@ -90,6 +95,19 @@ std::vector<PreviewEdge> previewEdges(const ToolContext& ctx, const Target& targ
     const geom::Mesh& mesh = ctx.mesh;
     const std::set<geom::VertexId>& vertices = target.vertices;
     std::vector<PreviewEdge> out;
+    // O cameră / lumină: o cruce în poziția ei și, la cameră, linia spre țintă.
+    if (target.object && ctx.model != nullptr) {
+        const std::vector<Vec3d> points = model::sceneObjectPoints(*ctx.model, *target.object);
+        if (!points.empty()) {
+            const double s = std::max(ctx.camera.worldPerPixelAtTarget(), 1e-6) * 18.0;
+            for (const Vec3d& axis : { Vec3d { 1, 0, 0 }, Vec3d { 0, 1, 0 }, Vec3d { 0, 0, 1 } }) {
+                out.push_back({ points[0] - axis * s, points[0] + axis * s, true, true });
+            }
+            if (points.size() > 1) {
+                out.push_back({ points[0], points[1], true, true });
+            }
+        }
+    }
     // Instanțele: muchiile cutiei lor, mutate întregi.
     if (ctx.model != nullptr) {
         for (model::InstanceId id : target.selection.instances) {
@@ -337,7 +355,22 @@ void transformTarget(ToolContext& ctx, const std::string& name, const Target& ta
     ctx.stack.run(name, [&](model::Model& model) {
         geom::transformVertices(model.mesh(ctx.context), target.vertices, t);
         model::transformInstances(model, target.selection.instances, t);
+        if (target.object) {
+            model::transformSceneObject(model, *target.object, t);
+        }
     });
+}
+
+// Punctele de prindere ale camerei / luminii selectate (poziția, ținta).
+std::vector<Grip> objectGrips(const ToolContext& ctx)
+{
+    std::vector<Grip> out;
+    if (ctx.model != nullptr && ctx.selection.empty() && ctx.object) {
+        for (const Vec3d& p : model::sceneObjectPoints(*ctx.model, *ctx.object)) {
+            out.push_back({ p, inference::Kind::Endpoint, false, false });
+        }
+    }
+    return out;
 }
 
 // Copiile țintei, câte una pentru fiecare transformare (array). Instanțele unei componente rămân legate.
@@ -573,6 +606,10 @@ private:
             }
         }
         m_grips = instanceGrips(ctx, ids);
+        if (!m_base) {
+            const std::vector<Grip> own = objectGrips(ctx);
+            m_grips.insert(m_grips.begin(), own.begin(), own.end());
+        }
         m_hotGrip = nearestGrip(ctx, m_grips, screen, kGripRadiusPx);
         if (m_hotGrip >= 0) {
             m_grips[std::size_t(m_hotGrip)].hot = true;
@@ -587,7 +624,7 @@ private:
         const Vec3d delta = m_current - *m_base;
         if (glm::length(delta) > tol::kLength) {
             const Transform t = Transform::translation(delta);
-            if (m_copy) {
+            if (m_copy && !m_target.object) { // camerele și luminile nu se copiază cu Option
                 const geom::Selection source = m_target.selection;
                 ctx.selection = copyTarget(ctx, source, { t });
                 m_lastCopy = LastCopy { source, [delta](double k) { return Transform::translation(delta * k); } };
@@ -827,6 +864,8 @@ private:
             }
         }
         m_grips = instanceGrips(ctx, ids);
+        const std::vector<Grip> own = objectGrips(ctx);
+        m_grips.insert(m_grips.end(), own.begin(), own.end());
         if (m_pivot && !m_fromPivot) {
             const auto same = [&](const Grip& g) { return glm::length(g.point - *m_pivot) < tol::kLength; };
             if (std::none_of(m_grips.begin(), m_grips.end(), same)) {
@@ -861,7 +900,7 @@ private:
         m_copy = e.modifiers.alt;
         if (m_phase == Phase::Center) {
             // Cu o selecție, centrul e pivotul ei (marcajul din viewport); Option = alege alt centru.
-            m_pivot = ctx.selection.empty() ? std::nullopt : ctx.pivot;
+            m_pivot = ctx.selection.empty() && !ctx.object ? std::nullopt : ctx.pivot;
             m_fromPivot = m_pivot.has_value() && !e.modifiers.alt;
             if (m_fromPivot) {
                 m_center = *m_pivot;
@@ -920,7 +959,7 @@ private:
     {
         if (std::abs(m_angle) > 1e-9) {
             const Transform t = rotation();
-            if (m_copy) {
+            if (m_copy && !m_target.object) {
                 const geom::Selection source = m_target.selection;
                 ctx.selection = copyTarget(ctx, source, { t });
                 const Vec3d center = m_center;
@@ -984,7 +1023,7 @@ public:
             return;
         }
         // Fără mâner sub cursor: alege entitatea (dacă nu e nimic selectat), ca să-i apară mânerele.
-        if (ctx.selection.empty()) {
+        if (ctx.selection.empty() && !ctx.object) {
             const Target t = targetAt(ctx, e.screen);
             if (!t.selection.empty()) {
                 ctx.selection = t.selection;
@@ -1156,6 +1195,17 @@ private:
     void refreshBox(const ToolContext& ctx)
     {
         m_hasBox = false;
+        if (ctx.selection.empty() && ctx.object && ctx.model != nullptr) {
+            // O cameră / lumină: o cutie mică în jurul poziției (mânerele dau factorii).
+            const std::vector<Vec3d> points = model::sceneObjectPoints(*ctx.model, *ctx.object);
+            if (!points.empty()) {
+                const double h = worldPerPixelAt(ctx.camera, points[0]) * 40.0;
+                m_lo = points[0] - Vec3d { h };
+                m_hi = points[0] + Vec3d { h };
+                m_hasBox = true;
+            }
+            return;
+        }
         if (ctx.selection.empty()) {
             return;
         }
@@ -1168,7 +1218,7 @@ private:
             lo = glm::min(lo, ctx.mesh.position(v));
             hi = glm::max(hi, ctx.mesh.position(v));
         }
-        for (const PreviewEdge& e : previewEdges(ctx, Target { t.selection, {} })) {
+        for (const PreviewEdge& e : previewEdges(ctx, Target { t.selection, {}, std::nullopt })) {
             lo = glm::min(lo, glm::min(e.a, e.b));
             hi = glm::max(hi, glm::max(e.a, e.b));
         }
@@ -1253,7 +1303,13 @@ private:
     void commit(ToolContext& ctx)
     {
         if (glm::length(m_factors - Vec3d { 1.0 }) > 1e-9) {
-            transformTarget(ctx, "Scale", m_target, scaling());
+            if (m_target.object && ctx.model != nullptr) {
+                const model::SceneObjectRef object = *m_target.object;
+                const Vec3d factors = m_factors;
+                ctx.stack.run("Scale", [&](model::Model& model) { model::scaleSceneObject(model, object, factors); });
+            } else {
+                transformTarget(ctx, "Scale", m_target, scaling());
+            }
             ctx.selection.prune(ctx.mesh);
         }
         m_dragging = false;
