@@ -489,3 +489,26 @@ TEST_CASE("Pen: pe fața unui grup, curba stă pe planul feței", "[core][tools]
         CHECK(std::abs(p.point.y - 1000.0) < 1e-6);
     }
 }
+
+TEST_CASE("Pen edit: un punct tras puțin nu se lipește de vechile muchii ale curbei", "[core][tools][pen]")
+{
+    PenScene s;
+    s.click({ 0, 0, 0 });
+    s.drag({ 1000, 800, 0 }, { 1500, 800, 0 });
+    s.click({ 2000, 0, 0 });
+    REQUIRE(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const model::PenCurveId id = s.model.penCurves().keys()[0];
+    auto edit = tools::makeTool("penedit");
+    s.ctx.editCurve = s.model.penCurves().at(id).path;
+    // 7 px la dreapta: vechiul vârf (și muchiile curbei) sunt încă în geometrie, la mai puțin de 10 px.
+    const double perPixel = 1.0 / (s.screen({ 1, 0, 0 }).x - s.screen({ 0, 0, 0 }).x);
+    const Vec2d from = s.screen({ 1000, 800, 0 });
+    const Vec2d to = from + Vec2d { 7, 0 };
+    edit->pointerMove(s.ctx, PenScene::at(from));
+    edit->pointerDown(s.ctx, PenScene::at(from));
+    edit->pointerMove(s.ctx, PenScene::at((from + to) * 0.5));
+    edit->pointerMove(s.ctx, PenScene::at(to));
+    edit->pointerUp(s.ctx, PenScene::at(to));
+    REQUIRE(s.requests.curveEdit);
+    CHECK(std::abs(s.requests.curveEdit->points[1].point.x - (1000.0 + 7.0 * perPixel)) < 1.0);
+}

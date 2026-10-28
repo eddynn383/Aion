@@ -424,3 +424,57 @@ TEST_CASE("Căi: ancorarea după ștergerea unui obiect ancorat", "[core][paths]
     CHECK(anchor.along == 0.0); // nu mai e nimeni în fața lui
     CHECK(glm::length(basePoint(m, second, at(m, path, second, 4.0)) - Vec3d { 10000, 0, 0 }) < 1e-3);
 }
+
+TEST_CASE("Căi: la un colț al căii, obiectul se întoarce treptat", "[core][paths]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    const model::InstanceId car = box(m, stack, { 0, 0, 0 }, { 1000, 400, 300 });
+    const geom::BezierPath l { { corner({ 0, 0, 0 }), corner({ 5000, 0, 0 }), corner({ 5000, 5000, 0 }) }, false };
+    const model::MotionPathId path = addPath(stack, l, 10.0);
+    REQUIRE(attach(stack, path, car));
+    double previous = 0.0;
+    for (int i = 0; i <= 100; ++i) {
+        const double time = 4.5 + 0.01 * i; // în jurul colțului (5 s = 5000 mm)
+        const Vec3d f = at(m, path, car, time).applyToVector(frontAxis(m, path));
+        const double angle = glm::degrees(std::atan2(f.y, f.x));
+        CHECK(angle - previous < 5.0);
+        previous = angle;
+    }
+}
+
+TEST_CASE("Căi: un obiect ancorat mutat într-un grup nu mai e pus pe cale", "[core][paths]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    const model::InstanceId car = box(m, stack, { 0, 0, 0 }, { 600, 600, 600 });
+    const model::MotionPathId path = addPath(stack, straight(10000));
+    REQUIRE(attach(stack, path, car));
+    const model::AnimationId animation = m.motionPaths().at(path).animation;
+    geom::Selection sel;
+    sel.instances.insert(car);
+    stack.run("Group", [&](model::Model& model) { model::makeGroup(model, model.root(), sel, false); });
+    REQUIRE(m.instance(car).parent != m.root());
+    CHECK_FALSE(model::pathOf(m, animation, car));
+    CHECK_FALSE(model::pathTransformAt(m, animation, car, 2.0));
+    CHECK(model::pathTransformsAt(m, animation, 2.0).empty());
+}
+
+TEST_CASE("Fișier: un fișier v3 (fără căi și curbe Pen) se încarcă", "[core][paths][io]")
+{
+    std::string text = io::toJson(model::Model {});
+    for (const char* key : { "\"penCurves\": []", "\"motionPaths\": []" }) {
+        const std::size_t at = text.find(key);
+        REQUIRE(at != std::string::npos);
+        const std::size_t comma = text.rfind(',', at);
+        text.erase(comma, at + std::string(key).size() - comma);
+    }
+    const std::string current = "\"formatVersion\": 4";
+    text.replace(text.find(current), current.size(), "\"formatVersion\": 3");
+    REQUIRE(text.find("penCurves") == std::string::npos);
+    REQUIRE(text.find("motionPaths") == std::string::npos);
+    const io::LoadResult loaded = io::fromJson(text);
+    REQUIRE(loaded.model);
+    CHECK(loaded.model->penCurves().empty());
+    CHECK(loaded.model->motionPaths().empty());
+}

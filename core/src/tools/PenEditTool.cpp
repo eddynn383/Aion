@@ -35,6 +35,8 @@ public:
         }
         m_curve = *ctx.editCurve;
         m_normal = ctx.editNormal;
+        // Vechea curbă e încă în geometrie (în Modelare): punctele prinse pe ea nu contează la tragere.
+        m_oldSamples = geom::sampleBezier(m_curve, geom::defaultTolerance(m_curve));
         m_pressed = true;
         m_dragging = false;
         m_press = e.screen;
@@ -246,10 +248,25 @@ private:
         return found;
     }
 
+    bool onOldCurve(const Vec3d& p) const
+    {
+        for (std::size_t i = 0; i + 1 < m_oldSamples.size(); ++i) {
+            const math::Vec3d a = m_oldSamples[i];
+            const math::Vec3d ab = m_oldSamples[i + 1] - a;
+            const double len2 = glm::dot(ab, ab);
+            const double t = len2 > 1e-12 ? std::clamp(glm::dot(p - a, ab) / len2, 0.0, 1.0) : 0.0;
+            if (glm::length(a + ab * t - p) <= 1.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::optional<Vec3d> onPlane(const ToolContext& ctx, Vec2d screen, const Vec3d& anchor) const
     {
         const math::Plane plane = math::Plane::fromPointNormal(anchor, m_normal);
-        if (m_inference.valid() && m_inference.kind != inference::Kind::Ground && m_inference.kind != inference::Kind::OnFace) {
+        if (m_inference.valid() && m_inference.kind != inference::Kind::Ground && m_inference.kind != inference::Kind::OnFace
+            && !(m_inference.isPoint() || m_inference.kind == inference::Kind::OnEdge ? onOldCurve(m_inference.point) : false)) {
             return plane.project(m_inference.point);
         }
         const math::Ray ray = ctx.camera.rayAt(screen);
@@ -305,6 +322,7 @@ private:
     }
 
     geom::BezierPath m_curve;
+    std::vector<Vec3d> m_oldSamples;
     Vec3d m_normal { 0.0, 0.0, 1.0 };
     int m_selected = -1;
     int m_index = -1;
