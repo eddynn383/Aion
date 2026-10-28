@@ -193,8 +193,10 @@ jobs:
       - name: Configurare
         run: cmake --preset wasm-app
 
+      # Două joburi: fișierele QML compilate pentru WebAssembly (em++) cer multă memorie; cu toate nucleele, runner-ul
+      # oprea build-ul (exit 143) pe 2026-10-28.
       - name: Build
-        run: cmake --build --preset wasm-app
+        run: cmake --build --preset wasm-app --parallel 2
 
       - name: Pagina web (HTML + JS + WASM)
         run: |
