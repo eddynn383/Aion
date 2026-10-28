@@ -175,10 +175,12 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
 - [x] `AppMenuBar.qml`: meniul „Vizualizare” (sau unul nou „Mod”) cu cele 3 moduri bifabile.
 
 ### Pasul 4 — Gărzile din Document ✅ criteriu: test că o operație de modelare e refuzată în Animare
-- [ ] `allows()` în metodele de modelare (desen prin unelte: `setActiveTool` refuză uneltele altui mod; `pointerDown`
+> Făcut: `Document::require(mode)` la începutul operațiilor publice (modelare, animare, interacțiune) și în
+> `setActiveTool`; `selectTool` din Main revine la Select pentru uneltele altui mod.
+- [x] `allows()` în metodele de modelare (desen prin unelte: `setActiveTool` refuză uneltele altui mod; `pointerDown`
       nu ajunge la ele; metodele publice: `deleteSelection`, `makeGroup`, `previewBevel`, `previewArray`,
       `mirrorSelection`, `assignMaterial`, booleene, `createPrimitive`…). Scripturile (`m_macro`) sunt scutite.
-- [ ] Mesaj clar: „În modul Animare nu se modifică geometria. Treci în Modelare (⌥1).”
+- [x] Mesaj clar: „În modul Animare nu se modifică geometria. Treci în Modelare (⌥1).”
 
 ### Pasul 5 — Layout-ul pe mod (panouri, Inspector) ✅ criteriu: capturi în cele 3 moduri
 - [ ] Panoul stâng: secțiunile vizibile după mod (tabelul din 3.3–3.5); înălțimile și starea deschis/închis rămân

@@ -539,6 +539,11 @@ Window {
     }
 
     function selectTool(id) {
+        // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare).
+        if (!doc.commandAllowed("tool." + id)) {
+            toast.show("Unealta nu e disponibilă în modul " + ["Modelare", "Animare", "Interacțiune"][doc.workMode] + ".")
+            id = "select"
+        }
         window.activeTool = id
         const tool = toolbar.toolInfo(id)
         const ready = modelingTools.includes(id) || navigationTools.includes(id)

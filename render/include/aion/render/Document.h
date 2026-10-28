@@ -420,6 +420,8 @@ public:
     Q_INVOKABLE bool commandAllowed(const QString& id) const;
     // Modurile în care e disponibilă comanda.
     static QList<int> commandModes(const QString& id);
+    // Gărzile operațiilor: false (și un mesaj) dacă modul dat nu e cel curent.
+    bool require(int mode);
     bool interactionMode() const { return m_runtime.has_value(); }
     void setInteractionMode(bool on);
     // Cursorul pentru obiectul de sub mouse: "drag", "click", "context", "hover" sau gol (nimic interactiv).
