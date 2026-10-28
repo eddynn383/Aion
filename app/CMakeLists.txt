@@ -44,6 +44,11 @@ qt_policy(SET QTP0004 NEW)
 
 # Trebuie setat înainte de qt_add_qml_module, altfel Theme nu apare ca singleton în qmldir.
 set_source_files_properties(qml/theme/Theme.qml qml/theme/UserPrefs.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+# Web: Main.qml (mare) nu trece prin compilatorul QML → C++ (qmlcachegen): pe runner-ele CI dura ~2 minute și uneori
+# era oprit (exit 143). Se compilează în browser la pornire; restul fișierelor rămân compilate dinainte.
+if(EMSCRIPTEN)
+    set_source_files_properties(qml/Main.qml PROPERTIES QT_QML_SKIP_CACHEGEN TRUE)
+endif()
 
 qt_add_qml_module(aion_app
     URI Aion
