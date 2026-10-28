@@ -561,10 +561,10 @@ Window {
                 } else if (action === "look:focus") {
                     viewport.pickingFocus = true // următorul click alege distanța de focus
                 } else if (action === "debug.pivot") {
-                    console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode, "selected", doc.pivotSelected,
+                    console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode,
                                  "at", JSON.stringify(doc.pivotPosition))
                 } else if (action.startsWith("pivotpos:")) {
-                    // „pivotpos:x=0,y=3000”: coordonatele pivotului selecției (ca din Inspector, cu pivotul selectat).
+                    // „pivotpos:x=0,y=3000”: coordonatele pivotului selecției (ca Poziția), fără să mute obiectul.
                     const pp = {}
                     for (const kv of action.slice(9).split(",")) {
                         const parts = kv.split("=")
@@ -586,6 +586,16 @@ Window {
                     const before = JSON.stringify(p) // înainte de tragere (p e o referință vie)
                     AppInfo.simulateDrag(window.contentItem, screen, Qt.point(screen.x + dl[0], screen.y + dl[1]))
                     console.info("light:", before, "→", JSON.stringify(doc.selectedObject.position), "undo:", doc.undoName)
+                } else if (action.startsWith("dragpivot:")) {
+                    // „dragpivot:x,y,z” (sau „…,hold”, fără eliberare): trage marcajul pivotului lângă punctul 3D dat,
+                    // la câțiva pixeli, ca să se vadă prinderea; afișează pivotul înainte și după.
+                    const dv = action.slice(10).split(",")
+                    const pm = doc.pivotMarker()
+                    const pFrom = viewport.mapToItem(window.contentItem, viewport.projectToScreen(Qt.vector3d(pm[0], pm[1], pm[2])))
+                    const pTo = viewport.mapToItem(window.contentItem,
+                                                   viewport.projectToScreen(Qt.vector3d(Number(dv[0]), Number(dv[1]), Number(dv[2]))))
+                    AppInfo.simulateDrag(window.contentItem, pFrom, Qt.point(pTo.x + 3, pTo.y - 2), dv[3] !== "hold")
+                    console.info("pivot:", JSON.stringify(pm), "→", JSON.stringify(doc.pivotMarker()), "undo:", doc.undoName)
                 } else if (action.startsWith("droppreview:")) {
                     // „droppreview:gen:table,700,450”: cutia de previzualizare a obiectului la poziția din viewport.
                     const dp = action.slice(12).split(",")
@@ -754,8 +764,6 @@ Window {
             bevelPanel.close()
         } else if (doc.interactionMode)
             window.selectTool("select")
-        else if (doc.pivotSelected && vcbText.length === 0)
-            doc.pivotSelected = false
         else if (viewport.lookThrough > 0 && vcbText.length === 0
                  && (window.activeTool === "select" || window.navigationTools.includes(window.activeTool)))
             viewport.lookThrough = 0

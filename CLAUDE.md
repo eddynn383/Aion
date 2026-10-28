@@ -186,8 +186,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `Document::selectionPivot` (marcajul din viewport), cheile `vx/vy/vz` și `pivot: center|base|corner` în
   `setPlacement` / `setGeometryPlacement`. Acțiune de script: `placement:vx=0,vy=0,vz=0`. Rotate pornește din
   pivot (`ToolContext::pivot`; Option = alt centru), Scale cu Option ține pivotul fix. **Poziția din Inspector e a
-  pivotului** (ca în timeline); click pe marcaj = pivotul selectat (`Document::pivotSelected`, `setPivotPosition`,
-  grupul „Pivot selectat”). Acțiuni: `debug.pivot`, `pivotpos:x=…,y=…`.
+  pivotului** (ca în timeline); pivotul se schimbă doar din grupul „Pivot (de la colțul minim)” sau trăgând
+  marcajul: unealta internă `pivot` (`Document::beginPivotDrag`, `ToolRequests::pivot`) se prinde ca Move, plus
+  centrele fețelor și originea. Acțiuni: `debug.pivot`, `pivotpos:x=…,y=…`, `dragpivot:x,y,z[,hold]`.
 
 - **Move cu puncte de prindere**: `tools::Grip` în `Overlay::grips` (desenate în `Viewport::appendOverlay`),
   `instanceGrips` / `nearestGrip` în `TransformTools.cpp` (cutia orientată a obiectului, colțuri + mijloace).

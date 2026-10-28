@@ -167,8 +167,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Cub 100 × 100 × 50 → Inspector → Pivot arată 50, 50, 25; marcajul (punct + axe) e în centrul cubului
 - [ ] Poziția din Inspector = coordonatele pivotului (aceleași ca „Poziție X/Y/Z” din timeline); Pivot → Colț → Poziția
       arată colțul; o poziție nouă duce pivotul acolo
-- [ ] Click pe marcajul pivotului → inel + „Pivot selectat (mm)” în Inspector; o valoare nouă mută doar pivotul;
-      Esc / ✕ / click pe obiect îl deselectează
+- [ ] Marcajul pivotului tras (cu Select) se prinde de colțurile / mijloacele altor obiecte, de centrele fețelor
+      obiectului, de origine, de axe (săgeți / Shift blochează), ghidaje și grid, cu eticheta punctului; Esc anulează;
+      un pas de undo; obiectul rămâne pe loc (și în Animare, la toate cheile)
+- [ ] Inspector-ul are un singur grup de pivot, „Pivot (mm, de la colțul minim)” (și pentru geometria liberă)
 - [ ] Rotație Z 30° → cubul se rotește pe loc (centrul nu se mișcă), Poziția (colțul) se schimbă
 - [ ] Pivot → Colț, apoi Rotație Z 45° → colțul rămâne pe loc; Bază → pivotul coboară pe fața de jos
 - [ ] Salvare / deschidere → pivotul ales rămâne; ⌘Z anulează schimbarea pivotului

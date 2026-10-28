@@ -272,7 +272,7 @@ void AppInfo::simulateMove(QQuickItem* item, const QPointF& position) const
     QCoreApplication::sendEvent(window, &e);
 }
 
-void AppInfo::simulateDrag(QQuickItem* item, const QPointF& from, const QPointF& to) const
+void AppInfo::simulateDrag(QQuickItem* item, const QPointF& from, const QPointF& to, bool release) const
 {
     if (item == nullptr || item->window() == nullptr) {
         return;
@@ -290,7 +290,9 @@ void AppInfo::simulateDrag(QQuickItem* item, const QPointF& from, const QPointF&
     for (int i = 1; i <= steps; ++i) {
         send(QEvent::MouseMove, from + (to - from) * (static_cast<double>(i) / steps), Qt::NoButton, Qt::LeftButton);
     }
-    send(QEvent::MouseButtonRelease, to, Qt::LeftButton, Qt::NoButton);
+    if (release) {
+        send(QEvent::MouseButtonRelease, to, Qt::LeftButton, Qt::NoButton);
+    }
 }
 
 void AppInfo::simulateRightClick(QQuickItem* item, const QPointF& position) const
