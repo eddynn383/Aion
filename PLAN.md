@@ -674,7 +674,7 @@ Planul detaliat (specificație, design, pași, criterii, decizii de confirmat): 
 
 ---
 
-## 6f. Etapa 6 – modul Animare: funcții noi și timeline mai bun (cerința din 2026-10-28)
+## 6f. Etapa 6 – modul Animare, timeline-ul și camera (cerința din 2026-10-28; implementare ulterioară)
 
 Planul detaliat (funcțiile de pe piață, designul, pașii, deciziile de confirmat): [`docs/plans/animatie.md`](docs/plans/animatie.md).
 
@@ -684,6 +684,9 @@ Planul detaliat (funcțiile de pe piață, designul, pașii, deciziile de confir
 - [ ] Pasul 4 — easing: presetări + editorul de curbă Bézier, curbe proprii salvate
 - [ ] Pasul 5 — UX: selecție multiplă, zoom / scroll, snap, copiere / lipire, Auto-key
 - [ ] Pasul 6 — documentație, capturi, CI
+- [ ] Camera (secțiunea 9 din plan): C1 date noi · C2 vederea prin cameră cu cadrul și zborul · C3 formatul ·
+      C4 „blochează camera pe vedere” · C5 Move / Rotate / Scale + snap pe camere și lumini · C6 depth of field
+- [ ] Rotația cu pivotul mutat (secțiunea 10 din plan): reproducere, Rotate / Scale din pivot, axe globale
 
 ---
 
