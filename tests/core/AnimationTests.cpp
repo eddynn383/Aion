@@ -361,3 +361,29 @@ TEST_CASE("Animații: un fișier vechi (formatVersion 1) se deschide cu animați
     REQUIRE(again.model);
     CHECK(again.model->animations().values().front() == a);
 }
+
+TEST_CASE("Animații: easing-ul implicit al animației pentru cheile noi", "[core][model][animation]")
+{
+    using model::Property;
+    Animation a;
+    a.defaultEasing = *model::easingPreset("linear");
+    const model::InstanceId box { 1 };
+    model::setChannelKey(a, box, Property::PositionX, 0.0, 0.0);
+    model::setColorKey(a, box, 1.0, { 1, 2, 3, 255 });
+    model::setChannelKey(a, box, Property::PositionX, 1.0, 10.0, *model::easingPreset("step")); // dat explicit
+    const model::ObjectTrack& t = *model::findTrack(a, box);
+    CHECK(model::findChannel(t, Property::PositionX)->keys[0].easing.name == "linear");
+    CHECK(model::findChannel(t, Property::PositionX)->keys[1].easing.name == "step");
+    CHECK(model::findChannel(t, Property::Color)->keys[0].easing.name == "linear");
+    // O cheie înlocuită își păstrează easing-ul.
+    a.defaultEasing = *model::easingPreset("easeOut");
+    model::setChannelKey(a, box, Property::PositionX, 0.0, 5.0);
+    CHECK(model::findChannel(*model::findTrack(a, box), Property::PositionX)->keys[0].easing.name == "linear");
+
+    // Se salvează în fișier.
+    model::Model m;
+    m.addAnimation(a);
+    const io::LoadResult loaded = io::fromJson(io::toJson(m));
+    REQUIRE(loaded.model);
+    CHECK(loaded.model->animations().values().front().defaultEasing.name == "easeOut");
+}

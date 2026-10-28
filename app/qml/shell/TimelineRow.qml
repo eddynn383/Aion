@@ -24,7 +24,14 @@ Item {
 
         MouseArea {
             anchors.fill: parent
-            onClicked: if (root.row.instance > 0) root.doc.selectInstance(root.row.instance)
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            // Click dreapta: curba de easing pentru tot canalul (sau toate cheile obiectului / camerei).
+            onClicked: (mouse) => {
+                if (mouse.button === Qt.RightButton)
+                    root.timeline.editRowEasing(root.row, nameCell)
+                else if (root.row.instance > 0)
+                    root.doc.selectInstance(root.row.instance)
+            }
             onDoubleClicked: if (root.isObject) root.timeline.toggleExpanded(root.row.instance)
         }
 
@@ -139,6 +146,48 @@ Item {
                 radius: 2
                 color: root.row.kind === "camera" ? Qt.rgba(Theme.axisY.r, Theme.axisY.g, Theme.axisY.b, 0.35)
                                                   : Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.35)
+            }
+        }
+
+        // Curba de easing a fiecărui segment dintre două chei (dacă încape); click = editorul ei.
+        Repeater {
+            model: Math.max(0, root.row.keys.length - 1)
+            delegate: Item {
+                id: segment
+                required property int index
+                readonly property var key: root.row.keys[index]
+                readonly property real x0: root.timeline.xAt(key.time)
+                readonly property real x1: root.timeline.xAt(root.row.keys[index + 1].time)
+                // Pe canale, eticheta valorii stă lângă cheie: curba e în a doua jumătate a segmentului.
+                readonly property real center: root.isChannel ? x0 + (x1 - x0) * 0.62 : (x0 + x1) / 2
+                visible: x1 - x0 > (root.isChannel ? 96 : 44) && key.easing !== null && key.easing !== undefined
+                x: center - width / 2
+                width: 18
+                height: root.height
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 20
+                    height: 16
+                    radius: 4
+                    color: segmentArea.containsMouse ? Theme.bgActive : (root.isChannel ? Theme.bgPanel : "transparent")
+                }
+                EasingCurve {
+                    anchors.centerIn: parent
+                    width: 14
+                    height: 12
+                    lineWidth: 1.2
+                    overshoot: 0.15
+                    easing: segment.key.easing ?? null
+                    color: segmentArea.containsMouse ? Theme.textPrimary : Theme.textTertiary
+                }
+                MouseArea {
+                    id: segmentArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.timeline.segmentClicked(root.row, segment.index, segment)
+                }
+                Tooltip { visible: segmentArea.containsMouse; text: "Curba tranziției (click pentru editor)" }
             }
         }
 

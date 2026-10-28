@@ -1946,7 +1946,8 @@ QVariantMap Document::timeline() const
         camera.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), easingToVariant(k.easing) } });
     }
     return { { QStringLiteral("name"), QString::fromStdString(a->name) }, { QStringLiteral("duration"), a->duration },
-        { QStringLiteral("fps"), a->fps }, { QStringLiteral("loop"), a->loop }, { QStringLiteral("tracks"), tracks },
+        { QStringLiteral("fps"), a->fps }, { QStringLiteral("loop"), a->loop },
+        { QStringLiteral("defaultEasing"), easingToVariant(a->defaultEasing) }, { QStringLiteral("tracks"), tracks },
         { QStringLiteral("camera"), camera } };
 }
 
@@ -2103,7 +2104,7 @@ void Document::keyCamera(const QVariantMap& camera)
             { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
                 camera.value(QStringLiteral("tz")).toDouble() },
             camera.value(QStringLiteral("yaw")).toDouble(), camera.value(QStringLiteral("pitch")).toDouble(),
-            camera.value(QStringLiteral("distance")).toDouble(), model::Easing {} });
+            camera.value(QStringLiteral("distance")).toDouble(), a.defaultEasing });
     });
 }
 
@@ -2170,6 +2171,16 @@ void Document::setKeysEasing(const QVariantList& keys, const QVariant& easing)
     }
     const std::vector<model::KeyRef> refs = keyRefs(keys);
     editAnimation("Easing", [&](model::Animation& a) { model::setKeysEasing(a, refs, *e); });
+}
+
+void Document::setDefaultEasing(const QVariant& easing)
+{
+    if (!require(Animation)) {
+        return;
+    }
+    if (const std::optional<model::Easing> e = easingFromVariant(easing)) {
+        editAnimation("Easing implicit", [&](model::Animation& a) { a.defaultEasing = *e; });
+    }
 }
 
 void Document::setKeyValue(const QVariantMap& key, double value)

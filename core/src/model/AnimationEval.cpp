@@ -381,7 +381,7 @@ void setChannelKey(Animation& animation, InstanceId instance, Property property,
     Key key;
     key.time = time;
     key.value = value;
-    key.easing = easing.value_or(Easing {});
+    key.easing = easing.value_or(animation.defaultEasing);
     upsert(channelFor(trackFor(animation, instance), property).keys, key, tolerance(animation), !easing.has_value());
     animation.duration = std::max(animation.duration, time);
 }
@@ -391,6 +391,7 @@ void setColorKey(Animation& animation, InstanceId instance, double time, const C
     Key key;
     key.time = time;
     key.color = value;
+    key.easing = animation.defaultEasing;
     upsert(channelFor(trackFor(animation, instance), Property::Color).keys, key, tolerance(animation), true);
     animation.duration = std::max(animation.duration, time);
 }

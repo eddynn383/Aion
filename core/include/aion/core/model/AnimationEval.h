@@ -62,7 +62,7 @@ struct TransformValues {
 // --- Editarea ---
 
 // Adaugă sau înlocuiește cheia de la momentul dat (o cheie la mai puțin de jumătate de cadru e „aceeași” și își
-// păstrează easing-ul). O cheie nouă primește `easing`, dacă e dat, altfel easing-ul implicit.
+// păstrează easing-ul). O cheie nouă primește `easing`, dacă e dat, altfel easing-ul implicit al animației.
 void setChannelKey(Animation& animation, InstanceId instance, Property property, double time, double value,
     const std::optional<Easing>& easing = std::nullopt);
 void setColorKey(Animation& animation, InstanceId instance, double time, const Color& value);
