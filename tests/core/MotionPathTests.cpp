@@ -375,3 +375,32 @@ TEST_CASE("Fișier: căile se salvează și se încarcă (v4)", "[core][paths][i
     CHECK(b.duration == a.duration);
     CHECK(b.easing == a.easing);
 }
+
+TEST_CASE("Căi: o mutare în Modelare se păstrează relativ la cale", "[core][paths]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    const model::InstanceId car = box(m, stack, { 0, 0, 0 }, { 1000, 400, 300 });
+    const model::MotionPathId path = addPath(stack, straight(10000));
+    REQUIRE(attach(stack, path, car));
+    // Move (în Modelare) schimbă direct transformarea de bază: 500 mm la stânga de start.
+    stack.run("Move", [&](model::Model& model) {
+        model::Instance inst = model.instance(car);
+        inst.transform = math::Transform::translation({ 0, 500, 0 }) * inst.transform;
+        model.setInstance(car, inst);
+    });
+    CHECK(glm::length(basePoint(m, car, at(m, path, car, 2.0)) - Vec3d { 5000, 500, 0 }) < 1e-6);
+    model::Model posed = m;
+    model::applyPaths(posed, m, m.motionPaths().at(path).animation, 2.0);
+    CHECK(glm::length(basePoint(m, car, posed.instance(car).transform) - Vec3d { 5000, 500, 0 }) < 1e-6);
+    const auto single = model::pathTransformAt(m, m.motionPaths().at(path).animation, car, 2.0);
+    REQUIRE(single);
+    CHECK(sameTransform(*single, posed.instance(car).transform));
+    // Calea editată (întoarsă spre +Y): decalajul rămâne la stânga direcției de mers.
+    stack.run("Edit", [&](model::Model& model) {
+        model::MotionPath p = model.motionPaths().at(path);
+        p.curve.points[1] = corner({ 0, 10000, 0 });
+        model::updatePath(model, path, p);
+    });
+    CHECK(glm::length(basePoint(m, car, at(m, path, car, 2.0)) - Vec3d { -500, 5000, 0 }) < 1e-6);
+}

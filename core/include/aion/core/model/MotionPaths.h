@@ -9,9 +9,13 @@
 // funcțiile care schimbă modelul se apelează într-o comandă (un pas de undo).
 namespace aion::model {
 
-// Transformarea obiectului ancorat la `time` (secunde în animația căii), cu scara dată.
+// Transformarea obiectului ancorat la `time` (secunde în animația căii), cu scara dată: poza din decalajele ancorei,
+// plus ce i s-a schimbat în Modelare față de startul căii.
 [[nodiscard]] math::Transform anchorTransform(const Model& model, const MotionPath& path, const PathAnchor& anchor,
     double time, const math::Vec3d& scale);
+// Transformarea unui obiect ancorat pe o cale a animației, la `time` (scara din pista lui, dacă o animă); gol dacă nu e
+// pe nicio cale a animației.
+[[nodiscard]] std::optional<math::Transform> pathTransformAt(const Model& model, AnimationId animation, InstanceId instance, double time);
 // Pune obiectele ancorate pe căile animației în poza `posed` (o copie a lui `source`), la `time`. Poziția și rotirea vin
 // de la cale; scara din pista obiectului, dacă o animă, altfel cea de dinainte de ancorare.
 void applyPaths(Model& posed, const Model& source, AnimationId animation, double time);
