@@ -23,6 +23,7 @@ add_executable(aion_tests
     core/ModelingTests.cpp
     core/ShapeTests.cpp
     core/BezierTests.cpp
+    core/PenCurveTests.cpp
     core/BevelTests.cpp
     core/SweepTests.cpp
     core/PickIndexTests.cpp

@@ -30,6 +30,8 @@ DrawLineResult drawPolygon(Mesh& mesh, const std::vector<Vec3d>& points);
 // Desenează o curbă (cerc, arc, poligon) din segmente: toate muchiile primesc același identificator de curbă,
 // ca să se selecteze și să se șteargă împreună. `smooth`: cerc sau arc (extrudat, are laturile soft).
 DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth);
+// La fel, cu un id de curbă dat (o curbă Pen redesenată își păstrează id-ul).
+DrawLineResult drawCurve(Mesh& mesh, const std::vector<Vec3d>& points, bool closed, bool smooth, std::uint32_t curve);
 
 // Închide fețe în buclele plane formate de muchiile date (de exemplu după ce fața a fost ștearsă și muchiile au rămas),
 // ca la redesenarea unei muchii în SketchUp. O față nouă lângă alte fețe ia sensul lor (normala spre exterior la un

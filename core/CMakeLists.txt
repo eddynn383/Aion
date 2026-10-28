@@ -28,6 +28,7 @@ add_library(aion_core STATIC
     src/math/Intersect.cpp
     src/model/Model.cpp
     src/model/Operations.cpp
+    src/model/PenCurves.cpp
     src/model/Quantities.cpp
     src/model/Interaction.cpp
     src/model/AnimationEval.cpp

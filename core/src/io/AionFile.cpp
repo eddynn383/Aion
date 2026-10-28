@@ -195,6 +195,53 @@ json camerasToJson(const model::Model& model)
     return out;
 }
 
+// Curba Bézier: { closed, points: [[px, py, pz, ix, iy, iz, ox, oy, oz, smooth]] }.
+json bezierToJson(const geom::BezierPath& path)
+{
+    json points = json::array();
+    for (const geom::BezierPoint& p : path.points) {
+        points.push_back(json { p.point.x, p.point.y, p.point.z, p.in.x, p.in.y, p.in.z, p.out.x, p.out.y, p.out.z,
+            p.smooth ? 1 : 0 });
+    }
+    return { { "closed", path.closed }, { "points", points } };
+}
+
+geom::BezierPath bezierFromJson(const json& j)
+{
+    geom::BezierPath path;
+    path.closed = j.value("closed", false);
+    for (const json& p : j.value("points", json::array())) {
+        const auto at = [&](std::size_t i) { return p.at(i).get<double>(); };
+        path.points.push_back({ { at(0), at(1), at(2) }, { at(3), at(4), at(5) }, { at(6), at(7), at(8) }, at(9) != 0.0 });
+    }
+    return path;
+}
+
+json penCurvesToJson(const model::Model& model)
+{
+    json out = json::array();
+    for (std::size_t i = 0; i < model.penCurves().size(); ++i) {
+        const model::PenCurve& c = model.penCurves().values()[i];
+        out.push_back({ { "id", model.penCurves().keys()[i].value }, { "definition", c.definition.value },
+            { "curve", c.curve }, { "normal", json { c.normal.x, c.normal.y, c.normal.z } },
+            { "path", bezierToJson(c.path) } });
+    }
+    return out;
+}
+
+void penCurvesFromJson(const json& list, model::ChangeSet& changes)
+{
+    for (const json& j : list) {
+        model::PenCurve c;
+        c.definition = model::DefinitionId { j.at("definition").get<std::uint64_t>() };
+        c.curve = j.at("curve").get<std::uint32_t>();
+        const json& n = j.at("normal");
+        c.normal = { n.at(0).get<double>(), n.at(1).get<double>(), n.at(2).get<double>() };
+        c.path = bezierFromJson(j.at("path"));
+        changes.penCurves[model::PenCurveId { j.at("id").get<std::uint64_t>() }].after = std::move(c);
+    }
+}
+
 json lightsToJson(const model::Model& model)
 {
     const auto vec = [](const math::Vec3d& v) { return json { v.x, v.y, v.z }; };
@@ -663,6 +710,7 @@ std::string toJson(const model::Model& model)
         { "cameras", camerasToJson(model) },
         { "lights", lightsToJson(model) },
         { "textures", textures },
+        { "penCurves", penCurvesToJson(model) },
     };
     return doc.dump(1);
 }
@@ -792,6 +840,7 @@ LoadResult fromJson(std::string_view text)
         std::vector<LegacyTrack> legacy;
         animationsFromJson(doc.value("animations", json::array()), changes, legacy);
         camerasAndLightsFromJson(doc, changes);
+        penCurvesFromJson(doc.value("penCurves", json::array()), changes);
         for (const json& s : doc.value("scenes", json::array())) {
             model::Scene scene;
             scene.name = s.value("name", std::string());
