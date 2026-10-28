@@ -2,7 +2,7 @@ import QtQuick
 import Aion
 
 // Meniu derulant în stilul Figma: bifă pentru elementul curent, iconiță, nume și scurtătură.
-// items: listă de { id, icon, name, shortcut, checked, enabled }.
+// items: listă de { id, icon, name, shortcut, checked, enabled }; { header: "Titlu" } e titlul unei secțiuni.
 Popover {
     id: root
 
@@ -59,8 +59,9 @@ Popover {
                 readonly property color foreground: highlighted ? Theme.accentText
                     : enabledItem ? Theme.textPrimary : Theme.textTertiary
 
+                readonly property bool isHeader: modelData.header !== undefined
                 width: root.availableWidth
-                height: 32
+                height: isHeader ? 24 : 32
                 radius: Theme.radiusMd
                 color: highlighted ? Theme.accent : "transparent"
 
@@ -68,6 +69,18 @@ Popover {
                     + Theme.space8 + shortcutText.implicitWidth + Theme.space3
                 Component.onCompleted: root.rowsWidth = Math.max(root.rowsWidth, implicitWidth)
 
+                Text {
+                    visible: row.isHeader
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.space2
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 3
+                    text: row.modelData.header ?? ""
+                    color: Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 0.6
+                }
                 Icon {
                     id: check
                     anchors.left: parent.left
@@ -85,6 +98,7 @@ Popover {
                     anchors.verticalCenter: parent.verticalCenter
                     size: 16
                     name: row.modelData.icon || ""
+                    visible: !row.isHeader
                     color: row.foreground
                 }
                 Text {
@@ -92,7 +106,7 @@ Popover {
                     anchors.left: icon.right
                     anchors.leftMargin: Theme.space3
                     anchors.verticalCenter: parent.verticalCenter
-                    text: row.modelData.name
+                    text: row.modelData.name ?? ""
                     color: row.foreground
                     font.pixelSize: Theme.fontSizeMd
                 }

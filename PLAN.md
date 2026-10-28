@@ -645,6 +645,10 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
 - [x] Marcajul pivotului în viewport; `aion.rotate` folosește pivotul
 - [ ] Pivotul tras direct din viewport
 
+### Toolbar: grupul Primitive (cerința din 2026-10-28)
+- [x] Line, Arc, Rectangle, Circle, Polygon (2D) și Cub, Sferă, Con, Cilindru (3D) într-un singur grup „Primitive”,
+      cu titluri de secțiune în meniu (`Menu` acceptă `{ header }`)
+
 ### Move: puncte de prindere ale obiectelor (cerința din 2026-10-27)
 - [x] Move arată colțurile (verde) și mijloacele muchiilor (cyan) cutiei obiectului de sub cursor sau selectat, mari
       și cu margine ca în SketchUp; cele din spate sunt mici și estompate
