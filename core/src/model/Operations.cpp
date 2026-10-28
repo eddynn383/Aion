@@ -262,7 +262,7 @@ Placement placementOf(const Model& model, InstanceId instance)
     const math::Vec3d extent = lo.x <= hi.x ? hi - lo : math::Vec3d { 0.0 };
     const Decomposed d = decompose(inst.transform);
     Placement p;
-    p.position = inst.transform.applyToPoint(corner);
+    p.position = inst.transform.applyToPoint(pivotLocal(model, instance));
     p.rotation = eulerDegrees(d.rotation);
     p.scale = d.scale;
     p.size = glm::abs(extent * d.scale);
@@ -359,8 +359,8 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
     }
     glm::dmat4 m(rs);
     if (glm::length(wanted.position - current.position) > 1e-6) {
-        // O mutare: colțul minim (local) ajunge în poziția cerută.
-        m[3] = glm::dvec4(wanted.position - rs * corner, 1.0);
+        // O mutare: pivotul ajunge în poziția cerută.
+        m[3] = glm::dvec4(wanted.position - rs * pivot, 1.0);
     } else {
         // Rotație / scară / dimensiuni: pivotul rămâne unde era.
         m[3] = glm::dvec4(pivotWorld - rs * pivot, 1.0);

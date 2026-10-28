@@ -105,7 +105,7 @@ TEST_CASE("Array liniar și polar: copii la distanțe și unghiuri egale", "[cor
         CHECK(m.definition(m.instance(id).definition).shape == "box");
         maxY = std::max(maxY, model::placementOf(m, id).position.y);
     }
-    CHECK(maxY == Approx(-100.0 + 1500.0));
+    CHECK(maxY == Approx(0.0 + 1500.0)); // poziția e a pivotului: centrul cutiei (y = 0)
 
     // Polar: 4 copii la 90° în jurul axei Z prin origine, rotite.
     const geom::Selection polar = model::polarArray(m, m.root(), sel, { 0, 0, 0 }, { 0, 0, 1 }, std::numbers::pi / 2, 3, true);
