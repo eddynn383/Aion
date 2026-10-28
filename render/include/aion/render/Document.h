@@ -549,7 +549,8 @@ private:
     int m_workMode = Modeling;
     // Modul Animare: o copie a modelului cu obiectele animate în poza de la timpul curent. Uneltele de transformare
     // și Inspector-ul lucrează pe ea; rezultatul devine keyframe-uri (modelul de bază nu se schimbă). Se reface doar
-    // când se schimbă modelul (m_modelRevision), timpul sau animația.
+    // când se schimbă modelul (m_modelRevision: crește la orice schimbare a istoricului — m_stack.setOnChanged —,
+    // în runOnModel și la înlocuirea modelului), timpul sau animația.
     mutable std::optional<model::Model> m_pose;
     mutable std::tuple<std::uint64_t, double, std::uint64_t> m_poseKey { ~std::uint64_t { 0 }, 0.0, 0 };
     std::uint64_t m_modelRevision = 0;
