@@ -97,6 +97,30 @@ private:
     bool m_ssaoSupported = false;
     [[nodiscard]] bool ssaoActive() const { return m_frame.ambientOcclusion && m_ssaoSupported && m_ssaoSize.isValid(); }
     void ensureSsaoTargets(QSize size);
+
+    // Depth of field: scena se desenează într-o țintă proprie, compatibilă cu a item-ului (aceleași formate și
+    // eșantioane), apoi două treceri de estompare: orizontal în m_dofBlur, vertical înapoi în ținta item-ului.
+    [[nodiscard]] bool dofWanted() const { return m_frame.dof.enabled && m_ssaoSupported; }
+    void ensureDofTargets(QSize size);
+    QSize m_dofSize;
+    int m_dofSamples = 0;
+    QVector<quint32> m_dofPassFormat;
+    const QRhiTexture* m_dofGbuffer = nullptr;
+    bool m_dofCompatible = false;
+    std::unique_ptr<QRhiTexture> m_dofScene;
+    std::unique_ptr<QRhiRenderBuffer> m_dofSceneMsaa;
+    std::unique_ptr<QRhiRenderBuffer> m_dofSceneDepth;
+    std::unique_ptr<QRhiTextureRenderTarget> m_dofSceneTarget;
+    std::unique_ptr<QRhiRenderPassDescriptor> m_dofScenePass;
+    std::unique_ptr<QRhiTexture> m_dofBlur;
+    std::unique_ptr<QRhiTextureRenderTarget> m_dofBlurTarget;
+    std::unique_ptr<QRhiRenderPassDescriptor> m_dofBlurPass;
+    std::unique_ptr<QRhiBuffer> m_dofUniformsH;
+    std::unique_ptr<QRhiBuffer> m_dofUniformsV;
+    std::unique_ptr<QRhiShaderResourceBindings> m_dofBindingsH;
+    std::unique_ptr<QRhiShaderResourceBindings> m_dofBindingsV;
+    std::unique_ptr<QRhiGraphicsPipeline> m_dofPipelineH;
+    std::unique_ptr<QRhiGraphicsPipeline> m_dofPipelineV;
     void updateBindings();
     void uploadTextures(QRhiResourceUpdateBatch* batch);
     glm::dmat4 m_lightViewProj { 1.0 };
