@@ -317,6 +317,11 @@ void Viewport::setDocument(Document* document)
         connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
         connect(m_document, &Document::animationStarted, this, &Viewport::requestAnimationFrame);
         connect(m_document, &Document::timelineTimeChanged, this, &Viewport::applyAnimationCamera);
+        // Pornirea / oprirea redării ascunde / readuce selecția, pivotul și ce desenează unealta.
+        connect(m_document, &Document::timelineChanged, this, [this] {
+            updateAnnotations();
+            update();
+        });
         connect(m_document, &Document::cameraRequested, this, [this](const QVariantMap& camera) { animateToCamera(camera, 1.0); });
         connect(m_document, &Document::interactionModeChanged, this, [this] {
             if (!m_document->interactionMode()) {
@@ -367,12 +372,17 @@ void Viewport::afterToolEvent()
     update();
 }
 
+bool Viewport::cleanView() const
+{
+    return m_cleanCapture || (m_document != nullptr && m_document->playing());
+}
+
 void Viewport::appendDocument(ViewportFrame& f) const
 {
     const Document& doc = *m_document;
-    // Imaginile și videoclipurile exportate nu arată hover-ul, selecția sau ce desenează unealta.
-    const view::PickResult hover = doc.tool() && !m_cleanCapture ? doc.tool()->hover() : view::PickResult {};
-    const tools::Overlay overlay = doc.tool() && !m_cleanCapture ? doc.tool()->overlay() : tools::Overlay {};
+    // Exportul și redarea animației nu arată hover-ul, selecția sau ce desenează unealta: doar modelul.
+    const view::PickResult hover = doc.tool() && !cleanView() ? doc.tool()->hover() : view::PickResult {};
+    const tools::Overlay overlay = doc.tool() && !cleanView() ? doc.tool()->overlay() : tools::Overlay {};
     appendDefinition(f, doc, doc.model().root(), math::Transform {}, 0, {}, hover, overlay);
 
     // Overlay-ul uneltei e în coordonatele contextului editat.
@@ -380,7 +390,7 @@ void Viewport::appendDocument(ViewportFrame& f) const
     const auto w = [&](const math::Vec3d& p) { return glm::vec3(ctx.applyToPoint(p)); };
 
     // Grupul editat: cutia lui, punctată (ca în SketchUp).
-    if (!doc.path().empty()) {
+    if (!doc.path().empty() && !cleanView()) {
         const auto [lo, hi] = model::bounds(doc.model(), doc.activeDefinition());
         if (lo.x <= hi.x) {
             std::array<glm::vec3, 8> c {};
@@ -446,7 +456,7 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
     // Geometria proprie a unei definiții de pe calea contextului (dar nu a contextului) e estompată.
     const bool dim = style.dim || ancestor;
     static const geom::Selection kNoSelection;
-    const geom::Selection& selection = m_cleanCapture ? kNoSelection : doc.selection();
+    const geom::Selection& selection = cleanView() ? kNoSelection : doc.selection();
 
     const auto stateOf = [&](geom::FaceId faceId) {
         if (active) {
@@ -696,7 +706,7 @@ glm::vec4 Viewport::markerColor(inference::Kind kind, inference::Tint tint) cons
 void Viewport::updateAnnotations()
 {
     QVariantList list;
-    if (m_document && m_document->tool()) {
+    if (m_document && m_document->tool() && !cleanView()) {
         const tools::Overlay overlay = m_document->tool()->overlay();
         constexpr double kMinDimensionPx = 36.0;
         constexpr double kDimensionOffsetPx = 14.0;
@@ -902,7 +912,7 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
     }
 
     // Pivotul selecției: un punct cu trei axe scurte, deasupra geometriei (se vede și în interiorul obiectului).
-    if (const auto pivot = doc.selectionPivot()) {
+    if (const auto pivot = doc.selectionPivot(); pivot && !cleanView()) {
         const glm::dvec3 p = definitionToWorld(doc, doc.activeDefinition()).applyToPoint(*pivot);
         const double len = std::max(glm::length(p - f.eye), 1.0) * 0.035;
         const glm::vec3 pf(p);
@@ -1945,7 +1955,7 @@ ViewportFrame Viewport::frameForRendering() const
         appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
     f.meshRevision = ((m_document ? m_document->revision() + m_document->interactionRevision() * 7919u : 0u)) * 2u
-        + (m_demoVisible ? 1u : 0u) + (m_cleanCapture ? 0x40000000u : 0u)
+        + (m_demoVisible ? 1u : 0u) + (cleanView() ? 0x40000000u : 0u)
         + static_cast<unsigned>(f.textureSignature & 0xFFFFu) * 2654435761u;
 
     // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.

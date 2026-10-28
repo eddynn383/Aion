@@ -1649,7 +1649,7 @@ Window {
         MeasurementsBox {
             id: measurementsBox
             readonly property real offset: 18
-            visible: doc.hasMeasurement && (window.vcbText.length > 0
+            visible: doc.hasMeasurement && !doc.playing && (window.vcbText.length > 0
                      || (viewport.pointerInside && doc.measurementValue.length > 0))
             // Lângă cursor, dar întotdeauna în interiorul viewport-ului.
             x: Math.min(viewport.pointerPosition.x + offset, viewport.width - width - Theme.space2)

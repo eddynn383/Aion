@@ -228,6 +228,8 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Click pe ceas → tastezi „1.5”, „36f” sau „00:02.50” → playhead-ul sare acolo
 - [ ] Auto-key oprit → Move schimbă poza de bază (fără chei); pe o proprietate animată, toată animația ei se mută
 - [ ] Marginea de sus a timeline-ului se trage (înălțimea se păstrează)
+- [ ] Redarea (Space) arată doar modelul: fără selecție, pivot, mânerele / liniile punctate ale lui Move, Rotate,
+      Scale și fără eticheta de măsură; la pauză revin toate
 - [ ] ⌘Z / ⇧⌘Z în Animare: cheile puse, mutate, șterse, easing-ul, durata se văd imediat în timeline; o animație
       ștearsă revine (și devine activă); obiectul mutat cu auto-key revine în viewport și în Inspector
 - [ ] Un obiect animat (mutat și rotit): în Animare, trage marcajul pivotului în colțul obiectului → în Modelare pivotul

@@ -345,6 +345,8 @@ private:
     void setPointer(QPointF position, bool inside);
     glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
     glm::vec4 tintColor(inference::Tint tint) const;
+    // Doar modelul (fără selecție, pivot, hover, unealtă): la export și cât rulează animația.
+    bool cleanView() const;
     void appendDocument(ViewportFrame& f) const;
     // Cum se desenează o definiție: estompată (în afara grupului editat), selectată, sub cursor, marcată de gumă.
     struct DrawStyle {
