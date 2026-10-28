@@ -4,6 +4,7 @@
 #include "aion/core/geom/Mesh.h"
 #include "aion/core/geom/Selection.h"
 #include "aion/core/geom/Triangulate.h"
+#include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Rules.h"
 #include "aion/core/tools/Tool.h"
@@ -457,14 +458,23 @@ public:
     Q_INVOKABLE void renameAnimation(double id, const QString& name);
     Q_INVOKABLE void removeAnimation(double id);
     Q_INVOKABLE void setAnimationSettings(double duration, int fps, bool loop);
-    // Keyframe-uri la momentul curent: transformarea / culoarea obiectelor selectate, camera dată (cameraState()).
+    // Keyframe-uri la momentul curent: toate canalele de transformare / culoarea obiectelor selectate, camera dată
+    // (cameraState()).
     Q_INVOKABLE void keySelection();
     Q_INVOKABLE void keySelectionColor();
     Q_INVOKABLE void keyCamera(const QVariantMap& camera);
-    // kind: "transform", "color", "camera"; instance 0 pentru cameră.
-    Q_INVOKABLE void removeKey(const QString& kind, double instance, double time);
-    Q_INVOKABLE void moveKey(const QString& kind, double instance, double time, double newTime);
-    Q_INVOKABLE void setKeyEasing(const QString& kind, double instance, double time, int easing);
+    // Cheile de pe timeline, ca liste de referințe { instance, property, time }: instance 0 = camera; property ""
+    // = rândul sumar al obiectului (toate canalele lui de la acel moment), altfel „position.x” … „color”.
+    Q_INVOKABLE void removeKeys(const QVariantList& keys);
+    // Mută cheile cu `delta` secunde; întoarce referințele noi (pentru selecție).
+    Q_INVOKABLE QVariantList moveKeys(const QVariantList& keys, double delta);
+    // easing: { name, x1, y1, x2, y2, step } sau numele unei presetări („easeInOut”).
+    Q_INVOKABLE void setKeysEasing(const QVariantList& keys, const QVariant& easing);
+    // Valoarea unei chei de pe un canal numeric; valoarea curentă a unui canal (scrie o cheie la timpul curent).
+    Q_INVOKABLE void setKeyValue(const QVariantMap& key, double value);
+    Q_INVOKABLE void setChannelValue(double instance, const QString& property, double value);
+    // Presetările de easing (ale aplicației), ca listă de { name, x1, y1, x2, y2, step }.
+    Q_INVOKABLE QVariantList easingPresets() const;
     Q_INVOKABLE void play();
     Q_INVOKABLE void pause();
     Q_INVOKABLE void togglePlay();
@@ -565,7 +575,11 @@ private:
     std::uint64_t m_modelRevision = 0;
     model::Model& pose() const;
     // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează animația).
+    // Auto-key: transformările noi ale obiectelor (la timpul curent) devin chei, doar pe canalele schimbate.
     void keyTransforms(const std::map<model::InstanceId, math::Transform>& transforms, const char* name);
+    // Valorile de transformare ale instanței la timpul curent (canalele animației peste modelul de bază).
+    [[nodiscard]] model::TransformValues currentValues(model::InstanceId instance) const;
+    [[nodiscard]] QString channelValueText(model::Property property, double value) const;
     model::RuleRuntime m_rules;
     model::InstanceId m_hoverInstance;
     struct DragState {

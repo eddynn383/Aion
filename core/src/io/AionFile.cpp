@@ -1,6 +1,8 @@
 #include "aion/core/io/AionFile.h"
 
 #include "aion/core/Version.h"
+#include "aion/core/model/AnimationEval.h"
+#include "aion/core/model/Operations.h"
 
 #include <miniz.h>
 #include <nlohmann/json.hpp>
@@ -242,7 +244,35 @@ void camerasAndLightsFromJson(const json& doc, model::ChangeSet& changes)
     }
 }
 
-// Animațiile: cheile ca liste compacte [timp, easing, valori…].
+// Easing-ul: numele presetării (dacă e chiar presetarea), altfel curba întreagă.
+json easingToJson(const model::Easing& e)
+{
+    if (const auto preset = model::easingPreset(e.name); preset && *preset == e) {
+        return e.name;
+    }
+    return { { "name", e.name }, { "x1", e.x1 }, { "y1", e.y1 }, { "x2", e.x2 }, { "y2", e.y2 }, { "step", e.step } };
+}
+
+model::Easing easingFromJson(const json& j)
+{
+    if (j.is_number()) { // formatVersion 1: Linear, EaseInOut, EaseIn, EaseOut, Step
+        static constexpr const char* kLegacy[] = { "linear", "easeInOut", "easeIn", "easeOut", "step" };
+        return *model::easingPreset(kLegacy[std::clamp(j.get<int>(), 0, 4)]);
+    }
+    if (j.is_string()) {
+        return model::easingPreset(j.get<std::string>()).value_or(model::Easing {});
+    }
+    model::Easing e;
+    e.name = j.value("name", std::string());
+    e.x1 = j.value("x1", e.x1);
+    e.y1 = j.value("y1", e.y1);
+    e.x2 = j.value("x2", e.x2);
+    e.y2 = j.value("y2", e.y2);
+    e.step = j.value("step", false);
+    return e;
+}
+
+// Animațiile: canalele, cu cheile ca liste compacte [timp, valoare, easing] (culoarea: [timp, r, g, b, a, easing]).
 json animationsToJson(const model::Model& model)
 {
     json out = json::array();
@@ -250,25 +280,23 @@ json animationsToJson(const model::Model& model)
         const model::Animation& a = model.animations().values()[i];
         json tracks = json::array();
         for (const model::ObjectTrack& t : a.tracks) {
-            json transform = json::array();
-            for (const model::TransformKey& k : t.transform) {
-                json entry = json::array({ k.time, static_cast<int>(k.easing) });
-                for (int c = 0; c < 4; ++c) {
-                    for (int r = 0; r < 4; ++r) {
-                        entry.push_back(k.value.matrix()[c][r]);
+            json channels = json::array();
+            for (const model::Channel& c : t.channels) {
+                json keys = json::array();
+                for (const model::Key& k : c.keys) {
+                    if (c.property == model::Property::Color) {
+                        keys.push_back({ k.time, k.color.r, k.color.g, k.color.b, k.color.a, easingToJson(k.easing) });
+                    } else {
+                        keys.push_back({ k.time, k.value, easingToJson(k.easing) });
                     }
                 }
-                transform.push_back(std::move(entry));
+                channels.push_back({ { "property", model::propertyName(c.property) }, { "keys", keys } });
             }
-            json color = json::array();
-            for (const model::ColorKey& k : t.color) {
-                color.push_back({ k.time, static_cast<int>(k.easing), k.value.r, k.value.g, k.value.b, k.value.a });
-            }
-            tracks.push_back({ { "instance", t.instance.value }, { "transform", transform }, { "color", color } });
+            tracks.push_back({ { "instance", t.instance.value }, { "channels", channels } });
         }
         json camera = json::array();
         for (const model::CameraKey& k : a.camera) {
-            camera.push_back({ k.time, static_cast<int>(k.easing), k.target.x, k.target.y, k.target.z, k.yaw, k.pitch,
+            camera.push_back({ k.time, easingToJson(k.easing), k.target.x, k.target.y, k.target.z, k.yaw, k.pitch,
                 k.distance });
         }
         out.push_back({ { "id", model.animations().keys()[i].value }, { "name", a.name }, { "duration", a.duration },
@@ -277,10 +305,17 @@ json animationsToJson(const model::Model& model)
     return out;
 }
 
-void animationsFromJson(const json& list, model::ChangeSet& changes)
+// Cheile vechi de transformare (formatVersion 1, matricea întreagă), migrate după ce modelul e construit.
+struct LegacyTrack {
+    model::AnimationId animation;
+    model::InstanceId instance;
+    std::vector<model::MatrixKey> keys;
+};
+
+void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector<LegacyTrack>& legacy)
 {
-    const auto easing = [](const json& v) { return static_cast<model::Easing>(std::clamp(v.get<int>(), 0, 4)); };
     for (const json& j : list) {
+        const model::AnimationId id { j.at("id").get<std::uint64_t>() };
         model::Animation a;
         a.name = j.value("name", std::string());
         a.duration = j.value("duration", 5.0);
@@ -289,28 +324,78 @@ void animationsFromJson(const json& list, model::ChangeSet& changes)
         for (const json& t : j.at("tracks")) {
             model::ObjectTrack track;
             track.instance = model::InstanceId { t.at("instance").get<std::uint64_t>() };
-            for (const json& k : t.at("transform")) {
-                math::Mat4d m(1.0);
-                for (int c = 0; c < 4; ++c) {
-                    for (int r = 0; r < 4; ++r) {
-                        m[c][r] = k.at(static_cast<std::size_t>(2 + c * 4 + r)).get<double>();
-                    }
+            for (const json& c : t.value("channels", json::array())) {
+                const auto property = model::propertyFromName(c.at("property").get<std::string>());
+                if (!property) {
+                    continue; // o proprietate dintr-o versiune mai nouă
                 }
-                track.transform.push_back({ k.at(0).get<double>(), math::Transform(m), easing(k.at(1)) });
+                model::Channel channel { *property, {} };
+                for (const json& k : c.at("keys")) {
+                    model::Key key;
+                    key.time = k.at(0).get<double>();
+                    if (*property == model::Property::Color) {
+                        key.color = { k.at(1).get<std::uint8_t>(), k.at(2).get<std::uint8_t>(),
+                            k.at(3).get<std::uint8_t>(), k.at(4).get<std::uint8_t>() };
+                        key.easing = easingFromJson(k.at(5));
+                    } else {
+                        key.value = k.at(1).get<double>();
+                        key.easing = easingFromJson(k.at(2));
+                    }
+                    channel.keys.push_back(std::move(key));
+                }
+                track.channels.push_back(std::move(channel));
             }
-            for (const json& k : t.at("color")) {
-                track.color.push_back({ k.at(0).get<double>(),
-                    model::Color { k.at(2).get<std::uint8_t>(), k.at(3).get<std::uint8_t>(), k.at(4).get<std::uint8_t>(),
-                        k.at(5).get<std::uint8_t>() },
-                    easing(k.at(1)) });
+            // formatVersion 1: [timp, easing, matricea 4 × 4] și [timp, easing, r, g, b, a].
+            if (const auto old = t.find("transform"); old != t.end() && !old->empty()) {
+                LegacyTrack lt { id, track.instance, {} };
+                for (const json& k : *old) {
+                    math::Mat4d m(1.0);
+                    for (int c = 0; c < 4; ++c) {
+                        for (int r = 0; r < 4; ++r) {
+                            m[c][r] = k.at(static_cast<std::size_t>(2 + c * 4 + r)).get<double>();
+                        }
+                    }
+                    lt.keys.push_back({ k.at(0).get<double>(), math::Transform(m), easingFromJson(k.at(1)) });
+                }
+                legacy.push_back(std::move(lt));
             }
-            a.tracks.push_back(std::move(track));
+            if (const auto old = t.find("color"); old != t.end() && !old->empty()) {
+                model::Channel channel { model::Property::Color, {} };
+                for (const json& k : *old) {
+                    model::Key key;
+                    key.time = k.at(0).get<double>();
+                    key.easing = easingFromJson(k.at(1));
+                    key.color = { k.at(2).get<std::uint8_t>(), k.at(3).get<std::uint8_t>(), k.at(4).get<std::uint8_t>(),
+                        k.at(5).get<std::uint8_t>() };
+                    channel.keys.push_back(std::move(key));
+                }
+                track.channels.push_back(std::move(channel));
+            }
+            if (!track.channels.empty()) {
+                a.tracks.push_back(std::move(track));
+            }
         }
         for (const json& k : j.at("camera")) {
             a.camera.push_back({ k.at(0).get<double>(), { k.at(2).get<double>(), k.at(3).get<double>(), k.at(4).get<double>() },
-                k.at(5).get<double>(), k.at(6).get<double>(), k.at(7).get<double>(), easing(k.at(1)) });
+                k.at(5).get<double>(), k.at(6).get<double>(), k.at(7).get<double>(), easingFromJson(k.at(1)) });
         }
-        changes.animations[model::AnimationId { j.at("id").get<std::uint64_t>() }].after = std::move(a);
+        changes.animations[id].after = std::move(a);
+    }
+}
+
+// Cheile vechi devin canale, față de pivotul și poza din model ale fiecărui obiect.
+void migrateLegacyTracks(model::Model& model, const std::vector<LegacyTrack>& legacy)
+{
+    for (const LegacyTrack& lt : legacy) {
+        if (!model.animations().contains(lt.animation)) {
+            continue;
+        }
+        model::Animation a = model.animations().at(lt.animation);
+        const bool exists = model.instances().contains(lt.instance);
+        const math::Transform base = exists ? model.instance(lt.instance).transform : math::Transform {};
+        const math::Vec3d pivot = exists ? model::pivotLocal(model, lt.instance) : math::Vec3d { 0.0 };
+        model::setMatrixKeys(a, lt.instance, lt.keys, base, pivot);
+        model.setAnimation(lt.animation, a);
     }
 }
 
@@ -637,7 +722,8 @@ LoadResult fromJson(std::string_view text)
             changes.sections[model::SectionId { s.at("id").get<std::uint64_t>() }].after = model::SectionPlane {
                 s.value("name", std::string()), vec(s.at("point")), vec(s.at("normal")), s.value("active", true) };
         }
-        animationsFromJson(doc.value("animations", json::array()), changes);
+        std::vector<LegacyTrack> legacy;
+        animationsFromJson(doc.value("animations", json::array()), changes, legacy);
         camerasAndLightsFromJson(doc, changes);
         for (const json& s : doc.value("scenes", json::array())) {
             model::Scene scene;
@@ -669,6 +755,7 @@ LoadResult fromJson(std::string_view text)
             changes.scenes[model::SceneId { s.at("id").get<std::uint64_t>() }].after = std::move(scene);
         }
         model.apply(changes, geom::ChangeDirection::Forward);
+        migrateLegacyTracks(model, legacy);
         const geom::ValidationReport report = model.validate(geom::ValidationLevel::Topology);
         if (!report.ok()) {
             result.error = "Fișierul e deteriorat: " + report.errors.front();

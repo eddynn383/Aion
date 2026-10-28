@@ -180,10 +180,13 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
   `left|right|home|end|space|delete|backspace`; trece prin harta scurtăturilor, ca pe macOS), `debug.anim`.
 
 ### Pasul 2 — Canale pe proprietate (core + fișier) ✅ criteriu: testele vechi și noi trec; fișierele vechi se deschid
-- [ ] `Channel`, `Key` cu easing Bézier (`Easing { name, x1, y1, x2, y2, step }`), `ObjectTrack::channels`.
-- [ ] `evaluateInstance` (recompunere în jurul pivotului), `setChannelKey`, `removeKey/moveKey` pe canal.
-- [ ] Migrarea în `AionFile.cpp` (vechi → canale), `formatVersion`++; teste de rotunjire.
-- [ ] `Document`: auto-key scrie doar canalele schimbate; `timeline` (QVariantMap) expune canalele și valorile.
+- [x] `Channel`, `Key` cu easing Bézier (`Easing { name, x1, y1, x2, y2, step }`), `ObjectTrack::channels`.
+- [x] `evaluateInstance` (recompunere în jurul pivotului), `setChannelKey`, `removeKeys/moveKeys` pe `KeyRef`
+      (+ `setKeysEasing`, `setKeyValue`, `copyKeys/pasteKeys`, `keyTransform`).
+- [x] Migrarea în `AionFile.cpp` (vechi → canale, `setMatrixKeys`), `formatVersion` 2; teste de rotunjire și de
+      încărcare a unui fișier vechi.
+- [x] `Document`: auto-key scrie doar canalele schimbate (un canal nou pornește cu valoarea de dinainte de la
+      începutul pistei); `timeline` (QVariantMap) expune canalele, valorile și textul lor. ADR 0034.
 
 ### Pasul 3 — Timeline: obiecte expandabile, canale, valori la chei ✅ criteriu: captură cu un obiect deschis
 - [ ] Rândul sumar + rândurile canalelor (doar cele existente), nume ca în Inspector, valoarea lângă fiecare cheie.

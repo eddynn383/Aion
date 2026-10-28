@@ -211,14 +211,6 @@ std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId defi
     return { lo, hi };
 }
 
-namespace {
-
-// M = T · R · S · T(−lo): rotația (coloane ortonormate) și scara (lungimile coloanelor) dintr-o transformare.
-struct Decomposed {
-    glm::dmat3 rotation { 1.0 };
-    math::Vec3d scale { 1.0 };
-};
-
 Decomposed decompose(const math::Transform& t)
 {
     const glm::dmat3 m(t.matrix());
@@ -236,9 +228,6 @@ Decomposed decompose(const math::Transform& t)
     return d;
 }
 
-} // namespace
-
-// Unghiurile Euler (grade) ale rotației R = Rz · Ry · Rx; la ±90° pe Y (gimbal lock), X devine 0.
 math::Vec3d eulerDegrees(const glm::dmat3& r)
 {
     const double sy = std::clamp(-r[0].z, -1.0, 1.0);

@@ -532,7 +532,7 @@ Window {
                 } else if (action === "debug.anim") {
                     console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
-                                     t => t.transform.map(k => k.time))))
+                                     t => t.channels.map(c => c.property + "=" + c.keys.map(k => k.time + ":" + k.text).join("|")))))
                 } else if (action === "debug.rz") {
                     console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {

@@ -1,23 +1,34 @@
 #include "aion/core/model/AnimationEval.h"
 
+#include "aion/core/model/Operations.h"
 #include "aion/core/view/CameraMotion.h"
 
+#include <glm/geometric.hpp>
+
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <utility>
 
 namespace aion::model {
 
 namespace {
 
-template <class Key>
+// Două chei la mai puțin de jumătate de cadru sunt „aceeași”.
 double tolerance(const Animation& a)
 {
     return 0.5 / std::max(a.fps, 1);
 }
 
+// Cât de mult trebuie să se schimbe o valoare ca auto-key-ul să scrie o cheie.
+double valueTolerance(Property p)
+{
+    return static_cast<int>(p) >= static_cast<int>(Property::ScaleX) ? 1e-9 : 1e-6;
+}
+
 // Cele două chei între care cade `time` și fracțiunea (după easing). Nullopt dacă lista e goală.
-template <class Key>
-std::optional<std::tuple<const Key*, const Key*, double>> bracket(const std::vector<Key>& keys, double time)
+template <class K>
+std::optional<std::tuple<const K*, const K*, double>> bracket(const std::vector<K>& keys, double time)
 {
     if (keys.empty()) {
         return std::nullopt;
@@ -28,27 +39,41 @@ std::optional<std::tuple<const Key*, const Key*, double>> bracket(const std::vec
     if (time >= keys.back().time) {
         return std::tuple { &keys.back(), &keys.back(), 0.0 };
     }
-    const auto next = std::upper_bound(keys.begin(), keys.end(), time,
-        [](double t, const Key& k) { return t < k.time; });
-    const Key& b = *next;
-    const Key& a = *(next - 1);
+    const auto next = std::upper_bound(keys.begin(), keys.end(), time, [](double t, const K& k) { return t < k.time; });
+    const K& b = *next;
+    const K& a = *(next - 1);
     const double span = b.time - a.time;
     const double k = span > 0.0 ? (time - a.time) / span : 1.0;
     return std::tuple { &a, &b, ease(a.easing, k) };
 }
 
-template <class Key>
-void upsert(std::vector<Key>& keys, Key key, double tol)
+// Pune cheia în listă, în ordinea timpului; una la mai puțin de `tol` e înlocuită (și își păstrează easing-ul, dacă
+// `keepEasing`).
+template <class K>
+void upsert(std::vector<K>& keys, K key, double tol, bool keepEasing)
 {
-    for (Key& k : keys) {
+    for (K& k : keys) {
         if (std::abs(k.time - key.time) < tol) {
-            key.easing = k.easing;
+            if (keepEasing) {
+                key.easing = k.easing;
+            }
             k = key;
             return;
         }
     }
-    keys.insert(std::upper_bound(keys.begin(), keys.end(), key.time, [](double t, const Key& k) { return t < k.time; }),
+    keys.insert(std::upper_bound(keys.begin(), keys.end(), key.time, [](double t, const K& k) { return t < k.time; }),
         key);
+}
+
+template <class K>
+K* keyAt(std::vector<K>& keys, double time, double tol)
+{
+    for (K& k : keys) {
+        if (std::abs(k.time - time) < tol) {
+            return &k;
+        }
+    }
+    return nullptr;
 }
 
 ObjectTrack& trackFor(Animation& animation, InstanceId instance)
@@ -58,49 +83,213 @@ ObjectTrack& trackFor(Animation& animation, InstanceId instance)
             return t;
         }
     }
-    animation.tracks.push_back({ instance, {}, {} });
+    animation.tracks.push_back({ instance, {} });
     return animation.tracks.back();
 }
 
-template <class Key>
-bool takeKey(std::vector<Key>& keys, double time, double tol, Key* out)
+ObjectTrack* findTrack(Animation& animation, InstanceId instance)
 {
-    for (auto it = keys.begin(); it != keys.end(); ++it) {
-        if (std::abs(it->time - time) < tol) {
-            if (out != nullptr) {
-                *out = *it;
-            }
-            keys.erase(it);
-            return true;
+    for (ObjectTrack& t : animation.tracks) {
+        if (t.instance == instance) {
+            return &t;
         }
     }
-    return false;
+    return nullptr;
 }
 
-void dropEmptyTracks(Animation& animation)
+Channel& channelFor(ObjectTrack& track, Property property)
 {
-    std::erase_if(animation.tracks, [](const ObjectTrack& t) { return t.transform.empty() && t.color.empty(); });
+    const auto it = std::lower_bound(track.channels.begin(), track.channels.end(), property,
+        [](const Channel& c, Property p) { return static_cast<int>(c.property) < static_cast<int>(p); });
+    if (it != track.channels.end() && it->property == property) {
+        return *it;
+    }
+    return *track.channels.insert(it, Channel { property, {} });
+}
+
+Channel* findChannel(ObjectTrack& track, Property property)
+{
+    for (Channel& c : track.channels) {
+        if (c.property == property) {
+            return &c;
+        }
+    }
+    return nullptr;
+}
+
+void dropEmpty(Animation& animation)
+{
+    for (ObjectTrack& t : animation.tracks) {
+        std::erase_if(t.channels, [](const Channel& c) { return c.keys.empty(); });
+    }
+    std::erase_if(animation.tracks, [](const ObjectTrack& t) { return t.channels.empty(); });
+}
+
+// Coordonata unei curbe Bézier cubice 1D cu capetele 0 și 1 și punctele de control a, b, la parametrul s.
+double bezier(double a, double b, double s)
+{
+    const double u = 1.0 - s;
+    return 3.0 * u * u * s * a + 3.0 * u * s * s * b + s * s * s;
+}
+
+double bezierSlope(double a, double b, double s)
+{
+    const double u = 1.0 - s;
+    return 3.0 * u * u * a + 6.0 * u * s * (b - a) + 3.0 * s * s * (1.0 - b);
+}
+
+// Unghiurile Euler cele mai apropiate de `reference`: cele două soluții ale aceleiași rotații ((x, y, z) și
+// (x + 180, 180 − y, z + 180)), fiecare despachetată față de referință.
+math::Vec3d nearestEuler(const math::Vec3d& euler, const math::Vec3d& reference)
+{
+    const auto unwrap = [&](math::Vec3d e) {
+        for (int i = 0; i < 3; ++i) {
+            e[i] = unwrapDegrees(e[i], reference[i]);
+        }
+        return e;
+    };
+    const math::Vec3d a = unwrap(euler);
+    const math::Vec3d b = unwrap({ euler.x + 180.0, 180.0 - euler.y, euler.z + 180.0 });
+    return glm::length(b - reference) + 1e-9 < glm::length(a - reference) ? b : a;
 }
 
 } // namespace
 
-double ease(Easing easing, double t)
+// --- Easing ---
+
+double ease(const Easing& easing, double t)
 {
     t = std::clamp(t, 0.0, 1.0);
-    switch (easing) {
-    case Easing::Linear:
-        return t;
-    case Easing::EaseIn:
-        return t * t * t;
-    case Easing::EaseOut:
-        return 1.0 - std::pow(1.0 - t, 3.0);
-    case Easing::Step:
+    if (easing.step) {
         return t < 1.0 ? 0.0 : 1.0;
-    case Easing::EaseInOut:
-        break;
     }
-    return view::easeInOutCubic(t);
+    // Timpul (x) trebuie să crească: mânerele stau în [0, 1] pe x.
+    const double x1 = std::clamp(easing.x1, 0.0, 1.0);
+    const double x2 = std::clamp(easing.x2, 0.0, 1.0);
+    if (x1 == easing.y1 && x2 == easing.y2) {
+        return t; // o dreaptă
+    }
+    // x(s) = t: Newton, apoi bisecție dacă nu converge.
+    double s = t;
+    for (int i = 0; i < 8; ++i) {
+        const double error = bezier(x1, x2, s) - t;
+        if (std::abs(error) < 1e-9) {
+            return bezier(easing.y1, easing.y2, s);
+        }
+        const double slope = bezierSlope(x1, x2, s);
+        if (std::abs(slope) < 1e-9) {
+            break;
+        }
+        s -= error / slope;
+        if (s < 0.0 || s > 1.0) {
+            break;
+        }
+    }
+    double lo = 0.0;
+    double hi = 1.0;
+    s = t;
+    for (int i = 0; i < 64; ++i) {
+        const double x = bezier(x1, x2, s);
+        if (std::abs(x - t) < 1e-10) {
+            break;
+        }
+        (x < t ? lo : hi) = s;
+        s = (lo + hi) * 0.5;
+    }
+    return bezier(easing.y1, easing.y2, s);
 }
+
+const std::vector<Easing>& easingPresets()
+{
+    static const std::vector<Easing> presets {
+        { "linear", 0.0, 0.0, 1.0, 1.0, false },
+        { "ease", 0.25, 0.1, 0.25, 1.0, false },
+        { "easeIn", 0.42, 0.0, 1.0, 1.0, false },
+        { "easeOut", 0.0, 0.0, 0.58, 1.0, false },
+        { "easeInOut", 0.42, 0.0, 0.58, 1.0, false },
+        { "easeInBack", 0.36, 0.0, 0.66, -0.56, false },
+        { "easeOutBack", 0.34, 1.56, 0.64, 1.0, false },
+        { "step", 0.0, 0.0, 1.0, 1.0, true },
+    };
+    return presets;
+}
+
+std::optional<Easing> easingPreset(std::string_view name)
+{
+    for (const Easing& e : easingPresets()) {
+        if (e.name == name) {
+            return e;
+        }
+    }
+    return std::nullopt;
+}
+
+// --- Proprietățile ---
+
+namespace {
+
+constexpr std::array<std::string_view, kPropertyCount> kPropertyNames { "position.x", "position.y", "position.z",
+    "rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y", "scale.z", "color" };
+
+} // namespace
+
+std::string_view propertyName(Property property)
+{
+    return kPropertyNames[static_cast<std::size_t>(property)];
+}
+
+std::optional<Property> propertyFromName(std::string_view name)
+{
+    for (std::size_t i = 0; i < kPropertyNames.size(); ++i) {
+        if (kPropertyNames[i] == name) {
+            return static_cast<Property>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+double TransformValues::get(Property p) const
+{
+    const int i = static_cast<int>(p);
+    return i < 3 ? position[i] : i < 6 ? rotation[i - 3] : i < 9 ? scale[i - 6] : 0.0;
+}
+
+void TransformValues::set(Property p, double value)
+{
+    const int i = static_cast<int>(p);
+    if (i < 3) {
+        position[i] = value;
+    } else if (i < 6) {
+        rotation[i - 3] = value;
+    } else if (i < 9) {
+        scale[i - 6] = value;
+    }
+}
+
+TransformValues transformValues(const math::Transform& transform, const math::Vec3d& pivot)
+{
+    const Decomposed d = decompose(transform);
+    return { transform.applyToPoint(pivot), eulerDegrees(d.rotation), d.scale };
+}
+
+math::Transform composeTransform(const TransformValues& values, const math::Vec3d& pivot)
+{
+    glm::dmat3 rs = rotationFromEuler(values.rotation);
+    for (int i = 0; i < 3; ++i) {
+        const double s = values.scale[i];
+        rs[i] *= std::abs(s) < 1e-9 ? std::copysign(1e-9, s) : s; // o scară nulă ar turti obiectul ireversibil
+    }
+    glm::dmat4 m(rs);
+    m[3] = glm::dvec4(values.position - rs * pivot, 1.0);
+    return math::Transform(m);
+}
+
+double unwrapDegrees(double degrees, double reference)
+{
+    return degrees + 360.0 * std::round((reference - degrees) / 360.0);
+}
+
+// --- Evaluarea ---
 
 const ObjectTrack* findTrack(const Animation& animation, InstanceId instance)
 {
@@ -112,28 +301,61 @@ const ObjectTrack* findTrack(const Animation& animation, InstanceId instance)
     return nullptr;
 }
 
-std::optional<math::Transform> evaluateTransform(const ObjectTrack& track, double time)
+const Channel* findChannel(const ObjectTrack& track, Property property)
 {
-    const auto b = bracket(track.transform, time);
+    for (const Channel& c : track.channels) {
+        if (c.property == property) {
+            return &c;
+        }
+    }
+    return nullptr;
+}
+
+std::optional<double> evaluateChannel(const Channel& channel, double time)
+{
+    const auto b = bracket(channel.keys, time);
     if (!b) {
         return std::nullopt;
     }
     const auto [a, c, k] = *b;
-    return a == c ? a->value : math::interpolate(a->value, c->value, k);
+    return a == c ? a->value : a->value + (c->value - a->value) * k;
 }
 
 std::optional<Color> evaluateColor(const ObjectTrack& track, double time)
 {
-    const auto b = bracket(track.color, time);
+    const Channel* channel = findChannel(track, Property::Color);
+    const auto b = channel != nullptr ? bracket(channel->keys, time) : std::nullopt;
     if (!b) {
         return std::nullopt;
     }
     const auto [a, c, k] = *b;
     const auto mix = [&](std::uint8_t x, std::uint8_t y) {
-        return static_cast<std::uint8_t>(std::lround(x + (y - x) * k));
+        return static_cast<std::uint8_t>(std::clamp(std::lround(x + (y - x) * k), 0L, 255L));
     };
-    return Color { mix(a->value.r, c->value.r), mix(a->value.g, c->value.g), mix(a->value.b, c->value.b),
-        mix(a->value.a, c->value.a) };
+    return Color { mix(a->color.r, c->color.r), mix(a->color.g, c->color.g), mix(a->color.b, c->color.b),
+        mix(a->color.a, c->color.a) };
+}
+
+TransformValues evaluateValues(const ObjectTrack& track, double time, const TransformValues& base)
+{
+    TransformValues v = base;
+    for (const Channel& c : track.channels) {
+        if (isTransform(c.property)) {
+            if (const auto value = evaluateChannel(c, time)) {
+                v.set(c.property, *value);
+            }
+        }
+    }
+    return v;
+}
+
+std::optional<math::Transform> evaluateInstance(
+    const ObjectTrack& track, double time, const math::Transform& base, const math::Vec3d& pivot)
+{
+    if (std::none_of(track.channels.begin(), track.channels.end(), [](const Channel& c) { return isTransform(c.property); })) {
+        return std::nullopt;
+    }
+    return composeTransform(evaluateValues(track, time, transformValues(base, pivot)), pivot);
 }
 
 std::optional<CameraKey> evaluateCamera(const Animation& animation, double time)
@@ -151,77 +373,254 @@ std::optional<CameraKey> evaluateCamera(const Animation& animation, double time)
     return CameraKey { time, pose.target, pose.yaw, pose.pitch, pose.distance, a->easing };
 }
 
-void setTransformKey(Animation& animation, InstanceId instance, double time, const math::Transform& value)
+// --- Editarea ---
+
+void setChannelKey(Animation& animation, InstanceId instance, Property property, double time, double value,
+    const std::optional<Easing>& easing)
 {
-    upsert(trackFor(animation, instance).transform, TransformKey { time, value, Easing::EaseInOut },
-        tolerance<TransformKey>(animation));
+    Key key;
+    key.time = time;
+    key.value = value;
+    key.easing = easing.value_or(Easing {});
+    upsert(channelFor(trackFor(animation, instance), property).keys, key, tolerance(animation), !easing.has_value());
     animation.duration = std::max(animation.duration, time);
 }
 
 void setColorKey(Animation& animation, InstanceId instance, double time, const Color& value)
 {
-    upsert(trackFor(animation, instance).color, ColorKey { time, value, Easing::EaseInOut },
-        tolerance<ColorKey>(animation));
+    Key key;
+    key.time = time;
+    key.color = value;
+    upsert(channelFor(trackFor(animation, instance), Property::Color).keys, key, tolerance(animation), true);
     animation.duration = std::max(animation.duration, time);
 }
 
 void setCameraKey(Animation& animation, CameraKey key)
 {
     animation.duration = std::max(animation.duration, key.time);
-    upsert(animation.camera, key, tolerance<CameraKey>(animation));
+    upsert(animation.camera, key, tolerance(animation), true);
 }
 
-void removeKey(Animation& animation, KeyKind kind, InstanceId instance, double time)
+std::vector<Property> keyTransform(Animation& animation, InstanceId instance, double time, const TransformValues& before,
+    const TransformValues& after, bool onlyChanged)
 {
-    const double tol = tolerance<TransformKey>(animation);
-    if (kind == KeyKind::Camera) {
-        takeKey<CameraKey>(animation.camera, time, tol, nullptr);
-        return;
-    }
-    for (ObjectTrack& t : animation.tracks) {
-        if (t.instance != instance) {
-            continue;
-        }
-        if (kind == KeyKind::Transform) {
-            takeKey<TransformKey>(t.transform, time, tol, nullptr);
-        } else {
-            takeKey<ColorKey>(t.color, time, tol, nullptr);
-        }
-    }
-    dropEmptyTracks(animation);
-}
-
-void moveKey(Animation& animation, KeyKind kind, InstanceId instance, double time, double newTime)
-{
-    newTime = std::clamp(newTime, 0.0, animation.duration);
-    const double tol = tolerance<TransformKey>(animation);
-    if (kind == KeyKind::Camera) {
-        CameraKey key;
-        if (takeKey(animation.camera, time, tol, &key)) {
-            key.time = newTime;
-            upsert(animation.camera, key, tol);
-        }
-        return;
-    }
-    for (ObjectTrack& t : animation.tracks) {
-        if (t.instance != instance) {
-            continue;
-        }
-        if (kind == KeyKind::Transform) {
-            TransformKey key;
-            if (takeKey(t.transform, time, tol, &key)) {
-                key.time = newTime;
-                upsert(t.transform, key, tol);
-            }
-        } else {
-            ColorKey key;
-            if (takeKey(t.color, time, tol, &key)) {
-                key.time = newTime;
-                upsert(t.color, key, tol);
+    TransformValues target = after;
+    target.rotation = nearestEuler(after.rotation, before.rotation);
+    // Auto-key: un canal nou pornește din valoarea de dinainte, la începutul pistei (prima cheie a obiectului, sau
+    // 0 s), ca mișcarea să se vadă de acolo până la cheia nouă (altfel o singură cheie ar ține valoarea peste tot).
+    double start = 0.0;
+    const ObjectTrack* existing = findTrack(std::as_const(animation), instance);
+    if (existing != nullptr) {
+        start = time;
+        for (const Channel& c : existing->channels) {
+            if (!c.keys.empty()) {
+                start = std::min(start, c.keys.front().time);
             }
         }
     }
+    std::vector<Property> written;
+    for (int i = 0; i < 9; ++i) {
+        const auto p = static_cast<Property>(i);
+        if (onlyChanged && std::abs(target.get(p) - before.get(p)) <= valueTolerance(p)) {
+            continue;
+        }
+        const bool created = existing == nullptr || findChannel(*existing, p) == nullptr;
+        if (onlyChanged && created && time - start > tolerance(animation)) {
+            setChannelKey(animation, instance, p, start, before.get(p));
+        }
+        setChannelKey(animation, instance, p, time, target.get(p));
+        written.push_back(p);
+        existing = findTrack(std::as_const(animation), instance);
+    }
+    return written;
 }
+
+std::vector<KeyRef> expandKeys(const Animation& animation, std::span<const KeyRef> refs)
+{
+    const double tol = tolerance(animation);
+    std::vector<KeyRef> out;
+    const auto add = [&](const KeyRef& r) {
+        if (std::find(out.begin(), out.end(), r) == out.end()) {
+            out.push_back(r);
+        }
+    };
+    for (const KeyRef& ref : refs) {
+        if (!ref.instance) {
+            for (const CameraKey& k : animation.camera) {
+                if (std::abs(k.time - ref.time) < tol) {
+                    add({ {}, std::nullopt, k.time });
+                }
+            }
+            continue;
+        }
+        const ObjectTrack* track = findTrack(animation, ref.instance);
+        if (track == nullptr) {
+            continue;
+        }
+        for (const Channel& c : track->channels) {
+            if (ref.property && *ref.property != c.property) {
+                continue;
+            }
+            for (const Key& k : c.keys) {
+                if (std::abs(k.time - ref.time) < tol) {
+                    add({ ref.instance, c.property, k.time });
+                }
+            }
+        }
+    }
+    return out;
+}
+
+void removeKeys(Animation& animation, std::span<const KeyRef> refs)
+{
+    for (const KeyRef& r : expandKeys(animation, refs)) {
+        if (!r.instance) {
+            std::erase_if(animation.camera, [&](const CameraKey& k) { return k.time == r.time; });
+        } else if (ObjectTrack* t = findTrack(animation, r.instance)) {
+            if (Channel* c = findChannel(*t, *r.property)) {
+                std::erase_if(c->keys, [&](const Key& k) { return k.time == r.time; });
+            }
+        }
+    }
+    dropEmpty(animation);
+}
+
+std::vector<KeyRef> moveKeys(Animation& animation, std::span<const KeyRef> refs, double delta)
+{
+    const std::vector<KeyRef> keys = expandKeys(animation, refs);
+    // Întâi se scot toate (ca o cheie mutată să nu înlocuiască una care pleacă și ea), apoi se pun la loc.
+    std::vector<std::pair<KeyRef, Key>> moved;
+    std::vector<CameraKey> camera;
+    for (const KeyRef& r : keys) {
+        if (!r.instance) {
+            for (auto it = animation.camera.begin(); it != animation.camera.end(); ++it) {
+                if (it->time == r.time) {
+                    camera.push_back(*it);
+                    animation.camera.erase(it);
+                    break;
+                }
+            }
+        } else if (ObjectTrack* t = findTrack(animation, r.instance)) {
+            if (Channel* c = findChannel(*t, *r.property)) {
+                for (auto it = c->keys.begin(); it != c->keys.end(); ++it) {
+                    if (it->time == r.time) {
+                        moved.emplace_back(r, *it);
+                        c->keys.erase(it);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    const double tol = tolerance(animation);
+    const auto shifted = [&](double t) { return std::clamp(t + delta, 0.0, animation.duration); };
+    std::vector<KeyRef> out;
+    for (CameraKey k : camera) {
+        k.time = shifted(k.time);
+        upsert(animation.camera, k, tol, false);
+        out.push_back({ {}, std::nullopt, k.time });
+    }
+    for (auto [ref, key] : moved) {
+        key.time = shifted(key.time);
+        upsert(channelFor(trackFor(animation, ref.instance), *ref.property).keys, key, tol, false);
+        out.push_back({ ref.instance, ref.property, key.time });
+    }
+    dropEmpty(animation);
+    return out;
+}
+
+void setKeysEasing(Animation& animation, std::span<const KeyRef> refs, const Easing& easing)
+{
+    const double tol = tolerance(animation);
+    for (const KeyRef& r : expandKeys(animation, refs)) {
+        if (!r.instance) {
+            if (CameraKey* k = keyAt(animation.camera, r.time, tol)) {
+                k->easing = easing;
+            }
+        } else if (ObjectTrack* t = findTrack(animation, r.instance)) {
+            if (Channel* c = findChannel(*t, *r.property)) {
+                if (Key* k = keyAt(c->keys, r.time, tol)) {
+                    k->easing = easing;
+                }
+            }
+        }
+    }
+}
+
+bool setKeyValue(Animation& animation, const KeyRef& ref, double value)
+{
+    if (!ref.instance || !ref.property || !isTransform(*ref.property)) {
+        return false;
+    }
+    ObjectTrack* t = findTrack(animation, ref.instance);
+    Channel* c = t != nullptr ? findChannel(*t, *ref.property) : nullptr;
+    Key* k = c != nullptr ? keyAt(c->keys, ref.time, tolerance(animation)) : nullptr;
+    if (k == nullptr) {
+        return false;
+    }
+    k->value = value;
+    return true;
+}
+
+std::vector<ClipboardKey> copyKeys(const Animation& animation, std::span<const KeyRef> refs)
+{
+    const std::vector<KeyRef> keys = expandKeys(animation, refs);
+    if (keys.empty()) {
+        return {};
+    }
+    double first = keys.front().time;
+    for (const KeyRef& r : keys) {
+        first = std::min(first, r.time);
+    }
+    std::vector<ClipboardKey> out;
+    for (const KeyRef& r : keys) {
+        ClipboardKey c;
+        c.ref = r;
+        c.ref.time = r.time - first;
+        if (!r.instance) {
+            for (const CameraKey& k : animation.camera) {
+                if (k.time == r.time) {
+                    c.camera = k;
+                }
+            }
+        } else if (const ObjectTrack* t = findTrack(animation, r.instance)) {
+            if (const Channel* ch = findChannel(*t, *r.property)) {
+                for (const Key& k : ch->keys) {
+                    if (k.time == r.time) {
+                        c.key = k;
+                    }
+                }
+            }
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
+std::vector<KeyRef> pasteKeys(Animation& animation, std::span<const ClipboardKey> keys, double time, InstanceId target)
+{
+    const double tol = tolerance(animation);
+    std::vector<KeyRef> out;
+    for (const ClipboardKey& c : keys) {
+        const double t = time + c.ref.time;
+        if (!c.ref.instance) {
+            CameraKey k = c.camera;
+            k.time = t;
+            upsert(animation.camera, k, tol, false);
+            out.push_back({ {}, std::nullopt, t });
+        } else {
+            Key k = c.key;
+            k.time = t;
+            const InstanceId instance = target ? target : c.ref.instance;
+            upsert(channelFor(trackFor(animation, instance), *c.ref.property).keys, k, tol, false);
+            out.push_back({ instance, c.ref.property, t });
+        }
+        animation.duration = std::max(animation.duration, t);
+    }
+    return out;
+}
+
+// --- Tastatura timeline-ului ---
 
 std::vector<double> keyTimes(const Animation& animation, const std::set<InstanceId>& instances)
 {
@@ -230,11 +629,10 @@ std::vector<double> keyTimes(const Animation& animation, const std::set<Instance
         if (!instances.empty() && !instances.contains(t.instance)) {
             continue;
         }
-        for (const TransformKey& k : t.transform) {
-            out.push_back(k.time);
-        }
-        for (const ColorKey& k : t.color) {
-            out.push_back(k.time);
+        for (const Channel& c : t.channels) {
+            for (const Key& k : c.keys) {
+                out.push_back(k.time);
+            }
         }
     }
     if (instances.empty()) {
@@ -243,7 +641,7 @@ std::vector<double> keyTimes(const Animation& animation, const std::set<Instance
         }
     }
     std::sort(out.begin(), out.end());
-    const double tol = tolerance<TransformKey>(animation);
+    const double tol = tolerance(animation);
     out.erase(std::unique(out.begin(), out.end(), [tol](double a, double b) { return std::abs(a - b) < tol; }), out.end());
     return out;
 }
@@ -251,7 +649,7 @@ std::vector<double> keyTimes(const Animation& animation, const std::set<Instance
 std::optional<double> adjacentKeyTime(const Animation& animation, const std::set<InstanceId>& instances, double time,
     int direction)
 {
-    const double tol = tolerance<TransformKey>(animation);
+    const double tol = tolerance(animation);
     const std::vector<double> times = keyTimes(animation, instances);
     if (direction > 0) {
         const auto it = std::find_if(times.begin(), times.end(), [&](double t) { return t > time + tol; });
@@ -271,6 +669,40 @@ double stepFrames(const Animation& animation, double time, int frames)
         start = frames > 0 ? std::floor(frame) : std::ceil(frame);
     }
     return std::clamp((start + frames) / fps, 0.0, std::max(animation.duration, 0.0));
+}
+
+// --- Migrarea ---
+
+void setMatrixKeys(Animation& animation, InstanceId instance, std::span<const MatrixKey> keys,
+    const math::Transform& base, const math::Vec3d& pivot)
+{
+    if (keys.empty()) {
+        return;
+    }
+    const TransformValues baseValues = transformValues(base, pivot);
+    std::vector<TransformValues> values;
+    for (const MatrixKey& k : keys) {
+        TransformValues v = transformValues(k.value, pivot);
+        v.rotation = nearestEuler(v.rotation, values.empty() ? baseValues.rotation : values.back().rotation);
+        values.push_back(v);
+    }
+    for (int i = 0; i < 9; ++i) {
+        const auto p = static_cast<Property>(i);
+        double lo = values.front().get(p);
+        double hi = lo;
+        for (const TransformValues& v : values) {
+            lo = std::min(lo, v.get(p));
+            hi = std::max(hi, v.get(p));
+        }
+        const double tol = valueTolerance(p) * 1000.0; // erorile de rotunjire ale descompunerii
+        if (hi - lo > tol) {
+            for (std::size_t k = 0; k < keys.size(); ++k) {
+                setChannelKey(animation, instance, p, keys[k].time, values[k].get(p), keys[k].easing);
+            }
+        } else if (std::abs(values.front().get(p) - baseValues.get(p)) > tol) {
+            setChannelKey(animation, instance, p, keys.front().time, values.front().get(p), keys.front().easing);
+        }
+    }
 }
 
 } // namespace aion::model
