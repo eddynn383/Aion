@@ -111,6 +111,9 @@ qt_add_qml_module(aion_app
         qml/shell/AppMenuBar.qml
         qml/shell/ViewportControls.qml
         qml/shell/Timeline.qml
+        qml/overlays/EasingEditor.qml
+        qml/components/EasingCurve.qml
+        qml/components/EasingMath.js
         qml/shell/TimelineKey.qml
         qml/shell/TimelineRow.qml
         qml/shell/TimelineRuler.qml

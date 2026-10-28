@@ -471,6 +471,8 @@ public:
     Q_INVOKABLE QVariantList moveKeys(const QVariantList& keys, double delta);
     // easing: { name, x1, y1, x2, y2, step } sau numele unei presetări („easeInOut”).
     Q_INVOKABLE void setKeysEasing(const QVariantList& keys, const QVariant& easing);
+    // Easing-ul cheilor noi din animația activă.
+    Q_INVOKABLE void setDefaultEasing(const QVariant& easing);
     // Valoarea unei chei de pe un canal numeric; valoarea curentă a unui canal (scrie o cheie la timpul curent).
     Q_INVOKABLE void setKeyValue(const QVariantMap& key, double value);
     Q_INVOKABLE void setChannelValue(double instance, const QString& property, double value);

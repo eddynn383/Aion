@@ -200,10 +200,14 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
   în timpul înregistrării (assert în `Model::operator=`); acum, cât durează tranzacția, poza e modelul de bază.
 
 ### Pasul 4 — Easing: presetări și editorul de curbă ✅ criteriu: o curbă proprie salvată apare în alt document
-- [ ] `ease(Easing, t)` pentru Bézier (rezolvarea lui x → t cu Newton + bisecție), teste.
-- [ ] `overlays/EasingEditor.qml`: graficul cu mânerele, câmpurile, previzualizarea, presetările ca miniaturi.
-- [ ] `UserPrefs.easingPresets` (salvează, redenumește, șterge); aplicarea pe cheie / chei selectate / canal.
-- [ ] Miniatura curbei pe segmentul dintre chei; click → editorul.
+- [x] `ease(Easing, t)` pentru Bézier (rezolvarea lui x → t cu Newton + bisecție), teste (făcut în pasul 2).
+- [x] `overlays/EasingEditor.qml`: graficul cu mânerele, câmpurile, previzualizarea, presetările ca miniaturi
+      (`components/EasingCurve.qml`, `components/EasingMath.js` — aceeași curbă ca în core).
+- [x] `preferences.easingPresets` (JSON în Main.qml; salvează, redenumește, șterge); aplicarea pe cheie / chei
+      selectate (meniul cheii → „Editează curba…”) / tot canalul (click dreapta pe numele lui).
+- [x] Miniatura curbei pe segmentul dintre chei; click → editorul.
+- [x] Easing-ul implicit al cheilor noi (`Animation::defaultEasing`, în fișier; ⚙ → „Implicit: …”).
+- Verificare: `anim:savecurve,Ușa mea,0.8,0,0.2,1`, `anim:curve,1` (editorul pentru rândul 1), `anim:curves`.
 
 ### Pasul 5 — UX-ul timeline-ului ✅ criteriu: selecție multiplă, zoom, snap, copiere / lipire
 - [ ] Selecție multiplă (⇧ / ⌘, dreptunghi), tragere în grup cu snap (cadre, alte chei), ⌫, ⌘C / ⌘V, meniul contextual.

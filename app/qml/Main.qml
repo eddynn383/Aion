@@ -465,6 +465,12 @@ Window {
                     else if (an[0] === "time") doc.timelineTime = parseFloat(an[1])
                     else if (an[0] === "play") doc.play()
                     else if (an[0] === "expand") timeline.expandAll(true)
+                    // „anim:curve,0”: editorul de curbă pentru toate cheile rândului 0 (după `anim:expand`).
+                    else if (an[0] === "curve") timeline.editRowEasing(timeline.rows[parseInt(an[1] || 0)], timeline)
+                    // „anim:savecurve,Nume,x1,y1,x2,y2”: o curbă proprie salvată (ca din editor).
+                    else if (an[0] === "savecurve") timeline.userEasingsEdited(timeline.userEasings.filter(p => p.name !== an[1]).concat([
+                        { name: an[1], x1: parseFloat(an[2]), y1: parseFloat(an[3]), x2: parseFloat(an[4]), y2: parseFloat(an[5]), step: false }]))
+                    else if (an[0] === "curves") console.info("curves:", JSON.stringify(timeline.userEasings.map(p => p.name)))
                 } else if (action.startsWith("scene:")) {
                     // „scene:0” aplică scena cu indexul dat (camera și obiectele).
                     const sc = doc.scenes[parseInt(action.slice(6))]
@@ -535,7 +541,7 @@ Window {
                 } else if (action === "debug.anim") {
                     console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
-                                     t => t.channels.map(c => c.property + "=" + c.keys.map(k => k.time + ":" + k.text).join("|")))))
+                                     t => t.channels.map(c => c.property + "=" + c.keys.map(k => k.time + ":" + k.text + ":" + k.easing.name).join("|")))))
                 } else if (action === "debug.rz") {
                     console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {
@@ -822,6 +828,8 @@ Window {
         property real animTransition: 2
         // Înălțimea timeline-ului (trasă de marginea lui de sus).
         property real timelineHeight: 260
+        // Curbele de easing salvate de utilizator (JSON: [{ name, x1, y1, x2, y2, step }]), în toate documentele.
+        property string easingPresets: "[]"
         property real animDelay: 1
         property bool animLoop: true
         property int animFps: 30
@@ -1916,6 +1924,10 @@ Window {
         anchors.right: rightPanel.left
         height: Math.max(140, Math.min(window.height * 0.6, preferences.timelineHeight))
         onResizeRequested: (h) => preferences.timelineHeight = Math.max(140, Math.min(window.height * 0.6, h))
+        userEasings: {
+            try { return JSON.parse(preferences.easingPresets) } catch (e) { return [] }
+        }
+        onUserEasingsEdited: (list) => preferences.easingPresets = JSON.stringify(list)
         document: doc
         viewport: viewport
         onExportRequested: fileDialog.ask("exportVideo")

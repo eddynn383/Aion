@@ -300,7 +300,8 @@ json animationsToJson(const model::Model& model)
                 k.distance });
         }
         out.push_back({ { "id", model.animations().keys()[i].value }, { "name", a.name }, { "duration", a.duration },
-            { "fps", a.fps }, { "loop", a.loop }, { "tracks", tracks }, { "camera", camera } });
+            { "fps", a.fps }, { "loop", a.loop }, { "defaultEasing", easingToJson(a.defaultEasing) }, { "tracks", tracks },
+            { "camera", camera } });
     }
     return out;
 }
@@ -321,6 +322,9 @@ void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector
         a.duration = j.value("duration", 5.0);
         a.fps = j.value("fps", 30);
         a.loop = j.value("loop", false);
+        if (const auto e = j.find("defaultEasing"); e != j.end()) {
+            a.defaultEasing = easingFromJson(*e);
+        }
         for (const json& t : j.at("tracks")) {
             model::ObjectTrack track;
             track.instance = model::InstanceId { t.at("instance").get<std::uint64_t>() };

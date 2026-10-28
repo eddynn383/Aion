@@ -208,6 +208,7 @@ struct Animation {
     double duration = 5.0; // secunde
     int fps = 30;
     bool loop = false;
+    Easing defaultEasing {}; // pentru cheile noi
     std::vector<ObjectTrack> tracks;
     std::vector<CameraKey> camera;
     bool operator==(const Animation&) const = default;

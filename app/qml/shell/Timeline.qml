@@ -1,5 +1,6 @@
 import QtQuick
 import Aion
+import "../components/EasingMath.js" as EasingMath
 
 // Timeline-ul (ca în After Effects / Blender, ADR 0034): animația activă, cu un rând pe obiect (un romb pentru fiecare
 // moment cu chei, bare pe intervalele animate) care se deschide (▸ / ▾) în canalele lui — doar proprietățile animate —,
@@ -12,7 +13,11 @@ Rectangle {
     property var document
     property var viewport
 
+    // Curbele de easing salvate de utilizator (din preferințe).
+    property var userEasings: []
+
     signal exportRequested()
+    signal userEasingsEdited(var list)
     // Înălțimea nouă cerută prin tragerea marginii de sus.
     signal resizeRequested(real height)
 
@@ -87,8 +92,17 @@ Rectangle {
             out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", icon: "video", keys: tl.camera, selected: false })
         for (const t of (tl.tracks ?? [])) {
             const open = expanded[t.instance] === true
+            // Pe rândul sumar, fiecare moment arată easing-ul primei chei de la el.
+            const easingAt = (time) => {
+                for (const c of t.channels) {
+                    const k = c.keys.find(k => sameTime(k.time, time))
+                    if (k)
+                        return k.easing
+                }
+                return null
+            }
             out.push({ kind: "object", instance: t.instance, property: "", name: t.name, icon: "box",
-                       keys: t.times.map(time => ({ time: time })), selected: t.selected, open: open })
+                       keys: t.times.map(time => ({ time: time, easing: easingAt(time) })), selected: t.selected, open: open })
             if (!open)
                 continue
             for (const c of t.channels)
@@ -151,6 +165,7 @@ Rectangle {
             if (!isSelected(ref))
                 selectKeys([ref])
             const p = item.mapToItem(root, mouse.x, mouse.y)
+            keyMenu.anchorItem = item
             keyMenu.openAt(p.x, p.y)
             return
         }
@@ -195,6 +210,38 @@ Rectangle {
         dragging = false
         dragStart = null
     }
+    // --- Easing: editorul de curbă pentru cheile date sau pentru cheile noi (easing-ul implicit) ---
+    property var easingTarget: null // { refs } sau { defaultEasing: true }
+    function editEasing(target, easing, subtitle, item) {
+        easingTarget = target
+        const p = item.mapToItem(root, item.width / 2, 0)
+        easingEditor.x = Math.max(Theme.space2, Math.min(root.width - easingEditor.width - Theme.space2, p.x - easingEditor.width / 2))
+        easingEditor.y = -easingEditor.implicitHeight - Theme.space2
+        easingEditor.edit(easing ?? { name: "easeInOut", x1: 0.42, y1: 0, x2: 0.58, y2: 1, step: false }, subtitle)
+    }
+    // Segmentul dintre cheia `index` a rândului și următoarea: easing-ul cheii de la început.
+    function segmentClicked(row, index, item) {
+        const key = row.keys[index]
+        editEasing({ refs: [{ instance: row.instance, property: row.property, time: key.time }] }, key.easing,
+                   row.kind === "object" ? row.name + " · toate proprietățile" : row.name, item)
+    }
+    // Tot canalul (sau toate canalele obiectului): click dreapta pe numele lui.
+    function editRowEasing(row, item) {
+        if (row.keys.length === 0)
+            return
+        editEasing({ refs: row.keys.map(k => ({ instance: row.instance, property: row.property, time: k.time })) },
+                   row.keys[0].easing, row.name + " · " + row.keys.length + (row.keys.length === 1 ? " cheie" : " chei"), item)
+    }
+    function editSelectedEasing(item) {
+        if (selectedKeys.length === 0)
+            return
+        const first = selectedKeys[0]
+        const row = rows.find(r => r.instance === first.instance && r.property === first.property)
+        const key = row ? row.keys.find(k => sameTime(k.time, first.time)) : null
+        editEasing({ refs: selectedKeys }, key ? key.easing : null,
+                   selectedKeys.length === 1 ? "1 cheie" : selectedKeys.length + " chei", item)
+    }
+
     function keyDoubleClicked(item) {
         if (item.row.kind !== "channel" || item.row.property === "color")
             return
@@ -459,6 +506,42 @@ Rectangle {
                     padding: Theme.space3
                     contentItem: Column {
                         spacing: Theme.space2
+                        // Easing-ul cheilor noi.
+                        Rectangle {
+                            id: defaultEasingButton
+                            width: 174
+                            height: Theme.controlHeightSm
+                            radius: Theme.radiusMd
+                            color: defaultEasingArea.containsMouse ? Theme.bgHover : Theme.bgInput
+                            EasingCurve {
+                                id: defaultCurve
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.space2
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 18
+                                height: 18
+                                easing: root.tl.defaultEasing ?? null
+                            }
+                            Text {
+                                anchors.left: defaultCurve.right
+                                anchors.leftMargin: Theme.space2
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideRight
+                                text: "Implicit: " + EasingMath.title(root.tl.defaultEasing)
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontSizeSm
+                            }
+                            MouseArea {
+                                id: defaultEasingArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    settingsPopup.close()
+                                    root.editEasing({ defaultEasing: true }, root.tl.defaultEasing, "cheile noi", defaultEasingButton)
+                                }
+                            }
+                        }
                         NumberField {
                             width: 174
                             label: "Durată"
@@ -651,10 +734,28 @@ Rectangle {
         Keys.onEscapePressed: visible = false
     }
 
-    // Meniul unei chei (click dreapta): easing, mergi la cheie, ștergere.
+    EasingEditor {
+        id: easingEditor
+        builtins: root.document ? root.document.easingPresets() : []
+        userPresets: root.userEasings
+        onApplied: (e) => {
+            if (!root.easingTarget)
+                return
+            if (root.easingTarget.defaultEasing)
+                root.document.setDefaultEasing(e)
+            else
+                root.document.setKeysEasing(root.easingTarget.refs, e)
+        }
+        onUserPresetsEdited: (list) => root.userEasingsEdited(list)
+    }
+
+    // Meniul unei chei (click dreapta): curba, easing-uri rapide, mergi la cheie, ștergere.
     ContextMenu {
         id: keyMenu
+        property var anchorItem: null
         items: [
+            { id: "curve", name: "Editează curba…" },
+            { separator: true },
             { id: "easing:linear", name: "Easing: liniar" },
             { id: "easing:easeInOut", name: "Easing: lin (in-out)" },
             { id: "easing:easeIn", name: "Easing: accelerează (in)" },
@@ -667,7 +768,9 @@ Rectangle {
               shortcut: "⌫", destructive: true }
         ]
         onTriggered: (id) => {
-            if (id.startsWith("easing:"))
+            if (id === "curve" && anchorItem)
+                root.editSelectedEasing(anchorItem)
+            else if (id.startsWith("easing:"))
                 root.document.setKeysEasing(root.selectedKeys, id.slice(7))
             else if (id === "goto" && root.selectedKeys.length > 0)
                 root.document.timelineTime = root.selectedKeys[0].time

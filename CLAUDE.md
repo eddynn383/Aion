@@ -216,6 +216,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `{ instance, property, time }`, tragerea în grup cu snap), `TimelineRow` (obiect ▸ / ▾, canal cu valoarea curentă),
   `TimelineKey`, `TimelineRuler`. Datele vin din `Document::timeline` (pistele cu `times` și `channels`). Acțiune de
   script: `anim:expand` (deschide toate obiectele).
+- **Easing** (ADR 0034): `overlays/EasingEditor.qml` (graficul cu mânere, presetări, curbele proprii din
+  `preferences.easingPresets`), `components/EasingCurve.qml` (miniaturi), `components/EasingMath.js`.
+  `Animation::defaultEasing` pentru cheile noi. În Popover, delegații Repeater-ului nu văd id-ul fișierului la creare
+  (conținut amânat): câmpurile editorului sunt scrise explicit. Acțiuni: `anim:savecurve,…`, `anim:curve,N`, `anim:curves`.
 
 ## Următorii pași
 0. **În lucru (aprobat, început pe 2026-10-28): Animare, timeline, cameră, rotația față de pivot** —
