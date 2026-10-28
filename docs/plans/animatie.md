@@ -341,7 +341,10 @@ AION_SCREENSHOT_DELAY_MS=5000 AION_SCREENSHOT=$S/anim.png \
 - [x] **C4** — „Blochează camera pe vedere” (navigarea mută camera, un pas de undo pe gest: la eliberarea mouse-ului
       sau la 350 ms după rotiță; în Animare scrie o cheie a camerei animației, iar prin cameră pistele camerei mută
       camera, cu lentila ei).
-- [ ] **C5** — Camerele și luminile cu Move / Rotate / Scale și snap (punctele lor de prindere, inferența).
+- [x] **C5** — Camerele și luminile cu Move / Rotate / Scale și snap: `ToolContext::object` (camera / lumina selectată,
+      în Modelare), `model::transformSceneObject` (poziția, ținta / direcția; roll-ul urmează rotația în jurul privirii),
+      `scaleSceneObject` (perspectivă: mărimea gizmo-ului; ortografic: scara; panou: laturile; spot: conul), punctele de
+      prindere (poziția, ținta) la Move, Rotate pornește din poziția obiectului. Teste în `ToolTests`.
 - [ ] **C6** — Depth of field: pasul de randare, „click pentru focus”, diafragma; doar prin cameră și la export.
 - [ ] **C7 (P2)** — Ghiduri de compoziție, expunere, animarea focalei / focusului.
 

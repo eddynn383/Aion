@@ -7,7 +7,10 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/trigonometric.hpp>
+
 #include <algorithm>
+#include <cmath>
 
 using namespace aion;
 using Catch::Approx;
@@ -1130,5 +1133,113 @@ TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în 
         REQUIRE(scale->applyMeasurement(ctx, "2"));
         CHECK(glm::length(world({ 1000, 0, 0 }) - Vec3d { 1000, 0, 0 }) < 1e-6);
         CHECK(glm::length(world({ 1600, 600, 600 }) - Vec3d { 2200, 1200, 1200 }) < 1e-6);
+    }
+}
+
+TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca obiectele (cu prindere)", "[core][tools][transform]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 0, 0, 0 }, 0, 0, 12000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    const auto at = [&](Vec3d p, tools::Modifiers mods = {}) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return tools::PointerEvent { *s, mods, 1 };
+    };
+    const auto click = [&](tools::Tool& tool, Vec3d p) {
+        tool.pointerMove(ctx, at(p));
+        tool.pointerDown(ctx, at(p));
+        tool.pointerUp(ctx, at(p));
+    };
+    model::CameraObject c;
+    c.position = { 0, 0, 1500 };
+    c.target = { 0, 3000, 1500 };
+    model::CameraId cam;
+    stack.run("Cameră", [&](model::Model& model) { cam = model.addCamera(c); });
+    ctx.object = model::SceneObjectRef { cam, {} };
+    ctx.pivot = c.position;
+
+    SECTION("Move: din poziția camerei (punct de prindere) până într-un punct; ținta vine cu ea")
+    {
+        auto move = tools::makeTool("move");
+        move->pointerMove(ctx, at({ 0, 0, 1500 }));
+        REQUIRE(move->overlay().grips.size() >= 2); // poziția și ținta
+        click(*move, { 0, 0, 1500 });
+        click(*move, { 2000, 1000, 1500 }); // un punct liber: în planul punctului de pornire
+        const model::CameraObject& moved = m.cameras().at(cam);
+        CHECK(moved.position.x == Approx(2000));
+        CHECK(moved.position.y == Approx(1000));
+        CHECK(moved.target.y == Approx(4000)); // ținta s-a mutat la fel
+        CHECK(stack.undoName() == "Move");
+    }
+
+    SECTION("Rotate: în jurul poziției camerei, 90° pe Z → ținta se rotește, camera rămâne")
+    {
+        auto rotate = tools::makeTool("rotate");
+        rotate->pointerMove(ctx, at({ 0, 3000, 1500 }));
+        REQUIRE(rotate->key(ctx, { tools::Key::Up, {} })); // axa albastră
+        click(*rotate, { 0, 3000, 1500 }); // referința: spre țintă
+        rotate->pointerMove(ctx, at({ -3000, 0, 1500 }));
+        REQUIRE(rotate->applyMeasurement(ctx, "90"));
+        const model::CameraObject& r = m.cameras().at(cam);
+        CHECK(glm::length(r.position - Vec3d { 0, 0, 1500 }) < 1e-6);
+        CHECK(glm::length(r.target - Vec3d { -3000, 0, 1500 }) < 1e-6);
+        CHECK(r.roll == Approx(0.0).margin(1e-6));
+    }
+
+    SECTION("Scale: în perspectivă doar mărimea gizmo-ului; ortografic, scara cadrului")
+    {
+        model::SceneObjectRef ref { cam, {} };
+        stack.run("Scale", [&](model::Model& model) { model::scaleSceneObject(model, ref, Vec3d { 2.0 }); });
+        CHECK(m.cameras().at(cam).displaySize == Approx(2.0));
+        CHECK(glm::length(m.cameras().at(cam).position - c.position) < 1e-9);
+        stack.run("Orto", [&](model::Model& model) {
+            model::CameraObject o = model.cameras().at(cam);
+            o.orthographic = true;
+            model.setCamera(cam, o);
+        });
+        stack.run("Scale", [&](model::Model& model) { model::scaleSceneObject(model, ref, Vec3d { 0.5 }); });
+        CHECK(m.cameras().at(cam).orthoScale == Approx(5000.0));
+    }
+
+    SECTION("Roll: o rotație în jurul direcției de privire înclină camera")
+    {
+        model::SceneObjectRef ref { cam, {} };
+        stack.run("Roll", [&](model::Model& model) {
+            model::transformSceneObject(model, ref, math::Transform::rotation(c.position, { 0, 1, 0 }, glm::radians(30.0)));
+        });
+        CHECK(std::abs(m.cameras().at(cam).roll) == Approx(30.0));
+        CHECK(glm::length(m.cameras().at(cam).target - c.target) < 1e-6);
+    }
+
+    SECTION("Luminile: direcția se rotește, panoul se scalează pe laturi, spotul își deschide conul")
+    {
+        model::Light l;
+        l.kind = model::Light::Kind::Area;
+        l.position = { 0, 0, 2000 };
+        l.direction = { 0, 0, -1 };
+        model::LightId light;
+        stack.run("Lumină", [&](model::Model& model) { light = model.addLight(l); });
+        const model::SceneObjectRef ref { {}, light };
+        stack.run("Rotate", [&](model::Model& model) {
+            model::transformSceneObject(model, ref, math::Transform::rotation(l.position, { 1, 0, 0 }, glm::radians(90.0)));
+        });
+        CHECK(glm::length(m.lights().at(light).direction - Vec3d { 0, 1, 0 }) < 1e-9);
+        stack.run("Scale", [&](model::Model& model) { model::scaleSceneObject(model, ref, Vec3d { 2.0, 0.5, 1.0 }); });
+        CHECK(m.lights().at(light).width == Approx(2000.0));
+        CHECK(m.lights().at(light).height == Approx(500.0));
+        stack.run("Spot", [&](model::Model& model) {
+            model::Light s = model.lights().at(light);
+            s.kind = model::Light::Kind::Spot;
+            model.setLight(light, s);
+        });
+        stack.run("Scale", [&](model::Model& model) { model::scaleSceneObject(model, ref, Vec3d { 1.5 }); });
+        CHECK(m.lights().at(light).cone == Approx(67.5));
     }
 }

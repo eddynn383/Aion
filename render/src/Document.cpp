@@ -1095,6 +1095,14 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.paintMaterial = m_currentMaterial;
     ctx.toWorld = contextTransform();
     ctx.pivot = selectionPivot(); // Rotate pornește din el, Scale cu Option îl ține fix
+    // O cameră sau o lumină selectată (în Modelare, la nivelul modelului): ținta lui Move / Rotate / Scale, cu pivotul
+    // în poziția ei. Camerele și luminile nu se animă, deci nu și în Animare.
+    const bool sceneObject = !animating && m_path.empty() && m_selection.empty()
+        && (m_model.cameras().contains(m_selectedCamera) || m_model.lights().contains(m_selectedLight));
+    if (sceneObject) {
+        ctx.object = model::SceneObjectRef { m_selectedCamera, m_selectedLight };
+        ctx.pivot = selectedObjectPosition();
+    }
     m_contextGuides.clear();
     for (const model::Guide& g : m_model.guides().values()) {
         if (g.context == activeDefinition()) {
@@ -1108,6 +1116,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.libraryMaterial
         = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
     fn(*m_tool, ctx);
+    if (sceneObject) {
+        emit selectionChanged(); // Inspector-ul camerei / luminii
+    }
     if (animating) {
         // Doar obiectele se animă: o selecție de fețe sau muchii nu are sens aici.
         m_selection.faces.clear();
