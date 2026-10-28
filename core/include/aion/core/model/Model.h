@@ -232,6 +232,35 @@ struct Animation {
     bool operator==(const Animation&) const = default;
 };
 
+// Un obiect ancorat pe o cale de parcurgere (ADR 0036): decalajul lui față de cale (pe axele ei, la locul obiectului)
+// și transformarea de dinainte de ancorare, pusă la loc când e scos.
+struct PathAnchor {
+    InstanceId instance;
+    double along = 0.0; // mm, de-a lungul căii (negativ = în urmă)
+    double lateral = 0.0; // mm, spre stânga (normala × tangenta)
+    double up = 0.0; // mm, pe normala planului
+    double yaw = 0.0; // grade, în jurul normalei
+    int front = 0; // sferturi de tură: axa locală Rz(front · 90°) · X a obiectului e fața
+    math::Transform before;
+    bool operator==(const PathAnchor&) const = default;
+};
+
+// O cale de parcurgere, desenată cu Pen-ul în Animare: un obiect de scenă (ca o cameră) al unei animații. Obiectele
+// ancorate o parcurg de la primul la ultimul punct în `duration` secunde, de la `start`, cu easing-ul ei.
+struct MotionPath {
+    std::string name;
+    math::Transform transform; // poziția / rotația / scara căii
+    geom::BezierPath curve; // în coordonatele căii
+    math::Vec3d normal { 0.0, 0.0, 1.0 }; // a planului, în coordonatele căii
+    AnimationId animation;
+    double start = 0.0; // secunde
+    double duration = 5.0;
+    Easing easing {};
+    std::vector<PathAnchor> anchors; // ordinea = ordinea pe cale
+    bool visible = true;
+    bool operator==(const MotionPath&) const = default;
+};
+
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
@@ -351,6 +380,7 @@ struct ChangeSet {
     std::map<LightId, geom::EntityChange<Light>> lights;
     std::map<TextureId, geom::EntityChange<Texture>> textures;
     std::map<PenCurveId, geom::EntityChange<PenCurve>> penCurves;
+    std::map<MotionPathId, geom::EntityChange<MotionPath>> motionPaths;
     std::map<DefinitionId, geom::ChangeSet> meshes;
 
     [[nodiscard]] bool empty() const;
@@ -393,6 +423,7 @@ public:
     [[nodiscard]] const geom::SlotMap<LightId, Light>& lights() const { return m_lights; }
     [[nodiscard]] const geom::SlotMap<TextureId, Texture>& textures() const { return m_textures; }
     [[nodiscard]] const geom::SlotMap<PenCurveId, PenCurve>& penCurves() const { return m_penCurves; }
+    [[nodiscard]] const geom::SlotMap<MotionPathId, MotionPath>& motionPaths() const { return m_motionPaths; }
     [[nodiscard]] geom::Mesh& mesh(DefinitionId id) { return *m_meshes.at(id); }
     [[nodiscard]] const geom::Mesh& mesh(DefinitionId id) const { return *m_meshes.at(id); }
     // Instanțele plasate direct în definiția dată (copiii ei în Outliner), în ordinea creării.
@@ -444,6 +475,9 @@ public:
     PenCurveId addPenCurve(PenCurve curve);
     void removePenCurve(PenCurveId id);
     void setPenCurve(PenCurveId id, PenCurve curve);
+    MotionPathId addMotionPath(MotionPath path);
+    void removeMotionPath(MotionPathId id);
+    void setMotionPath(MotionPathId id, MotionPath path);
 
     // --- Înregistrarea schimbărilor ---
     void beginRecording();
@@ -487,6 +521,7 @@ private:
     geom::SlotMap<AnimationId, Animation> m_animations;
     geom::SlotMap<CameraId, CameraObject> m_cameras;
     geom::SlotMap<PenCurveId, PenCurve> m_penCurves;
+    geom::SlotMap<MotionPathId, MotionPath> m_motionPaths;
     geom::SlotMap<LightId, Light> m_lights;
     geom::SlotMap<TextureId, Texture> m_textures;
     std::map<DefinitionId, std::unique_ptr<geom::Mesh>> m_meshes;
