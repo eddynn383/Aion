@@ -177,6 +177,12 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Spre colțul celui de-al doilea cub → se prinde exact („Colț”); click → cuburile se ating în acel punct
 - [ ] Un obiect rotit: punctele sunt pe muchiile lui, nu pe ale cutiei aliniate cu axele
 
+## Follow Me
+- [ ] O placă (dreptunghi) și un profil vertical lipit de o latură → selectează placa → Follow Me → click pe profil:
+      ramă în jurul plăcii, colțurile îmbinate în unghi, fețele albe în afară
+- [ ] Un cerc și o linie perpendiculară pe el → selectează linia → Follow Me → cerc: cilindru cu laturile netede
+- [ ] Fără nimic selectat: bara de stare cere traseul; profil paralel cu traseul → mesaj, fără pas în istoric
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

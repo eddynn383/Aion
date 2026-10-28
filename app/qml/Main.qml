@@ -482,7 +482,7 @@ Window {
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
-                                         "move", "rotate", "scale", "eraser", "paint", "texture",
+                                         "followme", "move", "rotate", "scale", "eraser", "paint", "texture",
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
 

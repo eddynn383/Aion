@@ -337,7 +337,7 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 - [~] **Scale (S):** cu mânere, uniform sau pe axă, din colț sau din centru (Option) — deocamdată uniform: punct fix, referință, factor (VCB); din centru cu Option. Mânerele și scalarea pe axă rămân de făcut
 - [x] **Offset (F):** offset al conturului unei fețe
 - [x] **Circle (C), Arc (A), Polygon:** curbe aproximate cu segmente (24 implicit), marcate ca „curbă” pentru selecție și afișare netedă
-- [ ] **Follow Me:** extrudarea unei fețe pe un traseu (opțional în această fază) — amânat
+- [x] **Follow Me:** extrudarea unei fețe pe un traseu — făcut pe 2026-10-28 (ADR 0031): traseul selectat, click pe profil
 - [x] Fețe netede (smooth/soft edges) pentru suprafețe curbe
 
 **Gata când:** poți modela o căsuță: pereți, acoperiș în două ape, o ușă și o fereastră tăiate prin Push/Pull, cu undo/redo complet pe tot istoricul.

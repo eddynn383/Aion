@@ -16,6 +16,8 @@ add_library(aion_core STATIC
     src/geom/Operations.cpp
     src/geom/Shapes.cpp
     src/geom/Bevel.cpp
+    src/geom/FaceBuilder.cpp
+    src/geom/Sweep.cpp
     src/geom/Primitives.cpp
     src/geom/PlanarRegions.cpp
     src/geom/PushPull.cpp
@@ -53,6 +55,7 @@ add_library(aion_core STATIC
     src/tools/TransformTools.cpp
     src/tools/ShapeTools.cpp
     src/tools/PaintTool.cpp
+    src/tools/FollowMeTool.cpp
     src/tools/TextureTool.cpp
     src/tools/MeasureTools.cpp
 )

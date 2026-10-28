@@ -187,6 +187,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Move cu puncte de prindere**: `tools::Grip` în `Overlay::grips` (desenate în `Viewport::appendOverlay`),
   `instanceGrips` / `nearestGrip` în `TransformTools.cpp` (cutia orientată a obiectului, colțuri + mijloace).
 
+- **Follow Me** (ADR 0031): `geom/Sweep.h` (`followMe`), `tools/FollowMeTool.cpp`; fețele noi (și la bevel) prin
+  `core/src/geom/FaceBuilder.h` (`buildFaces`). Acțiune de script: `tool.followme`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 
