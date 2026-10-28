@@ -551,7 +551,16 @@ Window {
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
                                      t => t.channels.map(c => c.property + "=" + c.keys.map(k => k.time + ":" + k.text + ":" + k.easing.name).join("|")))))
                 } else if (action === "debug.pivot") {
-                    console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode)
+                    console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode, "selected", doc.pivotSelected,
+                                 "at", JSON.stringify(doc.pivotPosition))
+                } else if (action.startsWith("pivotpos:")) {
+                    // „pivotpos:x=0,y=3000”: coordonatele pivotului selecției (ca din Inspector, cu pivotul selectat).
+                    const pp = {}
+                    for (const kv of action.slice(9).split(",")) {
+                        const parts = kv.split("=")
+                        pp[parts[0]] = parseFloat(parts[1])
+                    }
+                    doc.setPivotPosition(pp)
                 } else if (action === "debug.rz") {
                     console.info("rz:", JSON.stringify(doc.entityInfo.placement), "undo:", doc.undoName)
                 } else if (action.startsWith("shape:")) {
@@ -735,6 +744,8 @@ Window {
             bevelPanel.close()
         } else if (doc.interactionMode)
             window.selectTool("select")
+        else if (doc.pivotSelected && vcbText.length === 0)
+            doc.pivotSelected = false
         else if (vcbText.length > 0)
             vcbText = ""
         else

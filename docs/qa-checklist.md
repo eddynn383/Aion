@@ -165,6 +165,10 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 
 ## Pivot (Faza 33)
 - [ ] Cub 100 × 100 × 50 → Inspector → Pivot arată 50, 50, 25; marcajul (punct + axe) e în centrul cubului
+- [ ] Poziția din Inspector = coordonatele pivotului (aceleași ca „Poziție X/Y/Z” din timeline); Pivot → Colț → Poziția
+      arată colțul; o poziție nouă duce pivotul acolo
+- [ ] Click pe marcajul pivotului → inel + „Pivot selectat (mm)” în Inspector; o valoare nouă mută doar pivotul;
+      Esc / ✕ / click pe obiect îl deselectează
 - [ ] Rotație Z 30° → cubul se rotește pe loc (centrul nu se mișcă), Poziția (colțul) se schimbă
 - [ ] Pivot → Colț, apoi Rotație Z 45° → colțul rămâne pe loc; Bază → pivotul coboară pe fața de jos
 - [ ] Salvare / deschidere → pivotul ales rămâne; ⌘Z anulează schimbarea pivotului

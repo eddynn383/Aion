@@ -1024,9 +1024,11 @@ QVariantMap Document::entityInfo() const
             const bool same = geometrySelectionKey() == m_geometryKey;
             const math::Vec3d r = same ? m_geometryRotation : math::Vec3d { 0.0 };
             const math::Vec3d k = same ? m_geometryScale : math::Vec3d { 1.0 };
-            const math::Vec3d pivot = (same && m_geometryPivot ? *m_geometryPivot : (lo + hi) * 0.5) - lo;
-            info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), lo.x }, { QStringLiteral("py"), lo.y },
-                { QStringLiteral("pz"), lo.z }, { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
+            // Poziția e a pivotului (ca la obiecte și în timeline); pivotul, ca distanță de la colțul minim.
+            const math::Vec3d at = same && m_geometryPivot ? *m_geometryPivot : (lo + hi) * 0.5;
+            const math::Vec3d pivot = at - lo;
+            info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), at.x }, { QStringLiteral("py"), at.y },
+                { QStringLiteral("pz"), at.z }, { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
                 { QStringLiteral("dz"), hi.z - lo.z }, { QStringLiteral("rx"), r.x }, { QStringLiteral("ry"), r.y },
                 { QStringLiteral("rz"), r.z }, { QStringLiteral("sx"), k.x }, { QStringLiteral("sy"), k.y },
                 { QStringLiteral("sz"), k.z }, { QStringLiteral("vx"), pivot.x }, { QStringLiteral("vy"), pivot.y },
@@ -4506,6 +4508,41 @@ std::optional<math::Vec3d> Document::selectionPivot() const
     return (lo + hi) * 0.5;
 }
 
+bool Document::pivotSelected() const
+{
+    return m_pivotSelected && m_pivotSelection == m_selection && selectionPivot().has_value();
+}
+
+void Document::setPivotSelected(bool on)
+{
+    if (on == pivotSelected() && (!on || m_pivotSelection == m_selection)) {
+        return;
+    }
+    m_pivotSelected = on;
+    m_pivotSelection = m_selection;
+    emit selectionChanged();
+    touch();
+}
+
+QVariantList Document::pivotPosition() const
+{
+    const auto p = selectionPivot();
+    return p ? QVariantList { p->x, p->y, p->z } : QVariantList {};
+}
+
+void Document::setPivotPosition(const QVariantMap& coordinates)
+{
+    const auto p = selectionPivot();
+    if (!p) {
+        return;
+    }
+    const auto axis = [&](const char* key, double fallback) {
+        return coordinates.contains(QLatin1String(key)) ? coordinates.value(QLatin1String(key)).toDouble() : fallback;
+    };
+    setSelectionPivot({ axis("x", p->x), axis("y", p->y), axis("z", p->z) });
+    m_pivotSelection = m_selection; // rămâne selectat
+}
+
 QVariantList Document::pivotMarker() const
 {
     const auto p = selectionPivot();
@@ -4625,10 +4662,12 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
     math::Transform t;
     std::string name = "Mută";
     if (has("px") || has("py") || has("pz")) {
-        const math::Vec3d to { has("px") ? value("px") : lo.x, has("py") ? value("py") : lo.y, has("pz") ? value("pz") : lo.z };
-        t = math::Transform::translation(to - lo);
+        // Pivotul ajunge în poziția cerută, iar geometria vine cu el.
+        const math::Vec3d to { has("px") ? value("px") : pivot.x, has("py") ? value("py") : pivot.y,
+            has("pz") ? value("pz") : pivot.z };
+        t = math::Transform::translation(to - pivot);
         if (m_geometryPivot) {
-            *m_geometryPivot += to - lo; // pivotul vine cu geometria
+            *m_geometryPivot += to - pivot;
         }
     } else if (has("dx") || has("dy") || has("dz")) {
         math::Vec3d k { 1.0 };

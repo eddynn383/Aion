@@ -101,6 +101,10 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
     // Săgețile sunt ale uneltei active (o operație în curs); altfel, în Animare, ← → mută playhead-ul.
     Q_PROPERTY(bool toolOwnsArrows READ toolOwnsArrows NOTIFY toolStatusChanged)
+    // Pivotul selectat (click pe marcajul lui, ținut cât rămâne aceeași selecție): Inspector-ul îi arată coordonatele
+    // (ca Poziția: în coordonatele contextului), editabile — mută doar pivotul, obiectul rămâne pe loc.
+    Q_PROPERTY(bool pivotSelected READ pivotSelected WRITE setPivotSelected NOTIFY selectionChanged)
+    Q_PROPERTY(QVariantList pivotPosition READ pivotPosition NOTIFY selectionChanged)
     // Auto-key (Animare): pornit, Move / Rotate / Scale / Inspector pun chei; oprit, schimbă poza de bază (iar
     // proprietățile animate își mută toate cheile).
     Q_PROPERTY(bool autoKey READ autoKey WRITE setAutoKey NOTIFY autoKeyChanged)
@@ -386,6 +390,11 @@ public:
     [[nodiscard]] std::optional<math::Vec3d> selectionPivot() const;
     // Marcajul pivotului în coordonatele lumii ([x, y, z]; gol fără selecție), pentru scripturile de verificare.
     Q_INVOKABLE QVariantList pivotMarker() const;
+    bool pivotSelected() const;
+    void setPivotSelected(bool on);
+    QVariantList pivotPosition() const;
+    // { x, y, z } (oricare): coordonatele noi ale pivotului, în coordonatele contextului.
+    Q_INVOKABLE void setPivotPosition(const QVariantMap& coordinates);
     // Punctele de care se prinde pivotul tras (colțurile, mijloacele muchiilor, centrele fețelor și centrul cutiei
     // selecției), în coordonatele contextului.
     [[nodiscard]] std::vector<math::Vec3d> pivotSnapPoints() const;
@@ -575,6 +584,8 @@ private:
     math::Vec3d m_geometryRotation { 0.0 };
     // Pivotul geometriei libere selectate (în lume), ales din Inspector; gol = centrul cutiei selecției.
     std::optional<math::Vec3d> m_geometryPivot;
+    bool m_pivotSelected = false;
+    geom::Selection m_pivotSelection; // selecția pentru care e ales pivotul
     math::Vec3d m_geometryScale { 1.0 };
     [[nodiscard]] std::vector<std::uint64_t> geometrySelectionKey() const;
     geom::Selection m_previewSelection;

@@ -8,9 +8,9 @@
 
 - **Obiectele țin pivotul în model:** `Instance::pivot` (opțional, în coordonatele definiției; gol = centrul cutiei,
   deci urmează geometria când e editată). Se salvează în `.aion` (`pivot`) doar când a fost ales.
-- **Poziția rămâne colțul minim.** O poziție nouă mută colțul acolo; rotația, scara și dimensiunile țin pivotul pe
-  loc (`model::setPlacement`). Un pivot nou nu mută obiectul. Inspector-ul trimite câte o singură valoare, deci cele
-  două cazuri nu se amestecă.
+- ~~**Poziția rămâne colțul minim.**~~ Schimbat pe 2026-10-28 (decizia utilizatorului): **Poziția e a pivotului**, vezi
+  completarea de la final. Rotația, scara și dimensiunile țin pivotul pe loc (`model::setPlacement`). Un pivot nou nu
+  mută obiectul. Inspector-ul trimite câte o singură valoare, deci cazurile nu se amestecă.
 - **Pivotul se arată ca distanță de la colțul minim, pe axele obiectului, în mm** (cu scara aplicată): o cutie
   100 × 100 × 50 are pivotul la 50, 50, 25. Presetări: Centru, Bază (centrul feței de jos), Colț.
 - **Geometria liberă** (forme, linii) are pivotul ales ținut în Document, pentru selecția curentă (ca rotația și scara
@@ -46,3 +46,13 @@
   transformarea de bază (nu la poza de la timpul curent), iar un pivot nou muta obiectele animate (cheile de poziție
   țin poziția pivotului). Acum `Document::shownTransform` dă poza (fără copia modelului, merge și în timpul tragerii),
   iar `model::setPivot` recalculează cheile de poziție ale animațiilor (ADR 0034).
+
+## Completare (2026-10-28): Poziția = pivotul; pivotul selectabil
+
+- Utilizatorul a văzut valori diferite în timeline (poziția pivotului) și în Inspector (colțul minim) pentru același
+  obiect și a ales: **Poziția din Inspector e a pivotului** (ca în Blender), pentru obiecte și pentru geometria liberă;
+  o poziție nouă mută obiectul ca pivotul să ajungă acolo. Scripturile (`place(id, { x, y, z })`) la fel.
+- **Pivotul se selectează**: click pe marcaj (fără tragere) → `Document::pivotSelected`; marcajul primește un inel, iar
+  Inspector-ul arată „Pivot selectat” cu coordonatele lui (ca Poziția), editabile: mută doar pivotul
+  (`Document::setPivotPosition`). Esc, ✕ sau un click în altă parte îl deselectează. Grupul „Pivot” rămâne distanța de
+  la colțul minim (cu presetările Centru / Bază / Colț).
