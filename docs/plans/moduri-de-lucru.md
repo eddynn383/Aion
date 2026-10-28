@@ -157,19 +157,22 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
       teste Catch2; altfel verificare prin script + captură.
 
 ### Pasul 2 — Toolbar: navigarea în primul grup + comutatorul ✅ criteriu: captură
-- [ ] `Toolbar.qml`: grupul `select` = Select + secțiunea „Navigare” (Orbit, Pan, Zoom); scoate clusterul `navigation`
+- [x] `Toolbar.qml`: grupul `select` = Select + secțiunea „Navigare” (Orbit, Pan, Zoom); scoate clusterul `navigation`
       (păstrează `allTools` pentru scurtături: O, H, Z rămân); Interact devine grupul `interact` (vizibil doar în
       modul Interacțiune).
-- [ ] `shell/ModeSwitch.qml` (nou, înregistrat în `app/CMakeLists.txt`): control segmentat cu 3 iconițe, tooltip-uri
+- [x] `shell/ModeSwitch.qml` (nou, înregistrat în `app/CMakeLists.txt`): control segmentat cu 3 iconițe, tooltip-uri
       cu scurtătura (`Toolbar.keyFor` / `shortcutOverrides`), semnal `modeSelected(int)`.
-- [ ] Fiecare grup primește `modes`; toolbar-ul filtrează grupurile după `doc.workMode`.
-- [ ] Ghidurile animate (`ToolGuides.js`, `ToolTour`) și `RichTooltip` funcționează pentru uneltele mutate.
+- [x] Fiecare grup primește `modes`; toolbar-ul filtrează grupurile după `doc.workMode`.
+- [x] Ghidurile animate (`ToolGuides.js`, `ToolTour`) și `RichTooltip` funcționează pentru uneltele mutate.
 
 ### Pasul 3 — Filtrarea comenzilor, scurtăturilor, meniurilor ✅ criteriu: în Animare, ⇧R / R / P nu fac nimic
-- [ ] `commands` primesc `modes`; `Shortcut.enabled` verifică modul; palette arată doar comenzile modului (sau
+> Făcut: regula e într-un singur loc, `Document::commandModes(id)` / `commandAllowed(id)` (C++). Palette arată doar
+> comenzile modului; scurtăturile se dezactivează; meniul nativ le lasă inactive; meniul contextual le omite.
+> `ui.timeline` (⌥T) a fost scos: timeline-ul ține de modul Animare.
+- [x] `commands` primesc `modes`; `Shortcut.enabled` verifică modul; palette arată doar comenzile modului (sau
       estompate cu mutarea în modul lor — decizie la pasul 3, preferat: doar ale modului curent + cele comune).
-- [ ] `Document::contextMenuItems()` filtrează după mod.
-- [ ] `AppMenuBar.qml`: meniul „Vizualizare” (sau unul nou „Mod”) cu cele 3 moduri bifabile.
+- [x] `Document::contextMenuItems()` filtrează după mod.
+- [x] `AppMenuBar.qml`: meniul „Vizualizare” (sau unul nou „Mod”) cu cele 3 moduri bifabile.
 
 ### Pasul 4 — Gărzile din Document ✅ criteriu: test că o operație de modelare e refuzată în Animare
 - [ ] `allows()` în metodele de modelare (desen prin unelte: `setActiveTool` refuză uneltele altui mod; `pointerDown`

@@ -2078,6 +2078,61 @@ void Document::setWorkMode(int mode)
     touch();
 }
 
+bool Document::commandAllowed(const QString& id) const
+{
+    return commandModes(id).contains(m_workMode);
+}
+
+QList<int> Document::commandModes(const QString& id)
+{
+    static const QList<int> all { Modeling, Animation, Interaction };
+    static const QList<int> modeling { Modeling };
+    // Uneltele: desen, modificare, măsurare, ștergere și vopsire doar în Modelare; transformările și în Animare
+    // (acolo scriu keyframe-uri); Interact doar în Interacțiune; selecția și navigarea peste tot.
+    if (id.startsWith(QLatin1String("tool."))) {
+        const QString tool = id.mid(5);
+        static const QStringList common { QStringLiteral("select"), QStringLiteral("orbit"), QStringLiteral("pan"),
+            QStringLiteral("zoom") };
+        static const QStringList transforms { QStringLiteral("move"), QStringLiteral("rotate"), QStringLiteral("scale") };
+        if (common.contains(tool)) {
+            return all;
+        }
+        if (transforms.contains(tool)) {
+            return { Modeling, Animation };
+        }
+        if (tool == QLatin1String("interact")) {
+            return { Interaction };
+        }
+        return modeling;
+    }
+    // Comune: fișierul, vizualizarea, interfața, selecția, undo, modurile, scripturile și plugin-urile.
+    static const QStringList commonEdit { QStringLiteral("edit.undo"), QStringLiteral("edit.redo"),
+        QStringLiteral("edit.selectAll"), QStringLiteral("edit.selectNone"), QStringLiteral("edit.selectConnected"),
+        QStringLiteral("org.exit"), QStringLiteral("org.hide"), QStringLiteral("org.unhideAll"),
+        QStringLiteral("view.zoomSelection") };
+    if (commonEdit.contains(id)) {
+        return all;
+    }
+    if (id == QLatin1String("file.exportVideo") || id.startsWith(QLatin1String("anim."))) {
+        return { Animation };
+    }
+    if (id == QLatin1String("rules.edit")) {
+        return { Interaction };
+    }
+    static const QStringList modelingPrefixes { QStringLiteral("edit."), QStringLiteral("org."), QStringLiteral("solid."),
+        QStringLiteral("guides."), QStringLiteral("material."), QStringLiteral("library."), QStringLiteral("object."),
+        QStringLiteral("texture.") };
+    for (const QString& prefix : modelingPrefixes) {
+        if (id.startsWith(prefix)) {
+            return modeling;
+        }
+    }
+    if (id == QLatin1String("file.import") || id == QLatin1String("view.snapGrid")) {
+        return modeling;
+    }
+    return all;
+}
+
 // --- Modul interacțiune ---
 
 void Document::setInteractionMode(bool on)
@@ -2653,6 +2708,9 @@ QVariantList Document::contextMenuItems() const
     QVariantList items;
     const auto item = [&](const QString& id, const QString& name, const QString& shortcut = {}, bool enabled = true,
                           bool destructive = false) {
+        if (!commandAllowed(id)) {
+            return; // comanda altui mod de lucru
+        }
         items.append(QVariantMap { { QStringLiteral("id"), id }, { QStringLiteral("name"), name },
             { QStringLiteral("shortcut"), shortcut }, { QStringLiteral("enabled"), enabled },
             { QStringLiteral("destructive"), destructive } });
@@ -2761,6 +2819,13 @@ QVariantList Document::contextMenuItems() const
     item(QStringLiteral("view.zoomSelection"), QStringLiteral("Zoom la selecție"));
     separator();
     item(QStringLiteral("edit.delete"), QStringLiteral("Șterge"), QStringLiteral("Delete"), geometry || !allLocked, true);
+    // Fără separatori la capete (după ce comenzile altor moduri au lipsit).
+    while (!items.isEmpty() && items.last().toMap().value(QStringLiteral("separator")).toBool()) {
+        items.removeLast();
+    }
+    while (!items.isEmpty() && items.first().toMap().value(QStringLiteral("separator")).toBool()) {
+        items.removeFirst();
+    }
     return items;
 }
 

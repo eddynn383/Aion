@@ -38,7 +38,6 @@ Window {
             { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
             { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
-            { id: "ui.timeline", title: window.timelineVisible ? "Ascunde timeline-ul" : "Timeline (animații)", category: "Interfață", shortcut: "Alt+T", icon: "film" },
             { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "film" },
             { id: "object.camera", title: "Adaugă o cameră (din vederea curentă)", category: "Obiecte", shortcut: "", icon: "camera" },
             { id: "object.light.point", title: "Adaugă o lumină punctuală (bec)", category: "Obiecte", shortcut: "", icon: "lightbulb" },
@@ -669,7 +668,7 @@ Window {
             required property var modelData
             sequence: modelData.shortcut
             // Cât timp se tastează în Measurements box, literele sunt unități („m”, „cm”), nu unelte.
-            enabled: modelData.shortcut.length > 0 && !palette.opened
+            enabled: modelData.shortcut.length > 0 && !palette.opened && (doc.workMode, doc.commandAllowed(modelData.id))
                      && !(window.vcbText.length > 0 && modelData.shortcut.indexOf("Ctrl+") < 0 && modelData.shortcut.indexOf("Alt+") < 0)
                      && !(window.nativeMenu && modelData.shortcut.indexOf("Ctrl+") >= 0)
             onActivated: window.runCommand(modelData.id)
@@ -1857,7 +1856,8 @@ Window {
     CommandPalette {
         id: palette
         parent: window.contentItem
-        commands: window.commands
+        // Doar comenzile modului de lucru curent (plus cele comune).
+        commands: (doc.workMode, window.commands.filter(c => doc.commandAllowed(c.id)))
         onCommandTriggered: (id) => window.runCommand(id)
     }
 

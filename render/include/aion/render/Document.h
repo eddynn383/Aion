@@ -415,6 +415,11 @@ public:
     // Operațiile modului dat sunt permise acum? (Modul curent e acela, sau rulează un script: scripturile sunt
     // cerute explicit de utilizator și ocolesc regula.)
     Q_INVOKABLE bool allows(int mode) const { return m_workMode == mode || m_macro; }
+    // Comanda (id din palette: „edit.bevel”, „tool.line”, „mode.animate”…) e disponibilă în modul curent?
+    // Sursa unică a regulii: palette, scurtăturile, meniurile și gărzile o folosesc.
+    Q_INVOKABLE bool commandAllowed(const QString& id) const;
+    // Modurile în care e disponibilă comanda.
+    static QList<int> commandModes(const QString& id);
     bool interactionMode() const { return m_runtime.has_value(); }
     void setInteractionMode(bool on);
     // Cursorul pentru obiectul de sub mouse: "drag", "click", "context", "hover" sau gol (nimic interactiv).
