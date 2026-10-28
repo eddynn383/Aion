@@ -169,6 +169,7 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Pivot → Colț, apoi Rotație Z 45° → colțul rămâne pe loc; Bază → pivotul coboară pe fața de jos
 - [ ] Salvare / deschidere → pivotul ales rămâne; ⌘Z anulează schimbarea pivotului
 - [ ] Un dreptunghi (geometrie liberă): Pivot implicit în centru; rotația și scara se fac în jurul lui
+- [ ] Cu Select, cursorul devine „mută” peste marcajul pivotului; tras spre un colț → se prinde; ⌘Z îl readuce
 
 ## Move: puncte de prindere
 - [ ] Două cuburi; Move peste primul → colțuri verzi și mijloace de muchii cyan; cele din spate estompate

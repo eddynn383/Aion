@@ -21,4 +21,10 @@
 
 ## Limite
 
-- Pivotul nu se trage încă din viewport (doar din Inspector). Uneltele Rotate / Scale își aleg centrul ca până acum.
+- Uneltele Rotate / Scale își aleg centrul ca până acum (pivotul e pentru Inspector și scripturi).
+
+## Completare (2026-10-28)
+
+- Marcajul se trage cu Select (`Viewport::m_pivotDrag`, `Document::setSelectionPivot`): se prinde de cele 27 de
+  puncte ale cutiei selecției (`pivotSnapPoints`: colțuri, mijloace, centre de fețe, centru), altfel de suprafața de
+  sub cursor, altfel de un plan prin pivot cu fața spre cameră. Toată tragerea e un pas de undo (macro).
