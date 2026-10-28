@@ -329,7 +329,11 @@ colț, ci se mută tot, ca pe un arc.
 **Ce am verificat** (2026-10-28): în nucleu, `model::setPlacement` cu pivotul în colț și rotația Y = 30° / 60° ține
 fixe colțul (0, 0, 0) și muchia (0, 0, 0)–(0, 1000, 0) — rotația din **Inspector** e corectă pentru un cub nerotit.
 
-**Ipoteze (de confirmat cu pașii exacți ai utilizatorului)**:
+**Confirmat de utilizator (2026-10-28)**: rotația s-a făcut cu **unealta Rotate din toolbar**; cubul **nu avea nicio
+rotație**; rotația din Inspector funcționează corect. Deci cauza e **ipoteza 1** de mai jos (unealta Rotate nu
+folosește pivotul); ipotezele 2 și 3 rămân doar de verificat, nu de reparat.
+
+**Ipoteze**:
 1. **Unealta Rotate din toolbar nu folosește pivotul**: centrul rotației e punctul pe care dai primul click
    (inferența), iar marcajul pivotului nu e un punct de snap → rotația se face în jurul altui punct → arcul. *Cea mai
    probabilă.* Reparația: Rotate (și Scale) pornesc implicit din **pivotul selecției** (centrul e deja ales, primul
@@ -342,8 +346,8 @@ fixe colțul (0, 0, 0) și muchia (0, 0, 0)–(0, 1000, 0) — rotația din **In
    `setSelectionPivot`. De verificat cu un test.
 
 **Pași**:
-- [ ] **P1** — Reproducere exactă (întreabă utilizatorul: Rotate din toolbar sau câmpul Rotație Y din Inspector?
-      cubul avea deja rotație?), un test în core pentru fiecare ipoteză confirmată.
+- [x] **P1** — Reproducere: Rotate din toolbar, cub fără rotație, pivotul în colț (confirmat de utilizator).
+      De scris testul în `tests/core/ToolTests.cpp`: Rotate pe un obiect cu pivot în colț → colțul rămâne fix.
 - [ ] **P2** — Rotate / Scale pornesc din pivotul selecției; pivotul ca punct de snap; testele uneltelor
       (`tests/core/ToolTests.cpp`).
-- [ ] **P3** — Dacă e ipoteza 2: rotația din Inspector în jurul axelor lumii (sau comutatorul Global / Local).
+- [ ] **P3** — ~~Ipoteza 2~~ nu e cauza (Inspector-ul merge); de reluat doar dacă utilizatorul cere axe Global / Local.
