@@ -1,5 +1,7 @@
+#include "aion/core/geom/Operations.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/model/AnimationEval.h"
+#include "aion/core/model/Operations.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -411,4 +413,47 @@ TEST_CASE("Animații: cu auto-key oprit, o mutare schimbă poza de bază sau mut
     CHECK(x.keys[0].value == Approx(300.0));
     CHECK(x.keys[1].value == Approx(1300.0));
     CHECK(model::findChannel(*model::findTrack(a, car), Property::PositionY) == nullptr); // nicio cheie nouă
+}
+
+TEST_CASE("Animații: un pivot mutat după animare nu mută obiectul (cheile de poziție se recalculează)", "[core][model][animation]")
+{
+    using model::Property;
+    model::Model m;
+    model::Definition def { "Cutie", true };
+    const model::DefinitionId d = m.addDefinition(def);
+    geom::Mesh& mesh = m.mesh(d);
+    geom::drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
+    geom::pushPull(mesh, mesh.faces().keys().front(), -1000);
+    model::Instance inst;
+    inst.parent = m.root();
+    inst.definition = d;
+    const model::InstanceId box = m.addInstance(inst);
+    // Mutat pe X de la 0 la 2 s și rotit pe Z, cu pivotul în centru (500, 500, 500).
+    Animation a;
+    model::setChannelKey(a, box, Property::PositionX, 0.0, 500.0);
+    model::setChannelKey(a, box, Property::PositionX, 2.0, 2500.0);
+    model::setChannelKey(a, box, Property::RotationZ, 0.0, 0.0);
+    model::setChannelKey(a, box, Property::RotationZ, 2.0, 90.0);
+    const model::AnimationId id = m.addAnimation(a);
+    const auto posed = [&](double t) {
+        const model::ObjectTrack& track = *model::findTrack(m.animations().at(id), box);
+        return *model::evaluateInstance(track, t, m.instance(box).transform, model::pivotLocal(m, box));
+    };
+    const Transform at0 = posed(0.0);
+    const Transform at2 = posed(2.0);
+
+    // Pivotul trece în colț, din Inspector (distanța de la colțul minim = 0).
+    model::Placement p = model::placementOf(m, box);
+    p.pivot = Vec3d { 0.0 };
+    model::setPlacement(m, box, p);
+    REQUIRE(glm::length(model::pivotLocal(m, box)) < 1e-9);
+    // La chei, obiectul e exact unde era (colțul (1000, 1000, 1000) al cutiei, de exemplu).
+    for (const Vec3d q : { Vec3d { 0, 0, 0 }, Vec3d { 1000, 1000, 1000 } }) {
+        CHECK(glm::length(posed(0.0).applyToPoint(q) - at0.applyToPoint(q)) < 1e-6);
+        CHECK(glm::length(posed(2.0).applyToPoint(q) - at2.applyToPoint(q)) < 1e-6);
+    }
+
+    // La fel cu `setPivot` (pivotul tras în viewport), înapoi în centru.
+    model::setPivot(m, box, Vec3d { 500, 500, 500 });
+    CHECK(glm::length(posed(2.0).applyToPoint({ 1000, 0, 0 }) - at2.applyToPoint({ 1000, 0, 0 })) < 1e-6);
 }
