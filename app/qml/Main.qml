@@ -20,7 +20,8 @@ Window {
     flags: Qt.platform.os === "osx" ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
 
     property bool leftPanelVisible: true
-    property bool timelineVisible: false
+    // Timeline-ul ține de modul Animare: acolo e mereu vizibil și nu se închide (docs/plans/moduri-de-lucru.md).
+    readonly property bool timelineVisible: doc.workMode === 1
     property bool rightPanelVisible: true
     property string activeTool: "select"
     // Uneltele tratate de viewport (nu de Document): navigarea și Interact.
@@ -237,10 +238,9 @@ Window {
         case "mode.animate": window.setWorkMode(1); break
         case "mode.interact": window.setWorkMode(2); break
         case "rules.edit": window.openRulesEditor(); break
-        case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
         case "file.exportVideo":
             if (doc.activeAnimation > 0) fileDialog.ask("exportVideo")
-            else { window.timelineVisible = true; toast.show("Creează întâi o animație în timeline.") }
+            else toast.show("Creează întâi o animație în timeline.")
             break
         case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
         case "debug.materials": preferences.leftMaterials = true; break
@@ -397,7 +397,7 @@ Window {
                 } else if (action.startsWith("anim:")) {
                     // „anim:new”, „anim:key”, „anim:color”, „anim:camera”, „anim:time,1.5”, „anim:play”.
                     const an = action.slice(5).split(",")
-                    if (an[0] === "new") { doc.createAnimation(); window.timelineVisible = true }
+                    if (an[0] === "new") { window.setWorkMode(1); doc.createAnimation() }
                     else if (an[0] === "key") doc.keySelection()
                     else if (an[0] === "color") doc.keySelectionColor()
                     else if (an[0] === "camera") doc.keyCamera(viewport.cameraState())
@@ -1844,7 +1844,6 @@ Window {
         height: 200
         document: doc
         viewport: viewport
-        onCloseRequested: window.timelineVisible = false
         onExportRequested: fileDialog.ask("exportVideo")
     }
 

@@ -281,12 +281,6 @@ Rectangle {
                 enabled: root.hasAnimation && !(root.viewport && root.viewport.exporting)
                 onClicked: root.exportRequested()
             }
-            IconButton {
-                width: 28; height: 28; iconSize: Theme.iconSizeSm
-                iconName: "x"
-                tooltip: "Închide timeline-ul"
-                onClicked: root.closeRequested()
-            }
         }
     }
 

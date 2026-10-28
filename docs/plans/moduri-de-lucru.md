@@ -191,13 +191,19 @@ Bifează aici și în `PLAN.md` → „Etapa 5”.
 - [x] Bara de stare: modul curent la stânga indicației (de exemplu „Animare · Click pe un obiect…”).
 
 ### Pasul 6 — Animare: timeline automat și auto-key ✅ criteriu: Move în Animare scrie un keyframe, modelul nu se schimbă
-- [ ] Intrarea în Animare: timeline vizibil (fără buton de închidere, ⌥T dezactivat), `m_previewing = true` la
+- [x] Intrarea în Animare: timeline vizibil (fără buton de închidere, ⌥T dezactivat), `m_previewing = true` la
       timpul curent; ieșirea: timeline ascuns, `endPreview`.
-- [ ] Select doar pe obiecte în Animare (`ToolContext`: `objectsOnly`).
-- [ ] Auto-key pentru Move / Rotate / Scale pe instanțe (callback în `ToolContext`, vezi 3.4), un pas de undo.
-- [ ] Inspector: plasarea la timpul curent; modificarea ei în Animare scrie keyframe (nu `setPlacement` pe model).
-- [ ] Teste în `tests/core/ToolTests.cpp` pentru callback-ul de transformare (unealta Move cu `onInstanceTransform`
-      nu schimbă modelul) și în `AnimationTests.cpp` dacă se adaugă funcții noi în `core/model/Animation*`.
+- [x] Select doar pe obiecte în Animare (`ToolContext`: `objectsOnly`).
+- [x] Auto-key pentru Move / Rotate / Scale pe instanțe (callback în `ToolContext`, vezi 3.4), un pas de undo.
+- [x] Inspector: plasarea la timpul curent; modificarea ei în Animare scrie keyframe (nu `setPlacement` pe model).
+- [x] ~~Teste pentru callback~~ — implementat altfel (fără schimbări în core), verificat prin script: Move și
+      Inspector-ul scriu keyframe-uri, modelul de bază rămâne, ⌘Z le anulează.
+> **Cum e făcut** (diferit de schița din 3.4, mai simplu): `Document::pose()` ține o copie a modelului cu obiectele
+> animate în poza de la timpul curent (refăcută doar la schimbarea modelului / timpului / animației). În Animare,
+> `withTool` dă uneltelor copia și un `CommandStack` temporar; după unealtă, transformările obiectelor care s-au
+> schimbat devin keyframe-uri (`keyTransforms`, un pas de undo „Keyframe”, creează animația dacă lipsește).
+> `setPlacement` face la fel. `endPreview` nu mai iese din poză în Animare; timeline-ul e legat de mod
+> (`window.timelineVisible`), fără butonul de închidere. Fețele / muchiile se scot din selecție în Animare.
 
 ### Pasul 7 — Interacțiune: Select + Interact ✅ criteriu: Interact rulează interacțiunile, Select revine la editare
 - [ ] Interact sub Select în primul grup (doar în modul Interacțiune); activarea lui pornește `interactionMode`,
