@@ -14,18 +14,19 @@ Item {
         { id: "select", tools: [
             { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", phase: 3 },
             { id: "interact", icon: "hand-pointer", name: "Interact", key: "I", phase: 0 } ] },
-        // Primitive: formele 2D (linii, contururi) și corpurile 3D, într-un singur grup cu două secțiuni.
-        // Corpurile se creează direct ca obiecte; formele rămân geometrie liberă.
+        // Primitive, după dimensiune: 1D (curbe deschise: linie, arc), 2D (contururi închise care fac o față) și 3D
+        // (corpuri create direct ca obiecte). Corpurile au Shift + forma din care „cresc” (dreptunghi → cub, cerc →
+        // cilindru), sfera ⇧O, conul ⇧V.
         { id: "primitives", tools: [
-            { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3, section: "2D" },
+            { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3, section: "1D" },
             { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 },
-            { id: "rectangle", icon: "square",   name: "Rectangle", key: "R", phase: 3 },
+            { id: "rectangle", icon: "square",   name: "Rectangle", key: "R", phase: 3, section: "2D" },
             { id: "circle",    icon: "circle",   name: "Circle",    key: "C", phase: 5 },
-            { id: "polygon",   icon: "pentagon", name: "Polygon",   key: "",  phase: 5 },
-            { id: "cube",     icon: "prim-cube",     name: "Cub",      key: "", phase: 13, section: "3D" },
-            { id: "sphere",   icon: "prim-sphere",   name: "Sferă",    key: "", phase: 13 },
-            { id: "cone",     icon: "prim-cone",     name: "Con",      key: "", phase: 13 },
-            { id: "cylinder", icon: "prim-cylinder", name: "Cilindru", key: "", phase: 13 } ] },
+            { id: "polygon",   icon: "pentagon", name: "Polygon",   key: "N", phase: 5 },
+            { id: "cube",     icon: "prim-cube",     name: "Cub",      key: "Shift+R", phase: 13, section: "3D" },
+            { id: "sphere",   icon: "prim-sphere",   name: "Sferă",    key: "Shift+O", phase: 13 },
+            { id: "cone",     icon: "prim-cone",     name: "Con",      key: "Shift+V", phase: 13 },
+            { id: "cylinder", icon: "prim-cylinder", name: "Cilindru", key: "Shift+C", phase: 13 } ] },
         { id: "modify", tools: [
             { id: "pushpull", icon: "arrow-up-from-line", name: "Push/Pull", key: "P", phase: 5 },
             { id: "offset",   icon: "square-dashed",      name: "Offset",    key: "F", phase: 5 },

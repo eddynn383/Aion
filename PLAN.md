@@ -649,8 +649,9 @@ Rămân în afara etapei (cer ceva ce nu există aici): testul pe o mașină Win
       centrul cutiei, altfel de suprafața de sub cursor; un pas de undo
 
 ### Toolbar: grupul Primitive (cerința din 2026-10-28)
-- [x] Line, Arc, Rectangle, Circle, Polygon (2D) și Cub, Sferă, Con, Cilindru (3D) într-un singur grup „Primitive”,
-      cu titluri de secțiune în meniu (`Menu` acceptă `{ header }`)
+- [x] Line, Arc (1D), Rectangle, Circle, Polygon (2D) și Cub, Sferă, Con, Cilindru (3D) într-un singur grup
+      „Primitive”, cu titluri de secțiune în meniu (`Menu` acceptă `{ header }`)
+- [x] Scurtături pentru toate: L, A, R, C, N (Polygon), ⇧R (Cub), ⇧O (Sferă), ⇧V (Con), ⇧C (Cilindru)
 
 ### Move: puncte de prindere ale obiectelor (cerința din 2026-10-27)
 - [x] Move arată colțurile (verde) și mijloacele muchiilor (cyan) cutiei obiectului de sub cursor sau selectat, mari
