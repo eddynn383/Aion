@@ -345,7 +345,8 @@ AION_SCREENSHOT_DELAY_MS=5000 AION_SCREENSHOT=$S/anim.png \
       în Modelare), `model::transformSceneObject` (poziția, ținta / direcția; roll-ul urmează rotația în jurul privirii),
       `scaleSceneObject` (perspectivă: mărimea gizmo-ului; ortografic: scara; panou: laturile; spot: conul), punctele de
       prindere (poziția, ținta) la Move, Rotate pornește din poziția obiectului. Teste în `ToolTests`.
-- [ ] **C6** — Depth of field: pasul de randare, „click pentru focus”, diafragma; doar prin cameră și la export.
+- [x] **C6** — Depth of field: pasul de randare (`shaders/dof.frag`, două treceri separabile după cercul de confuzie),
+      „Alege punctul de focus” (`Viewport::pickingFocus`), diafragma; doar prin cameră și la export. ADR 0035 (camera).
 - [ ] **C7 (P2)** — Ghiduri de compoziție, expunere, animarea focalei / focusului.
 
 ### 9.5 Decizii implicite (de confirmat la începutul implementării)

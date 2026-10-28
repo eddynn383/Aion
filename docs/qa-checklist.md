@@ -230,6 +230,19 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
       e tot în acel colț; Pivot → Colț în Modelare → în Animare, la chei, obiectul e unde era
 - [ ] ⌥G (snap la grid) pornește / oprește snap-ul și în Animare
 
+## Camera (ADR 0035)
+- [ ] Inspector-ul camerei: format (presetări, L × H), focală (16…135), senzor, shift, roll, proiecție paralelă cu scară,
+      depth of field, planuri de tăiere; gizmo-ul își schimbă piramida după ele
+- [ ] „Privește prin cameră”: zbor lin în poza camerei, apoi cadrul 16:9 cu exteriorul estompat și eticheta
+      („Cameră 1 · 50 mm · 16:9”); Esc sau un orbit → zbor înapoi în vederea de dinainte
+- [ ] Trage marginea din dreapta a cadrului → formatul se schimbă (se prinde de 4:3, 1:1, 2.39:1 …)
+- [ ] „Blochează camera pe vedere” → orbit / pan / zoom mută camera; ⌘Z o readuce dintr-un pas
+- [ ] Exportă PNG prin cameră → imaginea are formatul și rezoluția camerei
+- [ ] Move pe o cameră selectată: punctele ei (poziția, ținta) se prind; Rotate o rotește în jurul ei; Scale schimbă
+      mărimea gizmo-ului (sau scara, la ortografic); pe un panou luminos, laturile
+- [ ] Depth of field pornit, f/1.4, „Alege punctul de focus” + click pe un obiect → el e clar, restul estompat
+      (doar prin cameră și la export)
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

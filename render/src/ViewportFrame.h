@@ -114,6 +114,14 @@ struct ViewportFrame {
     int shadowSpot = -1;
     // Planul de secțiune activ (n, d cu n·x = d); geometria de partea normalei se ascunde.
     std::optional<glm::dvec4> section;
+    // Depth of field (doar prin cameră și la export): lentila camerei.
+    struct DepthOfField {
+        bool enabled = false;
+        float focus = 5000.0f; // mm
+        float focal = 35.0f; // mm
+        float fStop = 2.8f;
+        float pixelsPerMm = 50.0f; // pixeli fizici pe mm de senzor (latura lungă a cadrului)
+    } dof;
 };
 
 } // namespace aion::render

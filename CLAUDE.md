@@ -203,7 +203,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `displaySize`; `model/CameraLens.h` (`cameraFov`, `frameInViewport`, `lookThrough`, `circleOfConfusion`, presetări).
   Vederea prin cameră: `Viewport::lookThrough` (id; zbor, cadru `lookFrame`, `lookLabel`, `lockCameraToView`,
   `previewLookAspect`), suprapunerea `shell/CameraFrame.qml`; `Document::setCameraProperties` / `cameraInfo`. Acțiuni:
-  `camera.look`, `look:lock`, `debug.look`, `object:focalLength=50,shiftY=0.1`.
+  `camera.look`, `look:lock`, `look:focus` (următorul click alege focusul), `debug.look`,
+  `object:focalLength=50,shiftY=0.1,dofEnabled=1`. Move / Rotate / Scale pe camere și lumini (`ToolContext::object`);
+  depth of field în `shaders/dof.frag` (ADR 0035). În rulările automate fereastra randează rar: zborurile durează mai
+  mult decât 0,7 s — exportul (`png:`) îl termină singur.
 - **Scurtături personalizabile**: `preferences.customShortcuts` (JSON id comandă → secvență, "" = fără),
   `window.setShortcut` / `resetShortcuts` în Main.qml; `commands` le aplică (păstrează `defaultShortcut`), iar
   `Toolbar.keyFor(tool)` le arată la unelte. Câmpul: `components/ShortcutRecorder.qml`.

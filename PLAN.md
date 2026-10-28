@@ -685,7 +685,7 @@ Planul detaliat (funcțiile de pe piață, designul, pașii, deciziile de confir
 - [x] Pasul 5 — UX: selecție multiplă, zoom / scroll, snap, copiere / lipire, Auto-key
 - [x] Pasul 6 — documentație, capturi, CI
 - [ ] Camera (secțiunea 9 din plan): [x] C1 date noi · [x] C2 vederea prin cameră cu cadrul și zborul · [x] C3 formatul ·
-      [x] C4 „blochează camera pe vedere” · [x] C5 Move / Rotate / Scale + snap pe camere și lumini · [ ] C6 depth of field
+      [x] C4 „blochează camera pe vedere” · [x] C5 Move / Rotate / Scale + snap pe camere și lumini · [x] C6 depth of field
 - [x] Rotația cu pivotul mutat (secțiunea 10 din plan): reproducere, Rotate / Scale din pivot (axele globale: doar la cerere)
 
 ---

@@ -444,6 +444,100 @@ void ViewportRenderer::ensureSsaoTargets(QSize size)
     m_ssaoPipeline->create();
 }
 
+namespace {
+
+// Trebuie să corespundă cu blocul Dof din shaders/dof.frag.
+struct DofUniforms {
+    float lens[4]; // focus (mm), focala (mm), f/N, pixeli pe mm de senzor
+    float pass[4]; // direcția, raza maximă (px)
+    float size[4]; // mărimea țintei
+};
+
+} // namespace
+
+void ViewportRenderer::ensureDofTargets(QSize size)
+{
+    const QVector<quint32> format = renderTarget()->renderPassDescriptor()->serializedFormat();
+    const bool same = m_dofSceneTarget && size == m_dofSize && m_dofSamples == m_sampleCount && m_dofPassFormat == format;
+    if (!same) {
+        m_dofSize = size;
+        m_dofSamples = m_sampleCount;
+        m_dofPassFormat = format;
+        // Scena: aceeași mărime, același număr de eșantioane și același format ca ținta item-ului.
+        m_dofScene.reset(m_rhi->newTexture(QRhiTexture::RGBA8, size, 1, QRhiTexture::RenderTarget));
+        m_dofScene->create();
+        QRhiColorAttachment color;
+        if (m_sampleCount > 1) {
+            m_dofSceneMsaa.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::Color, size, m_sampleCount, {}, QRhiTexture::RGBA8));
+            m_dofSceneMsaa->create();
+            color.setRenderBuffer(m_dofSceneMsaa.get());
+            color.setResolveTexture(m_dofScene.get());
+        } else {
+            m_dofSceneMsaa.reset();
+            color.setTexture(m_dofScene.get());
+        }
+        m_dofSceneDepth.reset(m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size, m_sampleCount));
+        m_dofSceneDepth->create();
+        QRhiTextureRenderTargetDescription desc { color };
+        desc.setDepthStencilBuffer(m_dofSceneDepth.get());
+        m_dofSceneTarget.reset(m_rhi->newTextureRenderTarget(desc));
+        m_dofScenePass.reset(m_dofSceneTarget->newCompatibleRenderPassDescriptor());
+        m_dofSceneTarget->setRenderPassDescriptor(m_dofScenePass.get());
+        m_dofSceneTarget->create();
+        // Toate pipeline-urile trecerii principale trebuie să meargă și pe această țintă.
+        m_dofCompatible = m_dofScenePass->isCompatible(renderTarget()->renderPassDescriptor());
+        if (!m_dofCompatible) {
+            qWarning("Depth of field: ținta scenei nu e compatibilă cu a viewport-ului; DoF rămâne oprit.");
+        }
+
+        m_dofBlur.reset(m_rhi->newTexture(QRhiTexture::RGBA8, size, 1, QRhiTexture::RenderTarget));
+        m_dofBlur->create();
+        m_dofBlurTarget.reset(m_rhi->newTextureRenderTarget({ QRhiColorAttachment(m_dofBlur.get()) }));
+        m_dofBlurPass.reset(m_dofBlurTarget->newCompatibleRenderPassDescriptor());
+        m_dofBlurTarget->setRenderPassDescriptor(m_dofBlurPass.get());
+        m_dofBlurTarget->create();
+        m_dofGbuffer = nullptr; // legăturile se refac mai jos
+    }
+    if (!m_dofUniformsH) {
+        m_dofUniformsH.reset(m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, sizeof(DofUniforms)));
+        m_dofUniformsH->create();
+        m_dofUniformsV.reset(m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, sizeof(DofUniforms)));
+        m_dofUniformsV->create();
+    }
+    if (m_dofGbuffer == m_gbufferTexture.get() && m_dofPipelineH) {
+        return;
+    }
+    m_dofGbuffer = m_gbufferTexture.get();
+    const auto bindings = [&](QRhiBuffer* uniforms, QRhiTexture* color) {
+        std::unique_ptr<QRhiShaderResourceBindings> b(m_rhi->newShaderResourceBindings());
+        b->setBindings({
+            QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::FragmentStage, uniforms),
+            QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, color, m_linearClampSampler.get()),
+            QRhiShaderResourceBinding::sampledTexture(
+                2, QRhiShaderResourceBinding::FragmentStage, m_gbufferTexture.get(), m_shadowSampler.get()),
+        });
+        b->create();
+        return b;
+    };
+    m_dofBindingsH = bindings(m_dofUniformsH.get(), m_dofScene.get());
+    m_dofBindingsV = bindings(m_dofUniformsV.get(), m_dofBlur.get());
+    const auto pipeline = [&](QRhiShaderResourceBindings* b, QRhiRenderPassDescriptor* pass, int samples) {
+        std::unique_ptr<QRhiGraphicsPipeline> p(m_rhi->newGraphicsPipeline());
+        p->setShaderStages({
+            { QRhiShaderStage::Vertex, loadShader(QStringLiteral("fullscreen.vert")) },
+            { QRhiShaderStage::Fragment, loadShader(QStringLiteral("dof.frag")) },
+        });
+        p->setVertexInputLayout({});
+        p->setShaderResourceBindings(b);
+        p->setRenderPassDescriptor(pass);
+        p->setSampleCount(samples);
+        p->create();
+        return p;
+    };
+    m_dofPipelineH = pipeline(m_dofBindingsH.get(), m_dofBlurPass.get(), 1);
+    m_dofPipelineV = pipeline(m_dofBindingsV.get(), renderTarget()->renderPassDescriptor(), m_sampleCount);
+}
+
 void ViewportRenderer::releaseMaskTarget()
 {
     m_outlinePipeline.reset();
@@ -721,11 +815,16 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
 
     const QSize size = renderTarget()->pixelSize();
-    // SSAO: normala și adâncimea fiecărui pixel, apoi umbrirea (citită în mesh.frag).
-    if (m_frame.ambientOcclusion && m_ssaoSupported) {
+    // SSAO: normala și adâncimea fiecărui pixel, apoi umbrirea (citită în mesh.frag). Adâncimea servește și la DoF.
+    if ((m_frame.ambientOcclusion || dofWanted()) && m_ssaoSupported) {
         ensureSsaoTargets(size);
     }
-    if (ssaoActive() && m_mesh && m_meshVertexCount > 0) {
+    bool dof = false;
+    if (dofWanted() && m_ssaoSize.isValid()) {
+        ensureDofTargets(size);
+        dof = m_dofCompatible;
+    }
+    if ((ssaoActive() || dof) && m_mesh && m_meshVertexCount > 0) {
         cb->beginPass(m_gbufferTarget.get(), QColor::fromRgbF(0, 0, 0, 0), { 1.0f, 0 }, batch);
         batch = nullptr;
         cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
@@ -736,12 +835,14 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         cb->draw(m_meshVertexCount);
         cb->endPass();
 
-        cb->beginPass(m_ssaoTarget.get(), Qt::white, { 1.0f, 0 });
-        cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
-        cb->setGraphicsPipeline(m_ssaoPipeline.get());
-        cb->setShaderResources();
-        cb->draw(3);
-        cb->endPass();
+        if (ssaoActive()) {
+            cb->beginPass(m_ssaoTarget.get(), Qt::white, { 1.0f, 0 });
+            cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
+            cb->setGraphicsPipeline(m_ssaoPipeline.get());
+            cb->setShaderResources();
+            cb->draw(3);
+            cb->endPass();
+        }
     }
 
     const bool outline = m_frame.hasSelectedFaces && m_mesh && m_meshVertexCount > 0;
@@ -778,7 +879,8 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
         }
     }
 
-    cb->beginPass(renderTarget(), Qt::black, { 1.0f, 0 }, batch);
+    // Cu DoF, scena merge în ținta proprie (estompată mai jos); altfel direct în a item-ului.
+    cb->beginPass(dof ? static_cast<QRhiRenderTarget*>(m_dofSceneTarget.get()) : renderTarget(), Qt::black, { 1.0f, 0 }, batch);
     cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
 
     cb->setGraphicsPipeline(m_backgroundPipeline.get());
@@ -864,6 +966,31 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
     }
 
     cb->endPass();
+
+    if (dof) {
+        QRhiResourceUpdateBatch* u = m_rhi->nextResourceUpdateBatch();
+        const auto& d = m_frame.dof;
+        const float maxRadius = 16.0f;
+        DofUniforms h { { d.focus, d.focal, d.fStop, d.pixelsPerMm }, { 1.0f, 0.0f, maxRadius, 0.0f },
+            { float(size.width()), float(size.height()), 0.0f, 0.0f } };
+        DofUniforms v = h;
+        v.pass[0] = 0.0f;
+        v.pass[1] = 1.0f;
+        u->updateDynamicBuffer(m_dofUniformsH.get(), 0, sizeof(DofUniforms), &h);
+        u->updateDynamicBuffer(m_dofUniformsV.get(), 0, sizeof(DofUniforms), &v);
+        cb->beginPass(m_dofBlurTarget.get(), Qt::black, { 1.0f, 0 }, u);
+        cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
+        cb->setGraphicsPipeline(m_dofPipelineH.get());
+        cb->setShaderResources(m_dofBindingsH.get());
+        cb->draw(3);
+        cb->endPass();
+        cb->beginPass(renderTarget(), Qt::black, { 1.0f, 0 });
+        cb->setViewport({ 0, 0, float(size.width()), float(size.height()) });
+        cb->setGraphicsPipeline(m_dofPipelineV.get());
+        cb->setShaderResources(m_dofBindingsV.get());
+        cb->draw(3);
+        cb->endPass();
+    }
 }
 
 } // namespace aion::render

@@ -259,6 +259,10 @@ void Viewport::showTransientCursor(const QCursor& cursor)
 
 void Viewport::updateCursor()
 {
+    if (m_pickingFocus) { // „Alege punctul de focus”: următorul click
+        setCursor(Qt::CrossCursor);
+        return;
+    }
     switch (m_drag) {
     case Drag::Orbit:
         setCursor(m_orbitCursor);
@@ -1584,6 +1588,11 @@ QImage Viewport::renderImage()
             hidden.append(child);
         }
     }
+    // Un zbor spre cameră încă în curs se termină: exportul arată vederea camerei.
+    if (m_lensFlight && m_lookCamera > 0.0) {
+        m_lensFlight.reset();
+        applyLookThrough();
+    }
     // Prin cameră: cadrul umple viewport-ul pe o latură (marginea 1) și se decupează la format.
     QRectF captureRect = boundingRect();
     QSize cameraFormat;
@@ -1898,6 +1907,16 @@ ViewportFrame Viewport::frameForRendering() const
         f.envReflection = 0.0f;
     }
     f.ambientOcclusion = m_ambientOcclusion;
+    // Depth of field: doar prin cameră (și deci la exportul prin ea), după zbor; o cameră ortografică n-are focus.
+    if (const model::CameraObject* c = lookedCamera(); c != nullptr && !m_lensFlight && c->dof.enabled && !c->orthographic) {
+        const QRectF frame = lookFrame();
+        const double dpr = window() != nullptr ? window()->effectiveDevicePixelRatio() : 1.0;
+        f.dof.enabled = true;
+        f.dof.focus = static_cast<float>(c->dof.focusDistance);
+        f.dof.focal = static_cast<float>(c->focalLength);
+        f.dof.fStop = static_cast<float>(c->dof.fStop);
+        f.dof.pixelsPerMm = static_cast<float>(std::max(frame.width(), frame.height()) * dpr / std::max(c->sensorWidth, 1.0));
+    }
     const auto [sunDir, sunIntensity] = sunPosition(m_sunHour, m_sunMonth, m_latitude);
     f.sunDirection = m_shadows ? sunDir : glm::normalize(glm::dvec3(-0.4, -0.6, 0.7));
     f.sunIntensity = (m_shadows ? sunIntensity : 1.0) * (m_environment == QLatin1String("innorat") ? 0.35 : 1.0);
@@ -2141,6 +2160,21 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         return;
     }
     stopScenes(); // ca în SketchUp: orice click oprește animația
+    // „Alege punctul de focus” (depth of field): distanța de la cameră la punctul de sub cursor, pe direcția privirii.
+    if (m_pickingFocus && event->button() == Qt::LeftButton && m_document) {
+        const model::CameraId id = m_lookCamera > 0.0 ? model::CameraId { static_cast<std::uint64_t>(m_lookCamera) }
+                                                      : m_document->selectedCamera();
+        const model::CameraObject* c = m_document->model().cameras().find(id);
+        const auto point = m_document->surfacePoint(m_camera, toVec2(event->position()));
+        if (c != nullptr && point) {
+            const math::Vec3d axis = glm::normalize(c->target - c->position);
+            const double distance = std::max(glm::dot(*point - c->position, axis), 1.0);
+            m_document->setCameraProperties(static_cast<double>(id.value), { { QStringLiteral("focusDistance"), distance } });
+        }
+        setPickingFocus(false);
+        event->accept();
+        return;
+    }
     // Tastele (Measurements box, săgețile) ajung la viewport după un click în el.
     forceActiveFocus(Qt::MouseFocusReason);
     const auto mods = event->modifiers();

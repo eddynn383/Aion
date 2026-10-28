@@ -554,9 +554,12 @@ Window {
                     const ci = viewport.lookThrough > 0 ? doc.cameraInfo(viewport.lookThrough) : doc.selectedObject
                     console.info("look:", viewport.lookThrough, "frame", JSON.stringify(viewport.lookFrame), "lock", viewport.lockCameraToView,
                                  "camera", JSON.stringify(ci.position), JSON.stringify(ci.target), ci.formatWidth + "x" + ci.formatHeight,
+                                 "focus", Math.round(ci.focusDistance ?? 0),
                                  "undo:", doc.undoName)
                 } else if (action === "look:lock") {
                     viewport.lockCameraToView = !viewport.lockCameraToView
+                } else if (action === "look:focus") {
+                    viewport.pickingFocus = true // următorul click alege distanța de focus
                 } else if (action === "debug.pivot") {
                     console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode, "selected", doc.pivotSelected,
                                  "at", JSON.stringify(doc.pivotPosition))

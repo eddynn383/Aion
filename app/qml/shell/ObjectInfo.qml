@@ -313,7 +313,7 @@ Column {
             width: parent.width
             spacing: Theme.space1
             NumberField {
-                width: (parent.width - Theme.space1) / 2
+                width: (parent.width - Theme.space1) * 0.62
                 label: "Focus"
                 unit: "mm"
                 from: 1
@@ -322,7 +322,7 @@ Column {
                 onValueModified: (v) => root.set({ focusDistance: v })
             }
             NumberField {
-                width: (parent.width - Theme.space1) / 2
+                width: (parent.width - Theme.space1) * 0.38
                 label: "f/"
                 decimals: 1
                 step: 0.1
