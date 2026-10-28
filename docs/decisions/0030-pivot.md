@@ -39,3 +39,10 @@
 - **Scale**: punctul fix rămâne mânerul opus; cu **Option**, pivotul selecției (implicit centrul cutiei, deci
   neschimbat pentru un pivot nemutat).
 - Test: „Unelte: Rotate și Scale pornesc din pivotul selecției” (`tests/core/ToolTests.cpp`).
+
+## Completare (2026-10-28): pivotul în Animare
+
+- Bug raportat: pivotul își schimba poziția la trecerea între moduri. Cauze: marcajul tras în Animare se raporta la
+  transformarea de bază (nu la poza de la timpul curent), iar un pivot nou muta obiectele animate (cheile de poziție
+  țin poziția pivotului). Acum `Document::shownTransform` dă poza (fără copia modelului, merge și în timpul tragerii),
+  iar `model::setPivot` recalculează cheile de poziție ale animațiilor (ADR 0034).

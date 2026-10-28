@@ -86,6 +86,9 @@ struct Decomposed {
 // Pivotul instanței în coordonatele definiției (cel ales sau centrul cutiei) și în coordonatele părintelui.
 [[nodiscard]] math::Vec3d pivotLocal(const Model& model, InstanceId instance);
 [[nodiscard]] math::Vec3d pivotPoint(const Model& model, InstanceId instance);
+// Pivotul nou al instanței (coordonatele definiției). Obiectul nu se mișcă, nici în animații: cheile de poziție ale
+// animațiilor (poziția pivotului) se recalculează.
+void setPivot(Model& model, InstanceId instance, const math::Vec3d& local);
 
 // Biții din Instance::placementLocks.
 enum PlacementLock : std::uint16_t {
