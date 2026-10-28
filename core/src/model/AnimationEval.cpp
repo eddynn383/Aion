@@ -436,6 +436,30 @@ std::vector<Property> keyTransform(Animation& animation, InstanceId instance, do
     return written;
 }
 
+math::Transform adjustWithoutKeys(Animation& animation, InstanceId instance, const TransformValues& before,
+    const TransformValues& after, const math::Transform& base, const math::Vec3d& pivot)
+{
+    TransformValues target = after;
+    target.rotation = nearestEuler(after.rotation, before.rotation);
+    TransformValues baseValues = transformValues(base, pivot);
+    ObjectTrack* track = findTrack(animation, instance);
+    for (int i = 0; i < 9; ++i) {
+        const auto p = static_cast<Property>(i);
+        const double delta = target.get(p) - before.get(p);
+        if (std::abs(delta) <= valueTolerance(p)) {
+            continue;
+        }
+        if (Channel* c = track != nullptr ? findChannel(*track, p) : nullptr) {
+            for (Key& k : c->keys) {
+                k.value += delta;
+            }
+        } else {
+            baseValues.set(p, baseValues.get(p) + delta);
+        }
+    }
+    return composeTransform(baseValues, pivot);
+}
+
 std::vector<KeyRef> expandKeys(const Animation& animation, std::span<const KeyRef> refs)
 {
     const double tol = tolerance(animation);

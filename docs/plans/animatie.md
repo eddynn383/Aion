@@ -210,10 +210,15 @@ valoare), săgețile rămân ale ei (blocarea pe axe); altfel merg la timeline. 
 - Verificare: `anim:savecurve,Ușa mea,0.8,0,0.2,1`, `anim:curve,1` (editorul pentru rândul 1), `anim:curves`.
 
 ### Pasul 5 — UX-ul timeline-ului ✅ criteriu: selecție multiplă, zoom, snap, copiere / lipire
-- [ ] Selecție multiplă (⇧ / ⌘, dreptunghi), tragere în grup cu snap (cadre, alte chei), ⌫, ⌘C / ⌘V, meniul contextual.
-- [ ] Zoom (⌘ + rotiță), scroll, bara de jos, „încadrează tot”, rigla adaptivă.
-- [ ] Timpul `mm:ss.cc · cadru`, editabil; playhead tras pe riglă.
-- [ ] Comutatorul Auto-key.
+- [x] Selecție multiplă (⇧ / ⌘, dreptunghi), tragere în grup cu snap (cadre, playhead, alte chei; ⇧ fără snap), ⌫,
+      ⌘C / ⌘V (`anim.copyKeys` / `anim.pasteKeys`, `Document::copyKeys` / `pasteKeys`: pe alt obiect selectat dacă
+      cheile sunt ale unui singur obiect), meniul contextual (curba, easing-uri, copiază, lipește, mergi, șterge).
+- [x] Zoom (⌘ + rotiță), scroll (rotița; ⇧ = timpul), bara de jos (mijlocul derulează, capetele fac zoom),
+      ⤢ „încadrează tot” (`anim.fit`), rigla adaptivă (cadre, zecimi, secunde, minute).
+- [x] Timpul `mm:ss.cc · cadru`, editabil (click: „1.5”, „36f”, „00:02.50”); playhead tras pe riglă.
+- [x] Comutatorul Auto-key (`Document::autoKey`, `anim.autoKey`): oprit, schimbările ajustează poza de bază, iar
+      proprietățile animate își mută toate cheile (`model::adjustWithoutKeys`, cu test). Meniul nativ „Animare”.
+- Antetul urmează schița: „◆ Keyframe ▾” (▾ = culoare, cameră), pe timeline-uri înguste doar iconițe.
 
 ### Pasul 6 — Documentație și verificare ✅ criteriu: CI verde, QA bifat
 - [ ] ADR (canale + easing Bézier + tastatura), `CLAUDE.md`, `docs/qa-checklist.md` (secțiunea „Animare”), `PLAN.md`.

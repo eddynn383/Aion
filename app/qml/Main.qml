@@ -78,6 +78,10 @@ Window {
             { id: "anim.end", title: "La sfârșitul animației", category: "Animare", shortcut: "End", icon: "skip-back" },
             { id: "anim.key", title: "Keyframe pe selecție (toate canalele)", category: "Animare", shortcut: "K", icon: "diamond" },
             { id: "anim.deleteKeys", title: "Șterge keyframe-urile selectate", category: "Animare", shortcut: "Delete", icon: "trash-2" },
+            { id: "anim.copyKeys", title: "Copiază keyframe-urile selectate", category: "Animare", shortcut: "Ctrl+C", icon: "copy" },
+            { id: "anim.pasteKeys", title: "Lipește keyframe-urile la playhead", category: "Animare", shortcut: "Ctrl+V", icon: "copy" },
+            { id: "anim.autoKey", title: doc.autoKey ? "Oprește Auto-key" : "Pornește Auto-key", category: "Animare", shortcut: "", icon: "circle" },
+            { id: "anim.fit", title: "Încadrează toată animația în timeline", category: "Animare", shortcut: "", icon: "scan" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
@@ -295,6 +299,10 @@ Window {
         case "anim.end": doc.jumpToEdge(true); break
         case "anim.key": doc.keySelection(); break
         case "anim.deleteKeys": timeline.deleteSelectedKeys(); break
+        case "anim.copyKeys": timeline.copySelectedKeys(); break
+        case "anim.pasteKeys": timeline.pasteKeys(); break
+        case "anim.autoKey": doc.autoKey = !doc.autoKey; break
+        case "anim.fit": timeline.fitAll(); break
         case "mode.model": window.setWorkMode(0); break
         case "mode.animate": window.setWorkMode(1); break
         case "mode.interact": window.setWorkMode(2); break

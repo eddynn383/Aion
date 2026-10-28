@@ -129,6 +129,13 @@ Platform.MenuBar {
     }
     CommandMenu {
         bar: root
+        title: "Animare"
+        commandIds: ["anim.play", "anim.prevFrame", "anim.nextFrame", "anim.prevKey", "anim.nextKey", "anim.start", "anim.end", "-",
+                     "anim.key", "anim.copyKeys", "anim.pasteKeys", "anim.deleteKeys", "-", "anim.autoKey", "anim.fit",
+                     "file.exportVideo"]
+    }
+    CommandMenu {
+        bar: root
         title: "Organizare"
         commandIds: ["org.makeGroup", "org.group", "org.duplicateLinked", "org.explode", "org.makeUnique", "-",
                      "org.enter", "org.exit", "-", "org.hide", "org.unhideAll", "org.lock", "org.unlock", "-",

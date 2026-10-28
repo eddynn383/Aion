@@ -387,3 +387,28 @@ TEST_CASE("Animații: easing-ul implicit al animației pentru cheile noi", "[cor
     REQUIRE(loaded.model);
     CHECK(loaded.model->animations().values().front().defaultEasing.name == "easeOut");
 }
+
+TEST_CASE("Animații: cu auto-key oprit, o mutare schimbă poza de bază sau mută tot canalul", "[core][model][animation]")
+{
+    using model::Property;
+    Animation a;
+    const model::InstanceId car { 7 };
+    const Vec3d pivot { 0, 0, 0 };
+    // X e animat (0 → 1000), Y nu.
+    model::setChannelKey(a, car, Property::PositionX, 0.0, 0.0);
+    model::setChannelKey(a, car, Property::PositionX, 2.0, 1000.0);
+    const Transform base = Transform::translation({ 0, 200, 0 });
+    const model::ObjectTrack& track = *model::findTrack(a, car);
+    const model::TransformValues before = model::evaluateValues(track, 1.0, model::transformValues(base, pivot));
+    // La 1 s, obiectul e mutat cu 300 pe X și 50 pe Y.
+    model::TransformValues after = before;
+    after.position += Vec3d { 300, 50, 0 };
+    const Transform newBase = model::adjustWithoutKeys(a, car, before, after, base, pivot);
+    // Y (neanimat) intră în poza de bază; X (animat) își mută toate cheile cu 300.
+    CHECK(newBase.applyToPoint(pivot).y == Approx(250.0));
+    CHECK(newBase.applyToPoint(pivot).x == Approx(0.0));
+    const model::Channel& x = *model::findChannel(*model::findTrack(a, car), Property::PositionX);
+    CHECK(x.keys[0].value == Approx(300.0));
+    CHECK(x.keys[1].value == Approx(1300.0));
+    CHECK(model::findChannel(*model::findTrack(a, car), Property::PositionY) == nullptr); // nicio cheie nouă
+}
