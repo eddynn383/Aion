@@ -152,8 +152,51 @@ Column {
         }
     }
 
-    // Transformarea: poziția colțului, dimensiunile, rotația (Euler XYZ) și scara, câte trei valori. Fiecare are un
-    // lacăt (blochează valoarea, inclusiv pentru Move / Rotate / Scale) și, cu timeline-ul deschis, un keyframe la hover.
+    // Pivotul selectat (click pe marcajul lui în viewport): coordonatele lui, ca Poziția; o valoare nouă mută doar
+    // pivotul, obiectul rămâne pe loc. Esc sau un click în altă parte îl deselectează.
+    PropertyGroup {
+        id: pivotBox
+        readonly property var at: root.document ? root.document.pivotPosition : []
+        visible: root.document && root.document.pivotSelected && at.length === 3 && root.workMode !== 2
+        title: "Pivot selectat (mm)"
+        actions: IconButton {
+            width: 20; height: 20; iconSize: 13
+            iconName: "x"
+            tooltip: "Deselectează pivotul (Esc)"
+            onClicked: root.document.pivotSelected = false
+        }
+        Row {
+            spacing: Theme.space1
+            Repeater {
+                model: ["x", "y", "z"]
+                delegate: NumberField {
+                    required property string modelData
+                    required property int index
+                    width: (pivotBox.width - Theme.space1 * 2) / 3
+                    compact: true
+                    label: modelData.toUpperCase()
+                    step: 10
+                    value: pivotBox.at.length === 3 ? pivotBox.at[index] : 0
+                    onValueModified: (v) => {
+                        const c = {}
+                        c[modelData] = v
+                        root.document.setPivotPosition(c)
+                    }
+                }
+            }
+        }
+        Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Coordonatele pivotului (ca Poziția obiectului). O valoare nouă mută doar pivotul; obiectul rămâne pe loc."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
+    // Transformarea: poziția (a pivotului, ca în timeline), dimensiunile, rotația (Euler XYZ) și scara, câte trei
+    // valori. Fiecare are un lacăt (blochează valoarea, inclusiv pentru Move / Rotate / Scale) și, cu timeline-ul
+    // deschis, un keyframe la hover.
     Column {
         id: transformBox
         visible: root.isInstance && root.workMode !== 2
@@ -255,7 +298,7 @@ Column {
         }
 
         PropertyGroup {
-        title: "Poziție (mm)"
+        title: "Poziție (mm) · a pivotului"
         Row {
             spacing: Theme.space1
             PlacementField { label: "X"; lockBit: 0; value: transformBox.p.px ?? 0; onValueModified: (v) => root.document.setPlacement({ px: v }) }
@@ -320,8 +363,7 @@ Column {
 
         // Pivotul: punctul fix la rotire și scalare, ca distanță de la colțul minim (pe axele obiectului).
         PropertyGroup {
-            visible: root.modeling
-            title: "Pivot (mm)"
+            title: "Pivot (mm, de la colțul minim)"
             Row {
                 spacing: Theme.space1
                 NumberField { width: transformBox.third; compact: true; label: "X"; step: 10; value: transformBox.p.vx ?? 0; onValueModified: (v) => root.document.setPlacement({ vx: v }) }
@@ -405,7 +447,7 @@ Column {
         width: parent.width
         spacing: Theme.space4
         PropertyGroup {
-        title: "Poziție (mm)"
+        title: "Poziție (mm) · a pivotului"
         Row {
             spacing: Theme.space1
             NumberField { width: geometryBox.third; compact: true; label: "X"; step: 10; value: geometryBox.g ? geometryBox.g.px : 0; onValueModified: (v) => root.document.setGeometryPlacement({ px: v }) }

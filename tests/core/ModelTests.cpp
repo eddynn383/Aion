@@ -295,8 +295,9 @@ TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni ed
     }
     const model::InstanceId id = model::makeGroup(m, m.root(), all, false, "Placă");
 
+    // Poziția e a pivotului (implicit centrul cutiei), ca în timeline.
     model::Placement p = model::placementOf(m, id);
-    CHECK(glm::length(p.position - math::Vec3d { 100, 200, 0 }) < 1e-6);
+    CHECK(glm::length(p.position - math::Vec3d { 400, 400, 0 }) < 1e-6);
     CHECK(p.rotation.z == Catch::Approx(0.0).margin(1e-9));
     CHECK(glm::length(p.size - math::Vec3d { 600, 400, 0 }) < 1e-6);
 
@@ -311,9 +312,9 @@ TEST_CASE("Plasarea unei instanțe: poziție, rotație, scară și dimensiuni ed
     CHECK(q.size.x == Catch::Approx(600.0));
     CHECK(q.size.y == Catch::Approx(800.0));
     CHECK(q.scale.y == Catch::Approx(2.0));
-    // Colțul opus: rotit spre +Y (X local → Y global), apoi Y local (dublat) → −X global.
+    // Colțul (700, 200) față de pivot (400, 400): (300, −200), Y dublat → (300, −400), rotit 90° → (400, 300).
     const auto [lo, hi] = model::bounds(m, m.instance(id).definition);
-    CHECK(glm::length(m.instance(id).transform.applyToPoint({ hi.x, lo.y, lo.z }) - math::Vec3d { 1000, 1600, 50 }) < 1e-6);
+    CHECK(glm::length(m.instance(id).transform.applyToPoint({ hi.x, lo.y, lo.z }) - math::Vec3d { 1400, 1300, 50 }) < 1e-6);
     CHECK(m.validate().ok());
 
     // Rotații pe toate axele (Euler XYZ): se citesc înapoi la fel; pivotul (centrul) și dimensiunile rămân.
@@ -499,7 +500,7 @@ TEST_CASE("Pivot: implicit în centru, rotația și scara îl țin pe loc, se po
     // Pivotul în colț (0, 0, 0 față de colț): obiectul nu se mișcă, iar scara pornește de acolo.
     const math::Transform before = m.instance(id).transform;
     p = model::placementOf(m, id);
-    const math::Vec3d corner = p.position;
+    const math::Vec3d corner = before.applyToPoint(model::bounds(m, m.instance(id).definition).first);
     p.pivot = math::Vec3d { 0.0 };
     model::setPlacement(m, id, p);
     CHECK(m.instance(id).transform == before);
@@ -511,7 +512,7 @@ TEST_CASE("Pivot: implicit în centru, rotația și scara îl țin pe loc, se po
     CHECK(glm::length(model::placementOf(m, id).position - corner) < 1e-6);
     CHECK(model::placementOf(m, id).size.z == Catch::Approx(100.0));
 
-    // O mutare duce colțul în poziția cerută (pivotul vine cu obiectul).
+    // O mutare duce pivotul (aici colțul) în poziția cerută.
     p = model::placementOf(m, id);
     p.position = { 1000, 0, 0 };
     model::setPlacement(m, id, p);

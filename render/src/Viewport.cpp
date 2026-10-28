@@ -897,6 +897,10 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         f.topLines.push_back({ pf, glm::vec3(p + glm::dvec3(len, 0, 0)), toVec4(m_axisX), { 2.0f, 0.0f } });
         f.topLines.push_back({ pf, glm::vec3(p + glm::dvec3(0, len, 0)), toVec4(m_axisY), { 2.0f, 0.0f } });
         f.topLines.push_back({ pf, glm::vec3(p + glm::dvec3(0, 0, len)), toVec4(m_axisZ), { 2.0f, 0.0f } });
+        // Selectat (click pe el): un inel mai mare, ca să se vadă că Inspector-ul îi arată coordonatele.
+        if (doc.pivotSelected()) {
+            f.topPoints.push_back({ pf, toVec4(m_accent), 17.0f });
+        }
         f.topPoints.push_back({ pf, glm::vec4(1.0f), 11.0f });
         f.topPoints.push_back({ pf, toVec4(m_accent), 7.0f });
     }
@@ -1885,6 +1889,7 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         }
     }
     if (drag == Drag::None && event->button() == Qt::LeftButton && m_document && m_document->hasTool()) {
+        m_document->setPivotSelected(false); // un click în altă parte deselectează pivotul
         // Un click de editare iese din previzualizarea animației: uneltele lucrează pe model.
         m_document->endPreview();
         // Numărăm noi clicurile (dublu, triplu), ca să funcționeze la fel pe toate platformele.
@@ -2085,6 +2090,8 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
     if (m_pivotDrag && event->button() == Qt::LeftButton) {
         if (m_document) {
             m_document->endMacro(m_pivotDrag->moved);
+            // Un click (fără tragere) selectează pivotul: Inspector-ul îi arată coordonatele.
+            m_document->setPivotSelected(true);
         }
         m_pivotDrag.reset();
         event->accept();
