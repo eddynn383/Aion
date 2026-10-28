@@ -208,6 +208,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   auto-key pe o copie pozată), `shell/ModeSwitch.qml`; grupurile toolbar-ului au `modes`. Acțiuni de script:
   `mode:model|animate|interact`, `mode.interaction` (Interact ↔ Select). Comenzile noi trebuie să fie clasificate în
   `commandModes` dacă nu sunt comune; operațiile noi de model încep cu `require(Modeling)`.
+- **Tastatura în Animare**: comenzile `anim.*` (Space redare, ← → cadre, ⇧ 10 cadre, ⌥ chei, Home / End, K);
+  `window.shortcutOwners` dă fiecare tastă unei singure comenzi pe mod (cea a modului bate una comună; Select are și
+  V); săgețile rămân ale uneltei cât `Tool::ownsArrowKeys()`. Acțiunea `keys:,alt+right` simulează taste cu
+  modificatori (prin harta scurtăturilor); `debug.anim` afișează timpul și cheile.
 
 ## Următorii pași
 0. **În lucru (aprobat, început pe 2026-10-28): Animare, timeline, cameră, rotația față de pivot** —
