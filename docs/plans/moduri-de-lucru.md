@@ -1,6 +1,7 @@
 # Plan: toolbar nou și cele trei moduri de lucru (Modelare / Animare / Interacțiune)
 
-> Stare: **plan aprobat de utilizator pentru implementare** (2026-10-28). Poate fi continuat de oricine (alt cont,
+> Stare: **plan scris pe 2026-10-28; deciziile din secțiunea 5 așteaptă confirmarea utilizatorului** (dacă nu
+> răspunde altfel, se implementează cum sunt scrise). Poate fi continuat de oricine (alt cont,
 > altă sesiune) fără contextul conversației: citește întâi `CLAUDE.md`, apoi acest fișier, și bifează pașii aici
 > pe măsură ce îi termini (și în `PLAN.md`, secțiunea „Etapa 5”). Comunicarea cu utilizatorul: în română.
 
