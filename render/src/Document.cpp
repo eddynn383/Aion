@@ -1175,9 +1175,16 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
             std::get<0>(m_poseKey) = ~std::uint64_t { 0 }; // copia s-a schimbat: se reface
             // Un obiect ancorat pe o cale a animației: mutarea / rotirea devine decalajul lui față de cale.
             std::map<model::InstanceId, std::pair<model::MotionPathId, math::Transform>> onPath;
+            std::map<model::InstanceId, math::Vec3d> scaled; // Scale pe un obiect ancorat: doar scara lui
             for (auto it = moved.begin(); it != moved.end();) {
                 if (const auto path = model::pathOf(m_model, m_activeAnimation, it->first)) {
-                    onPath[it->first] = { *path, it->second };
+                    const math::Vec3d scaleBefore = model::decompose(posedBefore[it->first]).scale;
+                    const math::Vec3d scaleAfter = model::decompose(it->second).scale;
+                    if (glm::length(scaleAfter - scaleBefore) > 1e-9) {
+                        scaled[it->first] = scaleAfter;
+                    } else {
+                        onPath[it->first] = { *path, it->second };
+                    }
                     it = moved.erase(it);
                 } else {
                     ++it;
@@ -1193,6 +1200,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
                 });
                 m_keepPreview = false;
                 ++m_interactionRevision;
+            }
+            for (const auto& [id, scale] : scaled) {
+                keyAnchoredScale(id, scale);
             }
             if (!moved.empty()) {
                 keyTransforms(moved, "Keyframe");
@@ -1232,7 +1242,7 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (requests.penPath) {
         createMotionPath(*requests.penPath, requests.penNormal);
     }
-    if (requests.curveEdit && m_editPath && m_model.motionPaths().contains(m_editPath)) {
+    if (requests.curveEdit && m_editPath && m_workMode == Animation && m_model.motionPaths().contains(m_editPath)) {
         model::MotionPath p = m_model.motionPaths().at(m_editPath);
         p.curve = geom::transformed(*requests.curveEdit, p.transform.inverse() * contextTransform());
         const model::MotionPathId id = m_editPath;
@@ -1242,7 +1252,7 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         ++m_interactionRevision;
         emit timelineChanged();
     }
-    if (requests.curveEdit && m_editCurve) {
+    if (requests.curveEdit && m_editCurve && m_workMode == Modeling) {
         const geom::BezierPath path = *requests.curveEdit;
         bool replaced = false;
         runOnModel("Editează curba", [&](model::Model& model) { replaced = model::replacePenCurve(model, m_editCurve, path); });
@@ -1343,6 +1353,7 @@ void Document::dropStaleReferences()
 
 void Document::setPath(std::vector<model::InstanceId> path)
 {
+    finishCurveEdit(); // curba editată era în contextul vechi
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -2593,7 +2604,14 @@ model::Model& Document::pose() const
                     }
                 }
             }
-            model::applyPaths(*m_pose, m_model, m_activeAnimation, m_timelineTime);
+            static_cast<void>(pathPoseOf({})); // reface cache-ul pentru timpul curent
+            for (const auto& [id, transform] : m_pathPoses) {
+                if (m_pose->instances().contains(id)) {
+                    model::Instance inst = m_pose->instance(id);
+                    inst.transform = transform;
+                    m_pose->setInstance(id, inst);
+                }
+            }
         }
         m_poseKey = key;
     }
@@ -2643,7 +2661,7 @@ math::Transform Document::shownTransform(model::InstanceId instance) const
 {
     const model::Instance& inst = m_model.instance(instance);
     if (m_workMode == Animation) {
-        if (const auto onPath = model::pathTransformAt(m_model, m_activeAnimation, instance, m_timelineTime)) {
+        if (const math::Transform* onPath = pathPoseOf(instance)) {
             return *onPath;
         }
         if (const model::Animation* a = currentAnimation()) {
@@ -2681,6 +2699,7 @@ void Document::setWorkMode(int mode)
         m_tool->cancel(ctx);
     }
     cancelOperation();
+    finishCurveEdit(); // o curbă Pen se editează doar în Modelare, o cale doar în Animare
     if (mode != Interaction) {
         setInteractionMode(false);
     }
@@ -3236,8 +3255,8 @@ bool Document::advanceInteractions(double dt)
 std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
 {
     if (m_previewing && currentAnimation() != nullptr) {
-        if (auto onPath = model::pathTransformAt(m_model, m_activeAnimation, instance, m_timelineTime)) {
-            return onPath;
+        if (const math::Transform* onPath = pathPoseOf(instance)) {
+            return *onPath;
         }
     }
     if (m_previewing) {
@@ -3653,6 +3672,11 @@ void Document::setPlacement(const QVariantMap& placement)
                 local[i] += v[i] / std::max(std::abs(scale[i]), 1e-9);
             }
             runOnModel("Pivot", [&](model::Model& model) { model::setPivot(model, id, local); });
+            return;
+        }
+        // Pe o cale, poziția și rotirea vin de la ea: din Inspector se schimbă (și se cheie) doar scara.
+        if (model::pathOf(m_model, m_activeAnimation, id)) {
+            keyAnchoredScale(id, { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) });
             return;
         }
         p.position = { value("px", p.position.x), value("py", p.position.y), value("pz", p.position.z) };
@@ -5885,6 +5909,25 @@ void Document::setPathTiming(double pathId, double start, double duration)
     m_selectedPath = id;
     setPathProperties({ { QStringLiteral("start"), start }, { QStringLiteral("duration"), duration } });
     m_selectedPath = previous;
+}
+
+const math::Transform* Document::pathPoseOf(model::InstanceId instance) const
+{
+    const auto key = std::make_tuple(m_modelRevision, m_timelineTime, m_activeAnimation.value);
+    if (key != m_pathPosesKey) {
+        m_pathPoses = m_activeAnimation ? model::pathTransformsAt(m_model, m_activeAnimation, m_timelineTime)
+                                        : std::map<model::InstanceId, math::Transform> {};
+        m_pathPosesKey = key;
+    }
+    const auto it = m_pathPoses.find(instance);
+    return it == m_pathPoses.end() ? nullptr : &it->second;
+}
+
+void Document::keyAnchoredScale(model::InstanceId instance, const math::Vec3d& scale)
+{
+    model::TransformValues values = currentValues(instance);
+    values.scale = scale;
+    keyTransforms({ { instance, model::composeTransform(values, model::pivotLocal(m_model, instance)) } }, "Keyframe");
 }
 
 QString Document::pathsDebug() const

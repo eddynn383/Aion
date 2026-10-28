@@ -710,6 +710,13 @@ private:
     model::MotionPathId m_editPath; // sau calea editată
     model::MotionPathId m_selectedPath;
     QVariantMap pathInfo(model::MotionPathId id) const;
+    // Pozele obiectelor ancorate pe căile animației active, la timpul curent (refăcute la o schimbare a modelului sau
+    // a timpului): se citesc de mai multe ori pe cadru (randare, Inspector, unelte).
+    mutable std::map<model::InstanceId, math::Transform> m_pathPoses;
+    mutable std::tuple<std::uint64_t, double, std::uint64_t> m_pathPosesKey { ~std::uint64_t { 0 }, 0.0, 0 };
+    [[nodiscard]] const math::Transform* pathPoseOf(model::InstanceId instance) const;
+    // Un obiect ancorat: doar scara lui se cheie (poziția și rotirea vin de la cale).
+    void keyAnchoredScale(model::InstanceId instance, const math::Vec3d& scale);
     void setPathProperties(const QVariantMap& changes);
     void createMotionPath(const geom::BezierPath& curve, const math::Vec3d& normal);
     void finishCurveEdit();

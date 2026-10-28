@@ -259,7 +259,7 @@ Column {
         }
 
         PropertyGroup {
-            visible: transformBox.anchor !== null
+            visible: transformBox.anchor !== null && root.workMode === 1
             title: "Față de cale (mm, °)"
             Row {
                 spacing: Theme.space1
@@ -285,8 +285,9 @@ Column {
             }
         }
 
+        // În Modelare, un obiect de pe o cale își arată locul de la startul ei (o mutare rămâne relativă la cale).
         PropertyGroup {
-        visible: transformBox.anchor === null
+        visible: transformBox.anchor === null || root.workMode !== 1
         title: "Poziție (mm) · a pivotului"
         Row {
             spacing: Theme.space1
@@ -316,7 +317,7 @@ Column {
         }
 
         PropertyGroup {
-        visible: transformBox.anchor === null
+        visible: transformBox.anchor === null || root.workMode !== 1
         title: "Rotație (°)"
         Row {
             spacing: Theme.space1
