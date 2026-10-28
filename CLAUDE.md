@@ -182,7 +182,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 
 - **Pivot** (Faza 33, ADR 0030): `Instance::pivot`, `model::pivotLocal` / `pivotPoint`, `Placement::pivot`;
   `Document::selectionPivot` (marcajul din viewport), cheile `vx/vy/vz` și `pivot: center|base|corner` în
-  `setPlacement` / `setGeometryPlacement`. Acțiune de script: `placement:vx=0,vy=0,vz=0`.
+  `setPlacement` / `setGeometryPlacement`. Acțiune de script: `placement:vx=0,vy=0,vz=0`. Rotate pornește din
+  pivot (`ToolContext::pivot`; Option = alt centru), Scale cu Option ține pivotul fix.
 
 - **Move cu puncte de prindere**: `tools::Grip` în `Overlay::grips` (desenate în `Viewport::appendOverlay`),
   `instanceGrips` / `nearestGrip` în `TransformTools.cpp` (cutia orientată a obiectului, colțuri + mijloace).
@@ -209,8 +210,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `commandModes` dacă nu sunt comune; operațiile noi de model încep cu `require(Modeling)`.
 
 ## Următorii pași
-0. **Planificat (aprobat, implementare ulterioară): Animare, timeline, cameră, rotația față de pivot** —
-   `docs/plans/animatie.md` (și `PLAN.md` → Etapa 6). Începe doar când utilizatorul cere.
+0. **În lucru (aprobat, început pe 2026-10-28): Animare, timeline, cameră, rotația față de pivot** —
+   `docs/plans/animatie.md` (și `PLAN.md` → Etapa 6). Ordinea: secțiunea 10, pașii 1–6, camera C1–C6.
 1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic
    redistribuirea SDK-ului și folosirea lui într-o aplicație terță care replică SketchUp, fără aprobare scrisă.
    Alternativa propusă utilizatorului: import COLLADA (.dae), fără SDK. SDK-ul NU se pune în repo.

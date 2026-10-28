@@ -1,8 +1,8 @@
 # Plan: modul Animare, timeline-ul și camera — funcții noi
 
 > Stare: **plan aprobat de utilizator pe 2026-10-28** (cu deciziile implicite din secțiunea 6), **extins** în aceeași zi
-> cu camera (secțiunea 9) și rotația față de pivot (secțiunea 10). **Implementarea e lăsată pentru mai târziu**, la
-> cererea utilizatorului. Poate fi
+> cu camera (secțiunea 9) și rotația față de pivot (secțiunea 10). **Implementarea a început pe 2026-10-28** (ordinea:
+> secțiunea 10, pașii 1–6, camera C1–C6). Poate fi
 > continuat de oricine (alt cont, altă sesiune): citește `CLAUDE.md`, apoi acest fișier; bifează pașii aici și în
 > `PLAN.md` → „Etapa 6”. Comunicarea cu utilizatorul: în română. Planul precedent (modurile de lucru) e
 > `docs/plans/moduri-de-lucru.md`; acesta îl continuă pe partea de Animare.
@@ -348,6 +348,7 @@ folosește pivotul); ipotezele 2 și 3 rămân doar de verificat, nu de reparat.
 **Pași**:
 - [x] **P1** — Reproducere: Rotate din toolbar, cub fără rotație, pivotul în colț (confirmat de utilizator).
       De scris testul în `tests/core/ToolTests.cpp`: Rotate pe un obiect cu pivot în colț → colțul rămâne fix.
-- [ ] **P2** — Rotate / Scale pornesc din pivotul selecției; pivotul ca punct de snap; testele uneltelor
-      (`tests/core/ToolTests.cpp`).
+- [x] **P2** — Rotate / Scale pornesc din pivotul selecției; pivotul ca punct de snap; testele uneltelor
+      (`tests/core/ToolTests.cpp`). Făcut pe 2026-10-28 (`feature/rotate-pivot`, ADR 0030 → completare): Rotate
+      pornește din pivot (Option = alt centru, cu prindere de colțuri / mijloace / pivot), Scale cu Option ține pivotul.
 - [ ] **P3** — ~~Ipoteza 2~~ nu e cauza (Inspector-ul merge); de reluat doar dacă utilizatorul cere axe Global / Local.
