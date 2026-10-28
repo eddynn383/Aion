@@ -243,6 +243,37 @@ int nearestGrip(const ToolContext& ctx, const std::vector<Grip>& grips, Vec2d sc
     return best;
 }
 
+// Obiectul ale cărui puncte de prindere contează la cursor: cel de sub el sau, dacă nu e niciunul, cel cu un punct
+// cel mai aproape de cursor (un colț văzut din afară). Fără cele din `exclude`; gol = niciunul.
+model::InstanceId gripObjectNear(const ToolContext& ctx, Vec2d screen, const std::set<model::InstanceId>& exclude)
+{
+    const view::PickResult hit = pickWithInstances(ctx, screen);
+    if (hit.kind == view::PickResult::Kind::Instance && !exclude.contains(hit.instance)) {
+        return hit.instance;
+    }
+    model::InstanceId nearest;
+    if (ctx.model == nullptr) {
+        return nearest;
+    }
+    double best = kGripRadiusPx;
+    for (std::size_t i = 0; i < ctx.model->instances().size(); ++i) {
+        const model::InstanceId id = ctx.model->instances().keys()[i];
+        const model::Instance& inst = ctx.model->instances().values()[i];
+        if (inst.parent != ctx.context || inst.hidden || exclude.contains(id)) {
+            continue;
+        }
+        const std::vector<Grip> grips = instanceGrips(ctx, { id });
+        const int k = nearestGrip(ctx, grips, screen, best);
+        if (k >= 0) {
+            if (const auto sp = ctx.camera.project(grips[std::size_t(k)].point)) {
+                best = glm::length(*sp - screen);
+            }
+            nearest = id;
+        }
+    }
+    return nearest;
+}
+
 void appendPreview(Overlay& o, const std::vector<PreviewEdge>& edges, const Transform& t)
 {
     for (const PreviewEdge& e : edges) {
@@ -579,30 +610,9 @@ private:
         if (!m_base && !ctx.selection.empty()) {
             ids = ctx.selection.instances;
         } else {
-            const view::PickResult hit = pickWithInstances(ctx, screen);
-            if (hit.kind == view::PickResult::Kind::Instance && !(m_base && m_target.selection.instances.contains(hit.instance))) {
-                ids.insert(hit.instance);
-                m_gripOwner = hit.instance;
-            } else if (ctx.model != nullptr) {
-                // Cursorul e lângă un obiect, dar nu pe el (un colț văzut din afară): cel mai apropiat punct al
-                // obiectelor vizibile din context.
-                double best = kGripRadiusPx;
-                for (std::size_t i = 0; i < ctx.model->instances().size(); ++i) {
-                    const model::InstanceId id = ctx.model->instances().keys()[i];
-                    const model::Instance& inst = ctx.model->instances().values()[i];
-                    if (inst.parent != ctx.context || inst.hidden || (m_base && m_target.selection.instances.contains(id))) {
-                        continue;
-                    }
-                    const std::vector<Grip> grips = instanceGrips(ctx, { id });
-                    const int k = nearestGrip(ctx, grips, screen, best);
-                    if (k >= 0) {
-                        if (const auto sp = ctx.camera.project(grips[std::size_t(k)].point)) {
-                            best = glm::length(*sp - screen);
-                        }
-                        ids = { id };
-                        m_gripOwner = id;
-                    }
-                }
+            m_gripOwner = gripObjectNear(ctx, screen, m_base ? m_target.selection.instances : std::set<model::InstanceId> {});
+            if (m_gripOwner) {
+                ids.insert(m_gripOwner);
             }
         }
         m_grips = instanceGrips(ctx, ids);
@@ -1337,6 +1347,199 @@ private:
     view::PickResult m_hover;
 };
 
+// --- Pivot ----------------------------------------------------------------------------------
+
+// Tragerea marcajului pivotului (cu Select): punctul nou se prinde ca la Move — capete, mijloace, muchii, fețe, axele
+// din pivotul de pornire, ghidaje, grid, colțurile și mijloacele obiectelor — plus centrele fețelor și centrul cutiei
+// selecției și originea. Unealta nu schimbă modelul: trimite punctul prin ToolRequests (previzualizare, apoi cel
+// ales la eliberare), iar Document mută pivotul (un pas de undo).
+class PivotTool final : public Tool {
+public:
+    std::string_view id() const override { return "pivot"; }
+
+    void pointerDown(ToolContext& ctx, const PointerEvent& e) override
+    {
+        if (!ctx.pivot) {
+            finish(ctx, false);
+            return;
+        }
+        m_start = *ctx.pivot;
+        m_current = *m_start;
+        m_press = e.screen;
+        m_moved = false;
+        m_engine.reset();
+        m_engine.restartFrom(*m_start);
+        track(ctx, e);
+    }
+
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override
+    {
+        if (!m_start) {
+            return;
+        }
+        m_moved = m_moved || glm::length(e.screen - m_press) > kDragThresholdPx;
+        track(ctx, e);
+    }
+
+    void pointerUp(ToolContext& ctx, const PointerEvent& /*e*/) override
+    {
+        finish(ctx, m_start && m_moved && glm::length(m_current - *m_start) > tol::kLength);
+    }
+
+    bool key(ToolContext& ctx, const KeyEvent& e) override
+    {
+        if (e.key == Key::Escape) {
+            finish(ctx, false);
+            return true;
+        }
+        return handleArrow(m_engine, e.key) || Tool::key(ctx, e);
+    }
+
+    void cancel(ToolContext& /*ctx*/) override { reset(); }
+
+    Overlay overlay() const override
+    {
+        Overlay o;
+        if (!m_start) {
+            return o;
+        }
+        o.lines.push_back({ *m_start, m_current, true, inference::Tint::Neutral, true });
+        appendInference(o, m_inference);
+        o.grips = m_grips;
+        if (m_hotGrip >= 0) {
+            const Grip& g = m_grips[std::size_t(m_hotGrip)];
+            o.marker = InferenceMarker { g.point, g.kind, inference::Tint::Neutral, m_labels[std::size_t(m_hotGrip)], false };
+        }
+        return o;
+    }
+
+    bool ownsArrowKeys() const override { return m_start.has_value(); }
+
+    std::string status() const override
+    {
+        return "Trage pivotul: se prinde de colțuri, mijloace, muchii, fețe, axe, ghidaje și grid · săgeți/Shift: "
+               "blochează · Esc anulează";
+    }
+
+private:
+    void track(ToolContext& ctx, const PointerEvent& e)
+    {
+        updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_start);
+        if (m_inference.valid()) {
+            m_current = m_inference.point;
+        }
+        // Punctele obiectului selectat și ale celui de sub cursor (sau ale celui mai apropiat), apoi centrele cutiei
+        // selecției și originea.
+        m_grips.clear();
+        m_labels.clear();
+        std::set<model::InstanceId> ids = ctx.selection.instances;
+        if (const model::InstanceId near = gripObjectNear(ctx, e.screen, {})) {
+            ids.insert(near);
+        }
+        for (const Grip& g : instanceGrips(ctx, ids)) {
+            m_grips.push_back(g);
+            m_labels.emplace_back(g.kind == inference::Kind::Endpoint ? "Colț" : "Mijlocul muchiei");
+        }
+        appendSelectionCenters(ctx);
+        m_grips.push_back({ ctx.toWorld.inverse().applyToPoint(Vec3d { 0.0 }), inference::Kind::Endpoint, false, false });
+        m_labels.emplace_back("Originea");
+        m_hotGrip = nearestGrip(ctx, m_grips, e.screen, kGripRadiusPx);
+        if (m_hotGrip >= 0) {
+            m_grips[std::size_t(m_hotGrip)].hot = true;
+            if (!m_shiftLock) {
+                m_current = m_grips[std::size_t(m_hotGrip)].point;
+            }
+        }
+        if (ctx.requests != nullptr) {
+            ctx.requests->pivot = m_current;
+        }
+    }
+
+    // Centrele fețelor și centrul cutiei selecției (a obiectului, orientată după el, sau a geometriei libere, cu tot
+    // cu colțurile și mijloacele ei). Centrul unei fețe văzute e un punct obișnuit; restul sunt estompate: se prind doar
+    // când nu e alt punct vizibil aproape.
+    void appendSelectionCenters(const ToolContext& ctx)
+    {
+        Vec3d lo { 1e300 };
+        Vec3d hi { -1e300 };
+        Transform t;
+        if (ctx.selection.instances.size() == 1 && ctx.model != nullptr
+            && ctx.model->instances().contains(*ctx.selection.instances.begin())) {
+            const model::Instance& inst = ctx.model->instance(*ctx.selection.instances.begin());
+            std::tie(lo, hi) = model::bounds(*ctx.model, inst.definition);
+            t = inst.transform;
+        } else if (ctx.selection.instances.empty()) {
+            for (geom::VertexId v : geom::verticesOf(ctx.mesh, ctx.selection)) {
+                lo = glm::min(lo, ctx.mesh.position(v));
+                hi = glm::max(hi, ctx.mesh.position(v));
+            }
+        }
+        if (!(lo.x <= hi.x)) {
+            return;
+        }
+        // Pe fiecare axă: minimul, mijlocul sau maximul. Obiectele au deja colțurile și mijloacele muchiilor.
+        const bool loose = ctx.selection.instances.empty();
+        for (int i = 0; i < 27; ++i) {
+            const int k[3] = { i % 3, (i / 3) % 3, i / 9 };
+            const int middles = int(k[0] == 1) + int(k[1] == 1) + int(k[2] == 1);
+            if (!loose && middles < 2) {
+                continue;
+            }
+            Vec3d p;
+            for (int a = 0; a < 3; ++a) {
+                p[a] = k[a] == 0 ? lo[a] : k[a] == 1 ? (lo[a] + hi[a]) * 0.5 : hi[a];
+            }
+            static constexpr const char* kLabels[] = { "Colț", "Mijlocul muchiei", "Centrul feței", "Centru" };
+            const Vec3d w = t.applyToPoint(p);
+            bool hidden = true;
+            if (middles == 2) {
+                const Vec3d toEye = ctx.camera.projection() == view::Projection::Orthographic ? -ctx.camera.forward()
+                                                                                               : ctx.camera.eye() - w;
+                hidden = glm::dot(w - t.applyToPoint((lo + hi) * 0.5), toEye) <= 0.0;
+            }
+            m_grips.push_back({ w, middles == 0 ? inference::Kind::Endpoint : inference::Kind::Midpoint, false, hidden });
+            m_labels.emplace_back(kLabels[middles]);
+        }
+    }
+
+    void finish(ToolContext& ctx, bool commit)
+    {
+        if (ctx.requests != nullptr) {
+            ctx.requests->pivotDone = true;
+            if (commit) {
+                ctx.requests->pivot = m_current;
+            } else {
+                ctx.requests->pivot.reset();
+            }
+        }
+        reset();
+    }
+
+    void reset()
+    {
+        m_start.reset();
+        m_moved = false;
+        m_engine.reset();
+        m_shiftLock = false;
+        m_grips.clear();
+        m_labels.clear();
+        m_hotGrip = -1;
+        m_inference = {};
+    }
+
+    std::optional<Vec3d> m_start;
+    Vec3d m_current { 0.0 };
+    Vec2d m_press { 0.0 };
+    bool m_moved = false;
+    inference::Engine m_engine;
+    inference::Inference m_inference;
+    bool m_shiftLock = false;
+    std::vector<Grip> m_grips;
+    std::vector<std::string> m_labels;
+    int m_hotGrip = -1;
+};
+
 } // namespace
 
 std::unique_ptr<Tool> makeMoveTool()
@@ -1352,6 +1555,11 @@ std::unique_ptr<Tool> makeRotateTool()
 std::unique_ptr<Tool> makeScaleTool()
 {
     return std::make_unique<ScaleTool>();
+}
+
+std::unique_ptr<Tool> makePivotTool()
+{
+    return std::make_unique<PivotTool>();
 }
 
 } // namespace aion::tools
