@@ -3,6 +3,7 @@
 #include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 
 namespace aion::geom {
@@ -170,8 +171,29 @@ std::vector<Vec3d> Mesh::loopPoints(const Loop& loop) const
 
 // --- Primitive ---
 
+namespace {
+
+std::uint64_t nextRevision()
+{
+    static std::atomic<std::uint64_t> counter { 0 };
+    return ++counter;
+}
+
+} // namespace
+
+Mesh::Mesh()
+    : m_revision(nextRevision())
+{
+}
+
+void Mesh::bump()
+{
+    m_revision = nextRevision();
+}
+
 void Mesh::touch(VertexId id)
 {
+    bump();
     if (m_recording) {
         touchIn(m_recording->vertices, m_vertices, id);
     }
@@ -179,6 +201,7 @@ void Mesh::touch(VertexId id)
 
 void Mesh::touch(EdgeId id)
 {
+    bump();
     if (m_recording) {
         touchIn(m_recording->edges, m_edges, id);
     }
@@ -186,6 +209,7 @@ void Mesh::touch(EdgeId id)
 
 void Mesh::touch(FaceId id)
 {
+    bump();
     if (m_recording) {
         touchIn(m_recording->faces, m_faces, id);
     }
@@ -193,6 +217,7 @@ void Mesh::touch(FaceId id)
 
 VertexId Mesh::addVertex(const Vec3d& position)
 {
+    bump();
     const VertexId id = m_vertices.insert(Vertex { position, {} });
     if (m_recording) {
         m_recording->vertices[id]; // înainte: nu exista
@@ -433,6 +458,7 @@ ChangeSet Mesh::endRecording()
 void Mesh::apply(const ChangeSet& changes, ChangeDirection direction)
 {
     assert(!m_recording);
+    bump();
     applyChanges(changes.vertices, m_vertices, direction);
     applyChanges(changes.edges, m_edges, direction);
     applyChanges(changes.faces, m_faces, direction);

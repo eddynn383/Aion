@@ -311,13 +311,15 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
                 best = -1.0;
             }
         }
-        for (std::size_t i = 0; best >= 0.0 && i < mesh.vertices().size(); ++i) {
-            const Vec3d& p = mesh.vertices().values()[i].position;
-            const double d = screenDistance(camera, p, screen);
-            if (d <= best && visible(ray, facePick, p) && !view::isHidden(mesh, mesh.vertices().keys()[i])) {
-                best = d;
-                bestVertex = mesh.vertices().keys()[i];
-            }
+        if (best >= 0.0) {
+            view::forEachVertexNear(mesh, camera, screen, best, [&](geom::VertexId v) {
+                const Vec3d& p = mesh.position(v);
+                const double d = screenDistance(camera, p, screen);
+                if (d <= best && visible(ray, facePick, p) && !view::isHidden(mesh, v)) {
+                    best = d;
+                    bestVertex = v;
+                }
+            });
         }
         if (bestVertex) {
             out.kind = Kind::Endpoint;
@@ -368,24 +370,23 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
     {
         double best = kInf;
         geom::EdgeId bestEdge;
-        for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
-            const geom::EdgeId id = mesh.edges().keys()[i];
-            const geom::Edge& e = mesh.edges().values()[i];
+        view::forEachEdgeNear(mesh, camera, screen, m_options.pointRadiusPx * hyst, [&](geom::EdgeId id) {
+            const geom::Edge& e = mesh.edge(id);
             if (view::isHidden(e)) {
-                continue;
+                return;
             }
             const Vec3d mid = (mesh.position(e.v0) + mesh.position(e.v1)) * 0.5;
             const bool previous = m_last.kind == Kind::Midpoint && m_last.edge == id;
             const double d = screenDistance(camera, mid, screen);
             if (d > m_options.pointRadiusPx * (previous ? hyst : 1.0) || !visible(ray, facePick, mid)) {
-                continue;
+                return;
             }
             const double score = previous ? -1.0 : d; // mijlocul ales anterior are prioritate
             if (score < best) {
                 best = score;
                 bestEdge = id;
             }
-        }
+        });
         if (bestEdge) {
             const geom::Edge& e = mesh.edge(bestEdge);
             out.kind = Kind::Midpoint;
@@ -460,23 +461,23 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         // 4a. Direcția taie o muchie lângă cursor.
         double bestPx = m_options.pointRadiusPx;
         std::optional<std::pair<Vec3d, geom::EdgeId>> crossing;
-        for (std::size_t i = 0; i < mesh.edges().size(); ++i) {
-            const geom::Edge& e = mesh.edges().values()[i];
+        view::forEachEdgeNear(mesh, camera, screen, bestPx, [&](geom::EdgeId id) {
+            const geom::Edge& e = mesh.edge(id);
             if (view::isHidden(e)) {
-                continue;
+                return;
             }
             const Vec3d a = mesh.position(e.v0);
             const Vec3d b = mesh.position(e.v1);
             const auto x = intersectLines(*from, dir, a, glm::normalize(b - a), eps);
             if (!x || math::projectOnSegment(*x, { a, b }).distance > eps || tol::samePoint(*x, *from)) {
-                continue;
+                return;
             }
             const double d = screenDistance(camera, *x, screen);
             if (d <= bestPx && visible(ray, facePick, *x)) {
                 bestPx = d;
-                crossing = std::pair { *x, mesh.edges().keys()[i] };
+                crossing = std::pair { *x, id };
             }
-        }
+        });
         if (crossing) {
             out.kind = Kind::Intersection;
             out.point = crossing->first;

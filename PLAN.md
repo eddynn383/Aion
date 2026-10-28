@@ -420,7 +420,8 @@ _(2026-10-26: scenariul trece în `ToolTests` și prin input real în aplicație
 ### Faza 10 – Finisare macOS și distribuție (v1.0 macOS)
 - [x] Meniul nativ macOS (App menu, Preferences cu Cmd+,), Dark Mode, scurtături standard — `shell/AppMenuBar.qml`, ADR 0012
 - [x] Iconița aplicației, ecran „About”, asociere cu fișierele `.aion` (Info.plist + QFileOpenEvent + linia de comandă)
-- [~] Performanță: modele cu ≥ 100.000 de fețe; profilare cu Instruments; BVH pentru picking și inferență — deocamdată test pe cutii la picking
+- [x] Performanță: modele cu ≥ 100.000 de fețe — BVH pentru picking și inferență (ADR 0032): ~1 ms în loc de ~1,5 s
+      pe 100 000 de fețe; reconstruit doar la schimbarea geometriei (`Mesh::revision`)
 - [~] Preferințe: unități, precizie, temă, latitudine (⌘,) — lipsesc scurtăturile personalizabile
 - [ ] Build **Universal** (arm64 + x86_64) — cere un Qt universal (vezi ADR 0012)
 - [x] `macdeployqt`, **semnare** (Developer ID), **notarizare** Apple, DMG — `scripts/package-macos.sh` / `make package` (semnarea reală cere certificatul tău)

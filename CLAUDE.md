@@ -190,6 +190,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Follow Me** (ADR 0031): `geom/Sweep.h` (`followMe`), `tools/FollowMeTool.cpp`; fețele noi (și la bevel) prin
   `core/src/geom/FaceBuilder.h` (`buildFaces`). Acțiune de script: `tool.followme`.
 
+- **Index de picking** (ADR 0032): `view::forEachFaceAlong` / `forEachVertexNear` / `forEachEdgeNear` (BVH din
+  `core/src/view/PickIndex.cpp`, după `Mesh::revision()`); buclele noi pe geometrie la hover trebuie să treacă prin ele.
+  Testul de performanță: `aion_tests "[.perf]"`.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 

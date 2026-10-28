@@ -7,6 +7,7 @@
 #include "aion/core/model/Ids.h"
 #include "aion/core/view/Camera.h"
 
+#include <functional>
 #include <set>
 
 namespace aion::geom {
@@ -44,6 +45,19 @@ void setHiddenTags(std::set<model::TagId> tags);
 
 // Raza atinge cutia aliniată cu axele (cu o margine)? Testul rapid de dinaintea triangulării unei fețe.
 [[nodiscard]] bool rayHitsBox(const math::Ray& ray, const math::Vec3d& lo, const math::Vec3d& hi, double margin = 0.0);
+
+// Căutările pe geometrie trec printr-un index (BVH pe fețe, muchii și vârfuri, refăcut doar când se schimbă
+// `Mesh::revision`) de la acest număr de entități în sus; sub el, buclele simple sunt la fel de rapide. Testele îl
+// pot coborî la 0, ca să verifice indexul pe modele mici.
+void setPickIndexThreshold(std::size_t entities);
+
+// Fețele pe care raza le poate atinge (un superset: cutia lor e atinsă de rază).
+void forEachFaceAlong(const geom::Mesh& mesh, const math::Ray& ray, const std::function<void(geom::FaceId)>& visit);
+// Vârfurile / muchiile care pot fi la cel mult `radiusPx` pixeli de cursor (un superset; filtrul exact e al apelantului).
+void forEachVertexNear(const geom::Mesh& mesh, const Camera& camera, Vec2d screen, double radiusPx,
+    const std::function<void(geom::VertexId)>& visit);
+void forEachEdgeNear(const geom::Mesh& mesh, const Camera& camera, Vec2d screen, double radiusPx,
+    const std::function<void(geom::EdgeId)>& visit);
 
 // Prioritate: vârf, apoi muchie, apoi față. Muchiile și vârfurile ascunse în spatele unei fețe nu se aleg.
 [[nodiscard]] PickResult pick(const geom::Mesh& mesh, const Camera& camera, Vec2d screen, PickOptions options = {});
