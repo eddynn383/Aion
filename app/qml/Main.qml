@@ -453,6 +453,13 @@ Window {
                     viewport.displayStyle = action.slice(6)
                 } else if (action === "file.newNow") {
                     doc.newDocument()
+                } else if (action === "anchor:") {
+                    // Ancorează obiectul selectat pe ultima cale.
+                    const ps = doc.paths
+                    const inst = doc.entityInfo.instanceId ?? 0
+                    console.info("anchor:", ps.length > 0 && inst > 0 ? doc.anchorToPath(ps[ps.length - 1].id, inst) : false)
+                } else if (action === "debug.paths") {
+                    console.info("paths:", doc.pathsDebug(), "undo:", doc.undoName, "time", doc.timelineTime.toFixed(2))
                 } else if (action.startsWith("dragw:")) {
                     // „dragw:x1,y1,z1,x2,y2,z2”: tragere cu butonul stâng între două puncte 3D (Pen: un punct neted).
                     const dw = action.slice(6).split(",").map(Number)

@@ -88,6 +88,7 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QVariantList interactions READ interactions NOTIFY outlineChanged)
     Q_PROPERTY(QVariantList cameras READ cameras NOTIFY outlineChanged)
     Q_PROPERTY(QVariantList lights READ lights NOTIFY outlineChanged)
+    Q_PROPERTY(QVariantList paths READ paths NOTIFY outlineChanged)
     // Obiectul selectat (cameră sau lumină) cu toate proprietățile; { kind: "none" } dacă nu e niciunul.
     Q_PROPERTY(QVariantMap selectedObject READ selectedObject NOTIFY selectionChanged)
     // Scenele: { id, name, style } (poziția camerei o citește QML prin sceneCamera).
@@ -189,6 +190,21 @@ public:
     QVariantList interactions() const;
     QVariantList generators() const;
     QVariantList lights() const;
+    // Căile de parcurgere (ADR 0036): { id, name, kind: "path", visible, active (animația ei e cea activă) }.
+    QVariantList paths() const;
+    // Ancorează / scoate / rotește fața unui obiect pe o cale (doar în Animare); false dacă nu se poate.
+    Q_INVOKABLE bool anchorToPath(double pathId, double instanceId);
+    Q_INVOKABLE void detachFromPath(double pathId, double instanceId);
+    Q_INVOKABLE void rotateAnchor(double pathId, double instanceId);
+    // Decalajul obiectului selectat față de calea lui: { along, lateral, up, yaw } (oricare).
+    Q_INVOKABLE void setAnchorOffsets(const QVariantMap& changes);
+    // Startul și durata căii (secunde); animația se lungește dacă bara trece de capătul ei.
+    Q_INVOKABLE void setPathTiming(double pathId, double start, double duration);
+    // Editarea curbei căii (dublu click pe ea), cu `penedit`.
+    Q_INVOKABLE void beginPathEdit(double pathId);
+    [[nodiscard]] model::MotionPathId selectedPath() const { return m_selectedPath; }
+    // Pentru scripturile de verificare: căile, ancorele și poziția obiectelor lor la timpul curent.
+    Q_INVOKABLE QString pathsDebug() const;
     QVariantMap selectedObject() const;
     QVariantList sections() const;
     int guideCount() const { return static_cast<int>(m_model.guides().size()); }
@@ -408,7 +424,7 @@ public:
     [[nodiscard]] bool pivotDragging() const { return m_suspendedTool != nullptr && !curveEditing(); }
     // Editarea unei curbe Pen (dublu click cu Select): unealta `penedit` până la Esc / click în afară.
     void beginCurveEdit(model::PenCurveId id);
-    [[nodiscard]] bool curveEditing() const { return static_cast<bool>(m_editCurve); }
+    [[nodiscard]] bool curveEditing() const { return static_cast<bool>(m_editCurve) || static_cast<bool>(m_editPath); }
     [[nodiscard]] std::optional<math::Vec3d> pivotDragPoint() const { return m_pivotDragPoint; }
     // Mută pivotul selecției în punctul dat (coordonatele contextului). Obiectul nu se mișcă.
     void setSelectionPivot(const math::Vec3d& point);
@@ -691,6 +707,11 @@ private:
     std::optional<math::Vec3d> m_pivotDragPoint;
     void finishPivotDrag(const std::optional<math::Vec3d>& point);
     model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
+    model::MotionPathId m_editPath; // sau calea editată
+    model::MotionPathId m_selectedPath;
+    QVariantMap pathInfo(model::MotionPathId id) const;
+    void setPathProperties(const QVariantMap& changes);
+    void createMotionPath(const geom::BezierPath& curve, const math::Vec3d& normal);
     void finishCurveEdit();
     QString m_toolId;
     std::map<model::DefinitionId, std::unordered_map<geom::FaceId, geom::FaceTriangles>> m_triangles;
