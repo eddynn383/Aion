@@ -198,6 +198,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `window.setShortcut` / `resetShortcuts` în Main.qml; `commands` le aplică (păstrează `defaultShortcut`), iar
   `Toolbar.keyFor(tool)` le arată la unelte. Câmpul: `components/ShortcutRecorder.qml`.
 
+- **Preferințele** sunt un modal (`overlays/PreferencesPage.qml`): categoriile în stânga, paginile din carduri
+  `components/SettingsGroup.qml` cu rânduri `components/SettingsRow.qml` (titlu + descriere, controlul în dreapta;
+  `stacked` pentru controale late, `compact` pentru liste). Setările noi folosesc aceleași componente.
+
 ## Următorii pași
 1. Faza 20 (import `.skp`): utilizatorul descarcă SDK-ul SketchUp și îi verifică licența (`AION_SKP_SDK_DIR`).
 
