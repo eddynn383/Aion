@@ -20,6 +20,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <map>
+#include <tuple>
 #include <memory>
 #include <optional>
 #include <unordered_map>
@@ -428,6 +429,8 @@ public:
     QString interactionHover(const view::Camera& camera, math::Vec2d screen);
     // event: "click", "rightClick", "doubleClick", "longPress". Întoarce true dacă a pornit ceva.
     bool interactionEvent(const view::Camera& camera, math::Vec2d screen, const QString& event);
+    // Sub cursor e un obiect, dar nici el, nici cele din care face parte nu au interacțiuni (pentru un mesaj).
+    bool objectWithoutInteractionsAt(const view::Camera& camera, math::Vec2d screen) const;
     bool interactionDragStart(const view::Camera& camera, math::Vec2d screen);
     void interactionDragMove(const view::Camera& camera, math::Vec2d screen);
     void interactionDragEnd();
@@ -544,6 +547,15 @@ private:
     model::LightId m_selectedLight;
     std::optional<model::Model> m_runtime;
     int m_workMode = Modeling;
+    // Modul Animare: o copie a modelului cu obiectele animate în poza de la timpul curent. Uneltele de transformare
+    // și Inspector-ul lucrează pe ea; rezultatul devine keyframe-uri (modelul de bază nu se schimbă). Se reface doar
+    // când se schimbă modelul (m_modelRevision), timpul sau animația.
+    mutable std::optional<model::Model> m_pose;
+    mutable std::tuple<std::uint64_t, double, std::uint64_t> m_poseKey { ~std::uint64_t { 0 }, 0.0, 0 };
+    std::uint64_t m_modelRevision = 0;
+    model::Model& pose() const;
+    // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează animația).
+    void keyTransforms(const std::map<model::InstanceId, math::Transform>& transforms, const char* name);
     model::RuleRuntime m_rules;
     model::InstanceId m_hoverInstance;
     struct DragState {

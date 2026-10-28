@@ -188,6 +188,15 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Dă unei comenzi tasta L → mesajul spune că Line a rămas fără scurtătură; toolbar-ul nu mai arată „L” la Line
 - [ ] ↺ pe rând readuce scurtătura implicită; „Resetează toate” le readuce pe toate; repornirea aplicației le păstrează
 
+## Moduri de lucru (Modelare / Animare / Interacțiune)
+- [ ] Comutatorul din dreapta toolbar-ului și ⌥1 / ⌥2 / ⌥3 schimbă modul; bara de stare arată modul; repornirea păstrează modul
+- [ ] Primul grup: Select + Navigare (Orbit, Pan, Zoom); în Interacțiune și Interact
+- [ ] Animare: doar Select și Transform în toolbar; R / ⇧R / P nu fac nimic; palette fără comenzi de modelare;
+      timeline-ul e vizibil și nu se închide
+- [ ] Animare: Move pe un obiect → keyframe la timpul curent (⌘Z îl anulează); în Modelare obiectul e la poziția de bază
+- [ ] Interacțiune: Select alege obiecte, Inspector arată doar Interacțiune; Interact (F5) → click pe o ușă cu balama
+      o deschide; click pe un obiect fără interacțiuni → tooltip; Select (sau Esc) revine la editare
+
 ## Texturi (Faza 24)
 - [ ] Biblioteca: Cărămidă aparentă, Parchet de stejar, Lemn, Beton turnat, Gresie — miniaturi cu textura; Paint Bucket le aplică
 - [ ] Pe un perete: rândurile de cărămizi sunt orizontale; pe pardoseală parchetul e la mărimea reală

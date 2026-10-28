@@ -55,17 +55,6 @@ Row {
         onClicked: popup.opened ? popup.close() : popup.open()
     }
 
-    // --- Modul interacțiune (regulile rulează; modelul nu se poate edita) ---
-    Group {
-        ShadeButton {
-            iconName: "play"
-            tooltip: root.document && root.document.interactionMode ? "Ieși din modul interacțiune (Esc)"
-                                                                     : "Modul interacțiune (F5)"
-            checked: root.document && root.document.interactionMode
-            onClicked: root.document.interactionMode = !root.document.interactionMode
-        }
-    }
-
     // --- Încadrare, proiecție, grid ---
     Group {
         ShadeButton {

@@ -202,9 +202,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `components/SettingsGroup.qml` cu rânduri `components/SettingsRow.qml` (titlu + descriere, controlul în dreapta;
   `stacked` pentru controale late, `compact` pentru liste). Setările noi folosesc aceleași componente.
 
+- **Modurile de lucru** (ADR 0033, `docs/plans/moduri-de-lucru.md`): `Document::workMode` (⌥1 / ⌥2 / ⌥3),
+  `commandModes` / `commandAllowed` (o singură clasificare a comenzilor), `require(mode)` (gărzi), `pose()` (Animare:
+  auto-key pe o copie pozată), `shell/ModeSwitch.qml`; grupurile toolbar-ului au `modes`. Acțiuni de script:
+  `mode:model|animate|interact`, `mode.interaction` (Interact ↔ Select). Comenzile noi trebuie să fie clasificate în
+  `commandModes` dacă nu sunt comune; operațiile noi de model încep cu `require(Modeling)`.
+
 ## Următorii pași
-0. **În lucru: toolbar nou + modurile Modelare / Animare / Interacțiune** — planul complet, cu pașii de bifat:
-   `docs/plans/moduri-de-lucru.md` (și `PLAN.md` → Etapa 5). Continuă de la primul pas nebifat.
 1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic
    redistribuirea SDK-ului și folosirea lui într-o aplicație terță care replică SketchUp, fără aprobare scrisă.
    Alternativa propusă utilizatorului: import COLLADA (.dae), fără SDK. SDK-ul NU se pune în repo.

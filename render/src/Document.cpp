@@ -415,6 +415,7 @@ void Document::replaceModel(const model::Model& model)
     m_path.clear();
     m_selection.clear();
     m_model = model;
+    ++m_modelRevision;
     m_stack.setActiveDefinition(m_model.root());
     m_stack.clear();
     m_stack.markClean();
@@ -881,7 +882,7 @@ QVariantMap Document::entityInfo() const
             details << detail(QStringLiteral("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
         }
         // Dimensiunile și materialul au controale proprii în Inspector (editabile).
-        const model::Placement placement = model::placementOf(m_model, id);
+        const model::Placement placement = model::placementOf(m_workMode == Animation ? pose() : m_model, id);
         info[QStringLiteral("placement")] = QVariantMap {
             { QStringLiteral("px"), placement.position.x },
             { QStringLiteral("py"), placement.position.y },
@@ -1065,8 +1066,22 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     // În grupul editat, uneltele lucrează în coordonatele lui (camera face conversia).
     const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
     tools::ToolRequests requests;
-    tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, local };
-    ctx.model = &m_model;
+    // În Animare, uneltele lucrează pe poza de la timpul curent, cu un istoric propriu (aruncat); ce mută ele devine
+    // keyframe-uri, mai jos.
+    const bool animating = m_workMode == Animation;
+    model::Model& target = animating ? pose() : m_model;
+    std::optional<commands::CommandStack> poseStack;
+    std::map<model::InstanceId, math::Transform> posedBefore;
+    if (animating) {
+        poseStack.emplace(target);
+        poseStack->setValidation(false);
+        poseStack->setActiveDefinition(activeDefinition());
+        for (std::size_t i = 0; i < target.instances().size(); ++i) {
+            posedBefore[target.instances().keys()[i]] = target.instances().values()[i].transform;
+        }
+    }
+    tools::ToolContext ctx { target.mesh(activeDefinition()), animating ? *poseStack : m_stack, m_selection, local };
+    ctx.model = &target;
     ctx.context = activeDefinition();
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
@@ -1084,6 +1099,23 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     ctx.libraryMaterial
         = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
     fn(*m_tool, ctx);
+    if (animating) {
+        // Doar obiectele se animă: o selecție de fețe sau muchii nu are sens aici.
+        m_selection.faces.clear();
+        m_selection.edges.clear();
+        if (poseStack->undoCount() > 0) {
+            std::map<model::InstanceId, math::Transform> moved;
+            for (const auto& [id, previous] : posedBefore) {
+                if (target.instances().contains(id) && !(target.instance(id).transform == previous)) {
+                    moved[id] = target.instance(id).transform;
+                }
+            }
+            std::get<0>(m_poseKey) = ~std::uint64_t { 0 }; // copia s-a schimbat: se reface
+            if (!moved.empty()) {
+                keyTransforms(moved, "Keyframe");
+            }
+        }
+    }
     // Paint Bucket: un material din bibliotecă a intrat în model, sau pipeta a ales unul.
     if (requests.addedMaterial) {
         m_currentMaterial = requests.addedMaterial;
@@ -1280,6 +1312,7 @@ void Document::undo()
 {
     const geom::Selection before = m_selection;
     m_geometryKey.clear(); // rotirea / scara afișate pentru geometria liberă pornesc din nou de la 0° / 1
+    ++m_modelRevision;
     m_stack.undo();
     afterInteraction(before);
 }
@@ -1288,6 +1321,7 @@ void Document::redo()
 {
     const geom::Selection before = m_selection;
     m_geometryKey.clear();
+    ++m_modelRevision;
     m_stack.redo();
     afterInteraction(before);
 }
@@ -1340,9 +1374,10 @@ void Document::runOnModel(const std::string& name, Fn&& fn)
 {
     // O editare a modelului iese din previzualizarea animației (altfel viewport-ul ar arăta poza animată, nu ce s-a
     // schimbat); doar keyframe-urile (editAnimation) o păstrează.
-    if (!m_keepPreview) {
+    if (!m_keepPreview && m_workMode != Animation) {
         endPreview();
     }
+    ++m_modelRevision;
     const geom::Selection before = m_selection;
     if (m_macro) {
         // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo).
@@ -1881,7 +1916,7 @@ void Document::createAnimation()
     m_activeAnimation = created;
     m_timelineTime = 0.0;
     emit timelineChanged();
-    emit timelineTimeChanged();
+    setTimelineTime(0.0);
 }
 
 void Document::renameAnimation(double id, const QString& name)
@@ -2069,6 +2104,14 @@ void Document::endPreview()
     if (!m_previewing && !m_playing) {
         return;
     }
+    // În Animare poza de la timpul curent rămâne mereu afișată (doar redarea se oprește).
+    if (m_workMode == Animation && m_previewing) {
+        if (m_playing) {
+            m_playing = false;
+            emit timelineChanged();
+        }
+        return;
+    }
     m_playing = false;
     m_previewing = false;
     ++m_interactionRevision;
@@ -2102,6 +2145,42 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
 
 // --- Modurile de lucru ---
 
+model::Model& Document::pose() const
+{
+    const auto key = std::make_tuple(m_modelRevision, m_timelineTime, m_activeAnimation.value);
+    if (!m_pose || key != m_poseKey) {
+        m_pose = m_model;
+        if (const model::Animation* a = currentAnimation()) {
+            for (std::size_t i = 0; i < m_model.instances().size(); ++i) {
+                const model::InstanceId id = m_model.instances().keys()[i];
+                if (const model::ObjectTrack* t = model::findTrack(*a, id)) {
+                    if (const auto value = model::evaluateTransform(*t, m_timelineTime)) {
+                        model::Instance inst = m_pose->instance(id);
+                        inst.transform = *value;
+                        m_pose->setInstance(id, inst);
+                    }
+                }
+            }
+        }
+        m_poseKey = key;
+    }
+    return *m_pose;
+}
+
+void Document::keyTransforms(const std::map<model::InstanceId, math::Transform>& transforms, const char* name)
+{
+    if (!currentAnimation()) {
+        createAnimation();
+    }
+    const double t = m_timelineTime;
+    editAnimation(name, [&](model::Animation& a) {
+        for (const auto& [id, transform] : transforms) {
+            model::setTransformKey(a, id, t, transform);
+        }
+    });
+}
+
+
 void Document::setWorkMode(int mode)
 {
     mode = std::clamp(mode, 0, 2);
@@ -2119,10 +2198,13 @@ void Document::setWorkMode(int mode)
     if (mode != Interaction) {
         setInteractionMode(false);
     }
+    m_workMode = mode;
     if (mode != Animation) {
         endPreview();
     }
-    m_workMode = mode;
+    if (mode == Animation) {
+        setTimelineTime(m_timelineTime); // obiectele animate se arată în poza de la timpul curent
+    }
     emit workModeChanged();
     emit toolStatusChanged();
     emit selectionChanged(); // Inspector-ul își schimbă grupurile
@@ -2253,6 +2335,11 @@ model::InstanceId Document::ruleTargetAt(const view::Camera& camera, math::Vec2d
         context = inst.definition;
     }
     return found;
+}
+
+bool Document::objectWithoutInteractionsAt(const view::Camera& camera, math::Vec2d screen) const
+{
+    return view::pickInstance(model(), model().root(), camera, screen).has_value() && !ruleTargetAt(camera, screen);
 }
 
 QString Document::interactionHover(const view::Camera& camera, math::Vec2d screen)
@@ -3047,6 +3134,23 @@ bool Document::hasTransformKey(double instanceId) const
 
 void Document::setPlacement(const QVariantMap& placement)
 {
+    // În Animare, plasarea de la timpul curent devine keyframe (modelul de bază nu se schimbă).
+    if (m_workMode == Animation && !m_macro && m_selection.instances.size() == 1) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        model::Model& posed = pose();
+        model::Placement p = model::placementOf(posed, id);
+        const auto value = [&](const char* key, double fallback) {
+            return placement.value(QLatin1String(key), fallback).toDouble();
+        };
+        p.position = { value("px", p.position.x), value("py", p.position.y), value("pz", p.position.z) };
+        p.rotation = { value("rx", p.rotation.x), value("ry", p.rotation.y), value("rz", value("rotation", p.rotation.z)) };
+        p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
+        p.size = math::Vec3d { 0.0 };
+        model::setPlacement(posed, id, p);
+        std::get<0>(m_poseKey) = ~std::uint64_t { 0 };
+        keyTransforms({ { id, posed.instance(id).transform } }, "Keyframe");
+        return;
+    }
     if (!require(Modeling)) {
         return;
     }
@@ -4083,7 +4187,7 @@ std::optional<math::Vec3d> Document::selectionPivot() const
         if (!m_model.instances().contains(id)) {
             return std::nullopt;
         }
-        return model::pivotPoint(m_model, id);
+        return model::pivotPoint(m_workMode == Animation ? pose() : m_model, id); // în Animare: poza de acum
     }
     if (!m_selection.instances.empty()) {
         return std::nullopt;

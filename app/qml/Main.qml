@@ -20,11 +20,13 @@ Window {
     flags: Qt.platform.os === "osx" ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
 
     property bool leftPanelVisible: true
-    property bool timelineVisible: false
+    // Timeline-ul ține de modul Animare: acolo e mereu vizibil și nu se închide (docs/plans/moduri-de-lucru.md).
+    readonly property bool timelineVisible: doc.workMode === 1
     property bool rightPanelVisible: true
     property string activeTool: "select"
-    // Uneltele tratate de viewport (nu de Document): navigarea și Interact.
-    readonly property var navigationTools: ["orbit", "pan", "zoom", "interact"]
+    // Uneltele tratate de viewport ca navigare. Interact pornește rularea interacțiunilor (doc.interactionMode),
+    // care primește clicurile direct.
+    readonly property var navigationTools: ["orbit", "pan", "zoom"]
 
     // Toate comenzile aplicației; apar în command palette și au scurtături.
     readonly property var commands: {
@@ -63,7 +65,7 @@ Window {
             { id: "mode.model", title: "Modul Modelare", category: "Moduri", shortcut: "Alt+1", icon: "box" },
             { id: "mode.animate", title: "Modul Animare", category: "Moduri", shortcut: "Alt+2", icon: "film" },
             { id: "mode.interact", title: "Modul Interacțiune", category: "Moduri", shortcut: "Alt+3", icon: "hand-pointer" },
-            { id: "mode.interaction", title: "Modul interacțiune (rulează regulile)", category: "Vizualizare", shortcut: "F5", icon: "play" },
+            { id: "mode.interaction", title: "Interact: folosește interacțiunile (comută cu Select)", category: "Vizualizare", shortcut: "F5", icon: "play" },
             { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
             { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
             { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
@@ -232,15 +234,22 @@ Window {
             if (doc.selectedObject.kind === "camera") viewport.animateToCamera(doc.cameraView(doc.selectedObject.id), 0.8)
             else toast.show("Selectează o cameră (în Outliner, la Camere și lumini).")
             break
-        case "mode.interaction": doc.interactionMode = !doc.interactionMode; break
+        case "mode.interaction":
+            // F5: Select ↔ Interact; din alt mod, trece în Interacțiune cu Interact activ.
+            if (doc.workMode !== 2) {
+                window.setWorkMode(2)
+                window.selectTool("interact")
+            } else {
+                window.selectTool(window.activeTool === "interact" ? "select" : "interact")
+            }
+            break
         case "mode.model": window.setWorkMode(0); break
         case "mode.animate": window.setWorkMode(1); break
         case "mode.interact": window.setWorkMode(2); break
         case "rules.edit": window.openRulesEditor(); break
-        case "ui.timeline": window.timelineVisible = !window.timelineVisible; break
         case "file.exportVideo":
             if (doc.activeAnimation > 0) fileDialog.ask("exportVideo")
-            else { window.timelineVisible = true; toast.show("Creează întâi o animație în timeline.") }
+            else toast.show("Creează întâi o animație în timeline.")
             break
         case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
         case "debug.materials": preferences.leftMaterials = true; break
@@ -397,7 +406,7 @@ Window {
                 } else if (action.startsWith("anim:")) {
                     // „anim:new”, „anim:key”, „anim:color”, „anim:camera”, „anim:time,1.5”, „anim:play”.
                     const an = action.slice(5).split(",")
-                    if (an[0] === "new") { doc.createAnimation(); window.timelineVisible = true }
+                    if (an[0] === "new") { window.setWorkMode(1); doc.createAnimation() }
                     else if (an[0] === "key") doc.keySelection()
                     else if (an[0] === "color") doc.keySelectionColor()
                     else if (an[0] === "camera") doc.keyCamera(viewport.cameraState())
@@ -523,7 +532,7 @@ Window {
     }
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
-    readonly property var modelingTools: ["select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
+    readonly property var modelingTools: ["select", "interact", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
                                          "followme", "move", "rotate", "scale", "eraser", "paint", "texture",
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""
@@ -545,6 +554,9 @@ Window {
             id = "select"
         }
         window.activeTool = id
+        // Interact folosește interacțiunile obiectelor (rulează pe o copie a modelului); orice altă unealtă revine la
+        // editare, iar starea rulării se aruncă.
+        doc.interactionMode = id === "interact"
         const tool = toolbar.toolInfo(id)
         const ready = modelingTools.includes(id) || navigationTools.includes(id)
         pendingToolMessage = tool && !ready ? "Unealta „" + tool.name + "” vine în Faza " + tool.phase : ""
@@ -649,7 +661,7 @@ Window {
             softenPanel.close()
             bevelPanel.close()
         } else if (doc.interactionMode)
-            doc.interactionMode = false
+            window.selectTool("select")
         else if (vcbText.length > 0)
             vcbText = ""
         else
@@ -1254,6 +1266,7 @@ Window {
                 }
                 AccordionSection {
                     id: librarySection
+                    visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
                     title: "Bibliotecă"
                     iconName: "book-open"
@@ -1285,6 +1298,7 @@ Window {
                 }
                 AccordionSection {
                     id: tagsSection
+                    visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
                     title: "Tag-uri"
                     iconName: "tag"
@@ -1309,6 +1323,7 @@ Window {
                 }
                 AccordionSection {
                     id: materialsSection
+                    visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
                     title: "Materiale"
                     iconName: "palette"
@@ -1346,6 +1361,7 @@ Window {
                 }
                 AccordionSection {
                     id: scenesSection
+                    visible: doc.workMode !== 2 // după modul de lucru
                     width: parent.width
                     title: "Scene"
                     iconName: "monitor"
@@ -1382,6 +1398,7 @@ Window {
                 }
                 AccordionSection {
                     id: interactionsSection
+                    visible: doc.workMode === 2 // după modul de lucru
                     width: parent.width
                     title: "Interacțiuni"
                     iconName: "hand-pointer"
@@ -1394,9 +1411,9 @@ Window {
                     actions: [
                         HeaderButton {
                             iconName: "play"
-                            tooltip: "Modul interacțiune (F5)"
-                            checked: doc.interactionMode
-                            onClicked: doc.interactionMode = !doc.interactionMode
+                            tooltip: "Folosește interacțiunile (Interact, F5)"
+                            checked: window.activeTool === "interact"
+                            onClicked: window.runCommand("mode.interaction")
                         },
                         HeaderButton {
                             iconName: "plus"
@@ -1705,30 +1722,28 @@ Window {
             onTriggered: (id) => window.runCommand(id)
         }
 
-        // Bannerul modului interacțiune.
-        Rectangle {
-            visible: doc.interactionMode
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.space3
-            anchors.top: parent.top
-            anchors.topMargin: Theme.space3
-            z: 5
-            width: bannerRow.implicitWidth + Theme.space4 * 2
-            height: 32
-            radius: 16
-            color: Theme.accent
-            Row {
-                id: bannerRow
-                anchors.centerIn: parent
-                spacing: Theme.space2
-                Icon { anchors.verticalCenter: parent.verticalCenter; name: "play"; size: 14; color: Theme.accentText }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Modul interacțiune · Esc pentru ieșire"
-                    color: Theme.accentText
-                    font.pixelSize: Theme.fontSizeSm
-                    font.weight: Font.Medium
-                }
+        // Interact: un click pe un obiect fără interacțiuni arată un mesaj lângă cursor.
+        Item {
+            id: noInteractionAnchor
+            parent: viewport
+            width: 1
+            height: 1
+            z: 6
+            Tooltip {
+                id: noInteractionTip
+                delay: 0
+                timeout: 2600
+                text: "Obiectul nu are interacțiuni. Alege Select și adaugă una din Inspector."
+            }
+        }
+        Connections {
+            target: viewport
+            function onNoInteractionAt(position) {
+                noInteractionAnchor.x = position.x
+                noInteractionAnchor.y = position.y
+                noInteractionTip.close()
+                // După click (deschis în timpul lui, s-ar închide la „release în afara părintelui”).
+                Qt.callLater(() => noInteractionTip.open())
             }
         }
 
@@ -1793,6 +1808,7 @@ Window {
                 width: parent.width
                 document: doc
                 timelineActive: window.timelineVisible
+                workMode: doc.workMode
                 onEditRules: window.openRulesEditor()
                 onToolRequested: (id) => window.selectTool(id)
             }
@@ -1838,7 +1854,6 @@ Window {
         height: 200
         document: doc
         viewport: viewport
-        onCloseRequested: window.timelineVisible = false
         onExportRequested: fileDialog.ask("exportVideo")
     }
 
@@ -1848,8 +1863,10 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         framesPerSecond: UserPrefs.showFps ? viewport.framesPerSecond : 0
-        message: window.pendingToolMessage.length > 0 ? window.pendingToolMessage
-               : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata"
+        // Modul de lucru, apoi indicația uneltei.
+        message: ["Modelare", "Animare", "Interacțiune"][doc.workMode] + "  ·  "
+               + (window.pendingToolMessage.length > 0 ? window.pendingToolMessage
+                  : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata")
         selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
         unitText: ["Auto", "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"

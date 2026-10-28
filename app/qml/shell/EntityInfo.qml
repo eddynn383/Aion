@@ -9,6 +9,9 @@ Column {
     property var document
     // Timeline-ul e deschis: la hover pe o valoare de plasare, eticheta devine butonul de keyframe.
     property bool timelineActive: false
+    // Modul de lucru (0 Modelare, 1 Animare, 2 Interacțiune): fiecare arată doar grupurile lui.
+    property int workMode: 0
+    readonly property bool modeling: workMode === 0
     signal editRules()
     signal toolRequested(string id)
 
@@ -88,7 +91,7 @@ Column {
 
     // Materialul grupului sau al obiectului (fețele fără material proprii îl preiau).
     MaterialSwatch {
-        visible: root.isInstance
+        visible: root.isInstance && root.modeling
         width: parent.width
         label: "Material"
         document: root.document
@@ -98,7 +101,7 @@ Column {
 
     // Fețele: materialul pe față și pe verso (Paint Bucket vopsește partea pe care o vezi).
     Column {
-        visible: root.info.kind === "faces"
+        visible: root.info.kind === "faces" && root.modeling
         width: parent.width
         spacing: Theme.space2
         MaterialSwatch {
@@ -121,7 +124,7 @@ Column {
     PropertyGroup {
         id: parametersBox
         readonly property var parametric: root.isInstance ? (root.info.parametric ?? null) : null
-        visible: parametric !== null
+        visible: parametric !== null && root.modeling
         title: "Parametri · " + (parametric ? parametric.name : "")
         Repeater {
             model: parametersBox.parametric ? parametersBox.parametric.parameters : []
@@ -153,7 +156,7 @@ Column {
     // lacăt (blochează valoarea, inclusiv pentru Move / Rotate / Scale) și, cu timeline-ul deschis, un keyframe la hover.
     Column {
         id: transformBox
-        visible: root.isInstance
+        visible: root.isInstance && root.workMode !== 2
         width: parent.width
         spacing: Theme.space4
 
@@ -262,6 +265,7 @@ Column {
         }
 
         PropertyGroup {
+            visible: root.modeling
             title: "Dimensiuni (mm)"
             actions: IconButton {
                 width: 20; height: 20; iconSize: 13
@@ -301,6 +305,7 @@ Column {
                     width: 20; height: 20; iconSize: 13
                     iconName: modelData.icon
                     rotation: index === 1 ? 90 : 0
+                    visible: root.modeling // oglindirea modifică modelul
                     tooltip: modelData.tip
                     onClicked: root.document.mirrorSelection(index)
                 }
@@ -315,6 +320,7 @@ Column {
 
         // Pivotul: punctul fix la rotire și scalare, ca distanță de la colțul minim (pe axele obiectului).
         PropertyGroup {
+            visible: root.modeling
             title: "Pivot (mm)"
             Row {
                 spacing: Theme.space1
@@ -338,7 +344,7 @@ Column {
         readonly property var shape: root.info.shape ?? null
         readonly property string kind: shape ? shape.kind : ""
         readonly property real half: (width - Theme.space1) / 2
-        visible: shape !== null
+        visible: shape !== null && root.modeling
         title: kind === "line" ? "Lungime (mm)" : kind === "rectangle" ? "Laturi (mm)" : "Mărime"
         NumberField {
             visible: shapeBox.kind === "line"
@@ -395,7 +401,7 @@ Column {
         id: geometryBox
         readonly property var g: root.info.geometry ?? null
         readonly property real third: (width - Theme.space1 * 2) / 3
-        visible: g !== null
+        visible: g !== null && root.modeling
         width: parent.width
         spacing: Theme.space4
         PropertyGroup {
@@ -477,7 +483,7 @@ Column {
     }
 
     Toggle {
-        visible: root.info.edgesSoft !== undefined
+        visible: root.info.edgesSoft !== undefined && root.modeling
         width: parent.width
         text: root.info.edgesSoft === -1 ? "Muchii netede (mixt)" : "Muchii netede (soft)"
         checked: root.info.edgesSoft === 1
@@ -487,7 +493,7 @@ Column {
     // Poziționarea texturii pe fețele selectate (Position Texture): deplasare, rotație, scară.
     PropertyGroup {
         id: textureBox
-        visible: root.info.kind === "faces" && root.info.texture !== undefined
+        visible: root.info.kind === "faces" && root.info.texture !== undefined && root.modeling
         readonly property var t: root.info.texture ?? ({})
         readonly property real half: (width - Theme.space1) / 2
         title: "Poziția texturii"
@@ -519,7 +525,7 @@ Column {
 
     // Tag-ul: „pastile” cu tag-urile modelului (pentru obiecte, grupuri, fețe și muchii).
     PropertyGroup {
-        visible: root.isInstance || root.info.kind === "faces" || root.info.kind === "edges"
+        visible: (root.isInstance || root.info.kind === "faces" || root.info.kind === "edges") && root.modeling
         title: "Tag"
         Flow {
             width: parent.width
@@ -570,7 +576,7 @@ Column {
     // Interacțiunea (unealta Interact): ușă pe balama sau sertar care glisează.
     PropertyGroup {
         id: behaviorBox
-        visible: root.isInstance
+        visible: root.isInstance && root.workMode === 2
         title: "Interacțiune"
 
         readonly property var behavior: root.isInstance && root.info.behavior ? root.info.behavior : ({ kind: "none" })
@@ -679,7 +685,7 @@ Column {
     }
 
     Toggle {
-        visible: root.isInstance
+        visible: root.isInstance && root.modeling
         width: parent.width
         text: "Blocat"
         checked: root.isInstance && root.info.locked === true
@@ -687,7 +693,7 @@ Column {
     }
 
     Flow {
-        visible: root.document && root.document.hasInstanceSelected
+        visible: root.document && root.document.hasInstanceSelected && root.modeling
         width: parent.width
         spacing: Theme.space2
 
