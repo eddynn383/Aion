@@ -1243,3 +1243,49 @@ TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca
         CHECK(m.lights().at(light).cone == Approx(67.5));
     }
 }
+
+TEST_CASE("Unelte: Rotate — referința și unghiul se prind exact de axa inferată (linia nu iese înclinată)", "[core][tools][transform]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1300, 300, 300 }, 0, 0, 7000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    const model::InstanceId box = boxObject(m, stack, 1000);
+    selection.instances.insert(box);
+    ctx.pivot = Vec3d { 1000, 0, 0 };
+    const auto at = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return tools::PointerEvent { *s, {}, 1 };
+    };
+    auto rotate = tools::makeTool("rotate");
+    rotate->pointerMove(ctx, at({ 1500, 0, 0 }));
+    REQUIRE(rotate->key(ctx, { tools::Key::Up, {} })); // rotație pe Z, planul z = 0 prin pivot
+    // Cursorul puțin lângă axa roșie din pivot: inferența o arată, iar referința trebuie să cadă pe ea.
+    const tools::PointerEvent near = at({ 1500, 12, 0 });
+    rotate->pointerMove(ctx, near);
+    rotate->pointerDown(ctx, near);
+    rotate->pointerUp(ctx, near);
+    const auto referenceLine = [&]() -> std::optional<tools::OverlayLine> {
+        for (const tools::OverlayLine& l : rotate->overlay().lines) {
+            if (l.dashed && glm::length(l.a - Vec3d { 1000, 0, 0 }) < 1e-9) {
+                return l;
+            }
+        }
+        return std::nullopt;
+    };
+    const auto ref = referenceLine();
+    REQUIRE(ref);
+    CHECK(std::abs(ref->b.y) < 1e-6); // exact pe axa X
+    // Unghiul: cursorul lângă axa verde → exact 90°, cu linia de final pe axă.
+    rotate->pointerMove(ctx, at({ 1000, 500, 0 }) );
+    const tools::PointerEvent green = at({ 1009, 500, 0 });
+    rotate->pointerMove(ctx, green);
+    REQUIRE(rotate->measurement());
+    CHECK(rotate->measurement()->value == "90°");
+}

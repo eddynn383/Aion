@@ -882,8 +882,14 @@ private:
     std::optional<Vec3d> onPlane(const ToolContext& ctx, Vec2d screen) const
     {
         const math::Plane plane = math::Plane::fromPointNormal(m_center, m_normal);
-        if (m_inference.isPoint() || m_inference.kind == inference::Kind::OnEdge) {
-            return plane.project(m_inference.point);
+        // Un punct prins (capăt, mijloc, muchie, ghidaj) sau o direcție inferată din centru (pe axă, paralel,
+        // perpendicular): punctul ei exact — altfel referința și linia de final ies puțin înclinate față de axa arătată.
+        if (m_inference.isPoint() || m_inference.kind == inference::Kind::OnEdge
+            || m_inference.kind == inference::Kind::GuidePoint || m_inference.direction.has_value()) {
+            const Vec3d p = plane.project(m_inference.point);
+            if (glm::length(p - m_center) > tol::kLength) { // o axă perpendiculară pe plan cade în centru
+                return p;
+            }
         }
         const math::Ray ray = ctx.camera.rayAt(screen);
         if (const auto t = math::intersectRayPlane(ray, plane)) {
