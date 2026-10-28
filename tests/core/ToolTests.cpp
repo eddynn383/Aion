@@ -1289,3 +1289,80 @@ TEST_CASE("Unelte: Rotate — referința și unghiul se prind exact de axa infer
     REQUIRE(rotate->measurement());
     CHECK(rotate->measurement()->value == "90°");
 }
+
+TEST_CASE("Unelte: tragerea pivotului se prinde ca la Move (colțul altui obiect, originea, centrul unei fețe)", "[core][tools][transform]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1800, 300, 300 }, 0, 0, 9000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    tools::ToolRequests requests;
+    ctx.requests = &requests;
+    const model::InstanceId a = boxObject(m, stack, 1000);
+    boxObject(m, stack, 3000);
+    selection.instances.insert(a);
+    const Vec3d center = model::pivotPoint(m, a);
+    ctx.pivot = center;
+    // Câțiva pixeli lângă punct, ca la o tragere reală.
+    const auto near = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return tools::PointerEvent { *s + Vec2d { 3, -2 }, {}, 1 };
+    };
+    auto pivot = tools::makeTool("pivot");
+    REQUIRE(pivot);
+
+    SECTION("colțul celuilalt obiect")
+    {
+        const Vec3d corner { 3600, 0, 600 };
+        pivot->pointerDown(ctx, near(center));
+        pivot->pointerMove(ctx, near((center + corner) * 0.5));
+        pivot->pointerMove(ctx, near(corner));
+        REQUIRE(requests.pivot);
+        CHECK(glm::length(*requests.pivot - corner) < 1e-6); // previzualizarea
+        CHECK_FALSE(requests.pivotDone);
+        pivot->pointerUp(ctx, near(corner));
+        CHECK(requests.pivotDone);
+        REQUIRE(requests.pivot);
+        CHECK(glm::length(*requests.pivot - corner) < 1e-6);
+    }
+    SECTION("originea")
+    {
+        pivot->pointerDown(ctx, near(center));
+        pivot->pointerMove(ctx, near({ 0, 0, 0 }));
+        pivot->pointerUp(ctx, near({ 0, 0, 0 }));
+        CHECK(requests.pivotDone);
+        REQUIRE(requests.pivot);
+        CHECK(glm::length(*requests.pivot) < 1e-6);
+    }
+    SECTION("centrul feței de sus a propriului obiect")
+    {
+        // De sus: centrul feței văzute e un punct obișnuit (centrul cutiei și fața de jos, sub el, sunt estompate).
+        camera.setPose(view::standardViewPose(view::StandardView::Top, { { 1800, 300, 300 }, 0, 0, 9000 }));
+        const Vec3d top { 1300, 300, 600 };
+        ctx.pivot = Vec3d { 1000, 0, 0 };
+        pivot->pointerDown(ctx, near({ 1000, 0, 0 }));
+        pivot->pointerMove(ctx, near(top));
+        pivot->pointerUp(ctx, near(top));
+        REQUIRE(requests.pivot);
+        CHECK(glm::length(*requests.pivot - top) < 1e-6);
+    }
+    SECTION("Esc anulează, un click fără tragere nu schimbă nimic")
+    {
+        pivot->pointerDown(ctx, near(center));
+        pivot->pointerMove(ctx, near({ 3600, 0, 600 }));
+        CHECK(pivot->key(ctx, { tools::Key::Escape, {} }));
+        CHECK(requests.pivotDone);
+        CHECK_FALSE(requests.pivot);
+        requests = {};
+        pivot->pointerDown(ctx, near(center));
+        pivot->pointerUp(ctx, near(center));
+        CHECK(requests.pivotDone);
+        CHECK_FALSE(requests.pivot);
+    }
+}

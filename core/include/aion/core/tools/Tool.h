@@ -107,6 +107,10 @@ struct ToolRequests {
     // Paint Bucket: materialul luat cu pipeta (Option) sau materialul nou intrat în model la vopsire.
     std::optional<model::MaterialId> sampledMaterial;
     model::MaterialId addedMaterial;
+    // Tragerea pivotului: punctul nou (în coordonatele contextului), pentru previzualizare; `pivotDone` = tragerea
+    // s-a terminat — cu `pivot` = punctul ales, fără = anulată.
+    std::optional<math::Vec3d> pivot;
+    bool pivotDone = false;
 };
 
 struct ToolContext {

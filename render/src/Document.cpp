@@ -665,6 +665,10 @@ void Document::setActiveTool(const QString& requested)
     // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare): rămâne Select.
     const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested) ? requested
                                                                                                  : QStringLiteral("select");
+    if (m_suspendedTool) { // o tragere a pivotului întreruptă: revine unealta de dinainte
+        m_tool = std::move(m_suspendedTool);
+        m_pivotDragPoint.reset();
+    }
     if (id == m_toolId) {
         return;
     }
@@ -1158,6 +1162,12 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         enterInstance(static_cast<double>(requests.enter.value));
     } else if (requests.exit) {
         exitContext();
+    }
+    // Tragerea pivotului: previzualizarea, apoi punctul ales (sau anularea).
+    if (requests.pivotDone) {
+        finishPivotDrag(requests.pivot);
+    } else if (requests.pivot && m_suspendedTool) {
+        m_pivotDragPoint = requests.pivot;
     }
     afterInteraction(before);
 }
@@ -4588,22 +4598,6 @@ std::optional<math::Vec3d> Document::selectionPivot() const
     return (lo + hi) * 0.5;
 }
 
-bool Document::pivotSelected() const
-{
-    return m_pivotSelected && m_pivotSelection == m_selection && selectionPivot().has_value();
-}
-
-void Document::setPivotSelected(bool on)
-{
-    if (on == pivotSelected() && (!on || m_pivotSelection == m_selection)) {
-        return;
-    }
-    m_pivotSelected = on;
-    m_pivotSelection = m_selection;
-    emit selectionChanged();
-    touch();
-}
-
 QVariantList Document::pivotPosition() const
 {
     const auto p = selectionPivot();
@@ -4620,7 +4614,30 @@ void Document::setPivotPosition(const QVariantMap& coordinates)
         return coordinates.contains(QLatin1String(key)) ? coordinates.value(QLatin1String(key)).toDouble() : fallback;
     };
     setSelectionPivot({ axis("x", p->x), axis("y", p->y), axis("z", p->z) });
-    m_pivotSelection = m_selection; // rămâne selectat
+}
+
+void Document::beginPivotDrag()
+{
+    if (m_suspendedTool || !m_tool || !selectionPivot()) {
+        return;
+    }
+    m_suspendedTool = std::exchange(m_tool, tools::makeTool("pivot"));
+    m_pivotDragPoint = selectionPivot();
+    emit toolStatusChanged();
+}
+
+void Document::finishPivotDrag(const std::optional<math::Vec3d>& point)
+{
+    if (!m_suspendedTool) {
+        return;
+    }
+    m_tool = std::move(m_suspendedTool);
+    m_pivotDragPoint.reset();
+    if (point) {
+        setSelectionPivot(*point); // un pas de undo
+    }
+    emit toolStatusChanged();
+    touch();
 }
 
 QVariantList Document::pivotMarker() const
@@ -4631,46 +4648,6 @@ QVariantList Document::pivotMarker() const
     }
     const math::Vec3d w = contextTransform().applyToPoint(*p);
     return { w.x, w.y, w.z };
-}
-
-std::vector<math::Vec3d> Document::pivotSnapPoints() const
-{
-    // Cutia selecției: a obiectului (orientată după el) sau a geometriei (aliniată cu axele).
-    math::Vec3d lo { 0.0 };
-    math::Vec3d hi { 0.0 };
-    math::Transform t;
-    if (m_selection.instances.size() == 1 && m_selection.faces.empty() && m_selection.edges.empty()) {
-        const model::InstanceId id = *m_selection.instances.begin();
-        if (!m_model.instances().contains(id)) {
-            return {};
-        }
-        const model::Instance& inst = m_model.instance(id);
-        std::tie(lo, hi) = model::bounds(m_model, inst.definition);
-        t = shownTransform(id);
-    } else if (m_selection.instances.empty()) {
-        const geom::Mesh& mesh = m_model.mesh(activeDefinition());
-        const std::set<geom::VertexId> vertices = geom::verticesOf(mesh, m_selection);
-        lo = math::Vec3d { std::numeric_limits<double>::infinity() };
-        hi = math::Vec3d { -std::numeric_limits<double>::infinity() };
-        for (geom::VertexId v : vertices) {
-            lo = glm::min(lo, mesh.position(v));
-            hi = glm::max(hi, mesh.position(v));
-        }
-    }
-    if (!(lo.x <= hi.x)) {
-        return {};
-    }
-    // Pe fiecare axă: minimul, mijlocul sau maximul (27 de puncte: colțuri, mijloace, centre de fețe, centrul).
-    std::vector<math::Vec3d> out;
-    for (int i = 0; i < 27; ++i) {
-        const int k[3] = { i % 3, (i / 3) % 3, i / 9 };
-        math::Vec3d p;
-        for (int a = 0; a < 3; ++a) {
-            p[a] = k[a] == 0 ? lo[a] : k[a] == 1 ? (lo[a] + hi[a]) * 0.5 : hi[a];
-        }
-        out.push_back(t.applyToPoint(p));
-    }
-    return out;
 }
 
 void Document::setSelectionPivot(const math::Vec3d& point)

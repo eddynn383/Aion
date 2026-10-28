@@ -57,3 +57,18 @@
   Inspector-ul arată „Pivot selectat” cu coordonatele lui (ca Poziția), editabile: mută doar pivotul
   (`Document::setPivotPosition`). Esc, ✕ sau un click în altă parte îl deselectează. Grupul „Pivot” rămâne distanța de
   la colțul minim (cu presetările Centru / Bază / Colț).
+
+## Completare (2026-10-28): fără „Pivot selectat”; tragerea se prinde ca Move
+
+- „Pivot selectat” arăta aceleași cifre ca Poziția (același punct, aceeași referință), cu alt efect: utilizatorul l-a
+  găsit confuz. A dispărut, cu tot cu starea `pivotSelected`. Pivotul se schimbă în două feluri: **trăgând marcajul**
+  sau din grupul **„Pivot (mm, de la colțul minim)”** (care există și pentru geometria liberă). Poziția rămâne a
+  pivotului; pentru mai multe obiecte selectate pivotul e doar centrul selecției (nu se păstrează; un pivot comun =
+  un grup).
+- Tragerea marcajului (cu Select) folosește o unealtă internă, `pivot` (`tools::PivotTool`, nu e în toolbar):
+  `Document::beginPivotDrag` o pune în locul lui Select până la eliberare. Se prinde ca Move — inferența (capete,
+  mijloace, muchii, fețe, axele din pivotul de pornire, ghidaje, grid) și punctele obiectelor de sub cursor / din jur
+  — plus centrele fețelor văzute și centrul cutiei selecției și originea. Unealta nu schimbă modelul: trimite punctul
+  prin `ToolRequests::pivot` (previzualizarea marcajului), iar la eliberare Document apelează `setSelectionPivot` (un
+  pas de undo; în Animare, prin poza de la timpul curent). Înainte se prindea doar de cele 27 de puncte ale propriei
+  cutii și de suprafețe.
