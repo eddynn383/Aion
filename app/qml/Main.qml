@@ -453,6 +453,16 @@ Window {
                     viewport.displayStyle = action.slice(6)
                 } else if (action === "file.newNow") {
                     doc.newDocument()
+                } else if (action.startsWith("dragw:")) {
+                    // „dragw:x1,y1,z1,x2,y2,z2”: tragere cu butonul stâng între două puncte 3D (Pen: un punct neted).
+                    const dw = action.slice(6).split(",").map(Number)
+                    AppInfo.simulateDrag(viewport, viewport.projectToScreen(Qt.vector3d(dw[0], dw[1], dw[2])),
+                                         viewport.projectToScreen(Qt.vector3d(dw[3], dw[4], dw[5])))
+                } else if (action.startsWith("dblclickw:")) {
+                    const dc = action.slice(10).split(",").map(Number)
+                    const dcp = viewport.projectToScreen(Qt.vector3d(dc[0], dc[1], dc[2]))
+                    AppInfo.simulateClick(viewport, dcp)
+                    AppInfo.simulateClick(viewport, dcp)
                 } else if (action.startsWith("rclickw:")) {
                     const r = action.slice(8).split(",").map(Number)
                     AppInfo.simulateRightClick(viewport, viewport.projectToScreen(Qt.vector3d(r[0], r[1], r[2])))
@@ -634,7 +644,7 @@ Window {
     }
 
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
-    readonly property var modelingTools: ["select", "interact", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset",
+    readonly property var modelingTools: ["select", "interact", "line", "arc", "pen", "rectangle", "circle", "polygon", "pushpull", "offset",
                                          "followme", "move", "rotate", "scale", "eraser", "paint", "texture",
                                          "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
     property string pendingToolMessage: ""

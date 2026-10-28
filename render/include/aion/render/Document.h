@@ -405,7 +405,10 @@ public:
     // Tragerea marcajului pivotului (cu Select): până la eliberare lucrează unealta „pivot” (se prinde ca Move), apoi
     // revine Select. Punctul previzualizat e unde se desenează marcajul.
     void beginPivotDrag();
-    [[nodiscard]] bool pivotDragging() const { return m_suspendedTool != nullptr; }
+    [[nodiscard]] bool pivotDragging() const { return m_suspendedTool != nullptr && !curveEditing(); }
+    // Editarea unei curbe Pen (dublu click cu Select): unealta `penedit` până la Esc / click în afară.
+    void beginCurveEdit(model::PenCurveId id);
+    [[nodiscard]] bool curveEditing() const { return static_cast<bool>(m_editCurve); }
     [[nodiscard]] std::optional<math::Vec3d> pivotDragPoint() const { return m_pivotDragPoint; }
     // Mută pivotul selecției în punctul dat (coordonatele contextului). Obiectul nu se mișcă.
     void setSelectionPivot(const math::Vec3d& point);
@@ -687,6 +690,8 @@ private:
     std::unique_ptr<tools::Tool> m_suspendedTool;
     std::optional<math::Vec3d> m_pivotDragPoint;
     void finishPivotDrag(const std::optional<math::Vec3d>& point);
+    model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
+    void finishCurveEdit();
     QString m_toolId;
     std::map<model::DefinitionId, std::unordered_map<geom::FaceId, geom::FaceTriangles>> m_triangles;
     unsigned m_revision = 1;

@@ -1,5 +1,6 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/PenCurves.h"
 #include "aion/core/view/ModelPicking.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
@@ -202,6 +203,23 @@ private:
             }
             s.instances.insert(hit.instance);
             return s;
+        }
+        // Dublu click pe o curbă Pen încă editabilă (muchia ei sau fața închisă de ea): editarea punctelor și mânerelor.
+        if (e.clickCount == 2 && ctx.requests != nullptr && ctx.model != nullptr
+            && (hit.kind == view::PickResult::Kind::Edge || hit.kind == view::PickResult::Kind::Face)) {
+            geom::EdgeId edge = hit.edge;
+            if (hit.kind == view::PickResult::Kind::Face && ctx.mesh.faces().contains(hit.face)) {
+                const geom::Loop& outer = ctx.mesh.face(hit.face).outer;
+                edge = outer.uses.empty() ? geom::EdgeId {} : outer.uses.front().edge;
+            }
+            const model::PenCurveId curve = edge ? model::penCurveForEdge(*ctx.model, ctx.context, edge) : model::PenCurveId {};
+            if (curve && model::penCurveEditable(*ctx.model, curve)) {
+                ctx.requests->editPenCurve = curve;
+                for (geom::EdgeId e2 : geom::curveEdges(ctx.mesh, edge)) {
+                    s.edges.insert(e2);
+                }
+                return s;
+            }
         }
         if (hit.kind == view::PickResult::Kind::Edge) {
             // O muchie a unei curbe (cerc, arc) selectează toată curba.

@@ -117,6 +117,8 @@ struct ToolRequests {
     // Editarea unei curbe (penedit): forma nouă, după o tragere / inserare / ștergere (un pas de undo), și ieșirea.
     std::optional<geom::BezierPath> curveEdit;
     bool curveEditDone = false;
+    // Select: dublu click pe o curbă Pen editabilă → Document intră în editarea ei.
+    model::PenCurveId editPenCurve;
 };
 
 struct ToolContext {

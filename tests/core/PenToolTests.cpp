@@ -346,3 +346,36 @@ TEST_CASE("Pen edit: Esc și click în afară termină editarea", "[core][tools]
     CHECK(s.requests.curveEditDone);
     CHECK_FALSE(s.requests.curveEdit);
 }
+
+TEST_CASE("Select: dublu click pe o curbă Pen editabilă cere editarea ei", "[core][tools][pen]")
+{
+    PenScene s;
+    s.click({ 0, 0, 0 });
+    s.drag({ 1000, 800, 0 }, { 1500, 800, 0 });
+    s.click({ 2000, 0, 0 });
+    REQUIRE(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const model::PenCurveId id = s.model.penCurves().keys()[0];
+    auto select = tools::makeTool("select");
+    const geom::BezierPath& path = s.model.penCurves().at(id).path;
+    const Vec2d onCurve = s.screen(geom::bezierPoint(path, 1, 0.5));
+
+    SECTION("pe o curbă editabilă")
+    {
+        select->pointerDown(s.ctx, PenScene::at(onCurve, 1));
+        select->pointerUp(s.ctx, PenScene::at(onCurve, 1));
+        CHECK_FALSE(s.requests.editPenCurve);
+        select->pointerDown(s.ctx, PenScene::at(onCurve, 2));
+        select->pointerUp(s.ctx, PenScene::at(onCurve, 2));
+        CHECK(s.requests.editPenCurve == id);
+    }
+    SECTION("pe una needitabilă (un vârf mutat), comportamentul de până acum")
+    {
+        const geom::Mesh& mesh = s.model.mesh(s.model.root());
+        const geom::VertexId v = mesh.vertices().keys()[1];
+        s.stack.run("Move", [&](geom::Mesh& m) { m.setPosition(v, mesh.position(v) + Vec3d { 0, 0, 50 }); });
+        REQUIRE_FALSE(model::penCurveEditable(s.model, id));
+        select->pointerDown(s.ctx, PenScene::at(onCurve, 2));
+        select->pointerUp(s.ctx, PenScene::at(onCurve, 2));
+        CHECK_FALSE(s.requests.editPenCurve);
+    }
+}
