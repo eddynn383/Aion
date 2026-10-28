@@ -6,6 +6,7 @@ add_executable(aion_tests
     core/ToleranceTests.cpp
     core/FuzzyMatchTests.cpp
     core/CameraTests.cpp
+    core/CameraLensTests.cpp
     core/MathTests.cpp
     core/SlotMapTests.cpp
     core/MeshTests.cpp

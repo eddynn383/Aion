@@ -111,52 +111,266 @@ Column {
         onClicked: root.document.placeSelectedObjectAtView(root.viewport.cameraState())
     }
 
-    // --- Camera ---
-    Slider {
+    // --- Camera (plan Animare, secțiunea 9): formatul, lentila, depth of field, planurile de tăiere ---
+    PropertyGroup {
         visible: root.isCamera
-        width: parent.width
-        label: "Unghi de vedere"
-        from: 10
-        to: 120
-        stepSize: 1
-        value: root.info.fov ?? 50
-        valueText: Math.round(value) + "°"
-        onMoved: root.set({ fov: value })
-    }
-    Toggle {
-        visible: root.isCamera
-        width: parent.width
-        text: "Proiecție paralelă"
-        checked: root.info.orthographic ?? false
-        onToggled: root.set({ orthographic: checked })
-    }
-    Row {
-        visible: root.isCamera
-        width: parent.width
-        spacing: Theme.space1
-        NumberField {
-            width: (parent.width - Theme.space1) / 2
-            label: "Clip ↑"
-            unit: "mm"
-            from: 0
-            value: root.info.nearClip ?? 0
-            onValueModified: (v) => root.set({ nearClip: v })
+        title: "Format"
+        Rectangle {
+            id: formatButton
+            width: parent.width
+            height: Theme.controlHeightSm
+            radius: Theme.radiusMd
+            color: formatArea.containsMouse ? Theme.bgHover : Theme.bgInput
+            readonly property var preset: (root.document ? root.document.cameraFormatPresets() : [])
+                .find(p => p.width === root.info.formatWidth && p.height === root.info.formatHeight)
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.space2
+                anchors.verticalCenter: parent.verticalCenter
+                text: formatButton.preset ? formatButton.preset.name : "Personalizat"
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            Icon {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.space2
+                anchors.verticalCenter: parent.verticalCenter
+                name: "chevron-down"
+                size: 12
+                color: Theme.textTertiary
+            }
+            MouseArea {
+                id: formatArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: formatMenu.openAt(formatButton.x, formatButton.y + formatButton.height + Theme.space1)
+            }
+            ContextMenu {
+                id: formatMenu
+                items: (root.document ? root.document.cameraFormatPresets() : [])
+                    .map(p => ({ id: p.width + "x" + p.height, name: p.name, shortcut: p.width + " × " + p.height }))
+                onTriggered: (id) => {
+                    const wh = id.split("x")
+                    root.set({ formatWidth: parseInt(wh[0]), formatHeight: parseInt(wh[1]) })
+                }
+            }
         }
-        NumberField {
-            width: (parent.width - Theme.space1) / 2
-            label: "Clip ↓"
-            unit: "mm"
-            from: 0
-            value: root.info.farClip ?? 0
-            onValueModified: (v) => root.set({ farClip: v })
+        Row {
+            width: parent.width
+            spacing: Theme.space1
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "L"
+                unit: "px"
+                from: 16
+                to: 16384
+                value: root.info.formatWidth ?? 1920
+                onValueModified: (v) => root.set({ formatWidth: Math.round(v) })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "H"
+                unit: "px"
+                from: 16
+                to: 16384
+                value: root.info.formatHeight ?? 1080
+                onValueModified: (v) => root.set({ formatHeight: Math.round(v) })
+            }
+        }
+    }
+
+    PropertyGroup {
+        visible: root.isCamera
+        title: (root.info.orthographic ?? false) ? "Lentilă · paralelă"
+              : "Lentilă · " + Math.round(root.info.fovH ?? 0) + "° × " + Math.round(root.info.fovV ?? 0) + "°"
+        Row {
+            width: parent.width
+            spacing: Theme.space1
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Focală"
+                unit: "mm"
+                from: 1
+                to: 2000
+                decimals: 0
+                visible: !(root.info.orthographic ?? false)
+                value: root.info.focalLength ?? 35
+                onValueModified: (v) => root.set({ focalLength: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Scară"
+                unit: "mm"
+                from: 1
+                visible: root.info.orthographic ?? false
+                value: root.info.orthoScale ?? 10000
+                onValueModified: (v) => root.set({ orthoScale: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Roll"
+                unit: "°"
+                decimals: 1
+                value: root.info.roll ?? 0
+                onValueModified: (v) => root.set({ roll: v })
+            }
+        }
+        // Focalele uzuale.
+        Row {
+            visible: !(root.info.orthographic ?? false)
+            spacing: Theme.space1
+            Repeater {
+                model: [16, 24, 35, 50, 85, 135]
+                delegate: Button {
+                    required property int modelData
+                    small: true
+                    text: modelData
+                    variant: Math.abs((root.info.focalLength ?? 0) - modelData) < 0.5 ? "primary" : "secondary"
+                    onClicked: root.set({ focalLength: modelData })
+                }
+            }
+        }
+        Rectangle {
+            id: sensorButton
+            visible: !(root.info.orthographic ?? false)
+            width: parent.width
+            height: Theme.controlHeightSm
+            radius: Theme.radiusMd
+            color: sensorArea.containsMouse ? Theme.bgHover : Theme.bgInput
+            readonly property var preset: (root.document ? root.document.cameraSensorPresets() : [])
+                .find(p => Math.abs(p.width - (root.info.sensorWidth ?? 36)) < 0.01)
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.space2
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Senzor: " + (sensorButton.preset ? sensorButton.preset.name : (root.info.sensorWidth ?? 36) + " mm")
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            Icon {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.space2
+                anchors.verticalCenter: parent.verticalCenter
+                name: "chevron-down"
+                size: 12
+                color: Theme.textTertiary
+            }
+            MouseArea {
+                id: sensorArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: sensorMenu.openAt(sensorButton.x, sensorButton.y + sensorButton.height + Theme.space1)
+            }
+            ContextMenu {
+                id: sensorMenu
+                items: (root.document ? root.document.cameraSensorPresets() : []).map(p => ({ id: String(p.width), name: p.name }))
+                onTriggered: (id) => root.set({ sensorWidth: parseFloat(id) })
+            }
+        }
+        Row {
+            width: parent.width
+            spacing: Theme.space1
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Shift X"
+                decimals: 2
+                step: 0.01
+                from: -2
+                to: 2
+                value: root.info.shiftX ?? 0
+                onValueModified: (v) => root.set({ shiftX: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Shift Y"
+                decimals: 2
+                step: 0.01
+                from: -2
+                to: 2
+                value: root.info.shiftY ?? 0
+                onValueModified: (v) => root.set({ shiftY: v })
+            }
+        }
+        Toggle {
+            width: parent.width
+            text: "Proiecție paralelă"
+            checked: root.info.orthographic ?? false
+            onToggled: root.set({ orthographic: checked })
+        }
+    }
+
+    PropertyGroup {
+        visible: root.isCamera
+        title: "Depth of field"
+        Toggle {
+            width: parent.width
+            text: "Claritate doar la distanța de focus"
+            checked: root.info.dofEnabled ?? false
+            onToggled: root.set({ dofEnabled: checked })
+        }
+        Row {
+            visible: root.info.dofEnabled ?? false
+            width: parent.width
+            spacing: Theme.space1
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Focus"
+                unit: "mm"
+                from: 1
+                step: 100
+                value: root.info.focusDistance ?? 5000
+                onValueModified: (v) => root.set({ focusDistance: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "f/"
+                decimals: 1
+                step: 0.1
+                from: 0.5
+                to: 64
+                value: root.info.fStop ?? 2.8
+                onValueModified: (v) => root.set({ fStop: v })
+            }
+        }
+        Button {
+            visible: root.info.dofEnabled ?? false
+            width: parent.width
+            iconName: "focus"
+            text: root.viewport && root.viewport.pickingFocus ? "Click în viewport pe punctul clar…" : "Alege punctul de focus"
+            onClicked: if (root.viewport) root.viewport.pickingFocus = !root.viewport.pickingFocus
+        }
+    }
+
+    PropertyGroup {
+        visible: root.isCamera
+        title: "Planuri de tăiere"
+        Row {
+            width: parent.width
+            spacing: Theme.space1
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Clip ↑"
+                unit: "mm"
+                from: 0
+                value: root.info.nearClip ?? 0
+                onValueModified: (v) => root.set({ nearClip: v })
+            }
+            NumberField {
+                width: (parent.width - Theme.space1) / 2
+                label: "Clip ↓"
+                unit: "mm"
+                from: 0
+                value: root.info.farClip ?? 0
+                onValueModified: (v) => root.set({ farClip: v })
+            }
         }
     }
     Button {
         visible: root.isCamera
         width: parent.width
         variant: "primary"
-        text: "Privește prin cameră"
-        onClicked: root.viewport.animateToCamera(root.document.cameraView(root.info.id), 0.8)
+        text: root.viewport && root.viewport.lookThrough === root.info.id ? "Ieși din cameră (Esc)" : "Privește prin cameră"
+        onClicked: root.viewport.lookThrough = root.viewport.lookThrough === root.info.id ? 0 : root.info.id
     }
 
     // --- Lumina ---

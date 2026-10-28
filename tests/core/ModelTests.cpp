@@ -448,15 +448,15 @@ TEST_CASE("Camere și lumini ca obiecte: adăugare, editare și undo", "[core][m
         l.intensity = 3.0;
         m.setLight(light, l);
         model::CameraObject c = m.cameras().at(camera);
-        c.fov = 80.0;
+        c.focalLength = 80.0;
         m.setCamera(camera, c);
     }));
     CHECK(doc.model.lights().at(light).kind == model::Light::Kind::Spot);
-    CHECK(doc.model.cameras().at(camera).fov == Approx(80.0));
+    CHECK(doc.model.cameras().at(camera).focalLength == Approx(80.0));
 
     REQUIRE(doc.stack.undo());
     CHECK(doc.model.lights().at(light).intensity == Approx(1.0));
-    CHECK(doc.model.cameras().at(camera).fov == Approx(50.0));
+    CHECK(doc.model.cameras().at(camera).focalLength == Approx(35.0));
 
     REQUIRE(doc.stack.run("Șterge", [&](Model& m) {
         m.removeLight(light);

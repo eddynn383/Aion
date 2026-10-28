@@ -276,7 +276,7 @@ Window {
             break
         }
         case "camera.look":
-            if (doc.selectedObject.kind === "camera") viewport.animateToCamera(doc.cameraView(doc.selectedObject.id), 0.8)
+            if (doc.selectedObject.kind === "camera") viewport.lookThrough = doc.selectedObject.id
             else toast.show("Selectează o cameră (în Outliner, la Camere și lumini).")
             break
         case "mode.interaction":
@@ -550,6 +550,13 @@ Window {
                     console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
                                      t => t.channels.map(c => c.property + "=" + c.keys.map(k => k.time + ":" + k.text + ":" + k.easing.name).join("|")))))
+                } else if (action === "debug.look") {
+                    const ci = viewport.lookThrough > 0 ? doc.cameraInfo(viewport.lookThrough) : doc.selectedObject
+                    console.info("look:", viewport.lookThrough, "frame", JSON.stringify(viewport.lookFrame), "lock", viewport.lockCameraToView,
+                                 "camera", JSON.stringify(ci.position), JSON.stringify(ci.target), ci.formatWidth + "x" + ci.formatHeight,
+                                 "undo:", doc.undoName)
+                } else if (action === "look:lock") {
+                    viewport.lockCameraToView = !viewport.lockCameraToView
                 } else if (action === "debug.pivot") {
                     console.info("pivot:", JSON.stringify(doc.pivotMarker()), "mode", doc.workMode, "selected", doc.pivotSelected,
                                  "at", JSON.stringify(doc.pivotPosition))
@@ -746,6 +753,9 @@ Window {
             window.selectTool("select")
         else if (doc.pivotSelected && vcbText.length === 0)
             doc.pivotSelected = false
+        else if (viewport.lookThrough > 0 && vcbText.length === 0
+                 && (window.activeTool === "select" || window.navigationTools.includes(window.activeTool)))
+            viewport.lookThrough = 0
         else if (vcbText.length > 0)
             vcbText = ""
         else
@@ -1623,6 +1633,13 @@ Window {
         ViewportAnnotations {
             anchors.fill: parent
             annotations: viewport.annotations
+            document: doc
+        }
+
+        // Vederea prin cameră: cadrul formatului, eticheta, blocarea pe vedere.
+        CameraFrame {
+            anchors.fill: parent
+            viewport: viewport
             document: doc
         }
 

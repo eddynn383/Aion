@@ -2,10 +2,12 @@
 
 #include "aion/core/Version.h"
 #include "aion/core/model/AnimationEval.h"
+#include "aion/core/model/CameraLens.h"
 #include "aion/core/model/Operations.h"
 
 #include <miniz.h>
 #include <nlohmann/json.hpp>
+#include <glm/trigonometric.hpp>
 
 #include <algorithm>
 #include <fstream>
@@ -182,8 +184,12 @@ json camerasToJson(const model::Model& model)
     for (std::size_t i = 0; i < model.cameras().size(); ++i) {
         const model::CameraObject& c = model.cameras().values()[i];
         out.push_back({ { "id", model.cameras().keys()[i].value }, { "name", c.name }, { "position", vec(c.position) },
-            { "target", vec(c.target) }, { "fov", c.fov }, { "orthographic", c.orthographic },
-            { "near", c.nearClip }, { "far", c.farClip }, { "visible", c.visible } });
+            { "target", vec(c.target) }, { "focalLength", c.focalLength }, { "sensorWidth", c.sensorWidth },
+            { "format", json { c.formatWidth, c.formatHeight } }, { "shift", json { c.shift.x, c.shift.y } },
+            { "roll", c.roll }, { "orthographic", c.orthographic }, { "orthoScale", c.orthoScale },
+            { "near", c.nearClip }, { "far", c.farClip },
+            { "dof", { { "enabled", c.dof.enabled }, { "focus", c.dof.focusDistance }, { "fStop", c.dof.fStop } } },
+            { "displaySize", c.displaySize }, { "visible", c.visible } });
     }
     return out;
 }
@@ -214,10 +220,31 @@ void camerasAndLightsFromJson(const json& doc, model::ChangeSet& changes)
         c.name = j.value("name", std::string());
         c.position = vec(j.value("position", json()), c.position);
         c.target = vec(j.value("target", json()), c.target);
-        c.fov = j.value("fov", c.fov);
+        c.sensorWidth = j.value("sensorWidth", c.sensorWidth);
+        if (const auto f = j.find("format"); f != j.end() && f->is_array() && f->size() == 2) {
+            c.formatWidth = std::max(f->at(0).get<int>(), 1);
+            c.formatHeight = std::max(f->at(1).get<int>(), 1);
+        }
+        if (const auto s = j.find("shift"); s != j.end() && s->is_array() && s->size() == 2) {
+            c.shift = { s->at(0).get<double>(), s->at(1).get<double>() };
+        }
+        c.roll = j.value("roll", 0.0);
+        if (j.contains("focalLength")) {
+            c.focalLength = j.value("focalLength", c.focalLength);
+        } else if (j.contains("fov")) {
+            // Fișierele vechi țineau unghiul vertical: focala care îl păstrează în formatul camerei.
+            c.focalLength = model::focalForVerticalFov(c, glm::radians(j.value("fov", 50.0)));
+        }
         c.orthographic = j.value("orthographic", false);
+        c.orthoScale = j.value("orthoScale", c.orthoScale);
         c.nearClip = j.value("near", 0.0);
         c.farClip = j.value("far", 0.0);
+        if (const auto d = j.find("dof"); d != j.end() && d->is_object()) {
+            c.dof.enabled = d->value("enabled", false);
+            c.dof.focusDistance = d->value("focus", c.dof.focusDistance);
+            c.dof.fStop = d->value("fStop", c.dof.fStop);
+        }
+        c.displaySize = j.value("displaySize", 1.0);
         c.visible = j.value("visible", true);
         changes.cameras[model::CameraId { j.at("id").get<std::uint64_t>() }].after = std::move(c);
     }

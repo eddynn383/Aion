@@ -110,7 +110,7 @@ CameraPose poseLookingAt(const Vec3d& eye, const Vec3d& target)
 
 void Camera::setFovY(double radians)
 {
-    m_fovY = std::clamp(radians, 0.0872664626, 2.6179938780);
+    m_fovY = std::clamp(radians, 0.0043633231, 2.9670597284);
 }
 
 Vec3d Camera::forward() const
@@ -161,7 +161,12 @@ Vec3d Camera::worldForward() const
 
 Vec3d Camera::worldRight() const
 {
-    return { std::sin(m_pose.yaw), -std::cos(m_pose.yaw), 0.0 };
+    const Vec3d level { std::sin(m_pose.yaw), -std::cos(m_pose.yaw), 0.0 };
+    if (m_roll == 0.0) {
+        return level;
+    }
+    const Vec3d up = glm::cross(level, worldForward());
+    return level * std::cos(m_roll) + up * std::sin(m_roll);
 }
 
 Vec3d Camera::worldUp() const
@@ -240,18 +245,26 @@ double Camera::worldFar() const
 Mat4d Camera::projectionMatrix() const
 {
     const double aspect = m_viewport.x / m_viewport.y;
+    Mat4d p(1.0);
     if (m_projection == Projection::Orthographic) {
         const double halfH = m_pose.distance * std::tan(m_fovY * 0.5);
         const double halfW = halfH * aspect;
-        return glm::ortho(-halfW, halfW, -halfH, halfH, worldNear(), worldFar());
+        p = glm::ortho(-halfW, halfW, -halfH, halfH, worldNear(), worldFar());
+        p[3][0] -= m_shift.x;
+        p[3][1] -= m_shift.y;
+        return p;
     }
-    return glm::perspective(m_fovY, aspect, worldNear(), worldFar());
+    p = glm::perspective(m_fovY, aspect, worldNear(), worldFar());
+    // x_ndc = P00 · x / (−z) − P20: centrul proiecției se mută cu −shift (cadrul, cu +shift).
+    p[2][0] = m_shift.x;
+    p[2][1] = m_shift.y;
+    return p;
 }
 
 Ray Camera::rayAt(Vec2d screen) const
 {
-    const double x = 2.0 * screen.x / m_viewport.x - 1.0;
-    const double y = 1.0 - 2.0 * screen.y / m_viewport.y;
+    const double x = 2.0 * screen.x / m_viewport.x - 1.0 + m_shift.x;
+    const double y = 1.0 - 2.0 * screen.y / m_viewport.y + m_shift.y;
     const double tanHalf = std::tan(m_fovY * 0.5);
     const double aspect = m_viewport.x / m_viewport.y;
 

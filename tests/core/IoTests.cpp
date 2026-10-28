@@ -109,7 +109,9 @@ Model sampleModel()
     camera.name = "Intrare";
     camera.position = { -3000, -5000, 1700 };
     camera.target = { 3000, 2000, 1200 };
-    camera.fov = 65.0;
+    camera.focalLength = 24.0;
+    camera.formatWidth = 1600;
+    camera.formatHeight = 1200;
     m.addCamera(camera);
     model::Light lamp;
     lamp.name = "Bec";

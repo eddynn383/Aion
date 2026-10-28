@@ -197,6 +197,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `core/src/view/PickIndex.cpp`, după `Mesh::revision()`); buclele noi pe geometrie la hover trebuie să treacă prin ele.
   Testul de performanță: `aion_tests "[.perf]"`.
 
+- **Camera** (plan Animare, secțiunea 9): `CameraObject` cu focală / senzor, format, shift, roll, `orthoScale`, `dof`,
+  `displaySize`; `model/CameraLens.h` (`cameraFov`, `frameInViewport`, `lookThrough`, `circleOfConfusion`, presetări).
+  Vederea prin cameră: `Viewport::lookThrough` (id; zbor, cadru `lookFrame`, `lookLabel`, `lockCameraToView`,
+  `previewLookAspect`), suprapunerea `shell/CameraFrame.qml`; `Document::setCameraProperties` / `cameraInfo`. Acțiuni:
+  `camera.look`, `look:lock`, `debug.look`, `object:focalLength=50,shiftY=0.1`.
 - **Scurtături personalizabile**: `preferences.customShortcuts` (JSON id comandă → secvență, "" = fără),
   `window.setShortcut` / `resetShortcuts` în Main.qml; `commands` le aplică (păstrează `defaultShortcut`), iar
   `Toolbar.keyFor(tool)` le arată la unelte. Câmpul: `components/ShortcutRecorder.qml`.
