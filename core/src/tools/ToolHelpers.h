@@ -10,6 +10,11 @@ namespace aion::tools {
 // Distanța minimă (în pixeli) de la care o apăsare devine tragere.
 inline constexpr double kDragThresholdPx = 4.0;
 
+// Inferența cu ghidajele, grid-ul și scena contextului.
+[[nodiscard]] inference::Inference inferAt(inference::Engine& engine, const ToolContext& ctx, Vec2d screen,
+    std::optional<Vec3d> from, std::optional<math::Plane> plane = std::nullopt);
+// Normala feței de sub inferență: `inf.normal`, altfel fața din ctx.mesh (`inf.face` / `inf.pick.face`), altfel `fallback`.
+[[nodiscard]] Vec3d inferenceNormal(const ToolContext& ctx, const inference::Inference& inf, Vec3d fallback);
 // Ghidajele și marcajul inferenței, adăugate în overlay.
 void appendInference(Overlay& o, const inference::Inference& inf);
 // Ce se evidențiază sub cursor: muchia sau fața pe care stă punctul inferat (capetele au marcajul lor).

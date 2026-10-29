@@ -4,6 +4,7 @@
 #include "aion/core/geom/Mesh.h"
 #include "aion/core/geom/Selection.h"
 #include "aion/core/inference/Inference.h"
+#include "aion/core/inference/SnapScene.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/math/Vec.h"
@@ -164,6 +165,8 @@ struct ToolContext {
     std::span<const inference::GuideRef> guides;
     // Snap la grid: pasul în mm (0 = oprit).
     double gridStep = 0.0;
+    // Scena de prindere: geometria obiectelor (grupuri, componente, primitive) văzută de inferență. Nul = doar mesh-ul.
+    const inference::SnapScene* snap = nullptr;
     // Transformarea contextului editat (local → model), pentru ce se păstrează în coordonatele modelului.
     math::Transform toWorld;
     // Pivotul selecției (marcajul din viewport), în coordonatele contextului: centrul implicit pentru Rotate și

@@ -6,6 +6,28 @@
 
 namespace aion::tools {
 
+inference::Inference inferAt(inference::Engine& engine, const ToolContext& ctx, Vec2d screen,
+    std::optional<Vec3d> from, std::optional<math::Plane> plane)
+{
+    return engine.withGuides(ctx.guides)
+        .withGridSnap(ctx.gridStep)
+        .withScene(ctx.snap)
+        .infer(ctx.mesh, ctx.camera, screen, from, plane);
+}
+
+Vec3d inferenceNormal(const ToolContext& ctx, const inference::Inference& inf, Vec3d fallback)
+{
+    if (inf.normal) {
+        return *inf.normal;
+    }
+    for (const geom::FaceId face : { inf.face, inf.pick.face }) {
+        if (face && ctx.mesh.faces().contains(face)) {
+            return ctx.mesh.face(face).plane.normal;
+        }
+    }
+    return fallback;
+}
+
 void appendInference(Overlay& o, const inference::Inference& inf)
 {
     for (const inference::Guide& g : inf.guides) {

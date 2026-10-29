@@ -172,7 +172,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         const std::optional<Vec3d> from = m_points.empty() ? std::nullopt : std::optional(m_points.back().point);
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = inferAt(m_engine, ctx, e.screen, from);
         m_closing = !m_pressed && m_points.size() >= 3 && nearFirst(ctx, e.screen);
         if (m_points.empty()) {
             if (m_inference.valid()) {
@@ -282,8 +282,8 @@ private:
         m_normal = { 0, 0, 1 };
         m_origin = m_inference.valid() ? m_inference.point : Vec3d { 0.0 };
         const geom::FaceId face = m_inference.kind == inference::Kind::OnFace ? m_inference.face : m_inference.pick.face;
-        if (face && ctx.mesh.faces().contains(face)) {
-            m_normal = ctx.mesh.face(face).plane.normal;
+        if (m_inference.normal || (face && ctx.mesh.faces().contains(face))) {
+            m_normal = inferenceNormal(ctx, m_inference, m_normal);
             return;
         }
         if (ctx.model == nullptr) {

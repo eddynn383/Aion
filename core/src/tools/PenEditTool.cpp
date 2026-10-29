@@ -82,7 +82,7 @@ public:
         }
         const geom::BezierPoint& original = ctx.editCurve->points[static_cast<std::size_t>(m_index)];
         const Vec3d from = m_grab == Grab::Point ? original.point : m_grab == Grab::Out ? original.out : original.in;
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = inferAt(m_engine, ctx, e.screen, from);
         const std::optional<Vec3d> cursor = onPlane(ctx, e.screen, original.point);
         if (!cursor) {
             return;

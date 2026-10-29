@@ -599,7 +599,7 @@ private:
     {
         m_copy = e.modifiers.alt;
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_base);
+        m_inference = inferAt(m_engine, ctx, e.screen, m_base);
         if (m_base && m_inference.valid()) {
             m_current = m_inference.point;
         }
@@ -742,8 +742,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         m_source = ctx.place.value_or(PlaceSource {});
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen,
-            std::nullopt);
+        m_inference = inferAt(m_engine, ctx, e.screen, std::nullopt);
         if (m_inference.valid()) {
             m_current = m_inference.point;
         }
@@ -1020,14 +1019,12 @@ private:
         }
         const std::optional<Vec3d> from
             = m_phase == Phase::Center && !m_fromPivot ? std::nullopt : std::optional(m_center);
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = inferAt(m_engine, ctx, e.screen, from);
         switch (m_phase) {
         case Phase::Center:
             m_hover = targetHover(ctx, e.screen);
             if (!m_axisLock) {
-                const geom::FaceId face = m_inference.pick.face;
-                m_hoverNormal = face && ctx.mesh.faces().contains(face) ? ctx.mesh.face(face).plane.normal
-                                                                        : Vec3d { 0, 0, 1 };
+                m_hoverNormal = inferenceNormal(ctx, m_inference, Vec3d { 0, 0, 1 });
             }
             updateGrips(ctx, e.screen);
             if (m_fromPivot) {
@@ -1521,7 +1518,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_start);
+        m_inference = inferAt(m_engine, ctx, e.screen, m_start);
         if (m_inference.valid()) {
             m_current = m_inference.point;
         }

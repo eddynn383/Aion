@@ -57,6 +57,9 @@ Vec3d drawingNormal(const ToolContext& ctx, const inference::Inference& inf, con
     if (lock) {
         return inference::axisDirection(*lock);
     }
+    if (inf.normal && (inf.origin == inference::Origin::Object || inf.kind == inference::Kind::OnFace)) {
+        return *inf.normal;
+    }
     const geom::FaceId face = inf.kind == inference::Kind::OnFace ? inf.face : inf.pick.face;
     if (face && ctx.mesh.faces().contains(face)) {
         const math::Plane& plane = ctx.mesh.face(face).plane;
@@ -216,7 +219,7 @@ private:
 
     void track(ToolContext& ctx, const PointerEvent& e)
     {
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_center);
+        m_inference = inferAt(m_engine, ctx, e.screen, m_center);
         if (!m_center) {
             if (m_inference.valid()) {
                 m_hoverNormal = drawingNormal(ctx, m_inference, m_axisLock);
@@ -418,7 +421,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         const std::optional<Vec3d> from = m_phase == Phase::End ? std::optional(m_start) : std::nullopt;
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = inferAt(m_engine, ctx, e.screen, from);
         switch (m_phase) {
         case Phase::Start:
             if (m_inference.valid()) {
@@ -732,7 +735,7 @@ private:
 
     void track(ToolContext& ctx, const PointerEvent& e)
     {
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_center);
+        m_inference = inferAt(m_engine, ctx, e.screen, m_center);
         if (!m_center) {
             if (m_inference.valid()) {
                 m_hoverNormal = drawingNormal(ctx, m_inference, std::nullopt);

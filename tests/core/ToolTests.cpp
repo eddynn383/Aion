@@ -1,6 +1,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Primitives.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/SnapSources.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/tools/Tool.h"
 #include "aion/core/view/Picking.h"
@@ -11,6 +12,7 @@
 #include <glm/trigonometric.hpp>
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 
 using namespace aion;
@@ -1504,4 +1506,142 @@ TEST_CASE("Place: snap la grid", "[core][tools]")
     s.place->pointerDown(s.ctx, { s.screen({ 1130, 980, 0 }), {}, 1 });
     REQUIRE(s.requests.placeAt);
     CHECK(glm::length(*s.requests.placeAt - Vec3d { 1000, 1000, 0 }) < 1e-6);
+}
+
+namespace {
+
+// Un model cu o cutie-obiect (xy centrat în `at`, înălțime 1000), camera izometrică și scena de prindere.
+struct ObjectScene {
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    tools::ToolRequests requests;
+    inference::SnapScene scene;
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+
+    ObjectScene()
+    {
+        stack.setValidation(true, geom::ValidationLevel::Full);
+        stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+        camera.setViewportSize(1000, 800);
+        camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 1500, 500, 300 }, 0, 0, 9000 }));
+        ctx.model = &m;
+        ctx.context = m.root();
+        ctx.requests = &requests;
+        ctx.snap = &scene;
+    }
+
+    model::InstanceId addBox(Vec3d at)
+    {
+        model::Definition def { "Cutie", true };
+        def.shape = "box";
+        const model::DefinitionId d = m.addDefinition(def);
+        geom::buildPrimitive(m.mesh(d), geom::Primitive::Box, { 1000, 1000, 1000 }, 24);
+        model::Instance inst;
+        inst.parent = m.root();
+        inst.definition = d;
+        inst.transform = math::Transform::translation(at);
+        return m.addInstance(inst);
+    }
+
+    void rebuildScene(const std::set<model::InstanceId>& exclude = {}) { scene = model::snapScene(m, {}, exclude); }
+
+    Vec2d screen(Vec3d world) const
+    {
+        const auto s = camera.project(world);
+        REQUIRE(s.has_value());
+        return *s;
+    }
+
+    void click(tools::Tool& tool, Vec3d world)
+    {
+        const tools::PointerEvent e { screen(world), {}, 1 };
+        tool.pointerMove(ctx, e);
+        tool.pointerDown(ctx, e);
+        tool.pointerUp(ctx, e);
+    }
+};
+
+} // namespace
+
+TEST_CASE("Line: capătul pe colțul unui obiect nu atinge obiectul", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId box = s.addBox({ 3000, 0, 0 });
+    s.rebuildScene();
+    const geom::Mesh before = s.m.mesh(s.m.instance(box).definition);
+
+    auto line = tools::makeTool("line");
+    const Vec3d corner { 3500, 500, 1000 };
+    s.click(*line, { 0, 0, 0 });
+    s.click(*line, corner);
+
+    const geom::Mesh& root = s.m.mesh(s.m.root());
+    REQUIRE(root.edges().size() == 1);
+    bool found = false;
+    for (geom::VertexId v : root.vertices().keys()) {
+        found = found || glm::length(root.position(v) - corner) < 1e-6;
+    }
+    CHECK(found);
+    CHECK(s.m.mesh(s.m.instance(box).definition).sameAs(before));
+}
+
+TEST_CASE("Push/Pull: distanța până în dreptul vârfului unui obiect", "[core][tools][snap]")
+{
+    ObjectScene s;
+    s.addBox({ 3000, 0, 0 });
+    s.rebuildScene();
+    s.stack.run("Rect", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
+    });
+    REQUIRE(s.m.mesh(s.m.root()).faces().size() == 1);
+
+    auto pp = tools::makeTool("pushpull");
+    const tools::PointerEvent down { s.screen({ 500, 500, 0 }), {}, 1 };
+    pp->pointerMove(s.ctx, down);
+    pp->pointerDown(s.ctx, down);
+    pp->pointerMove(s.ctx, tools::PointerEvent { s.screen({ 3500, 500, 1000 }) + Vec2d { 2, 0 }, {}, 1 });
+    const tools::PointerEvent up { s.screen({ 3500, 500, 1000 }), {}, 1 };
+    pp->pointerMove(s.ctx, up);
+    pp->pointerUp(s.ctx, up);
+
+    const geom::Mesh& root = s.m.mesh(s.m.root());
+    double top = -1e9;
+    for (geom::VertexId v : root.vertices().keys()) {
+        top = std::max(top, root.position(v).z);
+    }
+    CHECK(top == Approx(1000).margin(1e-6));
+}
+
+TEST_CASE("Rectangle pe fața altui obiect", "[core][tools][snap]")
+{
+    ObjectScene s;
+    s.addBox({ 3000, 0, 0 });
+    s.rebuildScene();
+
+    auto rect = tools::makeTool("rectangle");
+    s.click(*rect, { 2800, -200, 1000 });
+    rect->pointerMove(s.ctx, tools::PointerEvent { s.screen({ 3200, 200, 1000 }), {}, 1 });
+    s.click(*rect, { 3200, 200, 1000 });
+
+    const geom::Mesh& root = s.m.mesh(s.m.root());
+    REQUIRE(root.faces().size() == 1);
+    for (geom::VertexId v : root.vertices().keys()) {
+        CHECK(root.position(v).z == Approx(1000).margin(1e-6));
+    }
+}
+
+TEST_CASE("Move: colțul obiectului mutat pe colțul altui obiect", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId a = s.addBox({ 0, 0, 0 });
+    s.addBox({ 3000, 0, 0 });
+    s.rebuildScene({ a });
+    s.selection.instances.insert(a);
+
+    auto move = tools::makeTool("move");
+    s.click(*move, { 500, 500, 1000 });                  // colțul lui A
+    s.click(*move, { 2500, 500, 1000 });                 // colțul lui B (cel din stânga)
+    CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - Vec3d { 2000, 0, 0 }) < 1e-6);
 }

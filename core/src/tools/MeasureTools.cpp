@@ -135,7 +135,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         m_measureOnly = e.modifiers.alt;
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, m_start);
+        m_inference = inferAt(m_engine, ctx, e.screen, m_start);
         if (m_inference.valid()) {
             m_current = m_inference.point;
         }
@@ -172,8 +172,7 @@ public:
         if (m_phase == Phase::Center) {
             if (m_inference.valid()) {
                 m_center = m_inference.point;
-                const geom::FaceId face = m_inference.pick.face;
-                m_normal = face && ctx.mesh.faces().contains(face) ? ctx.mesh.face(face).plane.normal : Vec3d { 0, 0, 1 };
+                m_normal = inferenceNormal(ctx, m_inference, Vec3d { 0, 0, 1 });
                 m_reference = m_center + anyPerpendicular(m_normal);
                 m_phase = Phase::Reference;
                 m_engine.restartFrom(m_center);
@@ -258,7 +257,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         const std::optional<Vec3d> from = m_phase == Phase::Center ? std::nullopt : std::optional(m_center);
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = inferAt(m_engine, ctx, e.screen, from);
         if (m_phase == Phase::Center || !m_inference.valid()) {
             return;
         }
@@ -397,7 +396,7 @@ private:
     void track(ToolContext& ctx, const PointerEvent& e)
     {
         const std::optional<Vec3d> from = m_phase == Phase::Second ? std::optional(m_a) : std::nullopt;
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, from);
+        m_inference = inferAt(m_engine, ctx, e.screen, from);
         if (m_phase == Phase::Second && m_inference.valid()) {
             m_b = m_inference.point;
         }
@@ -477,7 +476,7 @@ public:
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override
     {
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, std::nullopt);
+        m_inference = inferAt(m_engine, ctx, e.screen, std::nullopt);
     }
 
     void pointerUp(ToolContext& /*ctx*/, const PointerEvent& /*e*/) override { }
@@ -534,9 +533,8 @@ public:
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override
     {
-        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen, std::nullopt);
-        const geom::FaceId face = m_inference.pick.face;
-        m_normal = face && ctx.mesh.faces().contains(face) ? ctx.mesh.face(face).plane.normal : Vec3d { 0, 0, 1 };
+        m_inference = inferAt(m_engine, ctx, e.screen, std::nullopt);
+        m_normal = inferenceNormal(ctx, m_inference, Vec3d { 0, 0, 1 });
         // Normala spre cameră: partea tăiată e cea pe care o vezi.
         const Vec3d toEye = ctx.camera.eye() - m_inference.point;
         if (glm::dot(m_normal, toEye) < 0.0) {
