@@ -53,7 +53,8 @@ Window {
             { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
             { id: "edit.chamfer", title: "Chamfer (teșește plat muchiile sau fața)…", category: "Modelare", shortcut: "", icon: "square" },
             { id: "edit.bevel", title: "Bevel (rotunjește muchiile sau fața)…", category: "Modelare", shortcut: "", icon: "circle" },
-            { id: "edit.soften", title: "Soften / Smooth (muchii netede după unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
+            { id: "edit.subdivide", title: "Subdivide (împarte fețele și rotunjește obiectul)…", category: "Modelare", shortcut: "", icon: "prim-sphere" },
+            { id: "edit.soften", title: "Muchii netede (Soften: ascunde muchiile sub un unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
             { id: "library.save", title: "Salvează obiectul selectat în bibliotecă", category: "Obiecte", shortcut: "", icon: "book-open" },
             { id: "view.environment:simplu", title: "Mediu: simplu", category: "Vizualizare", shortcut: "", icon: "sun" },
             { id: "view.environment:studio", title: "Mediu: studio", category: "Vizualizare", shortcut: "", icon: "sun" },
@@ -326,6 +327,7 @@ Window {
         case "edit.mirrorZ": doc.mirrorSelection(2); break
         case "edit.array": arrayPanel.start(); break
         case "edit.soften": softenPanel.start(); break
+        case "edit.subdivide": subdividePanel.start(); break
         case "edit.chamfer": bevelPanel.start(false); break
         case "edit.bevel": bevelPanel.start(true); break
         case "library.save": window.saveToLibrary(); break
@@ -638,6 +640,16 @@ Window {
                     const size = doc.libraryItemSize(dp[0])
                     viewport.setDropPreview(viewport.dropPointAt(Qt.point(parseFloat(dp[1]), parseFloat(dp[2]))),
                                             Qt.vector3d(size.dx, size.dy, size.dz))
+                } else if (action.startsWith("soften:")) {
+                    // „soften:120”: pragul din panoul Soften deschis (ca o mișcare a slider-ului).
+                    softenPanel.angle = parseFloat(action.slice(7))
+                    softenPanel.update()
+                    console.info("soften:", softenPanel.angle, "undo:", doc.undoName)
+                } else if (action.startsWith("subdivide:")) {
+                    // „subdivide:2”: nivelurile din panoul Subdivide deschis.
+                    subdividePanel.levels = parseInt(action.slice(10))
+                    subdividePanel.update()
+                    console.info("subdivide:", subdividePanel.levels, JSON.stringify(subdividePanel.result), "undo:", doc.undoName)
                 } else if (action.startsWith("scriptjs:")) {
                     // Cod JavaScript direct (pentru teste): „scriptjs:aion.box(0,0,0,100,100,100)”.
                     const r = scripts.run(action.slice(9), "Script")
@@ -820,10 +832,11 @@ Window {
     }
 
     function escapePressed() {
-        if (arrayPanel.visible || softenPanel.visible || bevelPanel.visible) {
+        if (arrayPanel.visible || softenPanel.visible || subdividePanel.visible || bevelPanel.visible) {
             doc.cancelOperation()
             arrayPanel.close()
             softenPanel.close()
+            subdividePanel.close()
             bevelPanel.close()
         } else if (doc.interactionMode)
             window.selectTool("select")
@@ -1103,6 +1116,13 @@ Window {
     }
     SoftenPanel {
         id: softenPanel
+        parent: viewport
+        x: Theme.space3
+        y: 56
+        document: doc
+    }
+    SubdividePanel {
+        id: subdividePanel
         parent: viewport
         x: Theme.space3
         y: 56
@@ -1404,7 +1424,7 @@ Window {
                     actions: HeaderButton {
                         id: addObjectButton
                         iconName: "plus"
-                        tooltip: "Adaugă o cameră sau o lumină"
+                        tooltip: "Adaugă o formă, o cameră sau o lumină"
                         checked: addObjectMenu.opened
                         onClicked: addObjectMenu.opened ? addObjectMenu.close() : addObjectMenu.open()
                         Popover {
@@ -1415,41 +1435,62 @@ Window {
                             padding: Theme.space1
                             contentItem: Column {
                                 Repeater {
-                                    model: [
+                                    // Formele doar în Modelare (ca uneltele 3D din toolbar); camerele și luminile mereu.
+                                    model: (doc.workMode === 0 ? [
+                                        { id: "box", icon: "prim-cube", label: "Cub" },
+                                        { id: "sphere", icon: "prim-sphere", label: "Sferă" },
+                                        { id: "cone", icon: "prim-cone", label: "Con" },
+                                        { id: "cylinder", icon: "prim-cylinder", label: "Cilindru", separatorAfter: true }
+                                    ] : []).concat([
                                         { id: "camera", icon: "camera", label: "Cameră (din vederea curentă)" },
                                         { id: "point", icon: "lightbulb", label: "Lumină punctuală (bec)" },
                                         { id: "spot", icon: "light-spot", label: "Spot" },
                                         { id: "directional", icon: "sun", label: "Lumină direcțională" },
                                         { id: "area", icon: "light-area", label: "Panou luminos" }
-                                    ]
-                                    delegate: Rectangle {
+                                    ])
+                                    delegate: Item {
                                         id: addItem
                                         required property var modelData
                                         width: 232
-                                        height: Theme.controlHeightSm
-                                        radius: Theme.radiusSm
-                                        color: addItemArea.containsMouse ? Theme.bgHover : "transparent"
-                                        Row {
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: Theme.space2
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            spacing: Theme.space2
-                                            Icon { anchors.verticalCenter: parent.verticalCenter; name: addItem.modelData.icon; size: 14; color: Theme.textSecondary }
-                                            Text {
+                                        height: Theme.controlHeightSm + (modelData.separatorAfter === true ? 9 : 0)
+                                        Rectangle {
+                                            width: parent.width
+                                            height: Theme.controlHeightSm
+                                            radius: Theme.radiusSm
+                                            color: addItemArea.containsMouse ? Theme.bgHover : "transparent"
+                                            Row {
+                                                anchors.left: parent.left
+                                                anchors.leftMargin: Theme.space2
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                text: addItem.modelData.label
-                                                color: Theme.textPrimary
-                                                font.pixelSize: Theme.fontSizeSm
+                                                spacing: Theme.space2
+                                                Icon { anchors.verticalCenter: parent.verticalCenter; name: addItem.modelData.icon; size: 14; color: Theme.textSecondary }
+                                                Text {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    text: addItem.modelData.label
+                                                    color: Theme.textPrimary
+                                                    font.pixelSize: Theme.fontSizeSm
+                                                }
+                                            }
+                                            MouseArea {
+                                                id: addItemArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                onClicked: {
+                                                    addObjectMenu.close()
+                                                    outliner.addObject(addItem.modelData.id)
+                                                }
                                             }
                                         }
-                                        MouseArea {
-                                            id: addItemArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: {
-                                                addObjectMenu.close()
-                                                outliner.addObject(addItem.modelData.id)
-                                            }
+                                        Rectangle {
+                                            visible: addItem.modelData.separatorAfter === true
+                                            anchors.bottom: parent.bottom
+                                            anchors.bottomMargin: 4
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.leftMargin: -Theme.space1
+                                            anchors.rightMargin: -Theme.space1
+                                            height: 1
+                                            color: Theme.borderSubtle
                                         }
                                     }
                                 }

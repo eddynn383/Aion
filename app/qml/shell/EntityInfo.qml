@@ -152,6 +152,32 @@ Column {
         }
     }
 
+    // Sferă / cilindru / con: câte laturi au cercurile (mai multe = mai fină). Doar cât geometria e a primitivei.
+    PropertyGroup {
+        id: segmentsBox
+        readonly property int segments: root.isInstance ? (root.info.segments ?? 0) : 0
+        visible: segments > 0 && root.modeling
+        title: "Formă"
+        NumberField {
+            width: segmentsBox.width
+            label: "Segmente"
+            unit: "buc."
+            from: 3
+            to: 128
+            step: 4
+            decimals: 0
+            value: segmentsBox.segments
+            onValueModified: (v) => root.document.setPrimitiveSegments(Math.round(v))
+        }
+        Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Mai multe segmente fac curba mai fină. După Push/Pull sau Subdivide nu se mai pot schimba."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
     // Transformarea: poziția (a pivotului, ca în timeline), dimensiunile, rotația (Euler XYZ) și scara, câte trei
     // valori. Fiecare are un lacăt (blochează valoarea, inclusiv pentru Move / Rotate / Scale) și, cu timeline-ul
     // deschis, un keyframe la hover.

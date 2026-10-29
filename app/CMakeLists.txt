@@ -100,6 +100,7 @@ qt_add_qml_module(aion_app
         qml/shell/InteractionsPanel.qml
         qml/overlays/ArrayPanel.qml
         qml/overlays/SoftenPanel.qml
+        qml/overlays/SubdividePanel.qml
         qml/overlays/BevelPanel.qml
         qml/overlays/ScriptConsole.qml
         qml/overlays/RulesEditor.qml

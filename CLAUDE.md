@@ -136,7 +136,7 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 
 - **Fazele 21–23** (ADR 0023): `model/Modeling.h` (mirror, array liniar / polar, soften), panourile
   `overlays/ArrayPanel.qml` și `SoftenPanel.qml` (previzualizare prin undo: `Document::previewArray` /
-  `previewSoften` / `commitOperation` / `cancelOperation`). Comenzi: `edit.mirrorX|Y|Z`, `edit.array`, `edit.soften`.
+  `previewSoften` / `commitOperation` / `cancelOperation`; o previzualizare care n-a schimbat nimic nu se anulează). Comenzi: `edit.mirrorX|Y|Z`, `edit.array`, `edit.soften`; acțiunea de script `soften:unghi` (cu panoul deschis).
   Atenție în QML: un Popover nu poate avea proprietăți proprii numite `opacity` sau `spacing` (FINAL în Popup).
   Tot în QML: nu folosi `long`, `int`, `short`, `byte`, `char`, `float`, `double` etc. ca nume de variabile JS —
   Qt-ul din CI (qmlcachegen) le respinge („Expected token identifier”), deși Qt 6.12 local le acceptă.
@@ -175,6 +175,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Bevel / chamfer** (Faza 32, ADR 0029): `geom/Bevel.h` (`bevelEdges`, `bevelFace`), `overlays/BevelPanel.qml`,
   `Document::previewBevel`. Comenzi: `edit.chamfer`, `edit.bevel`. În scripturi, `clicks:` pe geometrie are nevoie de
   `AION_SCREENSHOT_DELAY_MS` mai mare (altfel captura se face înainte de acțiuni).
+
+- **Subdivide și segmente** (ADR 0041): `geom/Subdivide.h` (Catmull-Clark), `Document::previewSubdivide`,
+  `overlays/SubdividePanel.qml` (comanda `edit.subdivide`); Soften apare ca „Muchii netede”; `model::primitiveSegments`
+  / `setPrimitiveSegments` (grupul „Formă” din Inspector). Acțiune de script: `subdivide:N` (cu panoul deschis).
+  Meniul „+” din Obiecte creează și forme (`Outliner.addObject`, `Document::createPrimitive`).
 
 - **Fețe din muchii**: `geom::createFaces` (comanda `edit.createFaces`; Line o apelează când retrasează o muchie).
   Cursoarele uneltelor se fac în `app/src/bridge/NavigationCursors.cpp` (găleata, guma).

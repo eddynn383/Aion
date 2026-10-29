@@ -20,6 +20,7 @@ add_library(aion_core STATIC
     src/geom/FaceBuilder.cpp
     src/geom/Sweep.cpp
     src/geom/Primitives.cpp
+    src/geom/Subdivide.cpp
     src/geom/PlanarRegions.cpp
     src/geom/PushPull.cpp
     src/geom/Selection.cpp

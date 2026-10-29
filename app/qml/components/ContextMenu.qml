@@ -15,7 +15,14 @@ Popover {
 
     // Deschide meniul la poziția dată (în coordonatele lui `parent`), fără să iasă din fereastră.
     function openAt(px, py) {
-        rowsWidth = 180
+        // Lățimea din rândurile deja create (items se schimbă înainte de openAt, deci rândurile și-au raportat-o deja).
+        let widest = 180
+        for (let i = 0; i < rows.count; ++i) {
+            const r = rows.itemAt(i)
+            if (r)
+                widest = Math.max(widest, r.implicitWidth)
+        }
+        rowsWidth = widest
         currentIndex = -1
         const p = parent
         x = Math.max(Theme.space2, Math.min(px, p.width - implicitWidth - Theme.space2))
@@ -59,6 +66,7 @@ Popover {
         Keys.onEscapePressed: root.close()
 
         Repeater {
+            id: rows
             model: root.items
 
             delegate: Item {

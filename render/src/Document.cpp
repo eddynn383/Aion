@@ -1,6 +1,7 @@
 #include "aion/render/Document.h"
 
 #include "aion/core/geom/Bevel.h"
+#include "aion/core/geom/Subdivide.h"
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Shapes.h"
 #include "aion/core/inference/Inference.h"
@@ -1020,6 +1021,8 @@ QVariantMap Document::entityInfo() const
                 { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
                 { QStringLiteral("parameters"), parameters } };
         }
+        // Sferă / cilindru / con nemodificate: numărul de segmente (0 = nu se poate schimba).
+        info[QStringLiteral("segments")] = model::primitiveSegments(m_model, inst.definition);
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
         double area = 0.0;
         const auto& tris = triangles(activeDefinition());
@@ -1660,7 +1663,7 @@ void Document::clearSelection()
 }
 
 template <class Fn>
-void Document::runOnModel(const std::string& name, Fn&& fn)
+bool Document::runOnModel(const std::string& name, Fn&& fn)
 {
     // O editare a modelului iese din previzualizarea animației (altfel viewport-ul ar arăta poza animată, nu ce s-a
     // schimbat); doar keyframe-urile (editAnimation) o păstrează.
@@ -1673,13 +1676,14 @@ void Document::runOnModel(const std::string& name, Fn&& fn)
         // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo), iar endMacro
         // anunță o singură dată selecția, Outliner-ul și viewport-ul (altfel 300 de cutii refăceau lista de 300 de ori).
         fn(m_model);
-        return;
+        return true;
     }
-    m_stack.run(name, [&](model::Model& model) { fn(model); });
+    const bool changed = m_stack.run(name, [&](model::Model& model) { fn(model); });
     afterInteraction(before);
     // Entity Info arată și proprietăți ale obiectelor (tag, nume, blocare), nu doar ce e selectat.
     emit selectionChanged();
     emit outlineChanged();
+    return changed;
 }
 
 void Document::makeGroup()
@@ -3675,17 +3679,18 @@ QVariantList Document::contextMenuItems() const
         separator();
         item(QStringLiteral("solid.union"), QStringLiteral("Reuniune"));
         item(QStringLiteral("solid.subtract"), QStringLiteral("Scade al doilea din primul"));
-        item(QStringLiteral("solid.intersect"), QStringLiteral("Intersecție (partea comună)"));
+        item(QStringLiteral("solid.intersect"), QStringLiteral("Intersecție"));
     }
     separator();
-    item(QStringLiteral("edit.mirrorX"), QStringLiteral("Oglindește pe X (roșu)"));
-    item(QStringLiteral("edit.mirrorY"), QStringLiteral("Oglindește pe Y (verde)"));
-    item(QStringLiteral("edit.mirrorZ"), QStringLiteral("Oglindește pe Z (albastru)"));
-    item(QStringLiteral("edit.array"), QStringLiteral("Array (copii în linie sau în cerc)…"));
-    item(QStringLiteral("edit.soften"), QStringLiteral("Soften / Smooth…"));
+    item(QStringLiteral("edit.mirrorX"), QStringLiteral("Oglindește pe X"));
+    item(QStringLiteral("edit.mirrorY"), QStringLiteral("Oglindește pe Y"));
+    item(QStringLiteral("edit.mirrorZ"), QStringLiteral("Oglindește pe Z"));
+    item(QStringLiteral("edit.array"), QStringLiteral("Array…"));
+    item(QStringLiteral("edit.subdivide"), QStringLiteral("Subdivide…"));
+    item(QStringLiteral("edit.soften"), QStringLiteral("Muchii netede…"));
     if (!m_selection.edges.empty() || m_selection.faces.size() == 1) {
-        item(QStringLiteral("edit.chamfer"), QStringLiteral("Chamfer (teșitură plată)…"));
-        item(QStringLiteral("edit.bevel"), QStringLiteral("Bevel (muchie rotunjită)…"));
+        item(QStringLiteral("edit.chamfer"), QStringLiteral("Chamfer…"));
+        item(QStringLiteral("edit.bevel"), QStringLiteral("Bevel…"));
     }
     if (geometry) {
         separator();
@@ -4888,6 +4893,21 @@ void Document::setParameter(const QString& key, double value)
     runOnModel("Parametru", [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), value); });
 }
 
+void Document::setPrimitiveSegments(int segments)
+{
+    if (!require(Modeling)) {
+        return;
+    }
+    if (m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    if (model::primitiveSegments(m_model, def) == 0) {
+        return;
+    }
+    runOnModel("Segmente", [&](model::Model& model) { model::setPrimitiveSegments(model, def, segments); });
+}
+
 void Document::setShapeValue(const QString& key, double value)
 {
     if (!require(Modeling)) {
@@ -5264,7 +5284,8 @@ void Document::previewArray(const QVariantMap& options)
     const int count = std::clamp(options.value(QStringLiteral("count"), 3).toInt(), 1, 500);
     const geom::Selection source = m_previewSelection;
     const bool polar = options.value(QStringLiteral("mode")).toString() == QStringLiteral("polar");
-    runOnModel(polar ? "Array polar" : "Array liniar", [&](model::Model& model) {
+    // Doar un pas adăugat în istoric se anulează la următoarea previzualizare (altfel undo-ul ar lua pasul de dinainte).
+    m_previewApplied = runOnModel(polar ? "Array polar" : "Array liniar", [&](model::Model& model) {
         if (polar) {
             math::Vec3d axis { 0.0 };
             axis[std::clamp(options.value(QStringLiteral("axis"), 2).toInt(), 0, 2)] = 1.0;
@@ -5286,18 +5307,17 @@ void Document::previewArray(const QVariantMap& options)
         }
     });
     m_selection = source;
-    m_previewApplied = true;
     emit selectionChanged();
 }
 
-void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
+QVariantMap Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
 {
     if (!require(Modeling)) {
-        return;
+        return {};
     }
     if (!m_previewApplied && m_selection.empty()) {
         setError(QStringLiteral("Selectează muchiile, fețele sau obiectele de netezit."));
-        return;
+        return {};
     }
     if (m_previewApplied) {
         m_stack.undo();
@@ -5306,7 +5326,17 @@ void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
         m_previewSelection = m_selection;
     }
     const geom::Selection source = m_previewSelection;
-    runOnModel("Soften / Smooth", [&](model::Model& model) {
+    int soft = 0;
+    int total = 0;
+    const auto soften = [&](geom::Mesh& mesh, const std::set<geom::EdgeId>& edges) {
+        soft += model::softenEdges(mesh, edges, maxAngleDegrees, includeCoplanar);
+        for (geom::EdgeId e : edges) {
+            const geom::Edge* edge = mesh.edges().find(e);
+            total += edge != nullptr && edge->faces.size() == 2 ? 1 : 0;
+        }
+    };
+    // Când nicio muchie nu-și schimbă starea (un cub sub prag), nu intră nimic în istoric: nu e nimic de anulat.
+    m_previewApplied = runOnModel("Muchii netede", [&](model::Model& model) {
         // Muchiile selectate și ale fețelor selectate, în context.
         geom::Mesh& mesh = model.mesh(activeDefinition());
         std::set<geom::EdgeId> edges = source.edges;
@@ -5323,21 +5353,116 @@ void Document::previewSoften(double maxAngleDegrees, bool includeCoplanar)
                 }
             }
         }
-        model::softenEdges(mesh, edges, maxAngleDegrees, includeCoplanar);
-        // Obiectele selectate: toate muchiile din definiția lor.
+        soften(mesh, edges);
+        // Obiectele selectate: toate muchiile din definiția lor și din subobiecte (blatul și picioarele unei mese).
         std::set<model::DefinitionId> definitions;
-        for (model::InstanceId id : source.instances) {
-            definitions.insert(model.instance(id).definition);
+        std::vector<model::InstanceId> pending(source.instances.begin(), source.instances.end());
+        while (!pending.empty()) {
+            const model::InstanceId id = pending.back();
+            pending.pop_back();
+            if (!model.instances().contains(id)) {
+                continue;
+            }
+            const model::DefinitionId d = model.instance(id).definition;
+            if (definitions.insert(d).second) {
+                const std::vector<model::InstanceId> children = model.childrenOf(d);
+                pending.insert(pending.end(), children.begin(), children.end());
+            }
         }
         for (model::DefinitionId d : definitions) {
             geom::Mesh& inner = model.mesh(d);
             const std::set<geom::EdgeId> all(inner.edges().keys().begin(), inner.edges().keys().end());
-            model::softenEdges(inner, all, maxAngleDegrees, includeCoplanar);
+            soften(inner, all);
         }
     });
     m_selection = source;
-    m_previewApplied = true;
     emit selectionChanged();
+    return { { QStringLiteral("soft"), soft }, { QStringLiteral("total"), total } };
+}
+
+QVariantMap Document::previewSubdivide(int levels)
+{
+    if (!require(Modeling)) {
+        return {};
+    }
+    if (!m_previewApplied && m_selection.empty()) {
+        setError(QStringLiteral("Selectează obiectele sau fețele de subdivizat."));
+        return {};
+    }
+    if (m_previewApplied) {
+        m_stack.undo();
+        m_selection = m_previewSelection;
+        m_previewApplied = false;
+    } else {
+        m_previewSelection = m_selection;
+    }
+    const geom::Selection source = m_previewSelection;
+    // Ce se subdivizează: în context, fețele conectate de cele selectate (altfel s-ar rupe de vecinele lor); pentru
+    // obiectele selectate, toată geometria lor și a subobiectelor.
+    std::set<geom::FaceId> contextFaces;
+    if (!source.faces.empty() || !source.edges.empty()) {
+        const geom::Selection seed { source.edges, source.faces, {} };
+        contextFaces = geom::connectedTo(m_model.mesh(activeDefinition()), seed).faces;
+    }
+    std::set<model::DefinitionId> definitions;
+    std::vector<model::InstanceId> pending(source.instances.begin(), source.instances.end());
+    while (!pending.empty()) {
+        const model::InstanceId id = pending.back();
+        pending.pop_back();
+        if (!m_model.instances().contains(id)) {
+            continue;
+        }
+        const model::DefinitionId d = m_model.instance(id).definition;
+        if (definitions.insert(d).second) {
+            const std::vector<model::InstanceId> children = m_model.childrenOf(d);
+            pending.insert(pending.end(), children.begin(), children.end());
+        }
+    }
+    const auto facesOf = [](const geom::Mesh& mesh) {
+        return std::set<geom::FaceId>(mesh.faces().keys().begin(), mesh.faces().keys().end());
+    };
+    // Întâi pe copii: o eroare (găuri, prea multe fețe) nu lasă un pas gol sau pe jumătate în istoric.
+    std::size_t total = 0;
+    const auto check = [&](geom::Mesh mesh, const std::set<geom::FaceId>& faces) {
+        if (faces.empty()) {
+            return std::string();
+        }
+        const geom::SubdivideResult r = geom::subdivide(mesh, faces, levels);
+        total += r.selection.faces.size();
+        return r.error;
+    };
+    std::string error = check(m_model.mesh(activeDefinition()), contextFaces);
+    for (model::DefinitionId d : definitions) {
+        if (error.empty()) {
+            error = check(m_model.mesh(d), facesOf(m_model.mesh(d)));
+        }
+    }
+    if (error.empty() && total > geom::kMaxSubdivideFaces) {
+        error = "Ar ieși prea multe fețe (" + std::to_string(total) + "). Alege mai puține niveluri.";
+    }
+    if (error.empty() && total == 0) {
+        error = "Selecția nu are fețe de subdivizat.";
+    }
+    if (!error.empty()) {
+        emit selectionChanged();
+        touch();
+        return { { QStringLiteral("faces"), 0 }, { QStringLiteral("error"), QString::fromStdString(error) } };
+    }
+    m_previewApplied = runOnModel("Subdivide", [&](model::Model& model) {
+        if (!contextFaces.empty()) {
+            (void)geom::subdivide(model.mesh(activeDefinition()), contextFaces, levels);
+        }
+        for (model::DefinitionId d : definitions) {
+            geom::Mesh& mesh = model.mesh(d);
+            (void)geom::subdivide(mesh, facesOf(mesh), levels);
+        }
+    });
+    // Fețele din context s-au înlocuit: selecția păstrează doar obiectele (fețele vechi nu mai există).
+    geom::Selection kept;
+    kept.instances = source.instances;
+    m_selection = kept;
+    emit selectionChanged();
+    return { { QStringLiteral("faces"), static_cast<qulonglong>(total) }, { QStringLiteral("error"), QString() } };
 }
 
 void Document::previewBevel(double distance, int segments)
@@ -5377,11 +5502,10 @@ void Document::previewBevel(double distance, int segments)
         return;
     }
     geom::Selection created;
-    runOnModel(segments > 1 ? "Bevel" : "Chamfer", [&](model::Model& model) {
+    m_previewApplied = runOnModel(segments > 1 ? "Bevel" : "Chamfer", [&](model::Model& model) {
         created = apply(model.mesh(activeDefinition())).selection;
     });
     m_selection = created;
-    m_previewApplied = true;
     emit selectionChanged();
 }
 

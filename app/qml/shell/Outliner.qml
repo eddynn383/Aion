@@ -49,7 +49,15 @@ Item {
 
     // Camerele noi privesc ca vederea curentă; luminile vin deasupra punctului privit.
     function addObject(kind) {
-        if (kind === "camera") {
+        if (kind in root.shapeIcons) {
+            // O formă de 1 m, cu baza pe planul la care privește camera și centrată în punctul acela.
+            const c = root.viewport.cameraState()
+            const side = 1000
+            const id = root.document.createPrimitive(kind, Qt.vector3d(c.tx - side / 2, c.ty - side / 2, c.tz),
+                                                     Qt.vector3d(side, side, side), "")
+            if (id > 0)
+                root.document.selectInstance(id)
+        } else if (kind === "camera") {
             root.document.addCamera(root.viewport.cameraState(), 0)
         } else {
             const c = root.viewport.cameraState()

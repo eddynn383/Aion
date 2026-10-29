@@ -381,6 +381,8 @@ public:
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
     Q_INVOKABLE double createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);
+    // Segmentele sferei / cilindrului / conului selectat (cât geometria e încă a primitivei; vezi model::primitiveSegments).
+    Q_INVOKABLE void setPrimitiveSegments(int segments);
 
     // --- Biblioteca de obiecte (ADR 0026) ---
     // Elementele: { id ("gen:door" | "file:/cale.aion"), name, category, thumbnail (data URL, opțional), user }.
@@ -402,7 +404,7 @@ public:
     void endMacro(bool keep);
     [[nodiscard]] bool inMacro() const { return m_macro; }
     // Operații pe obiecte după id (în contextul editat), folosite de API-ul scripturilor. Întorc id-ul creat (0 = eșec).
-    double createPrimitive(const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name);
+    Q_INVOKABLE double createPrimitive(const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name);
     bool setInstancePlacement(double instanceId, const QVariantMap& placement);
     bool transformInstance(double instanceId, const math::Transform& delta);
     bool removeInstanceById(double instanceId);
@@ -417,8 +419,12 @@ public:
     // commitOperation() / cancelOperation(). options: { mode: "linear"|"polar", count, dx, dy, dz (pasul liniar, mm),
     // axis: 0|1|2, angle (grade între copii), rotate, aroundOrigin (altfel în jurul centrului selecției) }.
     Q_INVOKABLE void previewArray(const QVariantMap& options);
-    // Soften / Smooth cu previzualizare: muchiile selecției (sau toate muchiile obiectelor selectate).
-    Q_INVOKABLE void previewSoften(double maxAngleDegrees, bool includeCoplanar);
+    // Soften / Smooth cu previzualizare: muchiile selecției (sau toate muchiile obiectelor selectate, cu subobiectele).
+    // Întoarce { soft, total }: câte muchii dintre două fețe au rămas soft din câte s-au verificat.
+    Q_INVOKABLE QVariantMap previewSoften(double maxAngleDegrees, bool includeCoplanar);
+    // Subdivide (Catmull-Clark) cu previzualizare: obiectele selectate (cu subobiectele) sau fețele conectate de selecție.
+    // Întoarce { faces, error }: câte fețe are rezultatul sau de ce nu se poate.
+    Q_INVOKABLE QVariantMap previewSubdivide(int levels);
     // Bevel / chamfer cu previzualizare: muchiile selectate sau toate laturile feței selectate. segments = 1 e chamfer
     // (o teșitură plată), mai multe = o rotunjire. Un caz nepermis lasă modelul neschimbat și arată motivul.
     Q_INVOKABLE void previewBevel(double distance, int segments);
@@ -732,7 +738,8 @@ private:
     void retriangulate(model::DefinitionId definition);
     // Rulează o comandă pe model și aduce la zi selecția și contextul.
     template <class Fn>
-    void runOnModel(const std::string& name, Fn&& fn);
+    // Întoarce false dacă operația n-a schimbat nimic (nu s-a adăugat niciun pas în istoric).
+    bool runOnModel(const std::string& name, Fn&& fn);
     void replayPointer();
     void touch();
     void replaceModel(const model::Model& model);

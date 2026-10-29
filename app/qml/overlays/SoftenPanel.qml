@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Templates as T
 import Aion
 
-// Soften / Smooth: muchiile dintre fețe cu unghi mai mic decât pragul devin soft (ascunse, cu umbrire netedă).
+// Muchii netede (Soften): muchiile dintre fețe cu unghi mai mic decât pragul devin soft (ascunse, cu umbrire netedă).
 // Se aplică pe muchiile selecției sau pe toate muchiile obiectelor selectate, cu previzualizare.
 Popover {
     id: root
@@ -10,6 +10,8 @@ Popover {
     property var document
     property real angle: 20
     property bool coplanar: true
+    // Rezultatul ultimei previzualizări: { soft, total }.
+    property var result: ({})
 
     function start() {
         root.open()
@@ -17,7 +19,7 @@ Popover {
     }
     function update() {
         if (root.visible)
-            root.document.previewSoften(root.angle, root.coplanar)
+            root.result = root.document.previewSoften(root.angle, root.coplanar)
     }
 
     modal: false
@@ -28,7 +30,7 @@ Popover {
     contentItem: Column {
         spacing: Theme.space3
         Text {
-            text: "Soften / Smooth"
+            text: "Muchii netede"
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
@@ -52,7 +54,18 @@ Popover {
         Text {
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Sub prag, muchia dispare și umbrirea trece lin peste ea (ca la un cilindru). 0° = toate muchiile vizibile."
+            visible: root.result.total !== undefined
+            text: root.result.total === 0 ? "Selecția nu are muchii între două fețe."
+                : root.result.soft > 0 ? root.result.soft + " din " + root.result.total + " muchii sunt netezite."
+                : "Nicio muchie nu e sub prag. Muchiile unui cub au 90°: ridică pragul peste 90°."
+            color: root.result.soft > 0 ? Theme.textSecondary : Theme.textPrimary
+            font.pixelSize: Theme.fontSizeSm
+        }
+        Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Sub prag, muchia dispare și umbrirea trece lin peste ea (ca la un cilindru). Nu adaugă fețe: ca obiectul să devină "
+                + "mai rotund, folosește Subdivide. 0° = toate muchiile vizibile."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }

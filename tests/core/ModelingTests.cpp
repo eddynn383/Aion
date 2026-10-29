@@ -141,3 +141,43 @@ TEST_CASE("Soften / Smooth: muchiile sub unghiul ales devin soft", "[core][model
     CHECK(all == static_cast<int>(edges.size()));
     CHECK(mesh.validate().ok());
 }
+
+TEST_CASE("Segmentele unei sfere și ale unui cilindru se schimbă cât geometria e a primitivei", "[core][modeling]")
+{
+    Model m;
+    model::Definition sphereDef { "Sferă", true };
+    sphereDef.shape = "sphere";
+    const model::DefinitionId sphere = m.addDefinition(sphereDef);
+    geom::buildPrimitive(m.mesh(sphere), geom::Primitive::Sphere, { 1000, 1000, 1000 }, 24);
+    REQUIRE(model::primitiveSegments(m, sphere) == 24);
+
+    REQUIRE(model::setPrimitiveSegments(m, sphere, 48));
+    CHECK(model::primitiveSegments(m, sphere) == 48);
+    CHECK(m.mesh(sphere).validate(geom::ValidationLevel::Topology).ok());
+    const auto [lo, hi] = model::bounds(m, sphere);
+    CHECK(hi.z - lo.z == Approx(1000.0));
+    CHECK_FALSE(model::setPrimitiveSegments(m, sphere, 48)); // nimic de schimbat
+
+    // Un număr impar de laturi păstrează diametrul (cutia cercului e mai mică decât el).
+    model::Definition cylinderDef { "Cilindru", true };
+    cylinderDef.shape = "cylinder";
+    const model::DefinitionId cylinder = m.addDefinition(cylinderDef);
+    geom::buildPrimitive(m.mesh(cylinder), geom::Primitive::Cylinder, { 600, 600, 900 }, 24);
+    REQUIRE(model::setPrimitiveSegments(m, cylinder, 7));
+    REQUIRE(model::primitiveSegments(m, cylinder) == 7);
+    REQUIRE(model::setPrimitiveSegments(m, cylinder, 24));
+    const auto [clo, chi] = model::bounds(m, cylinder);
+    CHECK(chi.x - clo.x == Approx(600.0));
+    CHECK(chi.z - clo.z == Approx(900.0));
+
+    // O cutie sau o primitivă editată nu au segmente de schimbat.
+    model::Definition boxDef { "Cutie", true };
+    boxDef.shape = "box";
+    const model::DefinitionId box = m.addDefinition(boxDef);
+    geom::buildPrimitive(m.mesh(box), geom::Primitive::Box, { 100, 100, 100 }, 24);
+    CHECK(model::primitiveSegments(m, box) == 0);
+    geom::Mesh& mesh = m.mesh(cylinder);
+    geom::drawLine(mesh, { 0, 0, 900 }, { 300, 0, 900 });
+    CHECK(model::primitiveSegments(m, cylinder) == 0);
+    CHECK_FALSE(model::setPrimitiveSegments(m, cylinder, 12));
+}

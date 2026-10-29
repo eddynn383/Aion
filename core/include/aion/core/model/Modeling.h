@@ -39,4 +39,12 @@ geom::Selection polarArray(Model& model, DefinitionId context, const geom::Selec
 // muchiile dintre fețe coplanare. Întoarce câte muchii au devenit soft.
 int softenEdges(geom::Mesh& mesh, const std::set<geom::EdgeId>& edges, double maxAngleDegrees, bool includeCoplanar);
 
+// Segmentele unei sfere / unui cilindru / con (numărul de laturi ale cercurilor), păstrate în
+// `Definition::parameters["segments"]` (implicit 24). Se pot schimba doar cât geometria e încă cea a primitivei
+// (nemodificată: fără Push/Pull, Subdivide…); altfel, și pentru alte definiții, `primitiveSegments` întoarce 0.
+inline constexpr int kDefaultPrimitiveSegments = 24;
+[[nodiscard]] int primitiveSegments(const Model& model, DefinitionId definition);
+// Reface primitiva cu `segments` (3–128), cu aceleași dimensiuni și același material. Întoarce false dacă nu se poate.
+bool setPrimitiveSegments(Model& model, DefinitionId definition, int segments);
+
 } // namespace aion::model

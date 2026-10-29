@@ -1,6 +1,8 @@
 #include "aion/core/model/Modeling.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
+#include "aion/core/math/Tolerance.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 
@@ -13,6 +15,8 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <optional>
+#include <string>
 
 namespace aion::model {
 
@@ -156,6 +160,112 @@ int softenEdges(geom::Mesh& mesh, const std::set<geom::EdgeId>& edges, double ma
         softened += soft ? 1 : 0;
     }
     return softened;
+}
+
+namespace {
+
+std::optional<geom::Primitive> roundPrimitive(const std::string& shape)
+{
+    if (shape == "cylinder") {
+        return geom::Primitive::Cylinder;
+    }
+    if (shape == "cone") {
+        return geom::Primitive::Cone;
+    }
+    if (shape == "sphere") {
+        return geom::Primitive::Sphere;
+    }
+    return std::nullopt;
+}
+
+int storedSegments(const Definition& definition)
+{
+    const auto it = definition.parameters.find("segments");
+    return it != definition.parameters.end() ? static_cast<int>(std::lround(it->second)) : kDefaultPrimitiveSegments;
+}
+
+// Dimensiunile date la buildPrimitive (baza e centrată în origine). Cutia unui cerc cu un număr impar de laturi e
+// mai mică decât diametrul, așa că raza vine din vârful de la unghiul 0 (cel mai depărtat pe +X), iar la sferă din
+// înălțime (de la pol la pol).
+math::Vec3d primitiveSize(const geom::Mesh& mesh, geom::Primitive kind)
+{
+    math::Vec3d lo { std::numeric_limits<double>::max() };
+    math::Vec3d hi { -std::numeric_limits<double>::max() };
+    for (const geom::Vertex& v : mesh.vertices().values()) {
+        lo = glm::min(lo, v.position);
+        hi = glm::max(hi, v.position);
+    }
+    const double height = hi.z - lo.z;
+    const double diameter = kind == geom::Primitive::Sphere ? height : 2.0 * hi.x;
+    return { diameter, diameter, height };
+}
+
+// Geometria e încă primitiva construită cu `segments`: aceleași numere de vârfuri, muchii și fețe și aceeași cutie.
+bool isPristine(const geom::Mesh& mesh, geom::Primitive kind, int segments)
+{
+    if (mesh.vertices().empty()) {
+        return false;
+    }
+    geom::Mesh fresh;
+    geom::buildPrimitive(fresh, kind, primitiveSize(mesh, kind), segments);
+    if (fresh.vertices().size() != mesh.vertices().size() || fresh.edges().size() != mesh.edges().size()
+        || fresh.faces().size() != mesh.faces().size()) {
+        return false;
+    }
+    return tol::samePoint(primitiveSize(fresh, kind), primitiveSize(mesh, kind), tol::kLength);
+}
+
+} // namespace
+
+int primitiveSegments(const Model& model, DefinitionId definition)
+{
+    if (!model.definitions().contains(definition)) {
+        return 0;
+    }
+    const Definition& def = model.definition(definition);
+    const auto kind = roundPrimitive(def.shape);
+    if (!kind || !def.generator.empty()) {
+        return 0;
+    }
+    const int segments = storedSegments(def);
+    return isPristine(model.mesh(definition), *kind, segments) ? segments : 0;
+}
+
+bool setPrimitiveSegments(Model& model, DefinitionId definition, int segments)
+{
+    const int current = primitiveSegments(model, definition);
+    segments = std::clamp(segments, 3, 128);
+    if (current == 0 || current == segments) {
+        return false;
+    }
+    Definition def = model.definition(definition);
+    geom::Mesh& mesh = model.mesh(definition);
+    const geom::Primitive kind = *roundPrimitive(def.shape);
+    const math::Vec3d size = primitiveSize(mesh, kind);
+    const geom::Face& first = mesh.faces().values().front();
+    const MaterialId material = first.material;
+    const MaterialId backMaterial = first.backMaterial;
+    for (geom::FaceId f : std::vector(mesh.faces().keys())) {
+        mesh.removeFace(f);
+    }
+    for (geom::EdgeId e : std::vector(mesh.edges().keys())) {
+        mesh.removeEdge(e);
+    }
+    for (geom::VertexId v : std::vector(mesh.vertices().keys())) {
+        mesh.removeVertex(v);
+    }
+    geom::buildPrimitive(mesh, kind, size, segments);
+    for (geom::FaceId f : std::vector(mesh.faces().keys())) {
+        if (material) {
+            mesh.setFaceMaterial(f, material);
+        }
+        if (backMaterial) {
+            mesh.setFaceBackMaterial(f, backMaterial);
+        }
+    }
+    def.parameters["segments"] = segments;
+    model.setDefinition(definition, def);
+    return true;
 }
 
 } // namespace aion::model

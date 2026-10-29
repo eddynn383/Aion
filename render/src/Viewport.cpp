@@ -588,14 +588,15 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
         if (view::isHidden(e)) {
             continue;
         }
-        glm::vec4 color = e.faces.empty() ? toVec4(m_freeEdge) : toVec4(m_edge);
+        // În wireframe nu se desenează fețe: toate muchiile stau pe fundal, ca muchiile libere.
+        glm::vec4 color = e.faces.empty() || displayStyle == 3 ? toVec4(m_freeEdge) : toVec4(m_edge);
         float width = kEdgeWidth;
         const bool isMarked = active ? marked.contains(id) : style.marked;
         const bool isSelected = active ? selection.contains(id) : style.selected;
         const bool isHovered
             = active ? (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) : style.hovered;
-        if (e.soft && !(isMarked || (active && (isSelected || isHovered)))) {
-            continue; // muchiile soft (laturile unui cilindru) nu se desenează
+        if (e.soft && displayStyle != 3 && !(isMarked || (active && (isSelected || isHovered)))) {
+            continue; // muchiile soft (laturile unui cilindru) nu se desenează; în wireframe, da (rețeaua sferei)
         }
         // Profil: muchia de margine a unei suprafețe sau cea dintre o față văzută din față și una din spate (aceasta
         // depinde de cameră: se alege la fiecare cadru, din `f.profiles`).
