@@ -31,6 +31,7 @@ add_executable(aion_tests
     core/PickIndexTests.cpp
     core/ModelScaleTests.cpp
     core/CopyingTests.cpp
+    core/AnimationPlayerTests.cpp
     core/TexturingTests.cpp
     core/ParametricTests.cpp
     core/IoTests.cpp

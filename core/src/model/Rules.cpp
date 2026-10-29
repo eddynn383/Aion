@@ -36,6 +36,7 @@ bool RuleRuntime::fire(Model& model, InstanceId self, Trigger trigger, std::stri
         any = true;
         Sequence s;
         s.self = self;
+        s.firing = ++m_firing;
         for (std::size_t a = 0; a < rule.actions.size(); ++a) {
             s.queue.push_back({ rule.actions[a], "r" + std::to_string(r) + "/a" + std::to_string(a) });
         }
@@ -64,11 +65,14 @@ bool RuleRuntime::startNext(Model& model, Sequence& s)
         }
         const InstanceId target = a.target ? a.target : s.self;
         if (a.kind == ActionKind::PlayAnimation) {
-            m_requests.push_back({ a.animation, {} });
+            m_requests.push_back(
+                { a.animation, {}, a.direction, a.repeat, std::to_string(s.self.value) + "/" + q.path, s.firing });
             continue;
         }
         if (a.kind == ActionKind::GoToScene) {
-            m_requests.push_back({ {}, a.scene });
+            HostRequest r;
+            r.goToScene = a.scene;
+            m_requests.push_back(r);
             continue;
         }
         if (a.kind == ActionKind::Wait) {

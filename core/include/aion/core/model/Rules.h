@@ -2,6 +2,7 @@
 
 #include "aion/core/model/Model.h"
 
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <string>
@@ -13,10 +14,14 @@
 // primit (în aplicație, o copie: Modul interacțiune nu atinge documentul).
 namespace aion::model {
 
-// Ce trebuie să facă aplicația (nu ține de geometrie): pornește o animație din timeline sau trece la o scenă.
+// Ce trebuie să facă aplicația (nu ține de geometrie): pornește o animație sau trece la o scenă.
 struct HostRequest {
     AnimationId playAnimation;
     SceneId goToScene;
+    PlayDirection direction = PlayDirection::Forward;
+    int repeat = 1; // 0 = la infinit
+    std::string action; // instanța + calea blocului (oprește bucla infinită a aceluiași bloc)
+    std::uint64_t firing = 0; // blocurile aceleiași declanșări de regulă au același număr
 };
 
 class RuleRuntime {
@@ -45,6 +50,7 @@ private:
     };
     struct Sequence {
         InstanceId self;
+        std::uint64_t firing = 0;
         std::deque<Queued> queue;
         std::optional<Step> current;
     };
@@ -55,6 +61,7 @@ private:
     std::vector<Sequence> m_running;
     std::map<std::pair<InstanceId, std::string>, int> m_alternate;
     std::vector<HostRequest> m_requests;
+    std::uint64_t m_firing = 0;
 };
 
 } // namespace aion::model

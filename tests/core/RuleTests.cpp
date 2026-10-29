@@ -131,3 +131,38 @@ TEST_CASE("Reguli: „Mută la” din fișierele vechi (colțul minim) se migrea
     const io::LoadResult same = io::fromJson(io::toJson(m));
     CHECK(glm::length(same.model->instance(id).rules.front().actions.front().vector - math::Vec3d { 3000, 0, 0 }) < 1e-6);
 }
+
+TEST_CASE("Interacțiuni: PlayAnimation trimite sensul, repetarea, blocul și declanșarea", "[core][rules]")
+{
+    model::Model m;
+    const auto door = makeObject(m);
+    Action first;
+    first.kind = ActionKind::PlayAnimation;
+    first.animation = model::AnimationId { 1 };
+    first.direction = model::PlayDirection::Toggle;
+    first.repeat = 3;
+    Action second = first;
+    second.animation = model::AnimationId { 2 };
+    second.direction = model::PlayDirection::Reverse;
+    second.repeat = 0;
+    setRules(m, door, { Rule { Trigger::Click, "", { first, second } } });
+
+    model::RuleRuntime runtime;
+    REQUIRE(runtime.fire(m, door, Trigger::Click));
+    const std::vector<model::HostRequest> requests = runtime.takeRequests();
+    REQUIRE(requests.size() == 2);
+    CHECK(requests[0].playAnimation == model::AnimationId { 1 });
+    CHECK(requests[0].direction == model::PlayDirection::Toggle);
+    CHECK(requests[0].repeat == 3);
+    CHECK(requests[1].playAnimation == model::AnimationId { 2 });
+    CHECK(requests[1].direction == model::PlayDirection::Reverse);
+    CHECK(requests[1].repeat == 0);
+    CHECK(requests[0].firing == requests[1].firing);
+    CHECK(requests[0].action != requests[1].action);
+
+    REQUIRE(runtime.fire(m, door, Trigger::Click)); // o declanșare nouă
+    const std::vector<model::HostRequest> again = runtime.takeRequests();
+    REQUIRE(again.size() == 2);
+    CHECK(again[0].firing != requests[0].firing);
+    CHECK(again[0].action == requests[0].action); // același bloc
+}
