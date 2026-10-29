@@ -211,6 +211,7 @@ struct DocumentPass {
 
 struct Viewport::DocumentPassCache {
     struct Key {
+        const void* document = nullptr;
         unsigned revision = 0;
         unsigned interaction = 0;
         bool clean = false;
@@ -1984,8 +1985,9 @@ std::shared_ptr<const DocumentPass> Viewport::documentPass(const std::optional<g
 {
     // Tot ce schimbă desenul modelului: documentul (modelul, selecția, hover-ul, unealta cresc `revision`), aspectul
     // (culori, stil, profile), texturile, secțiunea, vederea curată (export, redare) și cutia demo.
-    DocumentPassCache::Key key { m_document ? m_document->revision() : 0U, m_document ? m_document->interactionRevision() : 0U,
-        cleanView(), m_demoVisible, m_appearanceGeneration, m_displayStyle, textures, section };
+    DocumentPassCache::Key key { m_document, m_document ? m_document->revision() : 0U,
+        m_document ? m_document->interactionRevision() : 0U, cleanView(), m_demoVisible, m_appearanceGeneration,
+        m_displayStyle, textures, section };
     if (m_documentPass->pass && m_documentPass->key == key) {
         return m_documentPass->pass;
     }

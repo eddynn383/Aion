@@ -2061,6 +2061,7 @@ void Document::setActiveAnimation(double id)
     }
     m_activeAnimation = m_model.animations().contains(next) ? next : model::AnimationId {};
     m_playing = false;
+    ++m_interactionRevision; // poza obiectelor (și căile) vin din altă animație: viewport-ul se reface
     emit timelineChanged();
     emit changed();
 }
