@@ -1153,9 +1153,11 @@ std::optional<std::pair<QString, double>> Viewport::objectHandleAt(QPointF posit
                 continue;
             }
             const std::vector<math::Vec3d> samples = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
-            for (std::size_t k = 0; k + 1 < samples.size(); ++k) {
+            // O cale închisă are și segmentul dintre ultimul eșantion și primul.
+            const std::size_t count = path.curve.closed ? samples.size() : samples.size() - 1;
+            for (std::size_t k = 0; samples.size() > 1 && k < count; ++k) {
                 const auto a = m_camera.project(path.transform.applyToPoint(samples[k]));
-                const auto b = m_camera.project(path.transform.applyToPoint(samples[k + 1]));
+                const auto b = m_camera.project(path.transform.applyToPoint(samples[(k + 1) % samples.size()]));
                 if (!a || !b) {
                     continue;
                 }

@@ -28,6 +28,8 @@ Item {
                 const kind = o.kind === "camera" || o.kind === "path" ? o.kind : "light"
                 out.push(Object.assign({}, o, { lightKind: o.kind, kind: kind, depth: 0,
                     hasChildren: false, copies: 1, hidden: !o.visible, locked: false,
+                    // O cale a altei animații: estompată, cu numele animației ei.
+                    otherAnimation: kind === "path" && !o.active ? (o.animationName || "altă animație") : "",
                     selected: selected.id === o.id && selected.kind === kind }))
             }
         }
@@ -191,17 +193,28 @@ Item {
                     color: row.modelData.current ? Theme.accent
                          : row.modelData.kind === "light" ? row.modelData.color
                          : row.isGroup ? Theme.textPrimary : Theme.textSecondary
-                    opacity: row.modelData.hidden || row.modelData.enabled === false ? 0.45 : 1
+                    opacity: row.modelData.hidden || row.modelData.enabled === false || row.modelData.otherAnimation ? 0.45 : 1
                 }
                 Text {
                     visible: !row.editing
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - 16 - Theme.iconSizeSm - Theme.space1 * 3 - copiesText.width - tagDot.width)
+                    width: Math.max(0, parent.width - 16 - Theme.iconSizeSm - Theme.space1 * 3 - copiesText.width - tagDot.width
+                                       - animationText.width)
                     text: row.modelData.name
                     elide: Text.ElideRight
-                    color: row.modelData.hidden ? Theme.textTertiary : Theme.textPrimary
+                    color: row.modelData.hidden || row.modelData.otherAnimation ? Theme.textTertiary : Theme.textPrimary
                     font.pixelSize: Theme.fontSizeSm
                     font.weight: row.isGroup || row.modelData.current ? Font.DemiBold : Font.Normal
+                }
+                Text {
+                    id: animationText
+                    visible: !row.editing && !!row.modelData.otherAnimation
+                    width: visible ? Math.min(implicitWidth, 96) : 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: row.modelData.otherAnimation ?? ""
+                    elide: Text.ElideRight
+                    color: Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
                 }
                 Text {
                     id: copiesText

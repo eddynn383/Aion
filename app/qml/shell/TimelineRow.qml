@@ -234,7 +234,7 @@ Item {
             MouseArea {
                 id: barArea
                 anchors.fill: parent
-                anchors.rightMargin: 8
+                anchors.rightMargin: endArea.width
                 hoverEnabled: true
                 cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                 property real pressX: 0
@@ -264,7 +264,7 @@ Item {
             MouseArea {
                 id: endArea
                 anchors.right: parent.right
-                width: 8
+                width: Math.min(8, parent.width * 0.35) // o bară scurtă rămâne de tras de mijloc
                 height: parent.height
                 hoverEnabled: true
                 cursorShape: Qt.SizeHorCursor
