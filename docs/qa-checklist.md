@@ -42,7 +42,18 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Undo / Redo imediat după Creează grup (grupul selectat), din interiorul grupului, după Desface și după Interact: fără crash
 ## Fișiere
 - [ ] Salvează / Deschide `.aion`, punctul de „modificat” din titlu, întrebarea la închidere
-- [ ] Autosalvare: închide forțat aplicația cu modificări, repornește → bannerul de recuperare
+- [ ] Autosalvare: închide forțat aplicația cu modificări (după > 1 min), repornește → ecranul de start cu cardul
+  „Aion s-a închis neașteptat”; Recuperează deschide documentul (modificat, cu fișierul lui); Renunță îl șterge
+## Ecranul de start (ADR 0040)
+- [ ] La pornire (Finder / Dock, fără fișier): banda Aion, Document nou, Deschide…, Redeschide „ultimul”, recentele cu
+  miniatură, dosar și moment („azi, 14:32”); light și dark
+- [ ] Click pe un recent / Redeschide / Enter → se deschide; săgețile ↑ ↓ aleg rândul; Esc sau click în afară → document gol
+- [ ] Document nou (⌘N), Deschide… (⌘O, dialogul); Turul uneltelor și Preferințe… pornesc din bara de jos
+- [ ] „Arată la pornire” oprit (sau Preferințe → General → Ecranul de start) → la repornire nu apare; apare totuși după
+  o închidere bruscă, cu copia de recuperare
+- [ ] Dublu-click pe un `.aion` cu aplicația închisă → se deschide fișierul, fără ecranul de start
+- [ ] Ajutor → Ecranul de start îl redeschide oricând; după ce l-ai închis fără să alegi, bannerul de recuperare rămâne
+- [ ] Două instanțe deodată (din terminal): a doua nu oferă copia primei; o recuperare ignorată rămâne la pornirile următoare
 - [ ] Export OBJ, GLB, glTF, PNG; deschide GLB-ul în Blender; import OBJ / glTF
 ## Raport de cantități (Fișier → Raport de cantități)
 - [ ] General: arie totală, volumul solidelor, obiectele cu bucăți (copiile unui obiect adunate), materiale, tag-uri
@@ -97,7 +108,7 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Model mare (mii de fețe): navigare fluentă, picking fără întârzieri
 ## Pagina de Preferințe (⌘,)
 - [ ] Categorii: General, Unități, Salvare, Aspect, Viewport, Navigare, Grid și snap, Scurtături; Esc / × închide
-- [ ] Salvare: autosalvare oprită → nu mai apare bannerul de recuperare; interval 1–30 min
+- [ ] Salvare: autosalvare oprită → nu mai apare copia de recuperare; interval 1–30 min
 - [ ] Aspect: accentul (8 culori) și culorile personalizate (ColorDialog) se aplică imediat, separat pentru light și dark; Resetează
 - [ ] Viewport: MSAA (fără / 2× / 4× / 8×) și calitatea umbrelor schimbă imaginea; „Arată fps”
 ## Ghiduri și tur
@@ -114,7 +125,7 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 ## Web (Faza 12)
 - [ ] Pagina din artefactul CI `aion-web` (servită local, de exemplu `python3 -m http.server`) pornește în Chrome, Safari, Firefox
 - [ ] Deschide (selectorul browserului), Salvează (download .aion), Exportă (OBJ + MTL, GLB, PNG), Importă
-- [ ] Reîncarcă pagina după modificări (> 1 min) → bannerul de recuperare
+- [ ] Reîncarcă pagina după modificări (> 1 min) → ecranul de start cu copia de recuperare (fără recente pe web)
 - [ ] Umbrele: merg sau se dezactivează fără erori; fps pe casa din Faza 5
 ## Interacțiuni cu blocuri (Faza 18)
 - [ ] Inspector → „Interacțiuni cu blocuri…” pe un grup: editorul se deschide cu numele obiectului
