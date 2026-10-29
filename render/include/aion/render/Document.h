@@ -453,6 +453,9 @@ public:
     // Transformarea de afișat pentru o instanță în mișcare (altfel nullopt: cea din model).
     std::optional<math::Transform> displayTransform(model::InstanceId instance) const;
     unsigned interactionRevision() const { return m_interactionRevision; }
+    // Se schimbă doar când se schimbă modelul (istoricul, runOnModel, înlocuirea lui), nu și la hover sau la selecție.
+    // Cât e deschisă o tranzacție (o unealtă trage și modifică modelul pe loc), urmează orice atingere a documentului.
+    std::uint64_t modelRevision() const;
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
     // --- Modul interacțiune ---
@@ -668,6 +671,22 @@ private:
     template <class Fn>
     void withTool(const view::Camera& camera, Fn&& fn);
     void afterInteraction(const geom::Selection& before);
+    // Ce se vede din unealtă (hover-ul și overlay-ul). O mișcare de mouse care nu-l schimbă, fără schimbări în model
+    // sau în selecție, nu atinge documentul: altfel fiecare hover refăcea tot desenul modelului.
+    struct ToolLook {
+        view::PickResult::Kind kind = view::PickResult::Kind::None;
+        geom::VertexId vertex;
+        geom::EdgeId edge;
+        geom::FaceId face;
+        model::InstanceId instance;
+        math::Vec3d vertexPoint { 0.0 }; // doar pentru un vârf (marcajul lui se desenează)
+        tools::Overlay overlay;
+        std::uint64_t model = 0;
+
+        bool operator==(const ToolLook&) const = default;
+    };
+    ToolLook toolLook() const;
+    std::optional<ToolLook> m_lookBeforeMove;
     // Undo / redo: pasul din istoric și tot ce depinde de model (animația activă, timeline-ul, panourile).
     template <class Fn>
     void stepHistory(Fn&& step);

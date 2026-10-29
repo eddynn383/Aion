@@ -14,12 +14,16 @@
 #include <QKeySequence>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <QPointer>
 #include <QGuiApplication>
 #include <QHash>
 #include <qpa/qwindowsysteminterface.h>
 #include <QQuickWindow>
 
+#include <cmath>
+#include <memory>
 #include <utility>
 
 namespace {
@@ -293,6 +297,48 @@ void AppInfo::simulateDrag(QQuickItem* item, const QPointF& from, const QPointF&
     if (release) {
         send(QEvent::MouseButtonRelease, to, Qt::LeftButton, Qt::NoButton);
     }
+}
+
+void AppInfo::simulateNavigation(QQuickItem* item, const QPointF& center, double radius, double seconds,
+    const QString& mode) const
+{
+    if (item == nullptr || item->window() == nullptr) {
+        return;
+    }
+    QPointer<QQuickWindow> window = item->window();
+    const bool hover = mode == QLatin1String("hover");
+    const Qt::MouseButton button = hover ? Qt::NoButton : Qt::MiddleButton;
+    const Qt::KeyboardModifiers mods = mode == QLatin1String("pan") ? Qt::ShiftModifier : Qt::NoModifier;
+    // Prin coada evenimentelor de sistem, ca mouse-ul real (aceeași cale, aceeași comprimare a mișcărilor).
+    const auto send = [window, mods](QEvent::Type type, const QPointF& scenePos, Qt::MouseButton b, Qt::MouseButtons buttons) {
+        if (window) {
+            QWindowSystemInterface::handleMouseEvent(window, scenePos, window->mapToGlobal(scenePos), buttons, b, type, mods);
+        }
+    };
+    const QPointF middle = item->mapToScene(center);
+    send(QEvent::MouseMove, middle + QPointF(radius, 0.0), Qt::NoButton, Qt::NoButton);
+    if (!hover) {
+        send(QEvent::MouseButtonPress, middle + QPointF(radius, 0.0), button, button);
+    }
+    auto* timer = new QTimer(window); // NOLINT(cppcoreguidelines-owning-memory): îl distruge fereastra / el însuși
+    auto elapsed = std::make_shared<QElapsedTimer>();
+    elapsed->start();
+    QObject::connect(timer, &QTimer::timeout, timer, [=] {
+        const double t = static_cast<double>(elapsed->elapsed()) / 1000.0;
+        const double angle = t * 2.0; // ~3 s pe tură
+        const QPointF p = middle + QPointF(std::cos(angle), std::sin(angle)) * radius;
+        if (t >= seconds) {
+            if (!hover) {
+                send(QEvent::MouseButtonRelease, p, button, Qt::NoButton);
+            }
+            timer->stop();
+            timer->deleteLater();
+            return;
+        }
+        send(QEvent::MouseMove, p, Qt::NoButton, button == Qt::NoButton ? Qt::MouseButtons {} : Qt::MouseButtons(button));
+    });
+    timer->setTimerType(Qt::PreciseTimer);
+    timer->start(8);
 }
 
 void AppInfo::simulateRightClick(QQuickItem* item, const QPointF& position) const

@@ -107,6 +107,7 @@ Model& Model::operator=(const Model& other)
     m_root = other.m_root;
     m_definitions = other.m_definitions;
     m_instances = other.m_instances;
+    instancesChanged();
     m_tags = other.m_tags;
     m_materials = other.m_materials;
     m_guides = other.m_guides;
@@ -137,14 +138,17 @@ Model& Model::operator=(const Model& other)
 
 std::vector<InstanceId> Model::childrenOf(DefinitionId parent) const
 {
-    std::vector<InstanceId> out;
-    for (std::size_t i = 0; i < m_instances.size(); ++i) {
-        if (m_instances.values()[i].parent == parent) {
-            out.push_back(m_instances.keys()[i]);
+    if (!m_children) {
+        auto& index = m_children.emplace();
+        for (std::size_t i = 0; i < m_instances.size(); ++i) {
+            index[m_instances.values()[i].parent.value].push_back(m_instances.keys()[i]);
+        }
+        for (auto& [definition, children] : index) {
+            std::sort(children.begin(), children.end());
         }
     }
-    std::sort(out.begin(), out.end());
-    return out;
+    const auto it = m_children->find(parent.value);
+    return it == m_children->end() ? std::vector<InstanceId> {} : it->second;
 }
 
 std::vector<InstanceId> Model::instancesOf(DefinitionId definition) const
@@ -294,6 +298,7 @@ InstanceId Model::addInstance(Instance instance)
 {
     assert(m_definitions.contains(instance.parent) && m_definitions.contains(instance.definition));
     const InstanceId id = m_instances.insert(std::move(instance));
+    instancesChanged();
     if (m_recording) {
         m_recording->instances[id];
     }
@@ -306,12 +311,16 @@ void Model::removeInstance(InstanceId id)
 {
     touch(id);
     m_instances.erase(id);
+    instancesChanged();
     notifyStructure();
 }
 
 void Model::setInstance(InstanceId id, Instance instance)
 {
     touch(id);
+    if (m_instances.at(id).parent != instance.parent) {
+        instancesChanged();
+    }
     m_instances.at(id) = std::move(instance);
     notifyStructure();
 }
@@ -643,6 +652,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.materials, m_materials, direction);
         applyMeshes();
         applyChanges(changes.instances, m_instances, direction);
+        instancesChanged();
         applyChanges(changes.tags, m_tags, direction);
         applyChanges(changes.guides, m_guides, direction);
         applyChanges(changes.annotations, m_annotations, direction);
@@ -676,6 +686,7 @@ void Model::apply(const ChangeSet& changes, geom::ChangeDirection direction)
         applyChanges(changes.cameras, m_cameras, direction);
         applyChanges(changes.lights, m_lights, direction);
         applyChanges(changes.instances, m_instances, direction);
+        instancesChanged();
         applyChanges(changes.tags, m_tags, direction);
         applyMeshes();
         applyChanges(changes.materials, m_materials, direction);

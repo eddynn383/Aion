@@ -7,6 +7,7 @@
 
 #include <QImage>
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -81,9 +82,10 @@ struct ViewportFrame {
     // Desenate după tot restul, fără test de adâncime: ghidajele și marcajele inferenței.
     std::vector<LineInstance> topLines;
     std::vector<PointInstance> topPoints;
-    std::vector<MeshVertex> triangles;
+    // Triunghiurile se schimbă rar (vezi `meshRevision`): Viewport le păstrează între cadre și le dă fără copie.
+    std::shared_ptr<const std::vector<MeshVertex>> triangles;
     // Fețele transparente (sticlă, x-ray): desenate după cele opace, cu amestec.
-    std::vector<MeshVertex> transparent;
+    std::shared_ptr<const std::vector<MeshVertex>> transparent;
     // Texturile materialelor (câte un strat în array-ul din shader, în ordinea din model) și semnătura lor:
     // renderer-ul le reîncarcă doar când semnătura se schimbă.
     std::vector<QImage> textures;

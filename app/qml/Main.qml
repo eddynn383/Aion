@@ -633,6 +633,20 @@ Window {
                     // „script:0” rulează exemplul 0 din consolă.
                     const r = scripts.run(scripts.examples[parseInt(action.slice(7))].code, "Script")
                     console.info("script:", r.ok, r.output, r.error)
+                } else if (action.startsWith("fpslog:")) {
+                    // „fpslog:secunde”: doar fps-ul în fiecare secundă (de exemplu în repaus).
+                    navBenchLog.left = parseInt(action.slice(7))
+                    navBenchLog.start()
+                } else if (action.startsWith("navbench:")) {
+                    // „navbench:orbit|pan|hover,secunde”: mouse-ul în timp real, în mijlocul viewport-ului. Fereastra vine în
+                    // față: una acoperită nu primește cadre (macOS), iar măsurătoarea n-ar spune nimic.
+                    window.raise()
+                    window.requestActivate()
+                    const nb = action.slice(9).split(",")
+                    AppInfo.simulateNavigation(viewport, Qt.point(viewport.width / 2, viewport.height / 2), 120,
+                                               parseFloat(nb[1] || 4), nb[0])
+                    navBenchLog.left = Math.ceil(parseFloat(nb[1] || 4)) + 1
+                    navBenchLog.start()
                 } else if (action.startsWith("drags:")) {
                     // Tragere în coordonatele ferestrei: „drags:x1,y1,x2,y2”.
                     const dg = action.slice(6).split(",").map(Number)
@@ -691,6 +705,19 @@ Window {
         id: doc
         activeTool: window.modelingTools.includes(window.activeTool) ? window.activeTool : ""
         onActiveToolChanged: window.vcbText = ""
+    }
+
+    // „navbench:”: fps-ul în fiecare secundă cât durează navigarea simulată.
+    Timer {
+        id: navBenchLog
+        property int left: 0
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            console.info("navbench fps:", viewport.framesPerSecond)
+            if (--left <= 0)
+                stop()
+        }
     }
 
     // Measurements box: ce a tastat utilizatorul (gol = arată valoarea curentă a uneltei).

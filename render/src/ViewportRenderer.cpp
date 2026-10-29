@@ -800,8 +800,9 @@ void ViewportRenderer::render(QRhiCommandBuffer* cb)
                 buffer.reset();
             }
         };
-        upload(m_mesh, m_meshVertexCount, m_frame.triangles);
-        upload(m_transparentMesh, m_transparentVertexCount, m_frame.transparent);
+        static const std::vector<MeshVertex> kNone;
+        upload(m_mesh, m_meshVertexCount, m_frame.triangles ? *m_frame.triangles : kNone);
+        upload(m_transparentMesh, m_transparentVertexCount, m_frame.transparent ? *m_frame.transparent : kNone);
     }
 
     // Harta de umbre, înaintea celorlalte treceri.

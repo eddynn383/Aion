@@ -15,15 +15,16 @@ namespace aion::view {
 namespace {
 
 // Cel mai apropiat punct atins în definiție (geometria ei și instanțele din ea), în coordonatele ei.
-std::optional<math::Vec3d> nearestHit(
-    const model::Model& model, model::DefinitionId definition, const Camera& camera, Vec2d screen)
+// `boxes`: cutiile definițiilor, măsurate o dată pe alegere (multe instanțe au aceeași definiție).
+std::optional<math::Vec3d> nearestHit(const model::Model& model, model::DefinitionId definition, const Camera& camera,
+    Vec2d screen, model::BoundsCache& boxes)
 {
     const math::Ray ray = camera.rayAt(screen);
     std::optional<math::Vec3d> best;
     double bestT = std::numeric_limits<double>::infinity();
     const geom::Mesh& mesh = model.mesh(definition);
     // Toată definiția ratată: nimic de testat înăuntru.
-    const auto [blo, bhi] = model::bounds(model, definition);
+    const auto [blo, bhi] = model::bounds(model, definition, boxes);
     if (blo.x > bhi.x || !rayHitsBox(ray, blo, bhi, 1.0)) {
         return std::nullopt;
     }
@@ -43,7 +44,7 @@ std::optional<math::Vec3d> nearestHit(
             continue;
         }
         const model::Instance& inst = model.instance(child);
-        if (const auto p = nearestHit(model, inst.definition, camera.inContext(inst.transform), screen)) {
+        if (const auto p = nearestHit(model, inst.definition, camera.inContext(inst.transform), screen, boxes)) {
             const math::Vec3d q = inst.transform.applyToPoint(*p);
             const double t = glm::dot(q - ray.origin, ray.direction);
             if (t < bestT) {
@@ -62,12 +63,13 @@ std::optional<InstanceHit> pickInstance(
 {
     const math::Ray ray = camera.rayAt(screen);
     std::optional<InstanceHit> best;
+    model::BoundsCache boxes;
     for (model::InstanceId id : model.childrenOf(context)) {
         if (!model.isVisible(id)) {
             continue;
         }
         const model::Instance& inst = model.instance(id);
-        if (const auto p = nearestHit(model, inst.definition, camera.inContext(inst.transform), screen)) {
+        if (const auto p = nearestHit(model, inst.definition, camera.inContext(inst.transform), screen, boxes)) {
             const math::Vec3d q = inst.transform.applyToPoint(*p);
             const double t = glm::dot(q - ray.origin, ray.direction);
             if (!best || t < best->t) {

@@ -51,6 +51,8 @@ struct OverlayLine {
     bool dashed = false;
     inference::Tint tint = inference::Tint::Neutral;
     bool onTop = false; // ghidajele de inferență se văd și prin fețe
+
+    bool operator==(const OverlayLine&) const = default;
 };
 
 // Punctul inferat de sub cursor, cu tipul lui (culoarea marcajului) și eticheta („Endpoint”).
@@ -60,6 +62,8 @@ struct InferenceMarker {
     inference::Tint tint = inference::Tint::Neutral; // culoarea direcției (axă, magenta), dacă există
     std::string label;
     bool locked = false;
+
+    bool operator==(const InferenceMarker&) const = default;
 };
 
 // Un punct de prindere al unui obiect (Move): colț sau mijloc de muchie al cutiei lui, desenat mare și vizibil.
@@ -68,6 +72,8 @@ struct Grip {
     inference::Kind kind = inference::Kind::Endpoint; // Endpoint = colț, Midpoint = mijloc de muchie
     bool hot = false; // sub cursor
     bool hidden = false; // în spatele obiectului (desenat estompat, prins doar dacă nu e altul vizibil)
+
+    bool operator==(const Grip&) const = default;
 };
 
 // O cotă afișată pe un segment în timpul desenării („2.5 m”).
@@ -75,6 +81,8 @@ struct Dimension {
     Vec3d a;
     Vec3d b;
     std::string text;
+
+    bool operator==(const Dimension&) const = default;
 };
 
 struct Overlay {
@@ -89,6 +97,8 @@ struct Overlay {
     std::optional<InferenceMarker> marker;
     std::vector<Dimension> dimensions;
     std::vector<Grip> grips;
+
+    bool operator==(const Overlay&) const = default;
 };
 
 // Ce arată Measurements box: eticheta („Lungime”) și valoarea curentă („2.5 m”, gol dacă nu e nimic de măsurat).

@@ -109,6 +109,26 @@ TEST_CASE("Unelte: dreptunghi, linie, selecție, ștergere, undo (scenariul din 
     CHECK(s.stack.undoName() == "Line");
 }
 
+TEST_CASE("Select: hover-ul în aceeași față nu schimbă overlay-ul (viewport-ul nu se reface)", "[core][tools]")
+{
+    Scene s;
+    s.stack.run("Rect", [&](Mesh& m) {
+        geom::drawPolygon(m, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } });
+    });
+    auto select = tools::makeTool("select");
+    select->pointerMove(s.ctx, Scene::at(s.screen({ 700, 700, 0 })));
+    const tools::Overlay first = select->overlay();
+    const view::PickResult hover = select->hover();
+    REQUIRE(hover.kind == view::PickResult::Kind::Face);
+    select->pointerMove(s.ctx, Scene::at(s.screen({ 900, 1100, 0 })));
+    CHECK(select->overlay() == first);
+    CHECK(select->hover().kind == hover.kind);
+    CHECK(select->hover().face == hover.face);
+    // Pe o muchie: alt hover (desenul se schimbă).
+    select->pointerMove(s.ctx, Scene::at(s.screen({ 1000, 0, 0 })));
+    CHECK(select->hover().kind == view::PickResult::Kind::Edge);
+}
+
 TEST_CASE("Unelte: linia continuă din ultimul punct și se oprește la închiderea unei fețe", "[core][tools]")
 {
     Scene s;

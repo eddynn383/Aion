@@ -700,6 +700,9 @@ ADR 0036.
 - [x] Documentație (ADR 0036, `CLAUDE.md`, `docs/qa-checklist.md`)
 - [x] Cerințele din 2026-10-28: ștergerea ca în SketchUp (ADR 0037), Pen pe axa Z / pe fețe, Esc / ⌘Z înapoi un nod,
   problemele amânate din revizuire
+- [x] Performanța viewport-ului (cerința din 2026-10-29, ADR 0038): orbit / pan fluide, hover fără refacerea desenului,
+  model fără costuri pătratice, scripturi rapide
+- [ ] (Opțional) Desen păstrat pe definiție, refolosit de instanțe: hover și editare rapide pe modele foarte mari
 
 ---
 

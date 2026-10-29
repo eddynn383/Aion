@@ -26,12 +26,15 @@
 
 #include <atomic>
 #include <deque>
+#include <memory>
 #include <optional>
+#include <tuple>
 #include <utility>
 
 namespace aion::render {
 
 struct ViewportFrame;
+struct DocumentPass;
 
 // Viewport-ul 3D integrat în scena QML. Ține camera și tratează navigarea
 // (mouse, trackpad); randarea propriu-zisă se face în ViewportRenderer.
@@ -94,7 +97,7 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(double exportProgress READ exportProgress NOTIFY sceneAnimationChanged)
     Q_PROPERTY(bool exporting READ exporting NOTIFY sceneAnimationChanged)
 
-    Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY cameraChanged)
+    Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY projectionChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
     // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit", "pan" sau "zoom".
     Q_PROPERTY(QString navigationTool READ navigationTool WRITE setNavigationTool NOTIFY navigationToolChanged)
@@ -226,7 +229,9 @@ public:
 signals:
     void preferredSamplesChanged();
     void appearanceChanged();
+    // Camera s-a mișcat: cel mult o dată pe cadru (vezi `updatePolish`), nu la fiecare eveniment de mouse.
     void cameraChanged();
+    void projectionChanged();
     void lookThroughChanged();
     void lookFrameChanged();
     void pickingFocusChanged();
@@ -252,6 +257,7 @@ protected:
     bool event(QEvent* event) override;
     void timerEvent(QTimerEvent* event) override;
     void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
+    void updatePolish() override;
     void itemChange(ItemChange change, const ItemChangeData& data) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
@@ -345,7 +351,9 @@ private:
     glm::vec4 tintColor(inference::Tint tint) const;
     // Doar modelul (fără selecție, pivot, hover, unealtă): la export și cât rulează animația.
     bool cleanView() const;
-    void appendDocument(ViewportFrame& f) const;
+    // Ce desenează documentul (fără ce depinde de cameră), refolosit între cadre cât timp cheia nu se schimbă.
+    std::shared_ptr<const DocumentPass> documentPass(const std::optional<glm::dvec4>& section, std::size_t textures) const;
+    void appendDocument(DocumentPass& f) const;
     // Cum se desenează o definiție: estompată (în afara grupului editat), selectată, sub cursor, marcată de gumă.
     struct DrawStyle {
         bool dim = false;
@@ -357,7 +365,7 @@ private:
     };
     // Desenează definiția și tot ce conține. `pathIndex`: câte instanțe din calea contextului s-au parcurs
     // (egal cu lungimea căii = contextul editat; -1 = în afara căii).
-    void appendDefinition(ViewportFrame& f, const Document& doc, model::DefinitionId definition,
+    void appendDefinition(DocumentPass& f, const Document& doc, model::DefinitionId definition,
         const math::Transform& toWorld, int pathIndex, DrawStyle style, const view::PickResult& hover,
         const tools::Overlay& overlay) const;
     void showTransientCursor(const QCursor& cursor);
@@ -376,6 +384,11 @@ private:
     void collectTextures(ViewportFrame& f, const Document& doc) const;
     mutable std::map<std::uint64_t, std::pair<std::size_t, QImage>> m_textureCache;
     mutable std::map<std::uint64_t, int> m_textureLayers;
+    struct DocumentPassCache;
+    std::unique_ptr<DocumentPassCache> m_documentPass; // folosit doar din frameForRendering (GUI blocat)
+    unsigned m_appearanceGeneration = 0; // crește la orice schimbare de aspect (culori, stil, profile)
+    // Cutia scenei, refolosită cât timp modelul nu se schimbă.
+    mutable std::optional<std::tuple<std::uint64_t, const void*, view::Vec3d, view::Vec3d>> m_sceneBoundsCache;
     // Camera sau lumina al cărei marcaj e sub cursor: ("camera" | "light", id).
     std::optional<std::pair<QString, double>> objectHandleAt(QPointF position) const;
 
@@ -428,6 +441,8 @@ private:
     QElapsedTimer m_frameClock;
     qint64 m_lastTickNs = 0;
     bool m_ticking = false;
+    bool m_cameraNotifyPending = false; // cameraChanged la următorul updatePolish
+    bool m_notifiedOrthographic = false;
     double m_turntableSecondsLeft = 0.0;
 
     Drag m_drag = Drag::None;

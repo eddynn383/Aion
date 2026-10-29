@@ -10,6 +10,8 @@
 #include <set>
 
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 // Operațiile pe structura modelului: grupuri, componente, explode (vezi ADR 0008).
@@ -139,5 +141,9 @@ void applySceneState(Model& model, const Scene& scene);
 
 // Cutia (min, max) a geometriei unei definiții, cu tot ce conține, în coordonatele ei.
 [[nodiscard]] std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition);
+// La fel, cu cutiile definițiilor deja măsurate (o definiție folosită de multe instanțe se măsoară o dată). Cache-ul
+// e valabil cât timp modelul nu se schimbă.
+using BoundsCache = std::unordered_map<std::uint64_t, std::pair<math::Vec3d, math::Vec3d>>;
+[[nodiscard]] std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition, BoundsCache& cache);
 
 } // namespace aion::model

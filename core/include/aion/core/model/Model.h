@@ -14,6 +14,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // Modelul: definiții (fiecare cu geometria ei), instanțe plasate cu o transformare și tag-uri (vezi ADR 0008).
@@ -508,10 +509,15 @@ private:
     template <class IdT, class T>
     void setEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id, T value);
     void notifyStructure();
+    void instancesChanged() { m_children.reset(); }
 
     DefinitionId m_root;
     geom::SlotMap<DefinitionId, Definition> m_definitions;
     geom::SlotMap<InstanceId, Instance> m_instances;
+    // Copiii fiecărei definiții (după `parent`), construit la nevoie și golit la orice schimbare a instanțelor:
+    // `childrenOf` e chemat recursiv la desen, la alegere și la cutii, iar o trecere prin toate instanțele la fiecare
+    // apel făcea costul pătratic în numărul de obiecte.
+    mutable std::optional<std::unordered_map<std::uint64_t, std::vector<InstanceId>>> m_children;
     geom::SlotMap<TagId, Tag> m_tags;
     geom::SlotMap<MaterialId, Material> m_materials;
     geom::SlotMap<GuideId, Guide> m_guides;
