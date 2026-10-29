@@ -12,6 +12,7 @@
 #include <glm/trigonometric.hpp>
 
 #include <algorithm>
+#include <iterator>
 #include <set>
 #include <cmath>
 
@@ -842,52 +843,6 @@ TEST_CASE("Paint Bucket: o față văzută din spate primește materialul pe ver
     CHECK(mesh.face(face).backMaterial == (up ? model::MaterialId {} : red));
 }
 
-TEST_CASE("Obiecte primitive: două clicuri creează un obiect nou, selectat, cu mărimea aleasă", "[core][tools][primitives]")
-{
-    model::Model m;
-    commands::CommandStack stack(m);
-    geom::Selection selection;
-    view::Camera camera;
-    camera.setViewportSize(1000, 800);
-    camera.setPose(view::standardViewPose(view::StandardView::Top, { { 0, 0, 0 }, 0, 0, 6000 }));
-    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
-    ctx.model = &m;
-    ctx.context = m.root();
-    auto cube = tools::makeTool("cube");
-    REQUIRE(cube);
-    const auto click = [&](Vec3d p) {
-        const auto s = camera.project(p);
-        REQUIRE(s);
-        tools::PointerEvent e;
-        e.screen = *s;
-        cube->pointerMove(ctx, e);
-        cube->pointerDown(ctx, e);
-    };
-    click({ 1000, 1000, 0 });
-    click({ 1400, 1000, 0 }); // raza 400 → latura 800
-    REQUIRE(selection.instances.size() == 1);
-    const model::InstanceId id = *selection.instances.begin();
-    const model::Placement p = model::placementOf(m, id);
-    CHECK(p.size.x == Approx(800.0).margin(1.0));
-    CHECK(p.size.z == Approx(800.0).margin(1.0));
-    CHECK(m.mesh(m.root()).faces().empty()); // geometria e în obiect, nu în model
-    CHECK(model::isSolid(m, m.instance(id).definition));
-    CHECK(m.definition(m.instance(id).definition).shape == "box"); // iconița din listă
-
-    // VCB: lățime și înălțime.
-    auto cylinder = tools::makeTool("cylinder");
-    const auto s = camera.project({ -1000, -1000, 0 });
-    tools::PointerEvent e;
-    e.screen = *s;
-    cylinder->pointerMove(ctx, e);
-    cylinder->pointerDown(ctx, e);
-    REQUIRE(cylinder->applyMeasurement(ctx, "600,1500"));
-    const model::Placement c = model::placementOf(m, *selection.instances.begin());
-    CHECK(c.size.x == Approx(600.0).margin(1.0));
-    CHECK(c.size.z == Approx(1500.0).margin(1e-6));
-    CHECK(m.definition(m.instance(*selection.instances.begin()).definition).shape == "cylinder");
-}
-
 TEST_CASE("Tag-uri pe forme: o față cu tag ascuns nu se mai alege", "[core][view][tags]")
 {
     Mesh mesh;
@@ -1532,12 +1487,12 @@ struct ObjectScene {
         ctx.snap = &scene;
     }
 
-    model::InstanceId addBox(Vec3d at)
+    model::InstanceId addBox(Vec3d at, double side = 1000.0)
     {
         model::Definition def { "Cutie", true };
         def.shape = "box";
         const model::DefinitionId d = m.addDefinition(def);
-        geom::buildPrimitive(m.mesh(d), geom::Primitive::Box, { 1000, 1000, 1000 }, 24);
+        geom::buildPrimitive(m.mesh(d), geom::Primitive::Box, { side, side, side }, 24);
         model::Instance inst;
         inst.parent = m.root();
         inst.definition = d;
@@ -1560,6 +1515,13 @@ struct ObjectScene {
     }
 
     void rebuildScene(const std::set<model::InstanceId>& exclude = {}) { scene = model::snapScene(m, {}, exclude); }
+
+    std::unique_ptr<tools::Tool> make(std::string_view id)
+    {
+        auto tool = tools::makeTool(id);
+        REQUIRE(tool);
+        return tool;
+    }
 
     Vec2d screen(Vec3d world) const
     {
@@ -1626,6 +1588,124 @@ TEST_CASE("Push/Pull: distanța până în dreptul vârfului unui obiect", "[cor
         top = std::max(top, root.position(v).z);
     }
     CHECK(top == Approx(1000).margin(1e-6));
+}
+
+TEST_CASE("Primitive: trei clicuri pentru cub (centru, mărime, înălțime)", "[core][tools][primitives]")
+{
+    ObjectScene s;
+    auto cube = s.make("cube");
+    s.click(*cube, { 1000, 1000, 0 });
+    s.click(*cube, { 1400, 1000, 0 }); // raza 400 → latura 800
+    CHECK(s.m.instances().empty()); // înălțimea abia urmează
+    CHECK(cube->measurement()->label == "Înălțime");
+    s.click(*cube, { 1000, 1000, 1500 });
+
+    REQUIRE(s.selection.instances.size() == 1);
+    const model::InstanceId id = *s.selection.instances.begin();
+    const model::Placement p = model::placementOf(s.m, id);
+    CHECK(p.size.x == Approx(800.0).margin(1e-3));
+    CHECK(p.size.z == Approx(1500.0).margin(1e-3));
+    CHECK(s.m.mesh(s.m.root()).faces().empty()); // geometria e în obiect, nu în model
+    CHECK(model::isSolid(s.m, s.m.instance(id).definition));
+    CHECK(s.m.definition(s.m.instance(id).definition).shape == "box"); // iconița din listă
+}
+
+TEST_CASE("Primitive: înălțimea în dreptul colțului altui obiect", "[core][tools][primitives]")
+{
+    ObjectScene s;
+    s.addBox({ 3000, 0, 0 }, 2500.0);
+    s.rebuildScene();
+    auto cylinder = s.make("cylinder");
+    s.click(*cylinder, { 0, 0, 0 });
+    s.click(*cylinder, { 400, 0, 0 });
+    const Vec3d corner { 4250, -1250, 2500 };
+    cylinder->pointerMove(s.ctx, tools::PointerEvent { s.screen(corner) + Vec2d { 2, 0 }, {}, 1 });
+    const tools::Overlay o = cylinder->overlay();
+    REQUIRE(o.marker);
+    CHECK(o.marker->kind == inference::Kind::Endpoint);
+    // Ghidajul punctat de la colț la vârful înălțimii.
+    CHECK(std::ranges::any_of(o.lines, [&](const tools::OverlayLine& l) {
+        return l.dashed && glm::length(l.a - corner) < 1e-6 && glm::length(l.b - Vec3d { 0, 0, 2500 }) < 1e-6;
+    }));
+    s.click(*cylinder, corner);
+
+    REQUIRE(s.selection.instances.size() == 1);
+    const model::InstanceId id = *s.selection.instances.begin();
+    CHECK(model::placementOf(s.m, id).size.z == Approx(2500.0).margin(1e-6));
+    CHECK(s.m.definition(s.m.instance(id).definition).shape == "cylinder");
+}
+
+TEST_CASE("Primitive: sfera rămâne cu două clicuri", "[core][tools][primitives]")
+{
+    ObjectScene s;
+    auto sphere = s.make("sphere");
+    s.click(*sphere, { 1000, 1000, 0 });
+    s.click(*sphere, { 1400, 1000, 0 });
+    REQUIRE(s.selection.instances.size() == 1);
+    const model::InstanceId id = *s.selection.instances.begin();
+    const model::Placement p = model::placementOf(s.m, id);
+    CHECK(p.size.x == Approx(800.0).margin(1e-3));
+    CHECK(p.size.z == Approx(800.0).margin(1e-3));
+    CHECK(s.m.definition(s.m.instance(id).definition).shape == "sphere");
+}
+
+TEST_CASE("Primitive: VCB pe pași", "[core][tools][primitives]")
+{
+    ObjectScene s;
+    auto cube = s.make("cube");
+    CHECK_FALSE(cube->applyMeasurement(s.ctx, "1000")); // fără centru nu e nimic de măsurat
+    s.click(*cube, { 0, 0, 0 });
+    cube->pointerMove(s.ctx, tools::PointerEvent { s.screen({ 300, 0, 0 }), {}, 1 });
+    CHECK(cube->measurement()->label == "Lățime");
+    CHECK_FALSE(cube->applyMeasurement(s.ctx, "0"));
+    CHECK_FALSE(cube->applyMeasurement(s.ctx, "-5"));
+    REQUIRE(cube->applyMeasurement(s.ctx, "1000"));
+    CHECK(s.m.instances().empty());
+    CHECK(cube->status().find("înălțimea") != std::string::npos);
+    CHECK(cube->measurement()->label == "Înălțime");
+    CHECK_FALSE(cube->applyMeasurement(s.ctx, "0"));
+    CHECK_FALSE(cube->applyMeasurement(s.ctx, "-5"));
+    REQUIRE(cube->applyMeasurement(s.ctx, "500"));
+    REQUIRE(s.selection.instances.size() == 1);
+    const model::Placement p = model::placementOf(s.m, *s.selection.instances.begin());
+    CHECK(p.size.x == Approx(1000.0).margin(1e-6));
+    CHECK(p.size.z == Approx(500.0).margin(1e-6));
+
+    // Lățimea și înălțimea deodată, la pasul 2.
+    auto other = s.make("cube");
+    s.click(*other, { -2000, -2000, 0 });
+    REQUIRE(other->applyMeasurement(s.ctx, "600,1500"));
+    REQUIRE(s.m.instances().size() == 2);
+    const model::Placement c = model::placementOf(s.m, *s.selection.instances.begin());
+    CHECK(c.size.x == Approx(600.0).margin(1e-6));
+    CHECK(c.size.z == Approx(1500.0).margin(1e-6));
+
+    // Lățimea și înălțimea la pasul 3.
+    auto third = s.make("cone");
+    s.click(*third, { -2000, 2000, 0 });
+    s.click(*third, { -1800, 2000, 0 });
+    REQUIRE(third->applyMeasurement(s.ctx, "700,900"));
+    const model::Placement k = model::placementOf(s.m, *s.selection.instances.begin());
+    CHECK(k.size.x == Approx(700.0).margin(1e-6));
+    CHECK(k.size.z == Approx(900.0).margin(1e-6));
+}
+
+TEST_CASE("Primitive: previzualizarea sferei are meridiane și paralele", "[core][tools][primitives]")
+{
+    ObjectScene s;
+    auto sphere = s.make("sphere");
+    s.click(*sphere, { 0, 0, 0 });
+    sphere->pointerMove(s.ctx, tools::PointerEvent { s.screen({ 600, 0, 0 }), {}, 1 });
+    const double r = 600.0; // raza bazei = raza sferei; centrul la înălțimea razei
+    const tools::Overlay o = sphere->overlay();
+    std::vector<tools::OverlayLine> body;
+    std::ranges::copy_if(o.lines, std::back_inserter(body), [](const tools::OverlayLine& l) { return !l.dashed && !l.onTop; });
+    CHECK(body.size() >= 8 * 16);
+    const Vec3d center { 0, 0, r };
+    for (const tools::OverlayLine& l : body) {
+        CHECK(glm::length(l.a - center) == Approx(r).margin(1e-6));
+        CHECK(glm::length(l.b - center) == Approx(r).margin(1e-6));
+    }
 }
 
 TEST_CASE("Rectangle pe fața altui obiect", "[core][tools][snap]")

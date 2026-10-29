@@ -624,6 +624,7 @@ public:
 
     std::string_view id() const override { return m_id; }
 
+    // Pașii: centrul bazei, mărimea (raza), apoi înălțimea (doar cub, cilindru, con; sfera are doi pași).
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
         track(ctx, e);
@@ -635,7 +636,18 @@ public:
             }
             return;
         }
-        commit(ctx, 2.0 * glm::length(m_radius), std::nullopt);
+        const double width = 2.0 * glm::length(m_radius);
+        if (m_heightStep) {
+            if (m_height > tol::kLength) {
+                commit(ctx, width, m_height);
+            }
+            return;
+        }
+        if (m_kind == geom::Primitive::Sphere || width <= tol::kLength) {
+            commit(ctx, width, std::nullopt);
+            return;
+        }
+        startHeight(width);
     }
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override { track(ctx, e); }
@@ -644,6 +656,8 @@ public:
     void cancel(ToolContext& /*ctx*/) override
     {
         m_center.reset();
+        m_heightStep = false;
+        m_inference = {};
         m_engine.reset();
     }
 
@@ -655,36 +669,11 @@ public:
             const double width = 2.0 * glm::length(m_radius);
             if (width > tol::kLength) {
                 const auto [u, v] = axes();
-                const double h = width;
-                // Conturul bazei și al capacului (sau ecuatorul, la sferă), plus muchiile verticale ale cubului.
-                const auto outline = [&](double z, double scale) {
-                    std::vector<Vec3d> pts;
-                    const int n = m_kind == geom::Primitive::Box ? 4 : 32;
-                    for (int k = 0; k < n; ++k) {
-                        const double a = m_kind == geom::Primitive::Box ? std::numbers::pi / 4 + k * std::numbers::pi / 2
-                                                                        : 2.0 * std::numbers::pi * k / n;
-                        const double rr = width / 2 * scale * (m_kind == geom::Primitive::Box ? std::sqrt(2.0) : 1.0);
-                        pts.push_back(*m_center + (u * std::cos(a) + v * std::sin(a)) * rr + m_normal * z);
-                    }
-                    appendPolyline(o, pts, true);
-                    return pts;
-                };
-                const auto base = outline(0.0, 1.0);
-                if (m_kind == geom::Primitive::Sphere) {
-                    outline(h / 2, 1.0);
-                } else if (m_kind != geom::Primitive::Cone) {
-                    const auto top = outline(h, 1.0);
-                    if (m_kind == geom::Primitive::Box) {
-                        for (std::size_t i = 0; i < base.size(); ++i) {
-                            o.lines.push_back({ base[i], top[i], false });
-                        }
-                    }
-                }
-                if (m_kind == geom::Primitive::Cone) {
-                    o.lines.push_back({ base.front(), *m_center + m_normal * h, false });
-                    o.lines.push_back({ base[base.size() / 2], *m_center + m_normal * h, false });
-                }
+                appendBody(o, width, m_heightStep ? m_height : width, u, v);
                 o.dimensions.push_back({ *m_center - u * (width / 2), *m_center + u * (width / 2), units::formatLength(width) });
+                if (m_heightStep && std::abs(m_height) > tol::kLength) {
+                    o.dimensions.push_back({ *m_center, *m_center + m_normal * m_height, units::formatLength(m_height) });
+                }
             }
         }
         appendInference(o, m_inference);
@@ -695,46 +684,192 @@ public:
 
     std::string status() const override
     {
+        if (m_heightStep) {
+            return "Alege înălțimea sau tastează-o · Esc anulează";
+        }
         if (m_center) {
-            return "Alege mărimea sau tastează-o (1000, sau 1000,500 cu înălțimea) · Esc anulează";
+            return "Alege mărimea bazei sau tastează-o (1000, sau 1000,500 cu înălțimea) · Esc anulează";
         }
         return "Alege centrul bazei " + m_name + " (pe o față: în planul ei)";
     }
 
     std::optional<Measurement> measurement() const override
     {
-        const bool round = m_kind != geom::Primitive::Box;
-        return Measurement { round ? "Diametru" : "Latură",
-            m_center ? units::formatLength(2.0 * glm::length(m_radius)) : "" };
+        if (m_heightStep) {
+            return Measurement { "Înălțime", units::formatLength(m_height) };
+        }
+        return Measurement { "Lățime", m_center ? units::formatLength(2.0 * glm::length(m_radius)) : "" };
     }
 
+    // Pasul 2: „1000” = lățimea (sfera: gata), „1000,500” = lățimea și înălțimea. Pasul 3: „500” = înălțimea,
+    // „1000,500” = lățimea și înălțimea.
     bool applyMeasurement(ToolContext& ctx, std::string_view text) override
     {
         const auto values = units::parseLengths(text, 2);
         if (!values || values->empty() || !m_center) {
             return false;
         }
-        const double width = (*values)[0].value_or(2.0 * glm::length(m_radius));
+        for (const auto& value : *values) {
+            if (value && *value <= tol::kLength) {
+                return false;
+            }
+        }
+        const double current = 2.0 * glm::length(m_radius);
+        if (m_heightStep && values->size() == 1) {
+            if (!(*values)[0]) {
+                return false;
+            }
+            commit(ctx, current, *(*values)[0]);
+            return true;
+        }
+        const double width = (*values)[0].value_or(current);
         if (width <= tol::kLength) {
             return false;
         }
-        std::optional<double> height;
-        if (values->size() > 1 && (*values)[1] && *(*values)[1] > tol::kLength) {
-            height = *(*values)[1];
+        if (values->size() > 1 && (*values)[1]) {
+            commit(ctx, width, *(*values)[1]);
+            return true;
         }
-        commit(ctx, width, height);
+        if (m_heightStep) {
+            return false; // „1000,” la pasul 3: lipsește înălțimea
+        }
+        if (m_kind == geom::Primitive::Sphere) {
+            commit(ctx, width, std::nullopt);
+            return true;
+        }
+        m_radius = axes().first * (width / 2);
+        startHeight(width);
         return true;
     }
 
 private:
+    static constexpr int kSegments = 16; // rezoluția cercurilor din previzualizare
+
     [[nodiscard]] std::pair<Vec3d, Vec3d> axes() const
     {
         const Vec3d u = glm::length(m_radius) > tol::kLength ? glm::normalize(m_radius) : anyPerpendicular(m_normal);
         return { u, glm::cross(m_normal, u) };
     }
 
+    // Direcția privirii spre `point`, din camera de la ultimul `track` (perspectivă: din ochi; ortografic: înainte).
+    [[nodiscard]] Vec3d viewDirection(const Vec3d& point) const
+    {
+        if (m_perspective && glm::length(point - m_eye) > tol::kLength) {
+            return glm::normalize(point - m_eye);
+        }
+        return m_forward;
+    }
+
+    // Cercul de rază `r` din jurul lui `c`, în planul (a, b), ca segmente.
+    static void appendCircle(Overlay& o, const Vec3d& c, const Vec3d& a, const Vec3d& b, double r)
+    {
+        std::vector<Vec3d> pts;
+        for (int k = 0; k < kSegments; ++k) {
+            const double t = 2.0 * std::numbers::pi * k / kSegments;
+            pts.push_back(c + (a * std::cos(t) + b * std::sin(t)) * r);
+        }
+        appendPolyline(o, pts, true);
+    }
+
+    // Generatoarele de contur (cilindru, con): punctele bazei unde privirea e tangentă la suprafață.
+    [[nodiscard]] std::vector<Vec3d> silhouetteDirections() const
+    {
+        const Vec3d d = viewDirection(*m_center);
+        const Vec3d inPlane = d - m_normal * glm::dot(d, m_normal);
+        if (glm::length(inPlane) <= tol::kLength) {
+            return {}; // privit de-a lungul axei: conturul e chiar cercul
+        }
+        const Vec3d side = glm::normalize(glm::cross(m_normal, inPlane));
+        return { side, -side };
+    }
+
+    // Corpul la mărimea curentă: rețeaua sferei, cercurile și generatoarele cilindrului / conului, muchiile cubului.
+    void appendBody(Overlay& o, double width, double height, const Vec3d& u, const Vec3d& v) const
+    {
+        const Vec3d c = *m_center;
+        const double r = width / 2;
+        const Vec3d up = m_normal * height;
+        switch (m_kind) {
+        case geom::Primitive::Box: {
+            std::array<Vec3d, 4> base;
+            for (std::size_t k = 0; k < base.size(); ++k) {
+                const double su = k == 0 || k == 3 ? 1.0 : -1.0;
+                const double sv = k < 2 ? 1.0 : -1.0;
+                base[k] = c + u * (su * r) + v * (sv * r);
+            }
+            for (std::size_t k = 0; k < base.size(); ++k) {
+                const Vec3d& a = base[k];
+                const Vec3d& b = base[(k + 1) % base.size()];
+                o.lines.push_back({ a, b, false });
+                o.lines.push_back({ a + up, b + up, false });
+                o.lines.push_back({ a, a + up, false });
+            }
+            return;
+        }
+        case geom::Primitive::Cylinder:
+        case geom::Primitive::Cone: {
+            const bool cone = m_kind == geom::Primitive::Cone;
+            appendCircle(o, c, u, v, r);
+            if (!cone) {
+                appendCircle(o, c + up, u, v, r);
+            }
+            std::vector<Vec3d> rims;
+            for (int k = 0; k < 8; ++k) {
+                const double t = 2.0 * std::numbers::pi * k / 8;
+                rims.push_back(u * std::cos(t) + v * std::sin(t));
+            }
+            for (const Vec3d& s : silhouetteDirections()) {
+                rims.push_back(s);
+            }
+            for (const Vec3d& dir : rims) {
+                const Vec3d a = c + dir * r;
+                o.lines.push_back({ a, cone ? c + up : a + up, false });
+            }
+            return;
+        }
+        case geom::Primitive::Sphere: {
+            // Sfera stă pe bază: centrul la înălțimea razei. 8 meridiane (de la pol la pol) și 7 paralele.
+            const Vec3d center = c + m_normal * r;
+            for (int k = 0; k < 8; ++k) {
+                const double t = 2.0 * std::numbers::pi * k / 8;
+                const Vec3d dir = u * std::cos(t) + v * std::sin(t);
+                std::vector<Vec3d> pts;
+                for (int i = 0; i <= kSegments / 2; ++i) {
+                    const double phi = 2.0 * std::numbers::pi * i / kSegments;
+                    pts.push_back(center + (m_normal * std::cos(phi) + dir * std::sin(phi)) * r);
+                }
+                appendPolyline(o, pts, false);
+            }
+            for (int i = 1; i < kSegments / 2; ++i) {
+                const double phi = 2.0 * std::numbers::pi * i / kSegments;
+                appendCircle(o, center + m_normal * (r * std::cos(phi)), u, v, r * std::sin(phi));
+            }
+            // Conturul văzut din cameră: cercul mare perpendicular pe privire.
+            const Vec3d d = viewDirection(center);
+            const Vec3d a = anyPerpendicular(d);
+            appendCircle(o, center, a, glm::cross(d, a), r);
+            return;
+        }
+        }
+    }
+
+    void startHeight(double width)
+    {
+        m_heightStep = true;
+        m_height = width;
+        m_inference = {};
+        m_engine.resetLock();
+    }
+
     void track(ToolContext& ctx, const PointerEvent& e)
     {
+        m_eye = ctx.camera.eye();
+        m_forward = ctx.camera.forward();
+        m_perspective = ctx.camera.projection() == view::Projection::Perspective;
+        if (m_heightStep) {
+            trackHeight(ctx, e.screen);
+            return;
+        }
         m_inference = inferAt(m_engine, ctx, e.screen, m_center);
         if (!m_center) {
             if (m_inference.valid()) {
@@ -747,8 +882,31 @@ private:
         }
     }
 
+    // Înălțimea, ca la Push/Pull: în dreptul unui punct al geometriei (capăt, mijloc, centru, muchie), cu ghidaj
+    // punctat până la vârful înălțimii; altfel punctul de pe normala bazei cel mai apropiat de cursor.
+    void trackHeight(ToolContext& ctx, Vec2d screen)
+    {
+        inference::Inference inf = inferAt(m_engine, ctx, screen, std::nullopt);
+        const double depth = glm::dot(inf.point - *m_center, m_normal);
+        if ((inf.isPoint() || inf.kind == inference::Kind::OnEdge) && std::abs(depth) > tol::kLength) {
+            m_height = depth;
+            const Vec3d top = *m_center + m_normal * m_height;
+            if (!tol::samePoint(top, inf.point)) {
+                inf.guides.push_back({ inf.point, top, inference::Tint::Neutral, true });
+            }
+            m_inference = inf;
+            return;
+        }
+        m_inference = {};
+        if (const auto p = inference::pointOnLineUnderCursor(ctx.camera, screen, *m_center, m_normal)) {
+            m_height = glm::dot(*p - *m_center, m_normal);
+        }
+    }
+
     void commit(ToolContext& ctx, double width, std::optional<double> height)
     {
+        m_heightStep = false;
+        m_inference = {};
         if (!m_center || width <= tol::kLength || ctx.model == nullptr) {
             m_center.reset();
             return;
@@ -787,6 +945,12 @@ private:
     Vec3d m_normal { 0, 0, 1 };
     Vec3d m_hoverNormal { 0, 0, 1 };
     Vec3d m_radius { 0.0 };
+    bool m_heightStep = false;
+    double m_height = 0.0;
+    // Camera de la ultimul `track` (în coordonatele contextului), pentru conturul din previzualizare.
+    Vec3d m_eye { 0.0 };
+    Vec3d m_forward { 0.0, 0.0, -1.0 };
+    bool m_perspective = true;
     inference::Engine m_engine;
     inference::Inference m_inference;
 };
