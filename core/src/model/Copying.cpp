@@ -279,28 +279,40 @@ void copyAnimations(
             }
         }
     }
+    // Fă unic: instanțele păstrate ale obiectului (el însuși și cele din definițiile lui proprii). Pistele lor trec în
+    // copia unei animații împărțite; o animație care atinge doar instanțe păstrate nu se împarte.
+    std::set<InstanceId> kept;
+    if (kind == CopyKind::Unique) {
+        std::set<InstanceId> cloned;
+        for (const auto& [from, to] : copy.instances) {
+            if (from != to) {
+                cloned.insert(to);
+            }
+        }
+        for (InstanceId root : copy.roots) {
+            for (InstanceId id : subtree(source, root)) {
+                if (!cloned.contains(id)) {
+                    kept.insert(id);
+                }
+            }
+        }
+    }
     struct Planned {
         AnimationId id;
         Animation value;
-        std::vector<ObjectTrack> tracks;
-        bool movesRoot = false; // Unique: pista obiectului însuși trece pe copie
+        std::vector<ObjectTrack> copied; // pistele instanțelor copiate, pe copii
+        std::vector<ObjectTrack> keptTracks; // Unique: pistele instanțelor păstrate (se mută dacă se împarte)
     };
     std::vector<Planned> planned;
     for (std::size_t i = 0; i < source.animations().size(); ++i) {
-        const AnimationId id = source.animations().keys()[i];
-        const Animation& a = source.animations().values()[i];
-        const bool isStarted = started.contains(id);
-        Planned p { id, a, {}, false };
-        for (const ObjectTrack& t : a.tracks) {
-            const auto it = copy.instances.find(t.instance);
-            if (it == copy.instances.end()) {
+        Planned p { source.animations().keys()[i], source.animations().values()[i], {}, {} };
+        for (const ObjectTrack& t : p.value.tracks) {
+            if (kept.contains(t.instance)) {
+                p.keptTracks.push_back(t);
                 continue;
             }
-            if (it->first == it->second) { // Unique: obiectul rămâne același
-                if (isStarted) {
-                    p.tracks.push_back(t);
-                    p.movesRoot = true;
-                }
+            const auto it = copy.instances.find(t.instance);
+            if (it == copy.instances.end() || it->first == it->second) {
                 continue;
             }
             ObjectTrack moved = t;
@@ -309,9 +321,9 @@ void copyAnimations(
                 moveTrack(moved, delta, transformValues(source.instance(t.instance).transform,
                     pivotLocal(source, t.instance)).position);
             }
-            p.tracks.push_back(std::move(moved));
+            p.copied.push_back(std::move(moved));
         }
-        if (!p.tracks.empty()) {
+        if (!p.copied.empty()) {
             planned.push_back(std::move(p));
         }
     }
@@ -322,18 +334,18 @@ void copyAnimations(
         if (started.contains(p.id)) {
             Animation a = p.value;
             a.name = copyName(target, a.name);
-            a.tracks = p.tracks;
+            a.tracks = p.copied;
+            a.tracks.insert(a.tracks.end(), p.keptTracks.begin(), p.keptTracks.end());
             a.camera.clear();
             copies[p.id] = target.addAnimation(a);
-            if (p.movesRoot && target.animations().contains(p.id)) {
+            if (!p.keptTracks.empty() && target.animations().contains(p.id)) {
                 Animation original = target.animations().at(p.id);
-                std::erase_if(original.tracks, [&](const ObjectTrack& t) { return copy.instances.contains(t.instance)
-                    && copy.instances.at(t.instance) == t.instance; });
+                std::erase_if(original.tracks, [&](const ObjectTrack& t) { return kept.contains(t.instance); });
                 target.setAnimation(p.id, original);
             }
         } else if (target.animations().contains(p.id)) {
             Animation a = target.animations().at(p.id);
-            a.tracks.insert(a.tracks.end(), p.tracks.begin(), p.tracks.end());
+            a.tracks.insert(a.tracks.end(), p.copied.begin(), p.copied.end());
             target.setAnimation(p.id, a);
         }
     }
@@ -374,8 +386,19 @@ void copyAnimations(
         const std::set<InstanceId> below = subtree(target, id);
         bool changed = false;
         for (const auto& [from, to] : copies) {
-            const bool hasOriginal = containsAny(below, animated(target.animations().at(from)));
-            const bool hasCopy = containsAny(below, animated(target.animations().at(to)));
+            const std::set<InstanceId> originals = animated(target.animations().at(from));
+            const std::set<InstanceId> moved = animated(target.animations().at(to));
+            bool hasOriginal = containsAny(below, originals);
+            bool hasCopy = containsAny(below, moved);
+            // Fără niciuna în el: contează frații lui (un mâner lângă uși). La nivelul modelului, frații sunt toate
+            // obiectele, deci un întrerupător pornește ambele.
+            if (!hasOriginal && !hasCopy) {
+                for (InstanceId sibling : target.childrenOf(inst.parent)) {
+                    const std::set<InstanceId> around = subtree(target, sibling);
+                    hasOriginal = hasOriginal || containsAny(around, originals);
+                    hasCopy = hasCopy || containsAny(around, moved);
+                }
+            }
             for (Rule& r : inst.rules) {
                 if (hasCopy && !hasOriginal) {
                     changed = remapPlayed(r.actions, { { from, to } }) || changed;
@@ -442,6 +465,31 @@ bool canMakeUnique(const Model& model, InstanceId instance)
     const std::set<InstanceId> inside = subtree(model, instance);
     return std::any_of(inside.begin(), inside.end(),
         [&](InstanceId id) { return usedOutside(model, model.instance(id).definition, inside); });
+}
+
+DefinitionUses definitionUses(const Model& model)
+{
+    DefinitionUses uses;
+    for (const Instance& inst : model.instances().values()) {
+        ++uses[inst.definition.value];
+    }
+    return uses;
+}
+
+bool canMakeUnique(const Model& model, InstanceId instance, const DefinitionUses& uses)
+{
+    if (!model.instances().contains(instance)) {
+        return false;
+    }
+    // O definiție e folosită și în afară dacă are mai multe instanțe decât în subarbore.
+    std::unordered_map<std::uint64_t, std::size_t> inside;
+    for (InstanceId id : subtree(model, instance)) {
+        ++inside[model.instance(id).definition.value];
+    }
+    return std::any_of(inside.begin(), inside.end(), [&](const auto& entry) {
+        const auto it = uses.find(entry.first);
+        return it != uses.end() && it->second > entry.second;
+    });
 }
 
 std::vector<std::pair<math::Vec3d, math::Vec3d>> instanceOutline(const Model& model, const std::vector<InstanceId>& instances)

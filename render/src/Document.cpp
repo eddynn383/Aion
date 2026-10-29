@@ -813,6 +813,8 @@ QStringList Document::contextPath() const
 QVariantList Document::outline() const
 {
     QVariantList out;
+    // Folosirile definițiilor, numărate o dată pentru toată lista (copiile, „Fă unic”).
+    const model::DefinitionUses uses = model::definitionUses(m_model);
     const std::set<model::InstanceId> current(m_path.begin(), m_path.end());
     const auto visit = [&](auto&& self, model::DefinitionId parent, int depth) -> void {
         for (model::InstanceId id : m_model.childrenOf(parent)) {
@@ -824,8 +826,8 @@ QVariantList Document::outline() const
                 { QStringLiteral("definition"), QString::fromStdString(def.name) },
                 { QStringLiteral("kind"), def.collection ? QStringLiteral("group") : QStringLiteral("object") },
                 { QStringLiteral("shape"), QString::fromStdString(def.shape) },
-                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
-                { QStringLiteral("canMakeUnique"), model::canMakeUnique(m_model, id) },
+                { QStringLiteral("copies"), static_cast<int>(uses.at(inst.definition.value)) },
+                { QStringLiteral("canMakeUnique"), model::canMakeUnique(m_model, id, uses) },
                 { QStringLiteral("parentDefinition"), static_cast<double>(inst.parent.value) },
                 { QStringLiteral("hasChildren"), !m_model.childrenOf(inst.definition).empty() },
                 { QStringLiteral("tagColor"), inst.tag && m_model.tags().contains(inst.tag)
@@ -1784,6 +1786,9 @@ void Document::makeUniqueSelection()
     }
     runOnModel("Fă unic", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
+            if (!model::canMakeUnique(model, id)) {
+                continue; // nimic legat: nimic de separat (și nicio animație de împărțit)
+            }
             const model::CopyResult r = model::makeUniqueDeep(model, id);
             model::copyAnimations(model, model, r, math::Transform {}, model::CopyKind::Unique);
         }
@@ -1806,7 +1811,8 @@ void Document::makeUnique(double instanceId)
 
 void Document::copySelection()
 {
-    if (!require(Modeling) || m_selection.instances.empty()) {
+    // Într-o tranzacție deschisă (un script, o tragere) modelul nu se poate copia: s-ar copia pe jumătate.
+    if (!require(Modeling) || m_selection.instances.empty() || m_stack.inTransaction()) {
         return;
     }
     m_clipboard = Clipboard { std::make_shared<const model::Model>(m_model),
@@ -1847,7 +1853,7 @@ void Document::finishPaste(const std::optional<math::Vec3d>& at)
     if (m_suspendedTool) {
         m_tool = std::move(m_suspendedTool);
     }
-    if (at && m_clipboard) {
+    if (at && m_clipboard && m_workMode == Modeling) {
         const Clipboard clip = *m_clipboard;
         const math::Transform delta = math::Transform::translation(*at - place.base);
         runOnModel("Lipește", [&](model::Model& model) {
@@ -2858,6 +2864,9 @@ void Document::setWorkMode(int mode)
     }
     cancelOperation();
     finishCurveEdit(); // o curbă Pen se editează doar în Modelare, o cale doar în Animare
+    if (m_place) {
+        finishPaste(std::nullopt); // o lipire neterminată nu continuă în alt mod
+    }
     if (mode != Interaction) {
         setInteractionMode(false);
     }

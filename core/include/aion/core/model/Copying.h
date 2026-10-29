@@ -2,7 +2,9 @@
 
 #include "aion/core/model/Model.h"
 
+#include <cstdint>
 #include <map>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -35,6 +37,11 @@ InstanceId copyLinked(Model& model, InstanceId instance, const math::Transform& 
 // → cele noi (plus instance → instance).
 CopyResult makeUniqueDeep(Model& model, InstanceId instance);
 [[nodiscard]] bool canMakeUnique(const Model& model, InstanceId instance);
+// Câte instanțe are fiecare definiție (după id), numărate o dată: pentru o listă întreagă (Outliner), unde
+// `canMakeUnique` pe fiecare rând ar număra din nou toate instanțele.
+using DefinitionUses = std::unordered_map<std::uint64_t, std::size_t>;
+[[nodiscard]] DefinitionUses definitionUses(const Model& model);
+[[nodiscard]] bool canMakeUnique(const Model& model, InstanceId instance, const DefinitionUses& uses);
 
 // Animațiile copiilor (secțiunea 2 din design). `source` = modelul din care s-a copiat (poate fi `target`); `delta` =
 // deplasarea copiei. Copy: o animație pornită de o regulă din subarbore → „<nume> (copie)” cu pistele subarborelui (pe

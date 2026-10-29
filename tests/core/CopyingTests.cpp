@@ -463,3 +463,84 @@ TEST_CASE("Fă unic: regula de pe un obiect păstrat din interior duplică anima
     CHECK(s.m.instance(s.usiB).rules[0].actions[0].animation == copy);
     CHECK(s.m.instance(s.usiA).rules[0].actions[0].animation == s.doors);
 }
+
+TEST_CASE("Fă unic: animația doar a obiectului însuși nu se dublează", "[core][copying]")
+{
+    Mobila s;
+    model::Animation slide;
+    slide.name = "Slide B";
+    slide.duration = 1.0;
+    slide.tracks = { { s.corpB, { channel(model::Property::PositionX, { { 0.0, 1000.0 }, { 1.0, 1500.0 } }) } } };
+    const model::AnimationId id = s.m.addAnimation(slide);
+    addRule(s.m, s.corpB, clickRule({ play(id) }));
+    const model::CopyResult r = model::makeUniqueDeep(s.m, s.corpB);
+    model::copyAnimations(s.m, s.m, r, Transform {}, model::CopyKind::Unique);
+    CHECK(s.m.animations().size() == 1);
+    CHECK(s.m.animations().at(id).tracks.size() == 1);
+    CHECK(s.m.instance(s.corpB).rules[0].actions[0].animation == id);
+}
+
+TEST_CASE("Fă unic: pistele obiectelor păstrate din interior trec în copie", "[core][copying]")
+{
+    // Câte un sertar propriu în A și în B (instanțe păstrate la Fă unic) și ușile comune, în aceeași animație.
+    Mobila s;
+    const InstanceId drawerA = place(s.m, s.a, s.board, { 0, 0, 300 });
+    const InstanceId drawerB = place(s.m, s.b, s.board, { 0, 0, 300 });
+    model::Animation open;
+    open.name = "Deschide";
+    open.duration = 1.0;
+    open.tracks = { swing(drawerA), swing(drawerB), swing(s.doorL), swing(s.doorR) };
+    const model::AnimationId id = s.m.addAnimation(open);
+    addRule(s.m, s.usiA, clickRule({ play(id) }));
+    addRule(s.m, s.usiB, clickRule({ play(id) }));
+    const model::CopyResult r = model::makeUniqueDeep(s.m, s.corpB);
+    model::copyAnimations(s.m, s.m, r, Transform {}, model::CopyKind::Unique);
+    const model::AnimationId copy = idOf(s.m, "Deschide (copie)");
+    REQUIRE(copy);
+    const auto animatedBy = [&](model::AnimationId a) {
+        std::set<InstanceId> out;
+        for (const model::ObjectTrack& t : s.m.animations().at(a).tracks) {
+            out.insert(t.instance);
+        }
+        return out;
+    };
+    CHECK(animatedBy(id) == std::set<InstanceId> { drawerA, s.doorL, s.doorR });
+    CHECK(animatedBy(copy) == std::set<InstanceId> { drawerB, r.instances.at(s.doorL), r.instances.at(s.doorR) });
+    CHECK(s.m.instance(s.usiB).rules[0].actions[0].animation == copy);
+    CHECK(s.m.instance(s.usiA).rules[0].actions[0].animation == id);
+}
+
+TEST_CASE("Fă unic: mânerul din definiția comună rămâne pe original", "[core][copying]")
+{
+    // Un mâner în grupul comun „Usi”, frate cu ușile, care pornește animația ușilor.
+    Animated s;
+    const DefinitionId knob = boxDefinition(s.m, "Mâner", { 20, 20, 20 });
+    const InstanceId handle = place(s.m, s.usi, knob, { 0, -30, 400 });
+    addRule(s.m, handle, clickRule({ play(s.doors) }));
+    const model::CopyResult r = model::makeUniqueDeep(s.m, s.corpB);
+    model::copyAnimations(s.m, s.m, r, Transform {}, model::CopyKind::Unique);
+    const model::AnimationId copy = idOf(s.m, "Animația 1 (copie)");
+    REQUIRE(copy);
+    // Mânerul lui A (în definiția originală) pornește doar ușile lui A; copia lui (la B) doar ușile lui B.
+    REQUIRE(s.m.instance(handle).rules[0].actions.size() == 1);
+    CHECK(s.m.instance(handle).rules[0].actions[0].animation == s.doors);
+    const InstanceId handleB = r.instances.at(handle);
+    REQUIRE(s.m.instance(handleB).rules[0].actions.size() == 1);
+    CHECK(s.m.instance(handleB).rules[0].actions[0].animation == copy);
+}
+
+TEST_CASE("canMakeUnique cu folosirile numărate o dată dă același rezultat", "[core][copying]")
+{
+    Mobila s;
+    const auto check = [&] {
+        const model::DefinitionUses uses = model::definitionUses(s.m);
+        for (InstanceId id : s.m.instances().keys()) {
+            INFO(id.value);
+            CHECK(model::canMakeUnique(s.m, id, uses) == model::canMakeUnique(s.m, id));
+        }
+        CHECK(uses.at(s.usi.value) == s.m.instancesOf(s.usi).size());
+    };
+    check();
+    (void)model::makeUniqueDeep(s.m, s.corpB);
+    check();
+}
