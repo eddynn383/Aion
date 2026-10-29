@@ -34,8 +34,9 @@ timeline-ul (o singură animație activă, globală, cu bucla ei).
 
 ### 1. Copierea cu ⌘C / ⌘V (Modelare)
 
-- ⌘C copiază obiectele și grupurile selectate (instanțe din contextul editat) într-un clipboard al aplicației (în
-  memorie, rămâne valabil și după deschiderea altui document). ⌘V le lipește în contextul editat.
+- ⌘C copiază obiectele și grupurile selectate (instanțe din contextul editat) într-un clipboard al documentului (în
+  memorie, cu starea de la ⌘C; se golește la „Nou” și la „Deschide”: lipirea între documente ar cere potrivirea
+  materialelor, tag-urilor și animațiilor între fișiere). ⌘V le lipește în contextul editat.
 - **Copia e unică, în adâncime**: fiecare definiție din subarbore primește o copie proprie. Dacă două instanțe din
   subarbore împart o definiție, copiile lor împart tot o definiție (nouă): legăturile interne se păstrează, cele cu
   originalul nu. *Decizia mea.*
