@@ -744,7 +744,9 @@ Column {
         Button {
             small: true
             text: "Fă unic"
-            visible: root.isInstance && root.info.title === "Obiect" && root.info.copies > 1
+            // Copii legate (×N) sau părți comune cu alte obiecte: separarea îi dă o copie proprie, cu animațiile
+            // și interacțiunile ei.
+            visible: root.isInstance && root.info.canMakeUnique === true
             onClicked: root.document.makeUniqueSelection()
         }
     }

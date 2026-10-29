@@ -448,3 +448,18 @@ TEST_CASE("copyAnimations: regulă cu animație ștearsă", "[core][copying]")
     CHECK(s.m.animations().empty());
     CHECK(s.m.instance(r.instances.at(s.usiA)).rules[0].actions[0].animation == model::AnimationId { 999 });
 }
+
+TEST_CASE("Fă unic: regula de pe un obiect păstrat din interior duplică animația", "[core][copying]")
+{
+    // Ca în Mobila.aion: regula stă pe Usi lui B (o instanță din definiția proprie a lui B, care nu se copiază).
+    Animated s;
+    addRule(s.m, s.usiB, clickRule({ play(s.doors) }));
+    const model::CopyResult r = model::makeUniqueDeep(s.m, s.corpB);
+    model::copyAnimations(s.m, s.m, r, Transform {}, model::CopyKind::Unique);
+    const model::AnimationId copy = idOf(s.m, "Animația 1 (copie)");
+    REQUIRE(copy);
+    CHECK(s.m.animations().at(s.doors).tracks.size() == 3); // ușile lui A și X: fără ușile lui B
+    CHECK(s.m.animations().at(copy).tracks.size() == 2);
+    CHECK(s.m.instance(s.usiB).rules[0].actions[0].animation == copy);
+    CHECK(s.m.instance(s.usiA).rules[0].actions[0].animation == s.doors);
+}

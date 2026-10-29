@@ -102,6 +102,9 @@ Window {
             { id: "edit.redo", title: doc.canRedo ? "Redo " + doc.redoName : "Redo", category: "Editare",
               shortcut: "Ctrl+Shift+Z", icon: "redo-2" },
             { id: "edit.delete", title: "Șterge selecția", category: "Editare", shortcut: "Delete", icon: "trash-2" },
+            { id: "edit.copy", title: "Copiază obiectele selectate", category: "Editare", shortcut: "Ctrl+C", icon: "copy" },
+            { id: "edit.paste", title: "Lipește (click pentru loc, Esc renunță)", category: "Editare", shortcut: "Ctrl+V",
+              icon: "clipboard-paste" },
             { id: "edit.selectAll", title: "Selectează tot", category: "Editare", shortcut: "Ctrl+A",
               icon: "square-dashed-mouse-pointer" },
             { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
@@ -353,6 +356,8 @@ Window {
         case "edit.undo": doc.undo(); break
         case "edit.redo": doc.redo(); break
         case "edit.delete": doc.deleteSelection(); break
+        case "edit.copy": doc.copySelection(); break
+        case "edit.paste": doc.pasteClipboard(); break
         case "edit.selectAll": doc.selectAll(); break
         case "edit.selectNone": doc.clearSelection(); break
         case "org.makeGroup": doc.makeGroup(); break

@@ -418,6 +418,9 @@ QString Document::localPath(const QUrl& url) const
 void Document::replaceModel(const model::Model& model)
 {
     finishCurveEdit();
+    if (m_place) {
+        finishPaste(std::nullopt);
+    }
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -446,6 +449,10 @@ void Document::replaceModel(const model::Model& model)
 
 void Document::newDocument()
 {
+    if (m_clipboard) {
+        m_clipboard.reset(); // clipboard-ul ține de document
+        emit clipboardChanged();
+    }
     replaceModel(model::Model {});
     setFilePath({});
     removeAutosave();
@@ -458,6 +465,10 @@ bool Document::openFile(const QString& path)
         setError(QStringLiteral("„%1” nu a putut fi deschis. %2")
                      .arg(QFileInfo(path).fileName(), QString::fromStdString(result.error)));
         return false;
+    }
+    if (m_clipboard) {
+        m_clipboard.reset();
+        emit clipboardChanged();
     }
     replaceModel(*result.model);
     setFilePath(path);
@@ -675,11 +686,12 @@ void Document::setActiveTool(const QString& requested)
     // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare): rămâne Select.
     const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested) ? requested
                                                                                                  : QStringLiteral("select");
-    if (m_suspendedTool) { // o tragere a pivotului sau o editare de curbă întreruptă: revine unealta de dinainte
+    if (m_suspendedTool) { // o tragere a pivotului, o editare de curbă sau o lipire întreruptă: revine unealta
         m_tool = std::move(m_suspendedTool);
         m_pivotDragPoint.reset();
         m_editCurve = {};
         m_editPath = {};
+        m_place.reset();
     }
     if (id == m_toolId) {
         return;
@@ -813,6 +825,7 @@ QVariantList Document::outline() const
                 { QStringLiteral("kind"), def.collection ? QStringLiteral("group") : QStringLiteral("object") },
                 { QStringLiteral("shape"), QString::fromStdString(def.shape) },
                 { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("canMakeUnique"), model::canMakeUnique(m_model, id) },
                 { QStringLiteral("parentDefinition"), static_cast<double>(inst.parent.value) },
                 { QStringLiteral("hasChildren"), !m_model.childrenOf(inst.definition).empty() },
                 { QStringLiteral("tagColor"), inst.tag && m_model.tags().contains(inst.tag)
@@ -910,6 +923,7 @@ QVariantMap Document::entityInfo() const
         info[QStringLiteral("tagId")] = static_cast<double>(inst.tag.value);
         info[QStringLiteral("locked")] = inst.locked;
         info[QStringLiteral("copies")] = static_cast<int>(m_model.instancesOf(inst.definition).size());
+        info[QStringLiteral("canMakeUnique")] = model::canMakeUnique(m_model, id);
         if (!def.group) {
             details << detail(QStringLiteral("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
         }
@@ -1153,6 +1167,7 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         ctx.editNormal = glm::normalize(toContext.applyToVector(p->normal));
     }
     ctx.pivot = selectionPivot(); // Rotate pornește din el, Scale cu Option îl ține fix
+    ctx.place = m_place;
     // O cameră sau o lumină selectată (în Modelare, la nivelul modelului): ținta lui Move / Rotate / Scale, cu pivotul
     // în poziția ei. Camerele și luminile nu se animă, deci nu și în Animare.
     const bool sceneObject = !animating && m_path.empty() && m_selection.empty()
@@ -1253,6 +1268,10 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         enterInstance(static_cast<double>(requests.enter.value));
     } else if (requests.exit) {
         exitContext();
+    }
+    // Lipirea: copia la punctul ales sau renunțarea.
+    if (m_place && (requests.placeAt || requests.placeCancel)) {
+        finishPaste(requests.placeCancel ? std::nullopt : requests.placeAt);
     }
     // Tragerea pivotului: previzualizarea, apoi punctul ales (sau anularea).
     if (requests.pivotDone && pivotDragging()) {
@@ -1765,9 +1784,82 @@ void Document::makeUniqueSelection()
     }
     runOnModel("Fă unic", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
-            (void)model::makeUniqueDeep(model, id);
+            const model::CopyResult r = model::makeUniqueDeep(model, id);
+            model::copyAnimations(model, model, r, math::Transform {}, model::CopyKind::Unique);
         }
     });
+    emit timelineChanged();
+}
+
+void Document::makeUnique(double instanceId)
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    if (!require(Modeling) || !m_model.instances().contains(id) || !model::canMakeUnique(m_model, id)) {
+        return;
+    }
+    runOnModel("Fă unic", [&](model::Model& model) {
+        const model::CopyResult r = model::makeUniqueDeep(model, id);
+        model::copyAnimations(model, model, r, math::Transform {}, model::CopyKind::Unique);
+    });
+    emit timelineChanged();
+}
+
+void Document::copySelection()
+{
+    if (!require(Modeling) || m_selection.instances.empty()) {
+        return;
+    }
+    m_clipboard = Clipboard { std::make_shared<const model::Model>(m_model),
+        std::vector<model::InstanceId>(m_selection.instances.begin(), m_selection.instances.end()) };
+    emit clipboardChanged();
+}
+
+void Document::pasteClipboard()
+{
+    if (!require(Modeling) || !m_clipboard || m_suspendedTool || !m_tool) {
+        return;
+    }
+    // Copia se ține de colțul minim al cutiei comune (în coordonatele părintelui), ca să se pună colț la colț.
+    tools::PlaceSource place;
+    place.edges = model::instanceOutline(*m_clipboard->model, m_clipboard->instances);
+    if (place.edges.empty()) {
+        return;
+    }
+    math::Vec3d lo { std::numeric_limits<double>::infinity() };
+    for (const auto& [a, b] : place.edges) {
+        lo = glm::min(lo, glm::min(a, b));
+    }
+    place.base = lo;
+    m_place = place;
+    m_suspendedTool = std::exchange(m_tool, tools::makeTool("place"));
+    replayPointer();
+    emit toolStatusChanged();
+    touch();
+}
+
+void Document::finishPaste(const std::optional<math::Vec3d>& at)
+{
+    if (!m_place) {
+        return;
+    }
+    const tools::PlaceSource place = *m_place;
+    m_place.reset();
+    if (m_suspendedTool) {
+        m_tool = std::move(m_suspendedTool);
+    }
+    if (at && m_clipboard) {
+        const Clipboard clip = *m_clipboard;
+        const math::Transform delta = math::Transform::translation(*at - place.base);
+        runOnModel("Lipește", [&](model::Model& model) {
+            const model::CopyResult r = model::copyDeep(model, activeDefinition(), *clip.model, clip.instances, delta);
+            model::copyAnimations(model, *clip.model, r, delta, model::CopyKind::Copy);
+            m_selection.clear();
+            m_selection.instances.insert(r.roots.begin(), r.roots.end());
+        });
+        emit timelineChanged();
+    }
+    emit toolStatusChanged();
+    touch();
 }
 
 void Document::hideSelection()

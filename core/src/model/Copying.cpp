@@ -255,17 +255,28 @@ CopyResult copyDeep(Model& target, DefinitionId context, const Model& source, co
 void copyAnimations(
     Model& target, const Model& source, const CopyResult& copy, const math::Transform& delta, CopyKind kind)
 {
-    // Din sursă (poate fi ținta): animațiile pornite de regulile subarborelui și pistele de copiat.
+    // Din sursă (poate fi ținta): animațiile pornite de regulile subarborelui și pistele de copiat. La Fă unic,
+    // subarborele are și instanțe păstrate (din definițiile proprii ale obiectului), care nu apar în `copy.instances`.
     std::set<AnimationId> started;
     std::set<InstanceId> roots;
+    std::set<InstanceId> withRules;
     for (const auto& [from, to] : copy.instances) {
-        if (source.instances().contains(from)) {
-            for (const Rule& r : source.instance(from).rules) {
-                collectPlayed(r.actions, started);
-            }
-        }
+        withRules.insert(from);
         if (std::find(copy.roots.begin(), copy.roots.end(), to) != copy.roots.end()) {
             roots.insert(from);
+        }
+    }
+    if (kind == CopyKind::Unique) {
+        for (InstanceId root : copy.roots) {
+            const std::set<InstanceId> below = subtree(source, root);
+            withRules.insert(below.begin(), below.end());
+        }
+    }
+    for (InstanceId id : withRules) {
+        if (source.instances().contains(id)) {
+            for (const Rule& r : source.instance(id).rules) {
+                collectPlayed(r.actions, started);
+            }
         }
     }
     struct Planned {
