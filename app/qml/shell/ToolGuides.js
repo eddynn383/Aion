@@ -46,8 +46,9 @@ const guides = {
     cube: {
         title: "Cub",
         summary: "Creează direct un obiect cub (cu fețele lui), gata de mutat, rotit sau redimensionat.",
-        steps: ["Click pentru centrul bazei (pe o față: în planul ei)", "Mișcă mouse-ul pentru mărime și dă click",
-                "Sau tastează latura (1000) ori latura și înălțimea (1000,500)"],
+        steps: ["Click pentru centrul bazei (pe o față: în planul ei)", "Mișcă mouse-ul pentru lățime și dă click",
+                "Mișcă mouse-ul pentru înălțime (se prinde în dreptul punctelor din jur) și dă click",
+                "Sau tastează lățimea (1000) ori lățimea și înălțimea (1000,500)"],
         tip: "Dimensiunile se pot schimba apoi din Inspector"
     },
     sphere: {
@@ -59,15 +60,15 @@ const guides = {
     cone: {
         title: "Con",
         summary: "Creează un obiect con, cu baza pe planul ales.",
-        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru diametru și dă click",
-                "Sau tastează diametrul și înălțimea (600,1200)"],
+        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru lățime (diametru) și dă click",
+                "Mișcă mouse-ul pentru înălțime și dă click", "Sau tastează diametrul și înălțimea (600,1200)"],
         tip: ""
     },
     cylinder: {
         title: "Cilindru",
         summary: "Creează un obiect cilindru, cu baza pe planul ales.",
-        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru diametru și dă click",
-                "Sau tastează diametrul și înălțimea (600,1500)"],
+        steps: ["Click pentru centrul bazei", "Mișcă mouse-ul pentru lățime (diametru) și dă click",
+                "Mișcă mouse-ul pentru înălțime și dă click", "Sau tastează diametrul și înălțimea (600,1500)"],
         tip: ""
     },
     pushpull: {

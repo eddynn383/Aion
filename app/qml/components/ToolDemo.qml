@@ -390,15 +390,25 @@ Canvas {
         },
         cube: function(d, t, c) {
             d.grid()
-            const k = phase(t, 0.3, 0.7)
-            const half = 1.1 * k
-            if (t > 0.28 && half > 0.02) {
-                d.box([-half, -half, 0], [2 * half, 2 * half, 2 * half], { highlight: t > 0.82 })
-                if (t < 0.82) d.label([0, -half - 0.3, 0], Math.round(2 * half * 1000) + " mm")
+            // Trei pași: centrul bazei, lățimea, înălțimea.
+            const half = 1.1 * phase(t, 0.24, 0.5)
+            const h = 2.2 * phase(t, 0.56, 0.82)
+            if (t > 0.2 && half > 0.02) {
+                if (h < 0.02) {
+                    d.polygon([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]],
+                              Qt.rgba(0.23, 0.51, 0.96, 0.10), c.accent, 1.6)
+                    d.label([0, -half - 0.3, 0], Math.round(2 * half * 1000) + " mm")
+                } else {
+                    d.box([-half, -half, 0], [2 * half, 2 * half, h], { highlight: t > 0.88 })
+                    if (t < 0.88) d.label([half + 0.2, -half, h / 2], Math.round(h * 1000) + " mm")
+                }
             }
-            if (t > 0.72) d.vcb("Latură", "2200")
+            if (t > 0.58) d.vcb("Înălțime", "2200")
+            else if (t > 0.3) d.vcb("Lățime", "2200")
             d.dot([0, 0, 0], c.cyan, 3)
-            d.cursor(t < 0.28 ? approach(d, t, [0, 0, 0], 0.24) : d.p(half, 0, 0), Math.max(d.clickK(t, 0.28), d.clickK(t, 0.8)))
+            const cur = t < 0.2 ? approach(d, t, [0, 0, 0], 0.18)
+                      : t < 0.54 ? d.p(half, 0, 0) : d.p(half, 0, h)
+            d.cursor(cur, Math.max(d.clickK(t, 0.2), d.clickK(t, 0.52), d.clickK(t, 0.86)))
         },
         pushpull: function(d, t, c) {
             d.grid()

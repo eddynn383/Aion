@@ -204,6 +204,18 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
 - **Index de picking** (ADR 0032): `view::forEachFaceAlong` / `forEachVertexNear` / `forEachEdgeNear` (BVH din
   `core/src/view/PickIndex.cpp`, după `Mesh::revision()`); buclele noi pe geometrie la hover trebuie să treacă prin ele.
   Testul de performanță: `aion_tests "[.perf]"`.
+- **Inferența pe obiecte** (ADR 0042, `docs/plans/inferenta-pe-obiecte.md`): `inference/SnapScene.h` (`SnapSource` = mesh +
+  `toContext` + instanța; `SnapScene`), `model/SnapSources.h` (`model::snapScene`: obiectele vizibile la orice adâncime
+  plus geometria liberă a părinților, fără selecția care se transformă), `Engine::withScene`, `Document::snapScene(exclude)`
+  (cache pe `modelRevision`), `ToolContext::snap`. Rezultatul are `Inference::origin` (`Context` | `Object`),
+  `sourceInstance` și `normal`; ID-urile de vârf / muchie / față sunt mereu din `ctx.mesh` (o inferență pe un obiect le are
+  goale), deci uneltele aleg doar PUNCTUL din ea. Uneltele cheamă `tools::inferAt` / `inferenceNormal` (ToolHelpers.h),
+  nu `Engine::infer` direct. `Kind::Center` (centrul cercurilor / arcelor / poligoanelor, după ce cursorul a atins curba;
+  listă scurtă de recente), aliniere dublă pe două axe, `ReferenceEdge` (segment pentru Parallel / Perpendicular).
+  Move: un colț real bate un punct al cutiei (`instanceGrips`) cu 0,5 px. Cub / Cilindru / Con au trei clicuri (centrul
+  bazei, lățimea, înălțimea cu prindere) și previzualizarea corpului; sfera are doi. Drop-ul din Bibliotecă
+  (`Viewport::dropPointAt`, `Document::inferDrop`) pune CENTRUL BAZEI pe punctul inferat; `createParametricAtCorner` păstrează
+  `aion.object` pe colț. Acțiune de script: `dropat:id,x,y` (id din Bibliotecă, ex. `gen:table`).
 
 - **Camera** (plan Animare, secțiunea 9): `CameraObject` cu focală / senzor, format, shift, roll, `orthoScale`, `dof`,
   `displaySize`; `model/CameraLens.h` (`cameraFov`, `frameInViewport`, `lookThrough`, `circleOfConfusion`, presetări).

@@ -707,6 +707,9 @@ ADR 0036.
   la vedere, animațiile și regulile copiilor, sens / repetări / redare paralelă, redenumirea animațiilor
 - [x] Ecranul de start și recuperarea (cerința din 2026-10-29, ADR 0040): splash ca în Blender (nou, deschide,
   ultimul fișier, recente cu miniaturi), copii de recuperare pe sesiune cu lock, oferite după o închidere bruscă
+- [x] Inferența pe obiecte (cerința din 2026-10-29, ADR 0042, `docs/plans/inferenta-pe-obiecte.md`): inferența vede capetele,
+  muchiile și fețele obiectelor (`SnapScene`), centrul cercurilor, alinierea cu două puncte, Move cu colțuri reale,
+  Cub / Cilindru / Con cu al treilea clic (înălțimea) și previzualizarea corpului, drop din Bibliotecă pe centrul bazei
 
 ---
 

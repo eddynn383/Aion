@@ -1,6 +1,6 @@
 # Inferență pe obiecte – design
 
-- Stare: propus (2026-10-29), de aprobat de utilizator (al treilea clic pentru înălțime: aprobat)
+- Stare: implementat (2026-10-30). ADR 0042
 - Legături: ADR 0005 (inferența și VCB), ADR 0032 (indexul de picking), ADR 0030 (pivot), ADR 0026 (biblioteca)
 
 ## De ce
@@ -38,7 +38,7 @@ obiectelor din jur; când o intersecție e detectată, apare o linie punctată �
 5. **Inferențe în plus** (ca în SketchUp):
    - centrul unui cerc / arc / poligon (`Kind::Center`), al geometriei libere și al celei din obiecte. Decizia mea, ca
      în SketchUp: centrul apare după ce cursorul a atins curba (devine punct de referință, prin mecanismul existent
-     `remember` / `m_references`), nu printr-un index separat de centre. „Cerc / arc / poligon” = muchiile cu același
+     `remember` / `m_references`); centrele găsite se păstrează într-o listă scurtă a celor recente (nu un index spațial). „Cerc / arc / poligon” = muchiile cu același
      `Edge::curve`; centrul se calculează din trei puncte ale curbei și se acceptă doar dacă toate punctele ei sunt la
      aceeași distanță de el (`Tolerance.h`) și în același plan;
    - aliniere dublă: punctul aflat simultan în dreptul a două puncte de referință, pe două axe, cu două linii punctate;
