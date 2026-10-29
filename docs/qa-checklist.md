@@ -331,3 +331,14 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Aceeași linie selectată și Delete: pleacă și fața pe care stă (marginile ei rămân)
 - [ ] Guma pe muchia unui cub: pleacă împreună cu cele două fețe (nu se pot uni)
 
+## Copii unice și animații din interacțiuni (ADR 0039)
+- [ ] ⌘C pe un corp, ⌘V: copia urmează cursorul; se prinde de colțul altui corp; click o așază; Esc renunță (nimic în
+      istoric); ⌘Z scoate copia într-un pas
+- [ ] Copia (⌘V, Move cu Option) nu apare cu „×” în lista Obiecte; ⌥D și Array fac copii legate („×N”)
+- [ ] Copia unui corp cu interacțiune își primește „<animație> (copie)”; click pe copie îi mișcă doar ușile
+- [ ] „Fă unic” apare în Inspector și în lista Obiecte pe un corp cu părți comune (și ×1); după el, click pe celălalt
+      corp nu mai mișcă ușile acestuia; un întrerupător pornește în continuare ambele
+- [ ] Blocul „Pornește animația”: înainte / înapoi / comută și o dată / de N ori / la infinit; „comută” deschide și
+      închide; la infinit, un al doilea click oprește pe loc; două corpuri se mișcă în paralel, fără să se reseteze
+- [ ] Un fișier vechi se deschide cu blocurile pe Înainte / O dată; după salvare are formatVersion 5
+- [ ] Lista animațiilor din timeline: creionul redenumește (Enter salvează, Esc renunță)

@@ -703,6 +703,8 @@ ADR 0036.
 - [x] Performanța viewport-ului (cerința din 2026-10-29, ADR 0038): orbit / pan fluide, hover fără refacerea desenului,
   model fără costuri pătratice, scripturi rapide
 - [ ] (Opțional) Desen păstrat pe definiție, refolosit de instanțe: hover și editare rapide pe modele foarte mari
+- [x] Copii unice și animații pornite din interacțiuni (cerința din 2026-10-29, ADR 0039): ⌘C / ⌘V cu plasare, Fă unic
+  la vedere, animațiile și regulile copiilor, sens / repetări / redare paralelă, redenumirea animațiilor
 
 ---
 

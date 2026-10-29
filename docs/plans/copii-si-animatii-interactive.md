@@ -1,6 +1,6 @@
 # Copii unice și animații pornite din interacțiuni (design)
 
-Stare: aprobat (2026-10-29). Cerința utilizatorului, pe fișierul lui `Mobila.aion` (două corpuri de mobilă cu uși).
+Stare: implementat (2026-10-29), ADR 0039. Cerința utilizatorului, pe fișierul lui `Mobila.aion` (două corpuri de mobilă cu uși).
 
 ## De ce
 
