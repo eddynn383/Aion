@@ -6,6 +6,7 @@
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Model.h"
+#include "aion/core/model/AnimationPlayer.h"
 #include "aion/core/model/Rules.h"
 #include "aion/core/tools/Tool.h"
 
@@ -544,6 +545,9 @@ public:
     Q_INVOKABLE void endPreview(); // înapoi la model (editare)
     // Camera animației la momentul curent ({} dacă nu are pistă de cameră), ca cameraState().
     Q_INVOKABLE QVariantMap animationCamera() const;
+    // Camera vederii urmează o animație: timeline-ul în previzualizare sau, în Modul interacțiune, o animație cu chei
+    // de cameră care rulează.
+    bool animationCameraActive() const;
     // Culoarea animată a unei instanțe (pentru randare), dacă există.
     std::optional<model::Color> displayColor(model::InstanceId instance) const;
     const model::Animation* currentAnimation() const;
@@ -643,6 +647,8 @@ private:
     [[nodiscard]] math::Transform shownTransform(model::InstanceId instance) const;
     [[nodiscard]] QString channelValueText(model::Property property, double value) const;
     model::RuleRuntime m_rules;
+    // Animațiile pornite din interacțiuni (fiecare cu ceasul ei), scrise în m_runtime.
+    model::AnimationPlayer m_player;
     model::InstanceId m_hoverInstance;
     struct DragState {
         model::InstanceId instance;

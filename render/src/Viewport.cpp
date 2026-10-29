@@ -1290,7 +1290,7 @@ std::optional<view::Camera> Viewport::lookLens() const
     }
     view::Camera lens = model::lookThrough(lookedCameraShown(), { width(), height() }, m_lookMargin);
     // În Animare, pistele camerei animației mută camera; lentila (unghiul, formatul) rămâne a camerei-obiect.
-    if (m_document->previewing()) {
+    if (m_document->animationCameraActive()) {
         const QVariantMap animated = m_document->animationCamera();
         if (!animated.isEmpty()) {
             lens.setPose(poseFromState(animated));
@@ -1610,7 +1610,7 @@ void Viewport::exportScenes(const QVariantList& states, double transition, doubl
 
 void Viewport::applyAnimationCamera()
 {
-    if (!m_document || !m_document->previewing()) {
+    if (!m_document || !m_document->animationCameraActive()) {
         return;
     }
     if (m_lookCamera > 0.0) { // prin cameră: camera animației mută camera, cu lentila ei
@@ -2212,7 +2212,8 @@ void Viewport::onAfterAnimating()
         advanceSceneAnimation(dt);
     }
     const bool interacting = m_document && m_document->advanceInteractions(dt);
-    if (interacting && m_document->playing()) {
+    // Camera animației: la redarea timeline-ului sau cât rulează, în Modul interacțiune, o animație cu chei de cameră.
+    if (interacting && (m_document->playing() || (m_document->interactionMode() && m_document->animationCameraActive()))) {
         applyAnimationCamera();
     }
     if (m_turntableSecondsLeft > 0.0) {

@@ -2612,13 +2612,19 @@ void Document::endPreview()
     emit changed();
 }
 
+bool Document::animationCameraActive() const
+{
+    return m_runtime ? m_player.camera(m_model).has_value() : m_previewing;
+}
+
 QVariantMap Document::animationCamera() const
 {
-    const model::Animation* a = currentAnimation();
-    if (a == nullptr || !m_previewing) {
-        return {};
+    std::optional<model::CameraKey> c;
+    if (m_runtime) {
+        c = m_player.camera(m_model);
+    } else if (const model::Animation* a = currentAnimation(); a != nullptr && m_previewing) {
+        c = model::evaluateCamera(*a, m_timelineTime);
     }
-    const auto c = model::evaluateCamera(*a, m_timelineTime);
     if (!c) {
         return {};
     }
@@ -2628,6 +2634,9 @@ QVariantMap Document::animationCamera() const
 
 std::optional<model::Color> Document::displayColor(model::InstanceId instance) const
 {
+    if (m_runtime) {
+        return m_player.color(m_model, instance);
+    }
     const model::Animation* a = m_previewing ? currentAnimation() : nullptr;
     if (a == nullptr) {
         return std::nullopt;
@@ -2858,9 +2867,11 @@ void Document::setInteractionMode(bool on)
         endPreview();
         m_runtime.emplace(m_model); // o copie: nimic din ce se întâmplă aici nu ajunge în document
         m_rules.reset();
+        m_player.reset();
         m_hoverInstance = {};
     } else {
         m_rules.reset();
+        m_player.reset();
         m_interactions.clear();
         m_drag.reset();
         m_runtime.reset();
@@ -3039,6 +3050,7 @@ const char* const kTriggerNames[] = { "click", "rightClick", "doubleClick", "hov
     "drag", "key" };
 const char* const kActionNames[] = { "moveBy", "moveTo", "rotateBy", "scaleTo", "show", "hide", "toggleVisible",
     "setMaterial", "playAnimation", "goToScene", "wait", "alternate" };
+const char* const kDirectionNames[] = { "forward", "reverse", "toggle" };
 
 template <std::size_t N>
 int indexOf(const char* const (&names)[N], const QString& name)
@@ -3067,7 +3079,9 @@ QVariantMap actionToMap(const model::Action& a)
         { QStringLiteral("material"), static_cast<double>(a.material.value) },
         { QStringLiteral("animation"), static_cast<double>(a.animation.value) },
         { QStringLiteral("scene"), static_cast<double>(a.scene.value) }, { QStringLiteral("first"), first },
-        { QStringLiteral("second"), second } };
+        { QStringLiteral("second"), second },
+        { QStringLiteral("direction"), QString::fromLatin1(kDirectionNames[static_cast<int>(a.direction)]) },
+        { QStringLiteral("repeat"), a.repeat } };
 }
 
 model::Action actionFromMap(const QVariantMap& m)
@@ -3081,6 +3095,9 @@ model::Action actionFromMap(const QVariantMap& m)
     a.material = model::MaterialId { static_cast<std::uint64_t>(m.value(QStringLiteral("material")).toDouble()) };
     a.animation = model::AnimationId { static_cast<std::uint64_t>(m.value(QStringLiteral("animation")).toDouble()) };
     a.scene = model::SceneId { static_cast<std::uint64_t>(m.value(QStringLiteral("scene")).toDouble()) };
+    a.direction = static_cast<model::PlayDirection>(
+        indexOf(kDirectionNames, m.value(QStringLiteral("direction"), QStringLiteral("forward")).toString()));
+    a.repeat = std::max(0, m.value(QStringLiteral("repeat"), 1).toInt());
     for (const QVariant& c : m.value(QStringLiteral("first")).toList()) {
         a.first.push_back(actionFromMap(c.toMap()));
     }
@@ -3164,11 +3181,11 @@ QVariantList Document::interactions() const
 
 void Document::handleRuleRequests()
 {
+    // Animațiile: blocurile aceleiași declanșări pornesc împreună (Comută decide o dată pentru toate).
+    std::map<std::uint64_t, std::vector<model::PlayRequest>> plays;
     for (const model::HostRequest& r : m_rules.takeRequests()) {
-        if (r.playAnimation && m_model.animations().contains(r.playAnimation)) {
-            m_activeAnimation = r.playAnimation;
-            m_timelineTime = 0.0;
-            play();
+        if (r.playAnimation) {
+            plays[r.firing].push_back({ r.playAnimation, r.direction, r.repeat, r.action });
         }
         if (r.goToScene && m_runtime && m_model.scenes().contains(r.goToScene)) {
             const model::Scene& scene = m_model.scenes().at(r.goToScene);
@@ -3177,6 +3194,12 @@ void Document::handleRuleRequests()
             ++m_interactionRevision;
             emit changed();
         }
+    }
+    for (const auto& [firing, requests] : plays) {
+        m_player.start(m_model, requests);
+    }
+    if (!plays.empty() && m_player.active()) {
+        emit animationStarted();
     }
 }
 
@@ -3300,6 +3323,11 @@ bool Document::advanceInteractions(double dt)
         handleRuleRequests();
         moved = true;
         active = active || m_rules.active();
+    }
+    // Animațiile pornite din interacțiuni: fiecare cu ceasul ei, de la poza documentului.
+    if (m_runtime && m_player.active()) {
+        moved = m_player.update(*m_runtime, m_model, dt) || moved;
+        active = active || m_player.active();
     }
 
     if (moved) {
