@@ -40,23 +40,6 @@ std::string defaultName(const Model& model, bool component)
     return "Obiect " + std::to_string(count); // rădăcina nu e grup, deci primul obiect e „Obiect 1”
 }
 
-// O copie independentă a definiției (geometrie și instanțele din ea).
-DefinitionId cloneDefinition(Model& model, DefinitionId source)
-{
-    Definition copy = model.definition(source);
-    if (!copy.group) {
-        copy.name += " (copie)";
-    }
-    const DefinitionId id = model.addDefinition(copy);
-    geom::copyEntities(model.mesh(source), everything(model.mesh(source)), model.mesh(id), {});
-    for (InstanceId child : model.childrenOf(source)) {
-        Instance c = model.instance(child);
-        c.parent = id;
-        model.addInstance(c);
-    }
-    return id;
-}
-
 } // namespace
 
 math::Transform worldTransform(const Model& model, const std::vector<InstanceId>& path)
@@ -140,27 +123,6 @@ geom::Selection explode(Model& model, InstanceId id)
         model.removeDefinition(definition);
     }
     return result;
-}
-
-DefinitionId makeUnique(Model& model, InstanceId id)
-{
-    Instance inst = model.instance(id);
-    if (model.instancesOf(inst.definition).size() <= 1) {
-        return inst.definition;
-    }
-    inst.definition = cloneDefinition(model, inst.definition);
-    model.setInstance(id, inst);
-    return inst.definition;
-}
-
-InstanceId copyInstance(Model& model, InstanceId id, const math::Transform& delta)
-{
-    Instance copy = model.instance(id);
-    copy.transform = delta * copy.transform;
-    if (model.definition(copy.definition).group) {
-        copy.definition = cloneDefinition(model, copy.definition);
-    }
-    return model.addInstance(copy);
 }
 
 void eraseInstance(Model& model, InstanceId id)

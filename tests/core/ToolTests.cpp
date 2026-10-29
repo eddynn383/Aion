@@ -583,7 +583,7 @@ TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin cape
     CHECK(a.mesh.findVertexNear({ 1000, 500, 0 }, 1e-6)); // vârful din mijloc, pe săgeată
 }
 
-TEST_CASE("Unelte pe model: selectarea unei componente, copii legate cu Move+Option, dublu-click intră", "[core][tools][model]")
+TEST_CASE("Unelte pe model: selectarea unei componente, copii unice cu Move+Option, dublu-click intră", "[core][tools][model]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -624,7 +624,7 @@ TEST_CASE("Unelte pe model: selectarea unei componente, copii legate cu Move+Opt
     REQUIRE(selection.instances.size() == 1);
     CHECK(*selection.instances.begin() == box);
 
-    // Move + Option, 1000 pe axa roșie: o copie a aceleiași definiții.
+    // Move + Option, 1000 pe axa roșie: o copie unică (definiție proprie, aceeași geometrie; doar ⌥D și Array leagă).
     auto move = tools::makeTool("move");
     tools::Modifiers option;
     option.alt = true;
@@ -635,13 +635,17 @@ TEST_CASE("Unelte pe model: selectarea unei componente, copii legate cu Move+Opt
     move->pointerMove(ctx, { at({ 1300, 0, 600 }), option, 1 });
     REQUIRE(move->applyMeasurement(ctx, "1000"));
     const model::DefinitionId def = m.instance(box).definition;
-    REQUIRE(m.instancesOf(def).size() == 2);
-    const model::InstanceId copy = m.instancesOf(def).back();
+    CHECK(m.instancesOf(def).size() == 1);
+    REQUIRE(m.childrenOf(m.root()).size() == 2);
+    const model::InstanceId copy = m.childrenOf(m.root()).back();
+    CHECK(m.instance(copy).definition != def);
+    CHECK(m.mesh(m.instance(copy).definition).faces().size() == m.mesh(def).faces().size());
     CHECK(glm::length(m.instance(copy).transform.applyToPoint({ 0, 0, 0 }) - Vec3d { 1000, 0, 0 }) < 1e-6);
 
-    // „x3”: încă două copii.
+    // „x3”: încă două copii, tot unice.
     REQUIRE(move->applyMeasurement(ctx, "x3"));
-    CHECK(m.instancesOf(def).size() == 4);
+    CHECK(m.childrenOf(m.root()).size() == 4);
+    CHECK(m.instancesOf(def).size() == 1);
 
     // Dublu-click pe o copie cere intrarea în ea.
     const tools::PointerEvent onCopy { at({ 1300, 300, 600 }), {}, 2 };

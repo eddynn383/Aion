@@ -1,6 +1,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 
 #include <catch2/catch_approx.hpp>
@@ -70,7 +71,7 @@ Model sampleModel()
         }
     }
     const model::InstanceId stool = model::makeGroup(m, m.root(), cylinder, true, "Taburet");
-    const model::InstanceId copy = model::copyInstance(m, stool, Transform::translation({ 0, 1500, 0 }));
+    const model::InstanceId copy = model::copyLinked(m, stool, Transform::translation({ 0, 1500, 0 }));
     const model::TagId furniture = m.addTag({ "Mobilier", { 245, 158, 11, 255 }, true });
     model::Instance inst = m.instance(copy);
     inst.tag = furniture;

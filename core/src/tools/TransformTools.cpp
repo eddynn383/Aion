@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
@@ -404,7 +405,8 @@ std::vector<Grip> objectGrips(const ToolContext& ctx)
     return out;
 }
 
-// Copiile țintei, câte una pentru fiecare transformare (array). Instanțele unei componente rămân legate.
+// Copiile țintei, câte una pentru fiecare transformare (și seriile ×N): copii unice, în adâncime (doar ⌥D și Array
+// leagă copiile).
 geom::Selection copyTarget(ToolContext& ctx, const geom::Selection& source, const std::vector<Transform>& transforms)
 {
     geom::Selection copies;
@@ -419,12 +421,15 @@ geom::Selection copyTarget(ToolContext& ctx, const geom::Selection& source, cons
     }
     ctx.stack.run("Copy", [&](model::Model& model) {
         copyGeometry(model.mesh(ctx.context));
-        for (const Transform& t : transforms) {
-            for (model::InstanceId i : source.instances) {
-                if (model.instances().contains(i)) {
-                    copies.instances.insert(model::copyInstance(model, i, t));
-                }
+        std::vector<model::InstanceId> ids;
+        for (model::InstanceId i : source.instances) {
+            if (model.instances().contains(i)) {
+                ids.push_back(i);
             }
+        }
+        for (const Transform& t : transforms) {
+            const model::CopyResult copy = model::copyDeep(model, ctx.context, model, ids, t);
+            copies.instances.insert(copy.roots.begin(), copy.roots.end());
         }
     });
     return copies;

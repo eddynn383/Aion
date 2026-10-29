@@ -15,6 +15,7 @@
 #include "aion/core/model/Parametric.h"
 #include "aion/core/model/Transfer.h"
 #include "ProceduralTextures.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/MotionPaths.h"
@@ -1667,16 +1668,10 @@ void Document::duplicateLinked()
     runOnModel("Duplicare legată", [&](model::Model& model) {
         std::set<model::InstanceId> copies;
         for (model::InstanceId id : m_selection.instances) {
-            const model::DefinitionId def = model.instance(id).definition;
-            // Geometria devine partajată: copia și originalul se editează împreună.
-            model::Definition d = model.definition(def);
-            if (d.group && !d.collection) {
-                d.group = false;
-                model.setDefinition(def, d);
-            }
-            const auto [lo, hi] = model::bounds(model, def);
+            // Aceeași definiție (și pentru grupuri și colecții): copia și originalul se editează împreună.
+            const auto [lo, hi] = model::bounds(model, model.instance(id).definition);
             const double offset = lo.x <= hi.x ? (hi.x - lo.x) * 1.2 : 1000.0;
-            copies.insert(model::copyInstance(model, id, math::Transform::translation({ offset, 0.0, 0.0 })));
+            copies.insert(model::copyLinked(model, id, math::Transform::translation({ offset, 0.0, 0.0 })));
         }
         m_selection.clear();
         m_selection.instances = copies;
@@ -1770,7 +1765,7 @@ void Document::makeUniqueSelection()
     }
     runOnModel("Fă unic", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
-            model::makeUnique(model, id);
+            (void)model::makeUniqueDeep(model, id);
         }
     });
 }
@@ -3492,7 +3487,7 @@ QVariantList Document::contextMenuItems() const
             {}, !inst.locked);
         separator();
         item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !inst.locked);
-        if (!group && m_model.instancesOf(inst.definition).size() > 1) {
+        if (model::canMakeUnique(m_model, id)) {
             item(QStringLiteral("org.makeUnique"), QStringLiteral("Fă unic"));
         }
         item(QStringLiteral("org.group"), QStringLiteral("Grupează"), QStringLiteral("Ctrl+Alt+G"));

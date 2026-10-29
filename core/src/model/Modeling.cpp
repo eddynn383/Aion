@@ -1,6 +1,7 @@
 #include "aion/core/model/Modeling.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 
 #include <glm/common.hpp>
@@ -90,7 +91,7 @@ geom::Selection arraySelection(Model& model, DefinitionId context, const geom::S
     math::Transform t = step;
     for (int k = 1; k <= copies; ++k) {
         for (InstanceId id : selection.instances) {
-            created.instances.insert(copyInstance(model, id, t));
+            created.instances.insert(copyLinked(model, id, t));
         }
         if (!selection.edges.empty() || !selection.faces.empty()) {
             const geom::Selection loose { selection.edges, selection.faces, {} };
