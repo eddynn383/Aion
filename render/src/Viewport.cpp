@@ -449,14 +449,7 @@ void Viewport::appendDocument(DocumentPass& f) const
     }
 
     const glm::vec4 accent = toVec4(m_accent);
-    const glm::vec4 preview = toVec4(m_preview);
-    for (const tools::OverlayLine& l : overlay.lines) {
-        if (l.onTop) {
-            f.topLines.push_back({ w(l.a), w(l.b), tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
-        } else {
-            f.lines.push_back({ w(l.a), w(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
-        }
-    }
+    appendInferenceDrawing(f.lines, f.topLines, f.topPoints, overlay, ctx);
     for (const math::Vec3d& p : overlay.points) {
         f.points.push_back({ w(p), accent, 7.0f });
     }
@@ -472,19 +465,53 @@ void Viewport::appendDocument(DocumentPass& f) const
         f.topPoints.push_back({ p, glm::vec4(1.0f), g.hot ? 16.0f : 10.5f });
         f.topPoints.push_back({ p, color, g.hot ? 12.5f : 8.0f });
     }
+    if (hover.kind == view::PickResult::Kind::Vertex) {
+        f.points.push_back({ w(hover.point), accent, 9.0f });
+    }
+}
+
+void Viewport::appendInferenceDrawing(std::vector<LineInstance>& lines, std::vector<LineInstance>& topLines,
+    std::vector<PointInstance>& topPoints, const tools::Overlay& overlay, const math::Transform& ctx) const
+{
+    const auto w = [&](const math::Vec3d& p) { return glm::vec3(ctx.applyToPoint(p)); };
+    const glm::vec4 preview = toVec4(m_preview);
+    for (const tools::OverlayLine& l : overlay.lines) {
+        if (l.onTop) {
+            topLines.push_back({ w(l.a), w(l.b), tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
+        } else {
+            lines.push_back({ w(l.a), w(l.b), preview, { 1.5f, l.dashed ? 5.0f : 0.0f } });
+        }
+    }
     // Marcajul inferenței: un disc colorat cu margine în culoarea fundalului, peste tot restul.
     if (overlay.marker) {
         const glm::vec3 p = w(overlay.marker->point);
         if (overlay.marker->kind == inference::Kind::Ground) {
-            f.topPoints.push_back({ p, preview, 6.0f });
+            topPoints.push_back({ p, preview, 6.0f });
         } else {
-            f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.9f), 13.0f });
-            f.topPoints.push_back({ p, markerColor(overlay.marker->kind, overlay.marker->tint), 9.0f });
+            topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.9f), 13.0f });
+            topPoints.push_back({ p, markerColor(overlay.marker->kind, overlay.marker->tint), 9.0f });
         }
     }
-    if (hover.kind == view::PickResult::Kind::Vertex) {
-        f.points.push_back({ w(hover.point), accent, 9.0f });
+}
+
+std::optional<QVariantMap> Viewport::inferenceAnnotation(const tools::Overlay& overlay, const math::Transform& ctx) const
+{
+    if (!overlay.marker || overlay.marker->label.empty()) {
+        return std::nullopt;
     }
+    const auto p = m_camera.project(ctx.applyToPoint(overlay.marker->point));
+    if (!p) {
+        return std::nullopt;
+    }
+    const glm::vec4 c = markerColor(overlay.marker->kind, overlay.marker->tint);
+    return QVariantMap {
+        { QStringLiteral("kind"), QStringLiteral("inference") },
+        { QStringLiteral("x"), p->x },
+        { QStringLiteral("y"), p->y },
+        { QStringLiteral("text"), QString::fromStdString(overlay.marker->label) },
+        { QStringLiteral("color"), QColor::fromRgbF(c.r, c.g, c.b, c.a) },
+        { QStringLiteral("locked"), overlay.marker->locked },
+    };
 }
 
 void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::DefinitionId definition,
@@ -775,33 +802,14 @@ void Viewport::updateAnnotations()
                 { QStringLiteral("text"), QString::fromStdString(d.text) },
             });
         }
-        if (overlay.marker && !overlay.marker->label.empty()) {
-            if (const auto p = m_camera.project(ctx.applyToPoint(overlay.marker->point))) {
-                const glm::vec4 c = markerColor(overlay.marker->kind, overlay.marker->tint);
-                list.append(QVariantMap {
-                    { QStringLiteral("kind"), QStringLiteral("inference") },
-                    { QStringLiteral("x"), p->x },
-                    { QStringLiteral("y"), p->y },
-                    { QStringLiteral("text"), QString::fromStdString(overlay.marker->label) },
-                    { QStringLiteral("color"), QColor::fromRgbF(c.r, c.g, c.b, c.a) },
-                    { QStringLiteral("locked"), overlay.marker->locked },
-                });
-            }
+        if (const auto label = inferenceAnnotation(overlay, ctx)) {
+            list.append(*label);
         }
     }
     // Eticheta inferenței obiectului tras din bibliotecă.
-    if (m_document && m_dropPreview && m_dropOverlay.marker && !m_dropOverlay.marker->label.empty()) {
-        const tools::InferenceMarker& marker = *m_dropOverlay.marker;
-        if (const auto p = m_camera.project(m_document->contextTransform().applyToPoint(marker.point))) {
-            const glm::vec4 c = markerColor(marker.kind, marker.tint);
-            list.append(QVariantMap {
-                { QStringLiteral("kind"), QStringLiteral("inference") },
-                { QStringLiteral("x"), p->x },
-                { QStringLiteral("y"), p->y },
-                { QStringLiteral("text"), QString::fromStdString(marker.label) },
-                { QStringLiteral("color"), QColor::fromRgbF(c.r, c.g, c.b, c.a) },
-                { QStringLiteral("locked"), false },
-            });
+    if (m_document && m_dropPreview && !cleanView()) {
+        if (const auto label = inferenceAnnotation(m_dropOverlay, m_document->contextTransform())) {
+            list.append(*label);
         }
     }
     // Etichetele adnotărilor din model (cote și texte), editabile din QML.
@@ -2147,7 +2155,7 @@ ViewportFrame Viewport::frameForRendering() const
     f.meshRevision = pass->generation;
 
     // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.
-    if (m_dropPreview) {
+    if (m_dropPreview && !cleanView()) {
         const glm::vec3 size(m_dropPreview->second.x(), m_dropPreview->second.y(), m_dropPreview->second.z());
         const glm::vec3 lo = glm::vec3(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z())
             - glm::vec3(size.x * 0.5f, size.y * 0.5f, 0.0f);
@@ -2163,20 +2171,9 @@ ViewportFrame Viewport::frameForRendering() const
             f.topLines.push_back({ c[std::size_t(a)], c[std::size_t(b)], color, { 1.5f, 0.0f } });
         }
         f.topPoints.push_back({ lo + glm::vec3(size.x * 0.5f, size.y * 0.5f, 0.0f), color, 7.0f });
-        // Inferența punctului de plasare: ghidajele și marcajul, ca la unelte (în coordonatele contextului).
+        // Inferența punctului de plasare: ghidajele și marcajul, ca la unelte.
         if (m_document) {
-            const math::Transform ctx = m_document->contextTransform();
-            for (const tools::OverlayLine& l : m_dropOverlay.lines) {
-                f.topLines.push_back({ glm::vec3(ctx.applyToPoint(l.a)), glm::vec3(ctx.applyToPoint(l.b)),
-                    tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
-            }
-            if (const auto& marker = m_dropOverlay.marker) {
-                const glm::vec3 p = glm::vec3(ctx.applyToPoint(marker->point));
-                if (marker->kind != inference::Kind::Ground) {
-                    f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.9f), 13.0f });
-                    f.topPoints.push_back({ p, markerColor(marker->kind, marker->tint), 9.0f });
-                }
-            }
+            appendInferenceDrawing(f.lines, f.topLines, f.topPoints, m_dropOverlay, m_document->contextTransform());
         }
     }
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });

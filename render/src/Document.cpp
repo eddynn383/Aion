@@ -1231,15 +1231,10 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         ctx.object = model::SceneObjectRef { m_selectedCamera, m_selectedLight };
         ctx.pivot = selectedObjectPosition();
     }
-    m_contextGuides.clear();
-    for (const model::Guide& g : m_model.guides().values()) {
-        if (g.context == activeDefinition()) {
-            m_contextGuides.push_back({ g.point, g.direction });
-        }
-    }
+    m_contextGuides = inferenceGuides();
     ctx.guides = m_contextGuides;
     if (m_snapToGrid) {
-        ctx.gridStep = m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance);
+        ctx.gridStep = inferenceGridStep(camera);
     }
     ctx.libraryMaterial
         = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
@@ -1434,17 +1429,27 @@ const inference::SnapScene& Document::snapScene(const std::set<model::InstanceId
     return m_snapCache->second;
 }
 
-inference::Inference Document::inferDrop(inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const
+std::vector<inference::GuideRef> Document::inferenceGuides() const
 {
-    const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
     std::vector<inference::GuideRef> guides;
     for (const model::Guide& g : m_model.guides().values()) {
         if (g.context == activeDefinition()) {
             guides.push_back({ g.point, g.direction });
         }
     }
-    engine.withGuides(guides).withScene(&snapScene()).withGridSnap(
-        m_snapToGrid ? (m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance)) : 0.0);
+    return guides;
+}
+
+double Document::inferenceGridStep(const view::Camera& camera) const
+{
+    return m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance);
+}
+
+inference::Inference Document::inferDrop(inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const
+{
+    const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
+    const std::vector<inference::GuideRef> guides = inferenceGuides();
+    engine.withGuides(guides).withScene(&snapScene()).withGridSnap(m_snapToGrid ? inferenceGridStep(camera) : 0.0);
     return engine.infer(mesh(), local, screen, std::nullopt);
 }
 
@@ -4574,6 +4579,16 @@ QVariantList Document::generators() const
 
 double Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
 {
+    return createParametricAt(generator, at, parameters, true);
+}
+
+double Document::createParametricAtCorner(const QString& generator, const QVector3D& corner, const QVariantMap& parameters)
+{
+    return createParametricAt(generator, corner, parameters, false);
+}
+
+double Document::createParametricAt(const QString& generator, const QVector3D& at, const QVariantMap& parameters, bool baseCenter)
+{
     if (!require(Modeling)) {
         return 0.0;
     }
@@ -4585,10 +4600,11 @@ double Document::createParametric(const QString& generator, const QVector3D& at,
     for (auto it = parameters.begin(); it != parameters.end(); ++it) {
         given[it.key().toStdString()] = it.value().toDouble();
     }
-    // `at` = centrul bazei, în coordonatele contextului editat; originea generatorului e colțul stânga-față-jos
-    // (ADR 0025), deci o mutăm cu jumătate din lățime și adâncime. Dimensiunile vin din parametrii rezolvați.
+    // `at` = centrul bazei (sau colțul minim, dacă `baseCenter` e fals), în coordonatele lumii; originea generatorului
+    // e colțul stânga-față-jos (ADR 0025), deci pentru centrul bazei o mutăm cu jumătate din lățime și adâncime.
+    // Dimensiunile vin din parametrii rezolvați.
     math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
-    {
+    if (baseCenter) {
         model::Model probe;
         if (const model::InstanceId i = model::createParametric(probe, probe.root(), info->id, given, {}); i) {
             const auto [lo, hi] = model::bounds(probe, probe.root());

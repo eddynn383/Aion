@@ -35,6 +35,8 @@ namespace aion::render {
 
 struct ViewportFrame;
 struct DocumentPass;
+struct LineInstance;
+struct PointInstance;
 
 // Viewport-ul 3D integrat în scena QML. Ține camera și tratează navigarea
 // (mouse, trackpad); randarea propriu-zisă se face în ViewportRenderer.
@@ -354,6 +356,11 @@ private:
     void setPointer(QPointF position, bool inside);
     glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
     glm::vec4 tintColor(inference::Tint tint) const;
+    // Ghidajele și marcajul inferenței dintr-un overlay (al uneltei sau al drop-ului), în coordonatele contextului `ctx`.
+    void appendInferenceDrawing(std::vector<LineInstance>& lines, std::vector<LineInstance>& topLines,
+        std::vector<PointInstance>& topPoints, const tools::Overlay& overlay, const math::Transform& ctx) const;
+    // Eticheta marcajului inferenței pentru QML (nullopt dacă nu are etichetă sau e în afara ecranului).
+    std::optional<QVariantMap> inferenceAnnotation(const tools::Overlay& overlay, const math::Transform& ctx) const;
     // Doar modelul (fără selecție, pivot, hover, unealtă): la export și cât rulează animația.
     bool cleanView() const;
     // Ce desenează documentul (fără ce depinde de cameră), refolosit între cadre cât timp cheia nu se schimbă.

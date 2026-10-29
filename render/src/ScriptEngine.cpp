@@ -120,7 +120,7 @@ double ScriptApi::sphere(double x, double y, double z, double diameter, const QS
 
 double ScriptApi::object(const QString& generator, const QVariantMap& parameters, double x, double y, double z)
 {
-    return m_document ? m_document->createParametric(generator, QVector3D(float(x), float(y), float(z)), parameters) : 0.0;
+    return m_document ? m_document->createParametricAtCorner(generator, QVector3D(float(x), float(y), float(z)), parameters) : 0.0;
 }
 
 bool ScriptApi::place(double id, const QVariantMap& placement)

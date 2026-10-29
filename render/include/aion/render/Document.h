@@ -382,7 +382,10 @@ public:
     // Reface fețele în buclele închise ale muchiilor selectate (după ce o față a fost ștearsă).
     Q_INVOKABLE void createFacesFromSelection();
     // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
+    // `at` = centrul bazei obiectului.
     Q_INVOKABLE double createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
+    // Ca `createParametric`, dar punctul dat e colțul minim (API-ul de scripting: ca aion.box).
+    double createParametricAtCorner(const QString& generator, const QVector3D& corner, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);
     // Segmentele sferei / cilindrului / conului selectat (cât geometria e încă a primitivei; vezi model::primitiveSegments).
     Q_INVOKABLE void setPrimitiveSegments(int segments);
@@ -803,6 +806,10 @@ private:
     model::MaterialId m_currentMaterial;
     model::AnnotationId m_editingAnnotation;
     std::vector<inference::GuideRef> m_contextGuides;
+    // Ghidajele contextului editat și pasul grid-ului pentru inferență (unelte și drop).
+    std::vector<inference::GuideRef> inferenceGuides() const;
+    double inferenceGridStep(const view::Camera& camera) const;
+    double createParametricAt(const QString& generator, const QVector3D& at, const QVariantMap& parameters, bool baseCenter);
     int m_libraryMaterial = -1;
 };
 
