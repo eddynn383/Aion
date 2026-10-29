@@ -4,6 +4,7 @@
 #include "aion/core/geom/Mesh.h"
 #include "aion/core/geom/Selection.h"
 #include "aion/core/geom/Triangulate.h"
+#include "aion/core/inference/SnapScene.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/AnimationPlayer.h"
@@ -23,6 +24,8 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <map>
+#include <set>
+#include <vector>
 #include <tuple>
 #include <memory>
 #include <optional>
@@ -482,6 +485,8 @@ public:
     // Se schimbă doar când se schimbă modelul (istoricul, runOnModel, înlocuirea lui), nu și la hover sau la selecție.
     // Cât e deschisă o tranzacție (o unealtă trage și modifică modelul pe loc), urmează orice atingere a documentului.
     std::uint64_t modelRevision() const;
+    // Geometria pe care o vede inferența (obiectele din contextul editat), cu cache; `exclude` = instanțe ignorate.
+    const inference::SnapScene& snapScene(const std::set<model::InstanceId>& exclude = {}) const;
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
     // --- Modul interacțiune ---
@@ -662,6 +667,9 @@ private:
     mutable std::optional<model::Model> m_pose;
     mutable std::tuple<std::uint64_t, double, std::uint64_t> m_poseKey { ~std::uint64_t { 0 }, 0.0, 0 };
     std::uint64_t m_modelRevision = 0;
+    using SnapKey = std::tuple<std::uint64_t, std::vector<model::InstanceId>, std::set<model::InstanceId>, std::set<model::TagId>>;
+    mutable std::optional<std::pair<SnapKey, inference::SnapScene>> m_snapCache;
+    std::set<model::InstanceId> snapExclude() const;
     model::Model& pose() const;
     // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează animația).
     // Auto-key: transformările noi ale obiectelor (la timpul curent) devin chei, doar pe canalele schimbate.

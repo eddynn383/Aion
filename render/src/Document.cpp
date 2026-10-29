@@ -14,6 +14,7 @@
 #include "aion/core/model/Interaction.h"
 #include "aion/core/model/Modeling.h"
 #include "aion/core/model/Parametric.h"
+#include "aion/core/model/SnapSources.h"
 #include "aion/core/model/Transfer.h"
 #include "ProceduralTextures.h"
 #include "RecoveryStore.h"
@@ -468,6 +469,7 @@ void Document::replaceModel(const model::Model& model)
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        ctx.snap = &snapScene(snapExclude());
         m_tool->cancel(ctx);
     }
     m_path.clear();
@@ -740,6 +742,7 @@ void Document::setActiveTool(const QString& requested)
         // Unealta veche nu are nevoie de cameră ca să renunțe; îi dăm una oarecare.
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        ctx.snap = &snapScene(snapExclude());
         m_tool->cancel(ctx);
     }
     m_toolId = id;
@@ -1197,6 +1200,14 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     tools::ToolContext ctx { target.mesh(activeDefinition()), animating ? *poseStack : m_stack, m_selection, local };
     ctx.model = &target;
     ctx.context = activeDefinition();
+    // În Animare scena vine din copia pozată (`target`), fără cache; altfel din cache-ul documentului.
+    inference::SnapScene posedSnap;
+    if (animating) {
+        posedSnap = model::snapScene(target, m_path, snapExclude());
+        ctx.snap = &posedSnap;
+    } else {
+        ctx.snap = &snapScene(snapExclude());
+    }
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
     ctx.toWorld = contextTransform();
@@ -1380,6 +1391,7 @@ void Document::repairContext()
     if (std::exchange(m_contextLost, false) && m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        ctx.snap = &snapScene(snapExclude());
         m_tool->cancel(ctx);
     }
     // Calea se oprește la prima instanță care nu mai există sau nu mai e în definiția de deasupra.
@@ -1401,6 +1413,25 @@ void Document::repairContext()
         const model::Instance* inst = m_model.instances().find(id);
         return inst == nullptr || inst->parent != active;
     });
+}
+
+std::set<model::InstanceId> Document::snapExclude() const
+{
+    // Obiectele mutate / rotite / scalate / puse nu se prind de ele însele.
+    const bool own = m_place.has_value() || m_toolId == QLatin1String("move") || m_toolId == QLatin1String("rotate")
+        || m_toolId == QLatin1String("scale") || m_toolId == QLatin1String("place");
+    return own ? m_selection.instances : std::set<model::InstanceId> {};
+}
+
+const inference::SnapScene& Document::snapScene(const std::set<model::InstanceId>& exclude) const
+{
+    // Vizibilitatea (instanțe și tag-uri) trece prin model, deci îi schimbă revizia; hiddenTags() intră în cheie
+    // pentru că e o stare globală separată.
+    const SnapKey key { modelRevision(), m_path, exclude, view::hiddenTags() };
+    if (!m_snapCache || m_snapCache->first != key) {
+        m_snapCache.emplace(key, model::snapScene(m_model, m_path, exclude));
+    }
+    return m_snapCache->second;
 }
 
 void Document::updateHiddenTags()
@@ -1450,6 +1481,7 @@ void Document::setPath(std::vector<model::InstanceId> path)
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        ctx.snap = &snapScene(snapExclude());
         m_tool->cancel(ctx);
     }
     m_path = std::move(path);
@@ -1512,6 +1544,7 @@ void Document::replayPointer()
     if (m_tool && m_lastPointer) {
         const view::Camera local = m_path.empty() ? m_lastCamera : m_lastCamera.inContext(contextTransform());
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, local };
+        ctx.snap = &snapScene(snapExclude());
         ctx.model = &m_model;
         ctx.context = activeDefinition();
         m_tool->pointerMove(ctx, *m_lastPointer);
@@ -1631,6 +1664,7 @@ void Document::deleteSelection(bool keepFaces)
     const geom::Selection before = m_selection;
     const view::Camera camera;
     tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+    ctx.snap = &snapScene(snapExclude());
     ctx.model = &m_model;
     ctx.context = activeDefinition();
     tools::deleteSelection(ctx, keepFaces);
@@ -2151,6 +2185,7 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
     const geom::Selection before = m_selection;
     const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
     tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, local };
+    ctx.snap = &snapScene(snapExclude());
     ctx.model = &m_model;
     ctx.context = activeDefinition();
     const geom::Selection hit = tools::selectionAt(ctx, screen);
@@ -2903,6 +2938,7 @@ void Document::setWorkMode(int mode)
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+        ctx.snap = &snapScene(snapExclude());
         m_tool->cancel(ctx);
     }
     cancelOperation();
@@ -3006,6 +3042,7 @@ void Document::setInteractionMode(bool on)
         if (m_tool) {
             const view::Camera camera;
             tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
+            ctx.snap = &snapScene(snapExclude());
             m_tool->cancel(ctx);
         }
         endPreview();
