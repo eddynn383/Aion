@@ -21,6 +21,7 @@ add_executable(aion_tests
     core/OffsetTests.cpp
     core/ModelTests.cpp
     core/ModelingTests.cpp
+    core/SnapSceneTests.cpp
     core/ShapeTests.cpp
     core/BezierTests.cpp
     core/PenCurveTests.cpp
