@@ -725,6 +725,7 @@ glm::vec4 Viewport::markerColor(inference::Kind kind, inference::Tint tint) cons
     case inference::Kind::Endpoint:
         return toVec4(m_axisY);
     case inference::Kind::Midpoint:
+    case inference::Kind::Center:
         return toVec4(m_inferenceCyan);
     case inference::Kind::OnEdge:
         return toVec4(m_axisX);

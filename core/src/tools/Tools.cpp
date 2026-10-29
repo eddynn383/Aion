@@ -721,7 +721,7 @@ private:
         inference::Inference inf = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, screen, std::nullopt);
         const double depth = glm::dot(inf.point - m_origin, m_normal);
         const bool fromPoint = (inf.kind == inference::Kind::Endpoint || inf.kind == inference::Kind::Midpoint
-                                   || inf.kind == inference::Kind::OnEdge)
+                                   || inf.kind == inference::Kind::Center || inf.kind == inference::Kind::OnEdge)
             && std::abs(depth) > tol::kLength; // punctele din planul feței nu dau o adâncime
 
         const bool fromFace = inf.kind == inference::Kind::OnFace && inf.face != m_face

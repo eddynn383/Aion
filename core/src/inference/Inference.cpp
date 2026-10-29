@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 
 namespace aion::inference {
 
@@ -158,6 +159,64 @@ ReferenceEdge referenceOf(const detail::Layer& l, geom::EdgeId id)
     return ref;
 }
 
+// Centrul curbei din care face parte muchia (cerc, arc, poligon), în coordonatele mesh-ului: centrul cercului prin trei
+// vârfuri ale curbei, dacă toate vârfurile ei sunt pe acel cerc. Vârfurile se strâng prin vecinătate, de la muchie.
+std::optional<Vec3d> curveCenter(const geom::Mesh& mesh, geom::EdgeId start)
+{
+    const geom::Edge& first = mesh.edge(start);
+    if (first.curve == 0) {
+        return std::nullopt;
+    }
+    std::vector<Vec3d> points;
+    std::unordered_set<geom::VertexId> seen { first.v0, first.v1 };
+    std::vector<geom::VertexId> pending { first.v0, first.v1 };
+    while (!pending.empty()) {
+        const geom::VertexId v = pending.back();
+        pending.pop_back();
+        points.push_back(mesh.position(v));
+        for (geom::EdgeId id : mesh.vertex(v).edges) {
+            const geom::Edge& e = mesh.edge(id);
+            if (e.curve == first.curve && seen.insert(e.other(v)).second) {
+                pending.push_back(e.other(v));
+            }
+        }
+    }
+    if (points.size() < 3) {
+        return std::nullopt;
+    }
+    // Trei vârfuri cât mai depărtate: primul, cel mai departe de el și cel care face cu ele triunghiul cel mai mare.
+    const Vec3d p0 = points.front();
+    Vec3d p1 = p0;
+    for (const Vec3d& p : points) {
+        if (glm::length(p - p0) > glm::length(p1 - p0)) {
+            p1 = p;
+        }
+    }
+    const Vec3d a = p1 - p0;
+    Vec3d b { 0.0 };
+    Vec3d n { 0.0 };
+    for (const Vec3d& p : points) {
+        const Vec3d c = glm::cross(a, p - p0);
+        if (glm::length(c) > glm::length(n)) {
+            b = p - p0;
+            n = c;
+        }
+    }
+    if (tol::isZero(glm::length(n), tol::kLength * glm::length(a))) {
+        return std::nullopt; // vârfuri coliniare
+    }
+    const Vec3d center = p0 + glm::cross(glm::dot(a, a) * b - glm::dot(b, b) * a, n) / (2.0 * glm::dot(n, n));
+    const double radius = glm::length(p0 - center);
+    const double eps = 1e-6 * radius + tol::kLength;
+    const Vec3d normal = glm::normalize(n);
+    for (const Vec3d& p : points) {
+        if (!tol::equal(glm::length(p - center), radius, eps) || !tol::isZero(glm::dot(p - center, normal), eps)) {
+            return std::nullopt;
+        }
+    }
+    return center;
+}
+
 // Direcția unitară a muchiei; vectorul nul pentru o muchie degenerată.
 Vec3d referenceDirection(const ReferenceEdge& ref)
 {
@@ -266,6 +325,8 @@ std::string_view label(const Inference& inference)
         return "Endpoint";
     case Kind::Midpoint:
         return "Midpoint";
+    case Kind::Center:
+        return "Center";
     case Kind::Intersection:
         return "Intersection";
     case Kind::OnAxis:
@@ -364,6 +425,7 @@ Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2
     std::optional<math::Plane> plane)
 {
     m_hitEdge.reset();
+    m_hitCenter.reset();
     std::vector<detail::Layer> layers { { &mesh, camera, nullptr, {} } };
     if (m_scene) {
         for (const SnapSource& source : m_scene->sources) {
@@ -388,6 +450,14 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
     Inference out;
     const FaceHit faceHit = nearestFace(layers, ray, screen, out.pick);
     const double hyst = m_options.hysteresis;
+    // Centrul curbei unei muchii atinse, în coordonatele contextului, cu originea curbei.
+    const auto centerOf = [](const detail::Layer& l, geom::EdgeId id) -> std::optional<CurveCenter> {
+        const auto c = curveCenter(*l.mesh, id);
+        if (!c) {
+            return std::nullopt;
+        }
+        return CurveCenter { l.point(*c), l.context() ? Origin::Context : Origin::Object, l.instance };
+    };
 
     // 1. Capete (vârfuri). Vârful ales anterior rămâne ales într-o rază mai mare (în ctx.mesh după ID, într-un obiect
     // după punct).
@@ -423,6 +493,27 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
                 out.vertex = bestVertex;
             }
             bestLayer->stamp(out);
+            return out;
+        }
+        // Centrele curbelor atinse recent, după capete.
+        const CurveCenter* bestCenter = nullptr;
+        for (const CurveCenter& c : m_centers) {
+            const bool previous = m_last.kind == Kind::Center && tol::samePoint(m_last.point, c.point);
+            const double d = screenDistance(camera, c.point, screen);
+            if (d > m_options.pointRadiusPx * (previous ? hyst : 1.0) || !visible(ray, faceHit, c.point)) {
+                continue;
+            }
+            const double score = previous ? -1.0 : d;
+            if (score < best) {
+                best = score;
+                bestCenter = &c;
+            }
+        }
+        if (bestCenter) {
+            out.kind = Kind::Center;
+            out.point = bestCenter->point;
+            out.origin = bestCenter->origin;
+            out.sourceInstance = bestCenter->instance;
             return out;
         }
     }
@@ -497,6 +588,7 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
             out.kind = Kind::Midpoint;
             out.point = bestPoint;
             m_hitEdge = referenceOf(*bestLayer, bestEdge);
+            m_hitCenter = centerOf(*bestLayer, bestEdge);
             if (bestLayer->context()) {
                 out.edge = bestEdge;
             }
@@ -679,6 +771,7 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
             out.kind = Kind::OnEdge;
             out.point = bestPoint;
             m_hitEdge = referenceOf(*bestLayer, bestPick.edge);
+            m_hitCenter = centerOf(*bestLayer, bestPick.edge);
             if (bestLayer->context()) {
                 out.edge = bestPick.edge;
             }
@@ -740,15 +833,21 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
 
     // 6. Aliniat cu un punct de referință pe o axă din planul punctului liber.
     if (free) {
+        const auto inPlane = [&](const Vec3d& r, const Vec3d& ad) {
+            return tol::perpendicular(ad, freePlane.normal, 1e-6) && tol::isZero(freePlane.signedDistance(r), 0.01)
+                && std::abs(glm::dot(ad, ray.direction)) <= kMaxViewAlignment;
+        };
+        struct Track {
+            Vec3d reference;
+            Axis axis;
+            Vec3d point;
+        };
         double best = m_options.lineRadiusPx;
-        std::optional<std::pair<Vec3d, Guide>> track;
+        std::optional<Track> track;
         for (const Vec3d& r : m_references) {
             for (Axis a : { Axis::X, Axis::Y, Axis::Z }) {
                 const Vec3d ad = axisDirection(a);
-                if (!tol::perpendicular(ad, freePlane.normal, 1e-6) || !tol::isZero(freePlane.signedDistance(r), 0.01)) {
-                    continue;
-                }
-                if (std::abs(glm::dot(ad, ray.direction)) > kMaxViewAlignment) {
+                if (!inPlane(r, ad)) {
                     continue;
                 }
                 const auto p = pointOnLineUnderCursor(camera, screen, r, ad);
@@ -758,14 +857,42 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
                 const double d = screenDistance(camera, *p, screen);
                 if (d <= best) {
                     best = d;
-                    track = std::pair { *p, Guide { r, *p, axisTint(a), true } };
+                    track = Track { r, a, *p };
                 }
             }
         }
         if (track) {
+            // Aliniere dublă: linia altui punct de referință, pe altă axă, o încrucișează pe prima lângă cursor.
+            const double eps = std::max(camera.worldPerPixelAtTarget(), tol::kLength);
+            const Vec3d firstDir = axisDirection(track->axis);
+            double bestCross = m_options.lineRadiusPx;
+            std::optional<Track> second;
+            for (const Vec3d& r : m_references) {
+                if (tol::samePoint(r, track->reference)) {
+                    continue;
+                }
+                for (Axis a : { Axis::X, Axis::Y, Axis::Z }) {
+                    const Vec3d ad = axisDirection(a);
+                    if (a == track->axis || !inPlane(r, ad)) {
+                        continue;
+                    }
+                    const auto x = intersectLines(track->reference, firstDir, r, ad, eps);
+                    if (!x || tol::samePoint(*x, r) || tol::samePoint(*x, track->reference)) {
+                        continue;
+                    }
+                    const double d = screenDistance(camera, *x, screen);
+                    if (d <= bestCross) {
+                        bestCross = d;
+                        second = Track { r, a, *x };
+                    }
+                }
+            }
             out.kind = Kind::FromPoint;
-            out.point = track->first;
-            out.guides.push_back(track->second);
+            out.point = second ? second->point : track->point;
+            out.guides.push_back({ track->reference, out.point, axisTint(track->axis), true });
+            if (second) {
+                out.guides.push_back({ second->reference, out.point, axisTint(second->axis), true });
+            }
             return out;
         }
     }
@@ -863,17 +990,27 @@ Inference Engine::inferLocked(const std::vector<detail::Layer>& layers, const vi
 
 void Engine::remember(const Inference& result)
 {
-    std::optional<Vec3d> reference;
-    if (result.kind == Kind::Endpoint || result.kind == Kind::Midpoint) {
-        reference = result.point;
-    }
-    if (reference) {
-        const auto same = [&](const Vec3d& r) { return tol::samePoint(r, *reference); };
+    const auto addReference = [&](const Vec3d& reference) {
+        const auto same = [&](const Vec3d& r) { return tol::samePoint(r, reference); };
         m_references.erase(std::remove_if(m_references.begin(), m_references.end(), same), m_references.end());
-        m_references.push_front(*reference);
+        m_references.push_front(reference);
         while (m_references.size() > m_options.maxReferences) {
             m_references.pop_back();
         }
+    };
+    if (result.kind == Kind::Endpoint || result.kind == Kind::Midpoint) {
+        addReference(result.point);
+    }
+    // Centrul curbei atinse devine țintă (Center) și punct de referință (From Point).
+    if ((result.kind == Kind::OnEdge || result.kind == Kind::Midpoint) && m_hitCenter) {
+        const CurveCenter center = *m_hitCenter;
+        const auto same = [&](const CurveCenter& c) { return tol::samePoint(c.point, center.point); };
+        m_centers.erase(std::remove_if(m_centers.begin(), m_centers.end(), same), m_centers.end());
+        m_centers.push_front(center);
+        while (m_centers.size() > m_options.maxReferences) {
+            m_centers.pop_back();
+        }
+        addReference(center.point);
     }
     m_lastFacePlane.reset();
     if (result.kind == Kind::OnFace && result.normal) {
@@ -942,6 +1079,7 @@ void Engine::reset()
     resetLock();
     m_references.clear();
     m_referenceEdge.reset();
+    m_centers.clear();
 }
 
 void Engine::restartFrom(const Vec3d& from)

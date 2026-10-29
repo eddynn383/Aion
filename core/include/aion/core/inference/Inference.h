@@ -36,6 +36,7 @@ enum class Kind {
     OnEdge,
     Endpoint,
     Midpoint,
+    Center, // centrul unui cerc, arc sau poligon atins recent
     Intersection, // o direcție (axă, paralelă) care taie o muchie
     OnAxis, // pe o axă care trece prin punctul de pornire
     Parallel, // paralel cu muchia de referință
@@ -90,7 +91,8 @@ struct Inference {
     [[nodiscard]] bool valid() const { return kind != Kind::None; }
     [[nodiscard]] bool isPoint() const
     {
-        return kind == Kind::Endpoint || kind == Kind::Midpoint || kind == Kind::Intersection;
+        return kind == Kind::Endpoint || kind == Kind::Midpoint || kind == Kind::Center
+            || kind == Kind::Intersection;
     }
 };
 
@@ -190,6 +192,12 @@ private:
         Kind reason = Kind::None; // inferența care a produs lock-ul (pentru etichetă și culoare)
         Axis axis = Axis::None;
     };
+    // Centrul unei curbe atinse, în coordonatele contextului, cu originea curbei.
+    struct CurveCenter {
+        Vec3d point { 0.0 };
+        Origin origin = Origin::Context;
+        model::InstanceId instance;
+    };
 
     // `layers`: mesh-ul contextului (primul), apoi fiecare sursă din scenă, cu camera în coordonatele ei.
     Inference inferFree(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
@@ -207,6 +215,9 @@ private:
     std::optional<ReferenceEdge> m_referenceEdge;
     // Muchia atinsă de ultima inferență liberă (Midpoint / OnEdge), din orice strat; devine referință în remember().
     std::optional<ReferenceEdge> m_hitEdge;
+    // Centrul curbei muchiei atinse (dacă muchia e pe un cerc, arc sau poligon); devine țintă în remember().
+    std::optional<CurveCenter> m_hitCenter;
+    std::deque<CurveCenter> m_centers; // cele mai recente primele
     std::optional<math::Plane> m_lastFacePlane;
     std::vector<GuideRef> m_guides;
     const SnapScene* m_scene = nullptr;

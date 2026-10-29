@@ -551,3 +551,137 @@ TEST_CASE("Inferență pe obiecte: fără scenă, nimic nou", "[core][inference]
     CHECK(r.origin == Origin::Context);
     CHECK_FALSE(r.normal);
 }
+
+namespace {
+
+// Camera de sus, aproape de cercul (1000, 1000, 0) cu raza 500: ~1.6 mm pe pixel, ca o latură să aibă loc și pentru
+// „pe muchie”, nu doar pentru capete și mijloc.
+view::Camera closeTopCamera(Vec3d target = { 1000, 1000, 0 })
+{
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Top, { target, 0, 0, 2000 }));
+    return camera;
+}
+
+std::vector<Vec3d> circlePoints(Vec3d center, double radius, int segments)
+{
+    std::vector<Vec3d> out;
+    for (int k = 0; k < segments; ++k) {
+        const double a = glm::radians(360.0 * k / segments);
+        out.push_back(center + Vec3d { radius * std::cos(a), radius * std::sin(a), 0.0 });
+    }
+    return out;
+}
+
+// Un punct la un sfert din latura k a cercului: departe și de capete, și de mijloc.
+Vec3d onSide(const std::vector<Vec3d>& pts, std::size_t k)
+{
+    return pts[k] + (pts[(k + 1) % pts.size()] - pts[k]) * 0.25;
+}
+
+} // namespace
+
+TEST_CASE("Inferență: centrul unui cerc după ce cursorul a atins cercul", "[core][inference]")
+{
+    Mesh mesh;
+    const Vec3d center { 1000, 1000, 0 };
+    const std::vector<Vec3d> pts = circlePoints(center, 500, 24);
+    geom::drawCurve(mesh, pts, true, true);
+    const auto camera = closeTopCamera();
+
+    // Fără atingerea cercului întâi: nu e centru.
+    inference::Engine fresh;
+    CHECK(fresh.infer(mesh, camera, screen(camera, center) + Vec2d { 3, 4 }, std::nullopt).kind != Kind::Center);
+
+    inference::Engine engine;
+    REQUIRE(engine.infer(mesh, camera, screen(camera, onSide(pts, 2)), std::nullopt).kind == Kind::OnEdge);
+    const auto r = engine.infer(mesh, camera, screen(camera, center) + Vec2d { 3, 4 }, std::nullopt);
+    CHECK(r.kind == Kind::Center);
+    CHECK(near(r.point, center));
+    CHECK(r.isPoint());
+    CHECK(r.origin == Origin::Context);
+    CHECK_FALSE(r.vertex);
+    CHECK_FALSE(r.edge);
+    CHECK(inference::label(r) == "Center");
+
+    // Centrul e și punct de referință: aliniere pe axă din el.
+    const auto aligned = engine.infer(mesh, camera, screen(camera, { 1000, 1700, 0 }) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(aligned.kind == Kind::FromPoint);
+    CHECK(aligned.point.x == Approx(1000).margin(1e-3));
+}
+
+TEST_CASE("Inferență: centrul unui cilindru din alt obiect", "[core][inference]")
+{
+    model::Model m;
+    model::Definition def { "Cilindru", true };
+    def.shape = "cylinder";
+    const model::DefinitionId d = m.addDefinition(def);
+    geom::buildPrimitive(m.mesh(d), geom::Primitive::Cylinder, { 1000, 1000, 1000 }, 24);
+    model::Instance inst;
+    inst.parent = m.root();
+    inst.definition = d;
+    inst.transform = Transform::translation({ 1000, 1000, 0 });
+    const model::InstanceId id = m.addInstance(inst);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+
+    // Capacul de sus (din Push/Pull) are și el un id de curbă.
+    const Vec3d center { 1000, 1000, 1000 };
+    const std::vector<Vec3d> pts = circlePoints(center, 500, 24);
+    const auto camera = closeTopCamera(center);
+    inference::Engine engine;
+    engine.withScene(&scene);
+    const auto edge = engine.infer(m.mesh(m.root()), camera, screen(camera, onSide(pts, 5)), std::nullopt);
+    REQUIRE(edge.kind == Kind::OnEdge);
+    REQUIRE(edge.origin == Origin::Object);
+
+    const auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, center) + Vec2d { 3, 4 }, std::nullopt);
+    CHECK(r.kind == Kind::Center);
+    CHECK(near(r.point, center));
+    CHECK(r.origin == Origin::Object);
+    CHECK(r.sourceInstance == id);
+}
+
+TEST_CASE("Inferență: o curbă care nu e cerc nu are centru", "[core][inference]")
+{
+    Mesh mesh;
+    // Polilinie deschisă cu un singur id de curbă; trei puncte oarecare sunt mereu pe un cerc, patru nu.
+    const std::vector<Vec3d> pts { { 500, 500, 0 }, { 1500, 500, 0 }, { 1500, 1500, 0 }, { 700, 1300, 0 } };
+    geom::drawCurve(mesh, pts, false, false);
+    const auto camera = closeTopCamera();
+    inference::Engine engine;
+    REQUIRE(engine.infer(mesh, camera, screen(camera, { 1000, 500, 0 }) + Vec2d { 0, 3 }, std::nullopt).kind
+        == Kind::Midpoint);
+    REQUIRE(engine.infer(mesh, camera, screen(camera, { 1500, 800, 0 }) + Vec2d { 3, 0 }, std::nullopt).kind
+        == Kind::OnEdge);
+
+    // Centrul cercului prin primele trei puncte.
+    const auto r = engine.infer(mesh, camera, screen(camera, { 1000, 1000, 0 }) + Vec2d { 2, 2 }, std::nullopt);
+    CHECK(r.kind != Kind::Center);
+}
+
+TEST_CASE("Inferență: aliniere dublă", "[core][inference]")
+{
+    Mesh mesh;
+    geom::drawLine(mesh, { 0, 2000, 0 }, { -800, 2000, 0 });
+    geom::drawLine(mesh, { 3000, 0, 0 }, { 3000, -600, 0 });
+    const auto camera = topCamera();
+    inference::Engine engine;
+    REQUIRE(engine.infer(mesh, camera, screen(camera, { 0, 2000, 0 }), std::nullopt).kind == Kind::Endpoint);
+    REQUIRE(engine.infer(mesh, camera, screen(camera, { 3000, 0, 0 }), std::nullopt).kind == Kind::Endpoint);
+
+    const auto r = engine.infer(mesh, camera, screen(camera, { 3000, 2000, 0 }) + Vec2d { 4, -3 }, std::nullopt);
+    CHECK(r.kind == Kind::FromPoint);
+    CHECK(near(r.point, { 3000, 2000, 0 }, 1e-3));
+    REQUIRE(r.guides.size() == 2);
+    CHECK(r.guides[0].dashed);
+    CHECK(r.guides[1].dashed);
+    const bool xy = r.guides[0].tint == inference::Tint::X && r.guides[1].tint == inference::Tint::Y;
+    const bool yx = r.guides[0].tint == inference::Tint::Y && r.guides[1].tint == inference::Tint::X;
+    CHECK((xy || yx));
+
+    // Departe de încrucișare rămâne alinierea simplă.
+    const auto single = engine.infer(mesh, camera, screen(camera, { 1500, 2000, 0 }) + Vec2d { 0, 4 }, std::nullopt);
+    CHECK(single.kind == Kind::FromPoint);
+    CHECK(single.guides.size() == 1);
+}
