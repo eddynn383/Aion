@@ -3,6 +3,7 @@
 #include "aion/core/math/Tolerance.h"
 
 #include <glm/geometric.hpp>
+#include <glm/trigonometric.hpp>
 
 #include <algorithm>
 #include <array>
@@ -155,36 +156,42 @@ ArcLength::ArcLength(const BezierPath& path)
         }
     }
     m_length = total;
+    // Colțurile: punctele (interioare, sau toate pe o cale închisă) unde tangenta de sosire și cea de plecare diferă.
+    const std::size_t n = m_path.points.size();
+    for (std::size_t i = m_path.closed ? 0 : 1; i < n && segments > 0; ++i) {
+        if (!m_path.closed && i + 1 >= n) {
+            break;
+        }
+        const std::size_t before = (i + segments - 1) % segments; // segmentul care se termină în punctul i
+        const std::size_t after = i % segments;
+        if (segmentLength(before) <= tol::kLength || segmentLength(after) <= tol::kLength) {
+            continue;
+        }
+        const Vec3d in = bezierTangent(m_path, before, 1.0);
+        const Vec3d out = bezierTangent(m_path, after, 0.0);
+        if (glm::dot(in, out) < std::cos(glm::radians(1.0))) {
+            m_corners.push_back({ m_table[after * (kTableSubdivisions + 1)].distance, in, out });
+        }
+    }
 }
 
-PathFrame ArcLength::at(double distance) const
+double ArcLength::segmentLength(std::size_t segment) const
 {
-    const std::size_t segments = m_path.segmentCount();
-    if (segments == 0) {
-        return { m_path.points.empty() ? Vec3d { 0.0 } : m_path.points.front().point, { 1.0, 0.0, 0.0 } };
-    }
-    if (m_path.closed && m_length > tol::kLength) {
-        distance = std::fmod(distance, m_length);
-        if (distance < 0.0) {
-            distance += m_length;
-        }
-    } else if (distance < 0.0 || m_length <= tol::kLength) {
-        // Înainte de start: prelungirea dreaptă pe tangenta de la primul punct.
-        const Vec3d tangent = bezierTangent(m_path, 0, 0.0);
-        return { m_path.points.front().point + tangent * std::min(distance, 0.0) + tangent * std::max(distance, 0.0),
-            tangent };
-    } else if (distance > m_length) {
-        const Vec3d tangent = bezierTangent(m_path, segments - 1, 1.0);
-        return { bezierPoint(m_path, segments - 1, 1.0) + tangent * (distance - m_length), tangent };
-    }
+    const std::size_t first = segment * (kTableSubdivisions + 1);
+    return first + kTableSubdivisions < m_table.size() ? m_table[first + kTableSubdivisions].distance - m_table[first].distance
+                                                       : 0.0;
+}
+
+std::pair<std::size_t, double> ArcLength::locate(double distance) const
+{
     // Intervalul din tabel (în același segment): t interpolat liniar după distanță.
     const auto it = std::lower_bound(m_table.begin(), m_table.end(), distance,
         [](const Entry& e, double d) { return e.distance < d; });
     if (it == m_table.begin()) {
-        return { bezierPoint(m_path, 0, 0.0), bezierTangent(m_path, 0, 0.0) };
+        return { 0, 0.0 };
     }
     const Entry& b = it == m_table.end() ? m_table.back() : *it;
-    const Entry& a = *(it == m_table.end() ? it - 1 : it - 1);
+    const Entry& a = *(it - 1);
     double t = b.t;
     if (a.segment == b.segment && b.distance - a.distance > 1e-12) {
         t = a.t + (b.t - a.t) * (distance - a.distance) / (b.distance - a.distance);
@@ -200,7 +207,73 @@ PathFrame ArcLength::at(double distance) const
             t = std::clamp(t + error / speed, a.t, b.t);
         }
     }
-    return { bezierPoint(m_path, b.segment, t), bezierTangent(m_path, b.segment, t) };
+    return { b.segment, t };
+}
+
+PathFrame ArcLength::at(double distance) const
+{
+    return at(distance, 0.0);
+}
+
+PathFrame ArcLength::at(double distance, double cornerBlend) const
+{
+    const std::size_t segments = m_path.segmentCount();
+    if (segments == 0) {
+        return { m_path.points.empty() ? Vec3d { 0.0 } : m_path.points.front().point, { 1.0, 0.0, 0.0 } };
+    }
+    // Capetele unei căi deschise: prelungirea dreaptă pe tangenta primului / ultimului segment care are lungime.
+    const auto startTangent = [&] {
+        std::size_t s = 0;
+        while (s + 1 < segments && segmentLength(s) <= tol::kLength) {
+            ++s;
+        }
+        return bezierTangent(m_path, s, 0.0);
+    };
+    const auto endTangent = [&] {
+        std::size_t s = segments - 1;
+        while (s > 0 && segmentLength(s) <= tol::kLength) {
+            --s;
+        }
+        return bezierTangent(m_path, s, 1.0);
+    };
+    if (m_path.closed && m_length > tol::kLength) {
+        distance = std::fmod(distance, m_length);
+        if (distance < 0.0) {
+            distance += m_length;
+        }
+    } else if (distance < 0.0 || m_length <= tol::kLength) {
+        const Vec3d tangent = startTangent();
+        return { m_path.points.front().point + tangent * distance, tangent };
+    } else if (distance > m_length) {
+        const Vec3d tangent = endTangent();
+        return { bezierPoint(m_path, segments - 1, 1.0) + tangent * (distance - m_length), tangent };
+    }
+    const auto [segment, t] = locate(distance);
+    PathFrame frame { bezierPoint(m_path, segment, t), bezierTangent(m_path, segment, t) };
+    if (cornerBlend <= 0.0) {
+        return frame;
+    }
+    for (const Corner& c : m_corners) {
+        double delta = distance - c.distance;
+        if (m_path.closed) {
+            delta = std::remainder(delta, m_length); // în jurul punctului de închidere, de o parte și de alta
+        }
+        if (std::abs(delta) >= cornerBlend * 0.5) {
+            continue;
+        }
+        // De la tangenta de sosire la cea de plecare, lin (smoothstep): înainte de colț pe tangenta exactă de sosire,
+        // după el pe cea exactă de plecare.
+        const double u = (delta + cornerBlend * 0.5) / cornerBlend;
+        const double k = u * u * (3.0 - 2.0 * u);
+        const Vec3d in = delta < -tol::kLength ? frame.tangent : c.in;
+        const Vec3d out = delta > tol::kLength ? frame.tangent : c.out;
+        const Vec3d mixed = in * (1.0 - k) + out * k;
+        if (glm::length(mixed) > 1e-9) {
+            frame.tangent = glm::normalize(mixed);
+        }
+        break;
+    }
+    return frame;
 }
 
 BezierPath insertPoint(const BezierPath& path, std::size_t segment, double t)

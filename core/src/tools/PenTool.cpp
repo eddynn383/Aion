@@ -19,8 +19,10 @@ constexpr double kClosePx = 10.0; // cât de aproape de primul punct închide un
 // --- Pen ------------------------------------------------------------------------------------
 
 // Pen-ul, ca în Figma (ADR 0036): click = punct cu colț, click și tragi = punct neted (mânerele simetrice), click pe
-// primul punct = închide, Enter / Esc / dublu click = termină deschisă. Curba stă pe planul primului click (solul sau
-// o față). În Modelare devine geometrie (o curbă Pen editabilă); în Animare, o cale (cerere către Document).
+// primul punct = închide, Enter / dublu click = termină deschisă, Esc (sau ⌘Z) = înapoi la nodul anterior. Curba stă pe
+// un plan: al feței de sub primul click (a geometriei sau a unui obiect), altfel solul; săgețile îl fixează pe o axă
+// (→ normala X, ← Y, ↑ Z), iar un al doilea punct pe axa albastră îl face vertical (spre cameră). În Modelare devine
+// geometrie (o curbă Pen editabilă); în Animare, o cale (cerere către Document).
 class PenTool final : public Tool {
 public:
     std::string_view id() const override { return "pen"; }
@@ -28,17 +30,29 @@ public:
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
         track(ctx, e);
+        if (m_points.empty() && e.clickCount >= 2 && m_justClosed) {
+            m_justClosed = false; // al doilea click al dublu click-ului care a închis curba: nu începe una nouă
+            return;
+        }
+        m_justClosed = false;
         if (e.clickCount >= 2 && m_points.size() >= 2) {
             finish(ctx, false); // al doilea click al unui dublu click: primul a pus deja ultimul punct
             return;
         }
         if (m_points.size() >= 3 && nearFirst(ctx, e.screen)) {
             finish(ctx, true);
+            m_justClosed = true;
             return;
         }
         if (m_points.empty()) {
             choosePlane(ctx, e.screen);
             m_cursor = m_origin;
+        } else if (m_points.size() == 1) {
+            m_normal = effectiveNormal(ctx); // al doilea punct fixează planul (și pe cel vertical, de pe axa Z)
+            m_freeVertical = autoVertical();
+        }
+        if (!m_points.empty() && tol::samePoint(m_cursor, m_points.back().point)) {
+            return; // un click pe ultimul punct nu adaugă un punct dublu
         }
         m_points.push_back({ m_cursor, m_cursor, m_cursor, false });
         m_pressed = true;
@@ -69,7 +83,7 @@ public:
 
     bool key(ToolContext& ctx, const KeyEvent& e) override
     {
-        if (e.key == Key::Enter || e.key == Key::Escape) {
+        if (e.key == Key::Enter) {
             if (m_points.size() >= 2) {
                 finish(ctx, false);
             } else {
@@ -77,8 +91,34 @@ public:
             }
             return true;
         }
+        if (e.key == Key::Escape) {
+            stepBack();
+            return true;
+        }
+        // Săgețile: planul curbei, cât nu e fixat de al doilea punct; apoi, ca la Line, blochează direcția.
+        if (m_points.size() <= 1 && (e.key == Key::Right || e.key == Key::Left || e.key == Key::Up)) {
+            const inference::Axis axis = e.key == Key::Right ? inference::Axis::X
+                : e.key == Key::Left                         ? inference::Axis::Y
+                                                             : inference::Axis::Z;
+            m_lock = m_lock == axis ? std::nullopt : std::optional(axis);
+            if (!m_points.empty()) {
+                m_normal = m_lock ? inference::axisDirection(*m_lock) : m_baseNormal;
+            }
+            return true;
+        }
         return handleArrow(m_engine, e.key);
     }
+
+    bool undoStep(ToolContext& /*ctx*/) override
+    {
+        if (m_points.empty()) {
+            return false;
+        }
+        stepBack();
+        return true;
+    }
+
+    bool ownsArrowKeys() const override { return true; }
 
     void cancel(ToolContext& /*ctx*/) override { reset(); }
 
@@ -119,7 +159,13 @@ public:
 
     std::string status() const override
     {
-        return "Click: punct cu colț · trage: punct neted · click pe primul punct: închide · Enter: termină · Esc";
+        const char* plane = m_lock == inference::Axis::X ? " · plan: vertical (X)"
+            : m_lock == inference::Axis::Y               ? " · plan: vertical (Y)"
+            : m_lock == inference::Axis::Z               ? " · plan: orizontal"
+                                                         : "";
+        return std::string("Click: punct cu colț · trage: punct neted · click pe primul punct: închide · Enter: termină · "
+                           "Esc: înapoi un punct · săgeți: planul")
+            + plane;
     }
 
 private:
@@ -138,8 +184,80 @@ private:
             m_cursor = m_points.front().point;
             return;
         }
+        if (m_points.size() == 1) {
+            m_normal = effectiveNormal(ctx);
+        } else if (m_points.size() == 2 && m_freeVertical) {
+            m_normal = verticalNormalToward(ctx, e.screen);
+        }
         if (const auto p = onPlane(ctx, e.screen)) {
             m_cursor = *p;
+        }
+    }
+
+    // Cu un singur punct, planul poate încă să se schimbe: lock-ul săgeților, sau unul vertical dacă cursorul e pe axa
+    // albastră din primul punct (pe un plan orizontal) — cel cu normala pe axa X sau Y cea mai spre cameră.
+    Vec3d effectiveNormal(const ToolContext& ctx) const
+    {
+        if (m_lock) {
+            return inference::axisDirection(*m_lock);
+        }
+        if (autoVertical()) {
+            const Vec3d f = ctx.camera.forward();
+            return std::abs(f.x) > std::abs(f.y) ? Vec3d { 1, 0, 0 } : Vec3d { 0, 1, 0 };
+        }
+        return m_baseNormal;
+    }
+
+    // Cursorul pe axa albastră din primul punct, pe un plan orizontal, fără lock: desenul trece pe un plan vertical.
+    bool autoVertical() const
+    {
+        const bool horizontal = std::abs(std::abs(m_baseNormal.z) - 1.0) < 1e-9;
+        return !m_lock && horizontal && m_inference.kind == inference::Kind::OnAxis && m_inference.axis == inference::Axis::Z;
+    }
+
+    // După un segment vertical, planul se rotește în jurul lui până la al treilea punct și îl conține: punctul inferat
+    // (pe o axă, pe o muchie...) sau, în gol, cel de pe planul vertical spre cameră.
+    Vec3d verticalNormalToward(const ToolContext& ctx, Vec2d screen) const
+    {
+        const Vec3d last = m_points.back().point;
+        std::optional<Vec3d> target;
+        if (m_inference.valid() && m_inference.kind != inference::Kind::Ground && m_inference.kind != inference::Kind::OnFace) {
+            target = m_inference.point;
+        } else {
+            const Vec3d f = ctx.camera.forward();
+            const Vec3d facing { f.x, f.y, 0.0 };
+            if (glm::length(facing) > 1e-9) {
+                const math::Plane plane = math::Plane::fromPointNormal(last, glm::normalize(facing));
+                const math::Ray ray = ctx.camera.rayAt(screen);
+                if (const auto t = math::intersectRayPlane(ray, plane)) {
+                    target = ray.at(*t);
+                } else if (const auto back = math::intersectRayPlane(ray, plane.flipped())) {
+                    target = ray.at(*back);
+                }
+            }
+        }
+        if (target) {
+            const Vec3d along { target->x - last.x, target->y - last.y, 0.0 };
+            if (glm::length(along) > tol::kLength) {
+                return glm::normalize(glm::cross(Vec3d { 0.0, 0.0, 1.0 }, along));
+            }
+        }
+        return m_normal;
+    }
+
+    // Esc / ⌘Z: înapoi la nodul anterior; de pe primul punct, renunță la desen.
+    void stepBack()
+    {
+        if (m_points.size() >= 2) {
+            m_points.pop_back();
+            m_pressed = false;
+            m_dragging = false;
+            m_closing = false;
+            if (m_points.size() == 1) {
+                m_normal = m_lock ? inference::axisDirection(*m_lock) : m_baseNormal;
+            }
+        } else {
+            reset();
         }
     }
 
@@ -151,6 +269,15 @@ private:
 
     // Planul curbei: fața de sub cursor (a geometriei libere sau a unui obiect), altfel solul.
     void choosePlane(const ToolContext& ctx, Vec2d screen)
+    {
+        pickPlane(ctx, screen);
+        m_baseNormal = m_normal;
+        if (m_lock) {
+            m_normal = inference::axisDirection(*m_lock);
+        }
+    }
+
+    void pickPlane(const ToolContext& ctx, Vec2d screen)
     {
         m_normal = { 0, 0, 1 };
         m_origin = m_inference.valid() ? m_inference.point : Vec3d { 0.0 };
@@ -220,6 +347,8 @@ private:
     void reset()
     {
         m_points.clear();
+        m_lock.reset();
+        m_freeVertical = false;
         m_pressed = false;
         m_dragging = false;
         m_closing = false;
@@ -230,6 +359,10 @@ private:
     std::vector<geom::BezierPoint> m_points;
     Vec3d m_origin { 0.0 };
     Vec3d m_normal { 0.0, 0.0, 1.0 };
+    Vec3d m_baseNormal { 0.0, 0.0, 1.0 }; // planul de la primul click (fără lock-ul săgeților)
+    std::optional<inference::Axis> m_lock;
+    bool m_justClosed = false;
+    bool m_freeVertical = false; // al doilea punct a dus desenul pe axa Z: al treilea alege planul vertical
     Vec3d m_cursor { 0.0 };
     Vec2d m_press { 0.0 };
     bool m_pressed = false;

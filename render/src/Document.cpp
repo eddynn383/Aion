@@ -1056,9 +1056,19 @@ QVariantMap Document::entityInfo() const
                 { QStringLiteral("vz"), pivot.z } };
         }
     }
-    // O curbă Pen (nu un arc): titlul ei; editarea e cu dublu click în viewport.
-    const model::PenCurveId pen
+    // O curbă Pen (nu un arc): titlul ei, doar când selecția e numai curba (toate muchiile au id-ul ei); editarea e cu
+    // dublu click în viewport.
+    model::PenCurveId pen
         = m_selection.edges.empty() ? model::PenCurveId {} : model::penCurveForEdge(m_model, activeDefinition(), *m_selection.edges.begin());
+    if (pen) {
+        const std::uint32_t curve = mesh.edge(*m_selection.edges.begin()).curve;
+        const bool onlyCurve = m_selection.faces.empty() && m_selection.instances.empty()
+            && std::all_of(m_selection.edges.begin(), m_selection.edges.end(),
+                [&](geom::EdgeId e) { return mesh.edges().contains(e) && mesh.edge(e).curve == curve; });
+        if (!onlyCurve) {
+            pen = {};
+        }
+    }
     if (pen) {
         info[QStringLiteral("title")] = QStringLiteral("Curbă");
         if (model::penCurveEditable(m_model, pen)) {
@@ -1190,6 +1200,12 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
                     ++it;
                 }
             }
+            // Decalajele, scările și cheile intră într-un singur pas de undo, ca mutarea care le-a produs.
+            const std::size_t steps = (onPath.empty() ? 0 : 1) + scaled.size() + (moved.empty() ? 0 : 1);
+            const bool oneStep = steps > 1 && !m_macro;
+            if (oneStep) {
+                beginMacro("Keyframe");
+            }
             if (!onPath.empty()) {
                 const double time = m_timelineTime;
                 m_keepPreview = true;
@@ -1206,6 +1222,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
             }
             if (!moved.empty()) {
                 keyTransforms(moved, "Keyframe");
+            }
+            if (oneStep) {
+                endMacro(true);
             }
         }
     }
@@ -1442,6 +1461,14 @@ bool Document::applyMeasurement(const QString& text)
 
 void Document::undo()
 {
+    // În mijlocul unei operații (Pen cu câteva puncte), un pas înapoi în ea, nu în istoric.
+    bool handled = false;
+    withTool(m_lastCamera, [&](tools::Tool& t, tools::ToolContext& ctx) { handled = t.undoStep(ctx); });
+    if (handled) {
+        emit toolStatusChanged();
+        touch();
+        return;
+    }
     stepHistory([this] { m_stack.undo(); });
 }
 
@@ -1491,10 +1518,14 @@ void Document::stepHistory(Fn&& step)
     emit outlineChanged();
 }
 
-void Document::deleteSelection()
+void Document::deleteSelection(bool keepFaces)
 {
     if (curveEditing()) { // ⌫ în editarea unei curbe: punctul selectat
         withTool(m_lastCamera, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Delete, {} }); });
+        return;
+    }
+    if (m_model.motionPaths().contains(m_selectedPath)) {
+        deleteSelectedObject();
         return;
     }
     if (!require(Modeling)) {
@@ -1509,7 +1540,7 @@ void Document::deleteSelection()
     tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
     ctx.model = &m_model;
     ctx.context = activeDefinition();
-    tools::deleteSelection(ctx);
+    tools::deleteSelection(ctx, keepFaces);
     afterInteraction(before);
 }
 
@@ -1530,7 +1561,7 @@ void Document::selectAll()
 
 void Document::clearSelection()
 {
-    if (m_selectedCamera || m_selectedLight) {
+    if (m_selectedCamera || m_selectedLight || m_selectedPath) {
         selectObject(QString(), 0.0);
     }
     const geom::Selection before = m_selection;
@@ -5547,6 +5578,9 @@ void Document::deleteSelectedObject()
     const model::LightId light = m_selectedLight;
     const model::MotionPathId path = m_selectedPath;
     if (m_model.motionPaths().contains(path)) {
+        if (!require(Animation)) { // o cale e a animației: se șterge în Animare
+            return;
+        }
         runOnModel("Șterge calea", [&](model::Model& model) { model::removePath(model, path); });
         emit timelineChanged();
     } else if (m_model.cameras().contains(camera)) {
@@ -5612,6 +5646,9 @@ void Document::moveSelectedObjectTo(const math::Vec3d& position)
     } else if (m_model.lights().contains(m_selectedLight)) {
         setObjectProperties({ { QStringLiteral("position"), vec3List(position) } });
     } else if (const model::MotionPath* p = m_model.motionPaths().find(m_selectedPath)) {
+        if (!require(Animation)) {
+            return;
+        }
         model::MotionPath moved = *p;
         moved.transform = math::Transform::translation(position - *selectedObjectPosition()) * p->transform;
         const model::MotionPathId id = m_selectedPath;
@@ -5662,10 +5699,12 @@ QVariantList Document::paths() const
     QVariantList out;
     for (std::size_t i = 0; i < m_model.motionPaths().size(); ++i) {
         const model::MotionPath& p = m_model.motionPaths().values()[i];
+        const model::Animation* animation = m_model.animations().find(p.animation);
         out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.motionPaths().keys()[i].value) },
             { QStringLiteral("name"), QString::fromStdString(p.name) }, { QStringLiteral("kind"), QStringLiteral("path") },
             { QStringLiteral("visible"), p.visible }, { QStringLiteral("enabled"), true },
-            { QStringLiteral("active"), p.animation == m_activeAnimation } });
+            { QStringLiteral("active"), p.animation == m_activeAnimation },
+            { QStringLiteral("animationName"), animation ? QString::fromStdString(animation->name) : QString() } });
     }
     return out;
 }
@@ -5722,6 +5761,15 @@ QVariantMap Document::pathInfo(model::MotionPathId id) const
 void Document::setPathProperties(const QVariantMap& changes)
 {
     const model::MotionPathId id = m_selectedPath;
+    if (!m_model.motionPaths().contains(id)) {
+        return;
+    }
+    // Numele și vizibilitatea se schimbă oriunde (ca în Outliner); restul e editarea animației.
+    const bool organizing = std::all_of(changes.keyBegin(), changes.keyEnd(),
+        [](const QString& key) { return key == QLatin1String("name") || key == QLatin1String("visible"); });
+    if (!organizing && !require(Animation)) {
+        return;
+    }
     model::MotionPath p = m_model.motionPaths().at(id);
     const auto vec = [&](const char* key, math::Vec3d current) {
         const QVariantList v = changes.value(QLatin1String(key)).toList();
@@ -5804,7 +5852,15 @@ void Document::createMotionPath(const geom::BezierPath& curve, const math::Vec3d
     const geom::BezierPath world = geom::transformed(curve, contextTransform());
     const math::Vec3d origin = world.points.front().point;
     model::MotionPath p;
-    p.name = "Calea " + std::to_string(m_model.motionPaths().size() + 1);
+    // „Calea N”, cu primul număr nefolosit (o cale ștearsă nu lasă două cu același nume).
+    for (int n = 1;; ++n) {
+        const std::string name = "Calea " + std::to_string(n);
+        const auto& paths = m_model.motionPaths().values();
+        if (std::none_of(paths.begin(), paths.end(), [&](const model::MotionPath& other) { return other.name == name; })) {
+            p.name = name;
+            break;
+        }
+    }
     p.transform = math::Transform::translation(origin);
     p.curve = geom::transformed(world, math::Transform::translation(-origin));
     p.normal = glm::normalize(contextTransform().applyToVector(normal));
@@ -5827,6 +5883,14 @@ bool Document::anchorToPath(double pathId, double instanceId)
     if (!require(Animation) || !m_model.motionPaths().contains(path)) {
         return false;
     }
+    if (!m_model.instances().contains(instance) || m_model.instance(instance).parent != m_model.root()) {
+        setError(QStringLiteral("Pe o cale se pune doar un obiect de la rădăcina modelului. Scoate-l întâi din grup."));
+        return false;
+    }
+    if (model::pathOf(m_model, m_model.motionPaths().at(path).animation, instance)) {
+        setError(QStringLiteral("Obiectul e deja pe o cale a acestei animații."));
+        return false;
+    }
     bool ok = false;
     m_keepPreview = true;
     runOnModel("Ancorează pe cale", [&](model::Model& model) { ok = model::attachToPath(model, path, instance); });
@@ -5841,7 +5905,7 @@ void Document::detachFromPath(double pathId, double instanceId)
 {
     const model::MotionPathId path { static_cast<std::uint64_t>(pathId) };
     const model::InstanceId instance { static_cast<std::uint64_t>(instanceId) };
-    if (!m_model.motionPaths().contains(path)) {
+    if (!require(Animation) || !m_model.motionPaths().contains(path)) {
         return;
     }
     m_keepPreview = true;
@@ -5856,7 +5920,7 @@ void Document::rotateAnchor(double pathId, double instanceId)
 {
     const model::MotionPathId path { static_cast<std::uint64_t>(pathId) };
     const model::InstanceId instance { static_cast<std::uint64_t>(instanceId) };
-    if (!m_model.motionPaths().contains(path)) {
+    if (!require(Animation) || !m_model.motionPaths().contains(path)) {
         return;
     }
     m_keepPreview = true;
@@ -5868,7 +5932,7 @@ void Document::rotateAnchor(double pathId, double instanceId)
 
 void Document::setAnchorOffsets(const QVariantMap& changes)
 {
-    if (m_selection.instances.size() != 1) {
+    if (m_selection.instances.size() != 1 || !require(Animation)) {
         return;
     }
     const model::InstanceId instance = *m_selection.instances.begin();

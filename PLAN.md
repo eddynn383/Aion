@@ -698,6 +698,8 @@ ADR 0036.
 - [x] Căile în model (ancore, coloană, decalaj, evaluare) · [x] în Document (Pen în Animare, poza, ancore, timp)
 - [x] Căile în viewport, Obiecte, Inspector · [x] bara lor în timeline
 - [x] Documentație (ADR 0036, `CLAUDE.md`, `docs/qa-checklist.md`)
+- [x] Cerințele din 2026-10-28: ștergerea ca în SketchUp (ADR 0037), Pen pe axa Z / pe fețe, Esc / ⌘Z înapoi un nod,
+  problemele amânate din revizuire
 
 ---
 

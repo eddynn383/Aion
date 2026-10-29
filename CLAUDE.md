@@ -247,6 +247,11 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `pathTransformAt`, `absorbAnchorEdit`), `Document::paths` / `pathInfo` / `setPathTiming`, `Viewport::pickingAnchor`.
   Format `.aion` v4. Acțiuni de script: `dragw:x1,y1,z1,x2,y2,z2`, `dblclickw:x,y,z`, `anchor:`, `pathtime:s,d`,
   `debug.paths`. Web: `Main.qml` fără qmlcachegen (`QT_QML_SKIP_CACHEGEN`, altfel runner-ul CI oprea build-ul).
+  Pen: Esc / ⌘Z = înapoi un nod (`Tool::undoStep`, apelat de `Document::undo`), săgețile aleg planul, axa Z → plan
+  vertical. O cale se editează doar în Animare.
+- **Ștergerea** (ADR 0037): guma și ⌫ păstrează fețele (`geom::eraseEdgesKeepingFaces`), Delete le ia
+  (`eraseEdgesWithFaces`); `tools::deleteSelection(ctx, keepFaces)`. În scripturi: `keys:,backspace` / `keys:,delete`;
+  `debug.geometry` arată și titlul selecției.
 
 ## Următorii pași
 0. **Făcut (2026-10-28): Animare, timeline, cameră, rotația față de pivot** — `docs/plans/animatie.md` (și `PLAN.md` →

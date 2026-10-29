@@ -568,7 +568,7 @@ Window {
                     const kk = action.slice(5).split(",")
                     AppInfo.simulateKeys(kk[0], kk[1] ?? "")
                 } else if (action === "debug.geometry") {
-                    console.info("geometry:", JSON.stringify(doc.entityInfo.geometry), "undo:", doc.undoName)
+                    console.info("geometry:", doc.entityInfo.title ?? "-", JSON.stringify(doc.entityInfo.geometry), "undo:", doc.undoName)
                 } else if (action === "debug.anim") {
                     console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
@@ -841,7 +841,7 @@ Window {
         sequence: "Backspace"
         enabled: !palette.opened && window.vcbText.length === 0
         // În Animare, cheile selectate pe timeline au prioritate.
-        onActivated: if (!(doc.workMode === 1 && timeline.deleteSelectedKeys())) doc.deleteSelection()
+        onActivated: if (!(doc.workMode === 1 && timeline.deleteSelectedKeys())) doc.deleteSelection(true)
     }
     // Săgețile blochează inferența pe o axă: → roșie, ← verde, ↑ albastră, ↓ paralel cu muchia atinsă.
     Instantiator {

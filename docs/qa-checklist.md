@@ -317,4 +317,17 @@ Bifează fiecare scenariu în aplicație (`make run`). Notează ce nu merge cu p
 - [ ] Două obiecte pe aceeași cale merg în coloană, fără să se suprapună; Move pe unul (în Animare) → „Față de cale”
 - [ ] Bara căii trasă în timeline mută startul; capătul ei schimbă durata; trasă după capăt, animația se lungește
 - [ ] Redarea și exportul nu arată căile; o cale a altei animații e estompată și nu mișcă nimic
+- [ ] Pen pe fețele unui cub (obiect sau geometrie): curba stă pe fața de sub primul click, inclusiv la mijlocul feței
+- [ ] Pen de la sol în sus pe axa albastră: desenul trece pe un plan vertical, orientat spre al treilea punct; săgețile
+      (→ X, ← Y, ↑ sus) aleg planul înainte de al doilea punct
+- [ ] Pen: Esc și ⌘Z în timpul desenului scot ultimul nod (fără să iasă din desen); Enter termină deschis; închiderea
+      termină singură
+- [ ] ⌫ / Delete pe o cale selectată (Animare) o șterge; în Modelare apare mesajul de mod; ancorarea refuzată spune de ce
+- [ ] Căile altei animații apar estompate în Obiecte, cu numele animației lor; numele noi „Calea N” nu se repetă
+
+## Ștergerea muchiilor (ADR 0037)
+- [ ] O linie liberă într-o față și una care o taie în două: guma sau ⌫ le șterge, iar fața rămâne întreagă (o singură
+      față, conturul dintr-o bucată)
+- [ ] Aceeași linie selectată și Delete: pleacă și fața pe care stă (marginile ei rămân)
+- [ ] Guma pe muchia unui cub: pleacă împreună cu cele două fețe (nu se pot uni)
 

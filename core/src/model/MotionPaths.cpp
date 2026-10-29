@@ -27,7 +27,8 @@ struct Frame {
 
 Frame frameAt(const MotionPath& path, const geom::ArcLength& arc, double distance)
 {
-    const geom::PathFrame f = arc.at(distance);
+    // La un colț al curbei, obiectul se întoarce treptat (5% din lungime, între 0,2 și 1,5 m).
+    const geom::PathFrame f = arc.at(distance, std::clamp(arc.length() * 0.05, 200.0, 1500.0));
     Frame out;
     out.n = path.transform.applyToVector(path.normal);
     out.n = glm::length(out.n) > tol::kLength ? glm::normalize(out.n) : Vec3d { 0, 0, 1 };
@@ -199,7 +200,7 @@ std::map<InstanceId, math::Transform> pathTransformsAt(const Model& model, Anima
         }
         const geom::ArcLength arc(path.curve);
         for (const PathAnchor& a : path.anchors) {
-            if (model.instances().contains(a.instance)) {
+            if (model.instances().contains(a.instance) && model.instance(a.instance).parent == model.root()) {
                 out[a.instance] = evaluateAnchor(model, path, arc, a, time, animatedScale(model, animation, a, time));
             }
         }
@@ -374,6 +375,10 @@ void rotateAnchorFront(Model& model, MotionPathId id, InstanceId instance)
 
 std::optional<MotionPathId> pathOf(const Model& model, AnimationId animation, InstanceId instance)
 {
+    // Un obiect mutat într-un grup nu mai e pe cale (calea e în coordonatele modelului); scos din grup, revine pe ea.
+    if (!model.instances().contains(instance) || model.instance(instance).parent != model.root()) {
+        return std::nullopt;
+    }
     for (std::size_t i = 0; i < model.motionPaths().size(); ++i) {
         const MotionPath& p = model.motionPaths().values()[i];
         if (p.animation == animation

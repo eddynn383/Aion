@@ -74,7 +74,7 @@ geom::Selection selectionAt(const ToolContext& ctx, Vec2d screen)
     return s;
 }
 
-bool deleteSelection(ToolContext& ctx)
+bool deleteSelection(ToolContext& ctx, bool keepFaces)
 {
     ctx.selection.prune(ctx.mesh);
     if (ctx.selection.empty()) {
@@ -88,10 +88,11 @@ bool deleteSelection(ToolContext& ctx)
                 geom::eraseFace(mesh, f);
             }
         }
-        for (geom::EdgeId e : doomed.edges) {
-            if (mesh.edges().contains(e)) {
-                geom::eraseEdge(mesh, e);
-            }
+        const std::vector<geom::EdgeId> edges(doomed.edges.begin(), doomed.edges.end());
+        if (keepFaces) {
+            geom::eraseEdgesKeepingFaces(mesh, edges);
+        } else {
+            geom::eraseEdgesWithFaces(mesh, edges);
         }
     };
     if (ctx.model == nullptr) {
@@ -808,12 +809,9 @@ public:
         }
         const std::set<model::InstanceId> instances = std::move(m_markedInstances);
         m_markedInstances.clear();
+        // Ca în SketchUp: fața pe care e desenată o linie rămâne (fețele de o parte și de alta se unesc).
         const auto eraseEdges = [&](geom::Mesh& mesh) {
-            for (geom::EdgeId e : doomed) {
-                if (mesh.edges().contains(e)) {
-                    geom::eraseEdge(mesh, e);
-                }
-            }
+            geom::eraseEdgesKeepingFaces(mesh, std::vector<geom::EdgeId>(doomed.begin(), doomed.end()));
         };
         if (ctx.model == nullptr) {
             ctx.stack.run("Erase", eraseEdges);

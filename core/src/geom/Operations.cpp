@@ -481,6 +481,55 @@ void eraseFace(Mesh& mesh, FaceId face)
     mesh.removeFace(face);
 }
 
+void eraseEdgesKeepingFaces(Mesh& mesh, const std::vector<EdgeId>& edges)
+{
+    std::vector<VertexId> ends;
+    for (EdgeId e : edges) {
+        if (!mesh.edges().contains(e)) {
+            continue;
+        }
+        ends.push_back(mesh.edge(e).v0);
+        ends.push_back(mesh.edge(e).v1);
+        if (!mergeFacesAcross(mesh, e)) { // unite: muchia a plecat deja
+            eraseEdge(mesh, e);
+        }
+    }
+    // Ca în SketchUp: o margine tăiată de linia ștearsă se reface dintr-o bucată (două muchii coliniare rămase).
+    for (VertexId v : ends) {
+        if (mesh.vertices().contains(v)) {
+            dissolveVertex(mesh, v);
+        }
+    }
+}
+
+void eraseEdgesWithFaces(Mesh& mesh, const std::vector<EdgeId>& edges)
+{
+    for (EdgeId e : edges) {
+        if (!mesh.edges().contains(e)) {
+            continue;
+        }
+        const Edge edge = mesh.edge(e);
+        if (edge.faces.empty()) {
+            // O linie liberă: fața pe care stă (coplanară, cu mijlocul liniei înăuntru).
+            const Vec3d a = mesh.position(edge.v0);
+            const Vec3d b = mesh.position(edge.v1);
+            std::vector<FaceId> under;
+            for (std::size_t i = 0; i < mesh.faces().size(); ++i) {
+                const FaceId f = mesh.faces().keys()[i];
+                const math::Plane& plane = mesh.faces().values()[i].plane;
+                if (std::abs(plane.signedDistance(a)) <= kTol && std::abs(plane.signedDistance(b)) <= kTol
+                    && faceContainsPoint(mesh, f, (a + b) * 0.5)) {
+                    under.push_back(f);
+                }
+            }
+            for (FaceId f : under) {
+                eraseFace(mesh, f);
+            }
+        }
+        eraseEdge(mesh, e);
+    }
+}
+
 void eraseEdge(Mesh& mesh, EdgeId id)
 {
     const Edge edge = mesh.edge(id);

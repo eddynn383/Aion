@@ -235,3 +235,44 @@ TEST_CASE("Pen: o curbă nouă după gruparea alteia rămâne editabilă (id-ul 
     const geom::EdgeId arcEdge = m.mesh(m.root()).edges().keys()[0];
     CHECK_FALSE(model::penCurveForEdge(m, m.root(), arcEdge));
 }
+
+TEST_CASE("Pen: la editare, fața curbei și fața-gazdă își păstrează materialele", "[core][pen]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    model::MaterialId host;
+    model::MaterialId inner;
+    stack.run("Materials", [&](model::Model& model) {
+        host = model.addMaterial({});
+        inner = model.addMaterial({});
+    });
+    stack.run("Rect", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 4000, 0, 0 }, { 4000, 3000, 0 }, { 0, 3000, 0 } });
+    });
+    const model::PenCurveId id = draw(stack, blob({ 2000, 1500, 0 }, 500));
+    const auto faceAt = [&](math::Vec3d p) -> geom::FaceId {
+        const geom::Mesh& mesh = m.mesh(m.root());
+        for (geom::FaceId f : mesh.faces().keys()) {
+            if (geom::faceContainsPoint(mesh, f, p)) {
+                return f;
+            }
+        }
+        return {};
+    };
+    stack.run("Paint", [&](geom::Mesh& mesh) {
+        mesh.setFaceMaterial(faceAt({ 500, 500, 0 }), host);
+        mesh.setFaceMaterial(faceAt({ 2000, 1500, 0 }), inner);
+    });
+    geom::BezierPath moved = m.penCurves().at(id).path;
+    for (geom::BezierPoint& p : moved.points) {
+        p.point += math::Vec3d { 300, 0, 0 };
+        p.in += math::Vec3d { 300, 0, 0 };
+        p.out += math::Vec3d { 300, 0, 0 };
+    }
+    stack.run("Edit", [&](model::Model& model) { REQUIRE(model::replacePenCurve(model, id, moved)); });
+    const geom::Mesh& mesh = m.mesh(m.root());
+    REQUIRE(faceAt({ 500, 500, 0 }));
+    REQUIRE(faceAt({ 2300, 1500, 0 }));
+    CHECK(mesh.face(faceAt({ 500, 500, 0 })).material == host);
+    CHECK(mesh.face(faceAt({ 2300, 1500, 0 })).material == inner);
+}

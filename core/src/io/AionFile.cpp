@@ -462,7 +462,6 @@ void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector
     }
 }
 
-// formatVersion < 3: „Mută la” ducea colțul minim al țintei în punctul dat; acum duce pivotul.
 json matrixToJson(const math::Transform& t)
 {
     json m = json::array();
@@ -533,6 +532,7 @@ void motionPathsFromJson(const json& list, model::ChangeSet& changes)
     }
 }
 
+// formatVersion < 3: „Mută la” ducea colțul minim al țintei în punctul dat; acum duce pivotul.
 void migrateMoveToRules(model::Model& model)
 {
     std::vector<std::pair<model::InstanceId, model::Instance>> changed;

@@ -1,5 +1,6 @@
 #include "aion/core/commands/CommandStack.h"
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Operations.h"
@@ -10,6 +11,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <array>
 #include <cmath>
 
 using namespace aion;
@@ -153,18 +155,126 @@ TEST_CASE("Pen: pe fața unui obiect, curba stă pe planul feței", "[core][tool
     }
 }
 
-TEST_CASE("Pen: Esc cu un singur punct anulează; cu două termină", "[core][tools][pen]")
+TEST_CASE("Pen: Esc revine la nodul anterior, fără să iasă din desen; Enter termină", "[core][tools][pen]")
+{
+    PenScene s;
+    s.click({ 0, 0, 0 });
+    s.click({ 1500, 900, 0 });
+    s.click({ 2000, 0, 0 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Escape, {} })); // fără ultimul punct
+    CHECK(s.model.penCurves().empty()); // încă desenează
+    s.click({ 1000, 1800, 0 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const geom::BezierPath& p = s.onlyCurve().path;
+    REQUIRE(p.points.size() == 3);
+    CHECK(tol::samePoint(p.points[1].point, { 1500, 900, 0 }));
+    CHECK(tol::samePoint(p.points[2].point, { 1000, 1800, 0 }));
+}
+
+TEST_CASE("Pen: Esc pe primul punct anulează desenul", "[core][tools][pen]")
 {
     PenScene s;
     s.click({ 0, 0, 0 });
     CHECK(s.pen->key(s.ctx, { tools::Key::Escape, {} }));
+    s.pen->key(s.ctx, { tools::Key::Enter, {} });
     CHECK(s.model.penCurves().empty());
     CHECK(s.model.mesh(s.model.root()).edges().empty());
+}
 
+TEST_CASE("Pen: undo în timpul desenului scoate ultimul punct", "[core][tools][pen]")
+{
+    PenScene s;
+    CHECK_FALSE(s.pen->undoStep(s.ctx)); // nimic desenat: undo-ul obișnuit
     s.click({ 0, 0, 0 });
     s.click({ 1500, 900, 0 });
-    CHECK(s.pen->key(s.ctx, { tools::Key::Escape, {} }));
+    s.click({ 2000, 0, 0 });
+    CHECK(s.pen->undoStep(s.ctx));
+    CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
     CHECK(s.onlyCurve().path.points.size() == 2);
+}
+
+TEST_CASE("Pen: un click pe ultimul punct nu adaugă un punct dublu", "[core][tools][pen]")
+{
+    PenScene s;
+    s.click({ 0, 0, 0 });
+    s.click({ 1500, 900, 0 });
+    s.click({ 1500, 900, 0 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    CHECK(s.onlyCurve().path.points.size() == 2);
+}
+
+TEST_CASE("Pen: dublu click pe primul punct închide fără să înceapă o curbă nouă", "[core][tools][pen]")
+{
+    PenScene s;
+    s.click({ 0, 0, 0 });
+    s.click({ 1500, 200, 0 });
+    s.click({ 800, 1500, 0 });
+    const Vec2d first = s.screen({ 0, 0, 0 });
+    s.pen->pointerDown(s.ctx, PenScene::at(first, 1));
+    s.pen->pointerUp(s.ctx, PenScene::at(first, 1));
+    s.pen->pointerDown(s.ctx, PenScene::at(first, 2));
+    s.pen->pointerUp(s.ctx, PenScene::at(first, 2));
+    s.click({ 1500, 1500, 0 });
+    s.pen->key(s.ctx, { tools::Key::Enter, {} }); // un singur punct nou: nu face o curbă
+    CHECK(s.model.penCurves().size() == 1);
+    CHECK(s.onlyCurve().path.closed);
+}
+
+TEST_CASE("Pen: săgețile aleg planul (→ = vertical, cu normala pe X)", "[core][tools][pen]")
+{
+    PenScene s(view::StandardView::Iso, { 0, 0, 500 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Right, {} }));
+    s.click({ 0, 0, 0 });
+    s.click({ 0, 1500, 800 });
+    s.click({ 0, -500, 1500 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const model::PenCurve& c = s.onlyCurve();
+    CHECK(std::abs(std::abs(c.normal.x) - 1.0) < 1e-9);
+    for (const geom::BezierPoint& p : c.path.points) {
+        CHECK(std::abs(p.point.x) < 1e-6);
+    }
+    CHECK(glm::length(c.path.points[1].point - Vec3d { 0, 1500, 800 }) < 1.0);
+}
+
+TEST_CASE("Pen: al doilea punct pe axa Z trece desenul pe un plan vertical", "[core][tools][pen]")
+{
+    PenScene s(view::StandardView::Iso, { 0, 0, 500 });
+    s.click({ 0, 0, 0 });
+    // Puțin lângă axa albastră din primul punct: inferența o arată, iar punctul cade pe ea.
+    s.pen->pointerMove(s.ctx, PenScene::at(s.screen({ 0, 0, 1500 }) + Vec2d { 2, 0 }));
+    s.clickAt(s.screen({ 0, 0, 1500 }) + Vec2d { 2, 0 });
+    // Următoarele puncte se proiectează pe planul vertical ales (cel mai spre cameră).
+    s.click({ 800, 0, 1500 });
+    s.click({ 0, 800, 1500 });
+    CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const model::PenCurve& c = s.onlyCurve();
+    CHECK(std::abs(c.normal.z) < 1e-9); // plan vertical
+    REQUIRE(c.path.points.size() >= 2);
+    CHECK(glm::length(c.path.points[1].point - Vec3d { 0, 0, 1500 }) < 1.0);
+    for (const geom::BezierPoint& p : c.path.points) {
+        CHECK(std::abs(glm::dot(p.point, c.normal)) < 1e-6); // toate pe planul prin primul punct
+    }
+}
+
+TEST_CASE("Pen: după un segment vertical, al treilea punct alege planul vertical", "[core][tools][pen]")
+{
+    // Vederea iso exactă (cameră la 45°): niciuna dintre axele X / Y nu e „mai spre cameră”; planul îl dă al treilea
+    // punct, în ambele direcții.
+    for (const Vec3d third : { Vec3d { 0, 0, 1500 }, Vec3d { -1500, 1500, 1500 } }) {
+        PenScene s(view::StandardView::Iso, { 0, 0, 500 });
+        s.click({ -1500, 0, 0 });
+        s.click({ -1500, 0, 1500 });
+        s.click(third);
+        CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+        const model::PenCurve& c = s.onlyCurve();
+        REQUIRE(c.path.points.size() == 3);
+        CHECK(glm::length(c.path.points[1].point - Vec3d { -1500, 0, 1500 }) < 1.0);
+        CHECK(glm::length(c.path.points[2].point - third) < 1.0);
+        CHECK(std::abs(c.normal.z) < 1e-9);
+        for (const geom::BezierPoint& p : c.path.points) {
+            CHECK(std::abs(glm::dot(p.point - Vec3d { -1500, 0, 0 }, c.normal)) < 1e-6);
+        }
+    }
 }
 
 TEST_CASE("Pen: dublu click termină curba deschisă", "[core][tools][pen]")
@@ -400,5 +510,72 @@ TEST_CASE("Pen: pe fața unui grup, curba stă pe planul feței", "[core][tools]
     CHECK(std::abs(std::abs(c.normal.y) - 1.0) < 1e-9);
     for (const geom::BezierPoint& p : c.path.points) {
         CHECK(std::abs(p.point.y - 1000.0) < 1e-6);
+    }
+}
+
+TEST_CASE("Pen edit: un punct tras puțin nu se lipește de vechile muchii ale curbei", "[core][tools][pen]")
+{
+    PenScene s;
+    s.click({ 0, 0, 0 });
+    s.drag({ 1000, 800, 0 }, { 1500, 800, 0 });
+    s.click({ 2000, 0, 0 });
+    REQUIRE(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+    const model::PenCurveId id = s.model.penCurves().keys()[0];
+    auto edit = tools::makeTool("penedit");
+    s.ctx.editCurve = s.model.penCurves().at(id).path;
+    // 7 px la dreapta: vechiul vârf (și muchiile curbei) sunt încă în geometrie, la mai puțin de 10 px.
+    const double perPixel = 1.0 / (s.screen({ 1, 0, 0 }).x - s.screen({ 0, 0, 0 }).x);
+    const Vec2d from = s.screen({ 1000, 800, 0 });
+    const Vec2d to = from + Vec2d { 7, 0 };
+    edit->pointerMove(s.ctx, PenScene::at(from));
+    edit->pointerDown(s.ctx, PenScene::at(from));
+    edit->pointerMove(s.ctx, PenScene::at((from + to) * 0.5));
+    edit->pointerMove(s.ctx, PenScene::at(to));
+    edit->pointerUp(s.ctx, PenScene::at(to));
+    REQUIRE(s.requests.curveEdit);
+    CHECK(std::abs(s.requests.curveEdit->points[1].point.x - (1000.0 + 7.0 * perPixel)) < 1.0);
+}
+
+TEST_CASE("Pen: pe toate fețele vizibile ale unei cutii (obiect), din vederea iso", "[core][tools][pen]")
+{
+    // Cutia ca obiect (ca `aion.box`): geometria centrată pe bază, mutată cu colțul minim în origine.
+    PenScene s(view::StandardView::Iso, { 1000, 1000, 1000 });
+    s.stack.run("Box", [&](model::Model& model) {
+        model::Definition def { "Cutie", true };
+        const model::DefinitionId d = model.addDefinition(def);
+        geom::buildPrimitive(model.mesh(d), geom::Primitive::Box, { 2000, 2000, 2000 }, 24);
+        model::Instance inst;
+        inst.parent = model.root();
+        inst.definition = d;
+        inst.transform = math::Transform::translation({ 1000, 1000, 0 });
+        model.addInstance(inst);
+    });
+    struct Case {
+        const char* name;
+        int axis;
+        double value;
+        std::array<Vec3d, 3> points;
+    };
+    const Vec3d forward = s.camera.forward();
+    std::vector<Case> cases;
+    // Fețele spre cameră: x = 0 sau 2000, y = 0 sau 2000, sus.
+    const double x = forward.x > 0 ? 0.0 : 2000.0;
+    const double y = forward.y > 0 ? 0.0 : 2000.0;
+    cases.push_back({ "fața X", 0, x, { Vec3d { x, 500, 500 }, Vec3d { x, 1500, 500 }, Vec3d { x, 1500, 1500 } } });
+    cases.push_back({ "fața Y", 1, y, { Vec3d { 500, y, 500 }, Vec3d { 1500, y, 500 }, Vec3d { 1500, y, 1500 } } });
+    cases.push_back({ "sus", 2, 2000.0, { Vec3d { 500, 500, 2000 }, Vec3d { 1500, 500, 2000 }, Vec3d { 1500, 1500, 2000 } } });
+    for (const Case& c : cases) {
+        INFO(c.name);
+        const std::size_t before = s.model.penCurves().size();
+        for (const Vec3d& p : c.points) {
+            s.click(p);
+        }
+        CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+        REQUIRE(s.model.penCurves().size() == before + 1);
+        const model::PenCurve& curve = s.model.penCurves().values().back();
+        CHECK(std::abs(std::abs(curve.normal[c.axis]) - 1.0) < 1e-9);
+        for (const geom::BezierPoint& p : curve.path.points) {
+            CHECK(std::abs(p.point[c.axis] - c.value) < 1e-6);
+        }
     }
 }

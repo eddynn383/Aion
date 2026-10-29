@@ -51,6 +51,9 @@ public:
     // distance < 0 sau > length: pe o cale deschisă, prelungirea dreaptă pe tangenta capătului; pe una închisă,
     // distanța se ia modulo lungimea.
     [[nodiscard]] PathFrame at(double distance) const;
+    // La fel, dar la un colț (un punct fără mânere netede) tangenta se întoarce treptat, pe `cornerBlend` mm în jurul
+    // lui (punctul rămâne pe curbă): un obiect pe cale nu se rotește brusc.
+    [[nodiscard]] PathFrame at(double distance, double cornerBlend) const;
 
 private:
     struct Entry {
@@ -58,8 +61,16 @@ private:
         std::size_t segment = 0;
         double t = 0.0;
     };
+    struct Corner {
+        double distance = 0.0;
+        Vec3d in { 1.0, 0.0, 0.0 }; // tangenta la sosire
+        Vec3d out { 1.0, 0.0, 0.0 }; // tangenta la plecare
+    };
+    [[nodiscard]] std::pair<std::size_t, double> locate(double distance) const; // pe curbă, 0 ≤ distance ≤ length
+    [[nodiscard]] double segmentLength(std::size_t segment) const;
     BezierPath m_path;
     std::vector<Entry> m_table;
+    std::vector<Corner> m_corners;
     double m_length = 0.0;
 };
 
