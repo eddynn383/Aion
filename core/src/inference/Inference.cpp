@@ -1,6 +1,7 @@
 #include "aion/core/inference/Inference.h"
 
 #include "aion/core/geom/Mesh.h"
+#include "aion/core/inference/SnapScene.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
 
@@ -15,6 +16,39 @@ namespace aion::inference {
 namespace {
 
 constexpr double kInf = std::numeric_limits<double>::infinity();
+// La aceeași prioritate, un candidat dintr-un obiect bate unul din ctx.mesh doar dacă e mai aproape cu atât (px).
+constexpr double kTiePx = 0.5;
+
+} // namespace
+
+namespace detail {
+
+// O geometrie pe care o vede inferența: mesh-ul contextului (`toContext` nul) sau o sursă din scenă. Căutările se fac
+// în coordonatele ei (cu camera mutată acolo), iar rezultatele trec în coordonatele contextului.
+struct Layer {
+    const geom::Mesh* mesh = nullptr;
+    view::Camera camera;
+    const math::Transform* toContext = nullptr;
+    model::InstanceId instance;
+
+    [[nodiscard]] bool context() const { return toContext == nullptr; }
+    [[nodiscard]] Vec3d point(const Vec3d& local) const { return toContext ? toContext->applyToPoint(local) : local; }
+    // Inversa transpusă: corectă și la scalări neuniforme sau oglindiri.
+    [[nodiscard]] Vec3d normal(const Vec3d& local) const { return toContext ? toContext->applyToNormal(local) : local; }
+    [[nodiscard]] double tiePenalty() const { return context() ? 0.0 : kTiePx; }
+    // Un rezultat dintr-un obiect spune de unde vine (ID-urile lui rămân goale).
+    void stamp(Inference& out) const
+    {
+        if (!context()) {
+            out.origin = Origin::Object;
+            out.sourceInstance = instance;
+        }
+    }
+};
+
+} // namespace detail
+
+namespace {
 // O direcție aproape paralelă cu raza de privire nu se poate urmări pe ecran.
 constexpr double kMaxViewAlignment = 0.995;
 // Avantajul axelor față de alte direcții la distanțe egale pe ecran (px).
@@ -62,13 +96,48 @@ std::optional<Vec3d> intersectLines(const Vec3d& o1, const Vec3d& d1, const Vec3
     return (p1 + p2) * 0.5;
 }
 
-// Punctul e vizibil dacă nu există o față între el și cameră (aceeași regulă ca la picking).
-bool visible(const math::Ray& ray, const view::PickResult& facePick, const Vec3d& p)
+// Fața cea mai apropiată de sub cursor, din toate straturile, în coordonatele contextului.
+struct FaceHit {
+    const detail::Layer* layer = nullptr;
+    geom::FaceId face; // din mesh-ul stratului
+    Vec3d point { 0.0 };
+    Vec3d normal { 0.0 };
+
+    [[nodiscard]] bool hit() const { return layer != nullptr; }
+};
+
+// Adâncimea se măsoară pe raza contextului; la egalitate rămâne ctx.mesh (primul strat). `contextPick` primește
+// fața atinsă în ctx.mesh (pentru `Inference::pick`).
+FaceHit nearestFace(
+    const std::vector<detail::Layer>& layers, const math::Ray& ray, Vec2d screen, view::PickResult& contextPick)
 {
-    if (facePick.kind != view::PickResult::Kind::Face) {
+    FaceHit best;
+    double bestDepth = kInf;
+    for (const detail::Layer& l : layers) {
+        const view::PickResult p = view::pick(*l.mesh, l.camera, screen, { -1.0, -1.0 });
+        if (l.context()) {
+            contextPick = p;
+        }
+        if (p.kind != view::PickResult::Kind::Face) {
+            continue;
+        }
+        const Vec3d point = l.point(p.point);
+        const double depth = glm::dot(point - ray.origin, ray.direction);
+        if (depth < bestDepth) {
+            bestDepth = depth;
+            best = { &l, p.face, point, l.normal(l.mesh->face(p.face).plane.normal) };
+        }
+    }
+    return best;
+}
+
+// Punctul e vizibil dacă nu există o față între el și cameră (aceeași regulă ca la picking).
+bool visible(const math::Ray& ray, const FaceHit& faceHit, const Vec3d& p)
+{
+    if (!faceHit.hit()) {
         return true;
     }
-    const double faceDepth = glm::dot(facePick.point - ray.origin, ray.direction);
+    const double faceDepth = glm::dot(faceHit.point - ray.origin, ray.direction);
     const double depth = glm::dot(p - ray.origin, ray.direction);
     return depth <= faceDepth + 1.0 + faceDepth * 1e-4;
 }
@@ -247,7 +316,7 @@ std::optional<Vec3d> snapInPlane(const Vec3d& point, const Vec3d& normal, double
 
 } // namespace
 
-void Engine::applyGrid(const geom::Mesh& mesh, Inference& result, const std::optional<Vec3d>& from) const
+void Engine::applyGrid(Inference& result, const std::optional<Vec3d>& from) const
 {
     if (m_gridStep <= 0.0) {
         return;
@@ -263,8 +332,8 @@ void Engine::applyGrid(const geom::Mesh& mesh, Inference& result, const std::opt
     std::optional<Vec3d> normal;
     if (result.kind == Kind::Ground) {
         normal = result.planeNormal;
-    } else if (result.kind == Kind::OnFace && result.face && mesh.faces().contains(result.face)) {
-        normal = mesh.face(result.face).plane.normal;
+    } else if (result.kind == Kind::OnFace) {
+        normal = result.normal;
     }
     if (normal) {
         if (const auto snapped = snapInPlane(result.point, *normal, m_gridStep)) {
@@ -281,50 +350,66 @@ Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2
         m_referenceEdge.reset();
         m_referenceDirection.reset();
     }
+    std::vector<detail::Layer> layers { { &mesh, camera, nullptr, {} } };
+    if (m_scene) {
+        for (const SnapSource& source : m_scene->sources) {
+            if (source.mesh) {
+                layers.push_back({ source.mesh, camera.inContext(source.toContext), &source.toContext, source.instance });
+            }
+        }
+    }
     m_lastFrom = from;
-    Inference result = locked() ? inferLocked(mesh, camera, screen, from) : inferFree(mesh, camera, screen, from, plane);
-    applyGrid(mesh, result, from);
+    Inference result
+        = locked() ? inferLocked(layers, camera, screen, from) : inferFree(layers, camera, screen, from, plane);
+    applyGrid(result, from);
     remember(mesh, result);
     m_last = result;
     return result;
 }
 
-Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen,
+Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
     std::optional<Vec3d> from, const std::optional<math::Plane>& plane)
 {
+    const geom::Mesh& mesh = *layers.front().mesh;
     const math::Ray ray = camera.rayAt(screen);
-    const view::PickResult facePick = view::pick(mesh, camera, screen, { -1.0, -1.0 });
+    Inference out;
+    const FaceHit faceHit = nearestFace(layers, ray, screen, out.pick);
     const double hyst = m_options.hysteresis;
 
-    Inference out;
-    out.pick = facePick;
-
-    // 1. Capete (vârfuri). Vârful ales anterior rămâne ales într-o rază mai mare.
+    // 1. Capete (vârfuri). Vârful ales anterior rămâne ales într-o rază mai mare (în ctx.mesh după ID, într-un obiect
+    // după punct).
     {
-        double best = m_options.pointRadiusPx;
+        double best = kInf;
+        const detail::Layer* bestLayer = nullptr;
         geom::VertexId bestVertex;
-        if (m_last.kind == Kind::Endpoint && mesh.vertices().contains(m_last.vertex)) {
-            const Vec3d& p = mesh.position(m_last.vertex);
-            const double d = screenDistance(camera, p, screen);
-            if (d <= best * hyst && visible(ray, facePick, p)) {
-                bestVertex = m_last.vertex;
-                best = -1.0;
-            }
-        }
-        if (best >= 0.0) {
-            view::forEachVertexNear(mesh, camera, screen, best, [&](geom::VertexId v) {
-                const Vec3d& p = mesh.position(v);
+        Vec3d bestPoint { 0.0 };
+        for (const detail::Layer& l : layers) {
+            view::forEachVertexNear(*l.mesh, l.camera, screen, m_options.pointRadiusPx * hyst, [&](geom::VertexId v) {
+                const Vec3d p = l.point(l.mesh->position(v));
+                const bool previous = m_last.kind == Kind::Endpoint
+                    && (l.context() ? m_last.origin == Origin::Context && m_last.vertex == v
+                                    : m_last.origin == Origin::Object && tol::samePoint(m_last.point, p));
                 const double d = screenDistance(camera, p, screen);
-                if (d <= best && visible(ray, facePick, p) && !view::isHidden(mesh, v)) {
-                    best = d;
+                if (d > m_options.pointRadiusPx * (previous ? hyst : 1.0) || !visible(ray, faceHit, p)
+                    || (!previous && view::isHidden(*l.mesh, v))) {
+                    return;
+                }
+                const double score = previous ? -1.0 : d + l.tiePenalty();
+                if (score <= best) {
+                    best = score;
+                    bestLayer = &l;
                     bestVertex = v;
+                    bestPoint = p;
                 }
             });
         }
-        if (bestVertex) {
+        if (bestLayer) {
             out.kind = Kind::Endpoint;
-            out.vertex = bestVertex;
-            out.point = mesh.position(bestVertex);
+            out.point = bestPoint;
+            if (bestLayer->context()) {
+                out.vertex = bestVertex;
+            }
+            bestLayer->stamp(out);
             return out;
         }
     }
@@ -369,29 +454,39 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
     // 2. Mijloacele muchiilor.
     {
         double best = kInf;
+        const detail::Layer* bestLayer = nullptr;
         geom::EdgeId bestEdge;
-        view::forEachEdgeNear(mesh, camera, screen, m_options.pointRadiusPx * hyst, [&](geom::EdgeId id) {
-            const geom::Edge& e = mesh.edge(id);
-            if (view::isHidden(e)) {
-                return;
-            }
-            const Vec3d mid = (mesh.position(e.v0) + mesh.position(e.v1)) * 0.5;
-            const bool previous = m_last.kind == Kind::Midpoint && m_last.edge == id;
-            const double d = screenDistance(camera, mid, screen);
-            if (d > m_options.pointRadiusPx * (previous ? hyst : 1.0) || !visible(ray, facePick, mid)) {
-                return;
-            }
-            const double score = previous ? -1.0 : d; // mijlocul ales anterior are prioritate
-            if (score < best) {
-                best = score;
-                bestEdge = id;
-            }
-        });
-        if (bestEdge) {
-            const geom::Edge& e = mesh.edge(bestEdge);
+        Vec3d bestPoint { 0.0 };
+        for (const detail::Layer& l : layers) {
+            view::forEachEdgeNear(*l.mesh, l.camera, screen, m_options.pointRadiusPx * hyst, [&](geom::EdgeId id) {
+                const geom::Edge& e = l.mesh->edge(id);
+                if (view::isHidden(e)) {
+                    return;
+                }
+                const Vec3d mid = l.point((l.mesh->position(e.v0) + l.mesh->position(e.v1)) * 0.5);
+                const bool previous = m_last.kind == Kind::Midpoint
+                    && (l.context() ? m_last.origin == Origin::Context && m_last.edge == id
+                                    : m_last.origin == Origin::Object && tol::samePoint(m_last.point, mid));
+                const double d = screenDistance(camera, mid, screen);
+                if (d > m_options.pointRadiusPx * (previous ? hyst : 1.0) || !visible(ray, faceHit, mid)) {
+                    return;
+                }
+                const double score = previous ? -1.0 : d + l.tiePenalty(); // mijlocul ales anterior are prioritate
+                if (score < best) {
+                    best = score;
+                    bestLayer = &l;
+                    bestEdge = id;
+                    bestPoint = mid;
+                }
+            });
+        }
+        if (bestLayer) {
             out.kind = Kind::Midpoint;
-            out.edge = bestEdge;
-            out.point = (mesh.position(e.v0) + mesh.position(e.v1)) * 0.5;
+            out.point = bestPoint;
+            if (bestLayer->context()) {
+                out.edge = bestEdge;
+            }
+            bestLayer->stamp(out);
             return out;
         }
     }
@@ -459,29 +554,39 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         const double eps = std::max(camera.worldPerPixelAtTarget(), tol::kLength);
 
         // 4a. Direcția taie o muchie lângă cursor.
-        double bestPx = m_options.pointRadiusPx;
-        std::optional<std::pair<Vec3d, geom::EdgeId>> crossing;
-        view::forEachEdgeNear(mesh, camera, screen, bestPx, [&](geom::EdgeId id) {
-            const geom::Edge& e = mesh.edge(id);
-            if (view::isHidden(e)) {
-                return;
-            }
-            const Vec3d a = mesh.position(e.v0);
-            const Vec3d b = mesh.position(e.v1);
-            const auto x = intersectLines(*from, dir, a, glm::normalize(b - a), eps);
-            if (!x || math::projectOnSegment(*x, { a, b }).distance > eps || tol::samePoint(*x, *from)) {
-                return;
-            }
-            const double d = screenDistance(camera, *x, screen);
-            if (d <= bestPx && visible(ray, facePick, *x)) {
-                bestPx = d;
-                crossing = std::pair { *x, id };
-            }
-        });
-        if (crossing) {
+        double best = kInf;
+        const detail::Layer* bestLayer = nullptr;
+        geom::EdgeId bestEdge;
+        Vec3d bestPoint { 0.0 };
+        for (const detail::Layer& l : layers) {
+            view::forEachEdgeNear(*l.mesh, l.camera, screen, m_options.pointRadiusPx, [&](geom::EdgeId id) {
+                const geom::Edge& e = l.mesh->edge(id);
+                if (view::isHidden(e)) {
+                    return;
+                }
+                const Vec3d a = l.point(l.mesh->position(e.v0));
+                const Vec3d b = l.point(l.mesh->position(e.v1));
+                const auto x = intersectLines(*from, dir, a, glm::normalize(b - a), eps);
+                if (!x || math::projectOnSegment(*x, { a, b }).distance > eps || tol::samePoint(*x, *from)) {
+                    return;
+                }
+                const double d = screenDistance(camera, *x, screen);
+                const double score = d + l.tiePenalty();
+                if (d <= m_options.pointRadiusPx && score <= best && visible(ray, faceHit, *x)) {
+                    best = score;
+                    bestLayer = &l;
+                    bestEdge = id;
+                    bestPoint = *x;
+                }
+            });
+        }
+        if (bestLayer) {
             out.kind = Kind::Intersection;
-            out.point = crossing->first;
-            out.edge = crossing->second;
+            out.point = bestPoint;
+            if (bestLayer->context()) {
+                out.edge = bestEdge;
+            }
+            bestLayer->stamp(out);
             withDirection(out, *linear);
             return out;
         }
@@ -540,13 +645,34 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
     }
 
     // 5. Pe o muchie. Câștigă în fața unei direcții doar dacă e mai aproape de cursor.
-    const view::PickResult edgePick = view::pick(mesh, camera, screen, { -1.0, m_options.edgeRadiusPx });
-    if (edgePick.kind == view::PickResult::Kind::Edge) {
-        const double d = screenDistance(camera, edgePick.point, screen);
-        if (!linear || d < linear->distance) {
+    {
+        double best = kInf;
+        double bestDistance = kInf;
+        const detail::Layer* bestLayer = nullptr;
+        view::PickResult bestPick;
+        Vec3d bestPoint { 0.0 };
+        for (const detail::Layer& l : layers) {
+            const view::PickResult edgePick = view::pick(*l.mesh, l.camera, screen, { -1.0, m_options.edgeRadiusPx });
+            if (edgePick.kind != view::PickResult::Kind::Edge) {
+                continue;
+            }
+            const Vec3d p = l.point(edgePick.point);
+            const double d = screenDistance(camera, p, screen);
+            if (d + l.tiePenalty() < best && visible(ray, faceHit, p)) {
+                best = d + l.tiePenalty();
+                bestDistance = d;
+                bestLayer = &l;
+                bestPick = edgePick;
+                bestPoint = p;
+            }
+        }
+        if (bestLayer && (!linear || bestDistance < linear->distance)) {
             out.kind = Kind::OnEdge;
-            out.edge = edgePick.edge;
-            out.point = edgePick.point;
+            out.point = bestPoint;
+            if (bestLayer->context()) {
+                out.edge = bestPick.edge;
+            }
+            bestLayer->stamp(out);
             return out;
         }
     }
@@ -568,7 +694,7 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
             }
             if (const auto p = pointOnLineUnderCursor(camera, screen, g.point, glm::normalize(g.direction))) {
                 const double d = screenDistance(camera, *p, screen);
-                if (d <= best && visible(ray, facePick, *p)) {
+                if (d <= best && visible(ray, faceHit, *p)) {
                     best = d;
                     hit = p;
                 }
@@ -581,12 +707,13 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         }
     }
 
-    // Punctul „liber”: pe fața de sub cursor sau pe planul de lucru.
+    // Punctul „liber”: pe fața de sub cursor (din orice strat) sau pe planul de lucru.
     std::optional<Vec3d> free;
     math::Plane freePlane;
-    if (facePick.kind == view::PickResult::Kind::Face) {
-        free = facePick.point;
-        freePlane = math::Plane::fromPointNormal(facePick.point, mesh.face(facePick.face).plane.normal);
+    if (faceHit.hit()) {
+        free = faceHit.point;
+        freePlane = math::Plane::fromPointNormal(faceHit.point, faceHit.normal);
+        out.normal = faceHit.normal;
     } else {
         freePlane = plane.value_or(
             from ? math::Plane::fromPointNormal(*from, { 0.0, 0.0, 1.0 }) : math::Plane::fromPointNormal({}, { 0, 0, 1 }));
@@ -633,10 +760,13 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
         }
     }
 
-    if (facePick.kind == view::PickResult::Kind::Face) {
+    if (faceHit.hit()) {
         out.kind = Kind::OnFace;
-        out.face = facePick.face;
-        out.point = facePick.point;
+        out.point = faceHit.point;
+        if (faceHit.layer->context()) {
+            out.face = faceHit.face;
+        }
+        faceHit.layer->stamp(out);
         return out;
     }
     if (free) {
@@ -647,19 +777,31 @@ Inference Engine::inferFree(const geom::Mesh& mesh, const view::Camera& camera, 
     return out;
 }
 
-Inference Engine::inferLocked(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen,
+Inference Engine::inferLocked(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
     std::optional<Vec3d> from)
 {
     const math::Ray ray = camera.rayAt(screen);
-    // Un punct atins (capăt, mijloc) se proiectează pe constrângere.
-    const view::PickResult snap = view::pick(mesh, camera, screen, { m_options.pointRadiusPx, -1.0 });
+    Inference out;
+    const FaceHit faceHit = nearestFace(layers, ray, screen, out.pick);
+    // Un capăt atins (din orice strat) se proiectează pe constrângere.
     std::optional<Vec3d> target;
-    if (snap.kind == view::PickResult::Kind::Vertex) {
-        target = snap.point;
+    double best = kInf;
+    for (const detail::Layer& l : layers) {
+        const view::PickResult snap = view::pick(*l.mesh, l.camera, screen, { m_options.pointRadiusPx, -1.0 });
+        if (l.context()) {
+            out.pick = snap;
+        }
+        if (snap.kind != view::PickResult::Kind::Vertex) {
+            continue;
+        }
+        const Vec3d p = l.point(snap.point);
+        const double score = screenDistance(camera, p, screen) + l.tiePenalty();
+        if (score < best && visible(ray, faceHit, p)) {
+            best = score;
+            target = p;
+        }
     }
 
-    Inference out;
-    out.pick = snap;
     out.locked = true;
     out.kind = m_lock.reason;
     if (m_lock.kind == LockKind::Line) {
@@ -724,8 +866,8 @@ void Engine::remember(const geom::Mesh& mesh, const Inference& result)
         }
     }
     m_lastFacePlane.reset();
-    if (result.kind == Kind::OnFace && result.face) {
-        m_lastFacePlane = math::Plane::fromPointNormal(result.point, mesh.face(result.face).plane.normal);
+    if (result.kind == Kind::OnFace && result.normal) {
+        m_lastFacePlane = math::Plane::fromPointNormal(result.point, *result.normal);
     }
     if ((result.kind == Kind::OnEdge || result.kind == Kind::Midpoint) && result.edge) {
         m_referenceEdge = result.edge;

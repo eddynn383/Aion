@@ -3,6 +3,7 @@
 #include "aion/core/geom/Id.h"
 #include "aion/core/math/Plane.h"
 #include "aion/core/math/Vec.h"
+#include "aion/core/model/Ids.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/Picking.h"
 
@@ -19,6 +20,11 @@ class Mesh;
 // Inferența (snap): din poziția cursorului și din context (punctul de pornire, geometria din jur,
 // punctele „atinse” recent) alege punctul pe care îl vrea utilizatorul, ca în SketchUp.
 namespace aion::inference {
+
+struct SnapScene;
+namespace detail {
+struct Layer;
+}
 
 using math::Vec2d;
 using math::Vec3d;
@@ -57,6 +63,9 @@ struct Guide {
     bool dashed = false;
 };
 
+// De unde vine geometria inferată: mesh-ul contextului editat sau un obiect din scenă (`SnapScene`).
+enum class Origin { Context, Object };
+
 struct Inference {
     Kind kind = Kind::None;
     Vec3d point { 0.0 };
@@ -64,6 +73,10 @@ struct Inference {
     geom::VertexId vertex; // pentru Endpoint
     geom::EdgeId edge; // pentru OnEdge, Midpoint, Intersection
     geom::FaceId face; // pentru OnFace
+    // ID-urile de mai sus (și `pick`) sunt mereu din mesh-ul contextului; o inferență pe un obiect le are goale.
+    Origin origin = Origin::Context;
+    model::InstanceId sourceInstance; // pentru Origin::Object: instanța din contextul editat care conține geometria
+    std::optional<Vec3d> normal; // normala feței atinse (OnFace sau punct pe o față), în coordonatele contextului
     // Direcția liniară din punctul de pornire (unitară), dacă inferența o folosește:
     // OnAxis, Parallel, Perpendicular sau o combinație (Intersection, FromPoint pe o axă).
     std::optional<Vec3d> direction;
@@ -117,6 +130,14 @@ public:
         return *this;
     }
 
+    // Obiectele pe care le vede inferența, pe lângă mesh-ul contextului (nullptr = doar mesh-ul). Scena trebuie să
+    // trăiască până la alt apel.
+    Engine& withScene(const SnapScene* scene)
+    {
+        m_scene = scene;
+        return *this;
+    }
+
     // Snap la grid cu pasul dat (mm; 0 = oprit). Se aplică doar punctelor „libere” (pe sol, pe o față
     // aliniată cu axele) și distanțelor de-a lungul unei direcții (axă, paralel); capetele, mijloacele și
     // muchiile au prioritate.
@@ -162,11 +183,13 @@ private:
         Axis axis = Axis::None;
     };
 
-    Inference inferFree(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen, std::optional<Vec3d> from,
-        const std::optional<math::Plane>& plane);
-    Inference inferLocked(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen, std::optional<Vec3d> from);
+    // `layers`: mesh-ul contextului (primul), apoi fiecare sursă din scenă, cu camera în coordonatele ei.
+    Inference inferFree(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
+        std::optional<Vec3d> from, const std::optional<math::Plane>& plane);
+    Inference inferLocked(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
+        std::optional<Vec3d> from);
     void remember(const geom::Mesh& mesh, const Inference& result);
-    void applyGrid(const geom::Mesh& mesh, Inference& result, const std::optional<Vec3d>& from) const;
+    void applyGrid(Inference& result, const std::optional<Vec3d>& from) const;
 
     Options m_options;
     Inference m_last;
@@ -177,6 +200,7 @@ private:
     std::optional<Vec3d> m_referenceDirection;
     std::optional<math::Plane> m_lastFacePlane;
     std::vector<GuideRef> m_guides;
+    const SnapScene* m_scene = nullptr;
     double m_gridStep = 0.0;
 };
 

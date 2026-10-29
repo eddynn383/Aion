@@ -1,16 +1,22 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/inference/Inference.h"
+#include "aion/core/math/Intersect.h"
+#include "aion/core/model/SnapSources.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <glm/geometric.hpp>
+#include <glm/trigonometric.hpp>
 
 using namespace aion;
 using Catch::Approx;
 using geom::Mesh;
 using inference::Axis;
 using inference::Kind;
+using inference::Origin;
+using math::Transform;
 using math::Vec2d;
 using math::Vec3d;
 
@@ -43,6 +49,21 @@ Vec2d screen(const view::Camera& camera, Vec3d world)
 bool near(Vec3d a, Vec3d b, double eps = 1e-6)
 {
     return glm::length(a - b) <= eps;
+}
+
+// O cutie 1000³ ca obiect în rădăcină: definiția are baza centrată în origine, `local` o mută în (3000..4000, 0..1000,
+// 0..1000) și apoi aplică `extra` (rotații, scalări).
+model::InstanceId placeBox(model::Model& m, const Transform& extra = {})
+{
+    model::Definition def { "Cutie", true };
+    def.shape = "box";
+    const model::DefinitionId d = m.addDefinition(def);
+    geom::buildPrimitive(m.mesh(d), geom::Primitive::Box, { 1000, 1000, 1000 }, 24);
+    model::Instance inst;
+    inst.parent = m.root();
+    inst.definition = d;
+    inst.transform = extra * Transform::translation({ 3500, 500, 0 });
+    return m.addInstance(inst);
 }
 
 } // namespace
@@ -281,4 +302,202 @@ TEST_CASE("Snap la grid: punctele libere cad pe grid, capetele au prioritate", "
     r = engine.infer(mesh, camera, screen(camera, { 2930, -640, 0 }), std::nullopt);
     CHECK_FALSE(r.onGrid);
     CHECK(near(r.point, { 2930, -640, 0 }, 1e-3));
+}
+
+TEST_CASE("Inferență pe obiecte: capătul unui obiect", "[core][inference]")
+{
+    model::Model m;
+    const model::InstanceId id = placeBox(m);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    const Vec3d corner { 4000, 1000, 1000 };
+    auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK(near(r.point, corner));
+    CHECK(r.origin == Origin::Object);
+    CHECK_FALSE(r.vertex);
+    CHECK(r.sourceInstance == id);
+    CHECK(inference::label(r) == "Endpoint");
+
+    // Histerezis: capătul rămâne ales puțin în afara razei (după punct, nu după ID).
+    r = engine.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 13, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK(near(r.point, corner));
+
+    // La egalitate pe ecran câștigă ctx.mesh.
+    geom::drawLine(m.mesh(m.root()), corner, corner + Vec3d { 0, 0, 500 });
+    inference::Engine both;
+    both.withScene(&scene);
+    r = both.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK(r.origin == Origin::Context);
+    CHECK(r.vertex);
+}
+
+TEST_CASE("Inferență pe obiecte: mijloc și pe muchie", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3500, 0, 1000 }) + Vec2d { 3, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Midpoint);
+    CHECK(near(r.point, { 3500, 0, 1000 }));
+    CHECK(r.origin == Origin::Object);
+    CHECK_FALSE(r.edge);
+
+    r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3200, 0, 1000 }) + Vec2d { 0, 3 }, std::nullopt);
+    CHECK(r.kind == Kind::OnEdge);
+    CHECK(r.origin == Origin::Object);
+    CHECK_FALSE(r.edge);
+    CHECK(math::projectOnSegment(r.point, { { 3000, 0, 1000 }, { 4000, 0, 1000 } }).distance < 1e-6);
+    CHECK(r.point.x == Approx(3200).margin(30));
+}
+
+TEST_CASE("Inferență pe obiecte: pe față, cu normala", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    const auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3500, 500, 1000 }), std::nullopt);
+    CHECK(r.kind == Kind::OnFace);
+    CHECK(r.origin == Origin::Object);
+    CHECK_FALSE(r.face);
+    REQUIRE(r.normal);
+    CHECK(near(*r.normal, { 0, 0, 1 }));
+    CHECK(near(r.point, { 3500, 500, 1000 }, 1e-3));
+    CHECK(inference::label(r) == "On Face");
+}
+
+TEST_CASE("Inferență pe obiecte: From Point de la colțul unui obiect", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    // Colțul de jos din față: linia verde prin el taie axa roșie din punctul de pornire. (Pe axa prin origine,
+    // x = 4000 ar fi chiar colțul cutiei, deci un capăt; linia prin colțul de sus nu taie axa deloc.)
+    const Vec3d corner { 4000, 0, 0 };
+    REQUIRE(engine.infer(m.mesh(m.root()), camera, screen(camera, corner), std::nullopt).kind == Kind::Endpoint);
+    REQUIRE(engine.references().size() == 1);
+
+    const Vec3d from { 0, -2000, 0 };
+    const auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 4000, -2000, 0 }) + Vec2d { 2, 2 }, from);
+    CHECK(r.kind == Kind::FromPoint);
+    CHECK(r.point.x == Approx(4000));
+    REQUIRE_FALSE(r.guides.empty());
+    CHECK(r.guides.back().dashed);
+    CHECK(near(r.guides.back().a, corner));
+}
+
+TEST_CASE("Inferență pe obiecte: ocluzie peste surse", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m);
+    const auto camera = isoCamera();
+    // Un vârf al ctx.mesh exact în spatele feței din față a cutiei, pe aceeași rază.
+    const Vec2d s = screen(camera, { 3500, 0, 500 });
+    const math::Ray ray = camera.rayAt(s);
+    const auto t = math::intersectRayPlane(ray, math::Plane::fromPointNormal({ 3500, 0, 500 }, { 0, -1, 0 }));
+    REQUIRE(t);
+    const Vec3d behind = ray.at(*t + 2500.0);
+    geom::drawLine(m.mesh(m.root()), behind, behind + Vec3d { 0, 0, 300 });
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+
+    inference::Engine alone;
+    CHECK(alone.infer(m.mesh(m.root()), camera, s, std::nullopt).kind == Kind::Endpoint);
+
+    inference::Engine engine;
+    engine.withScene(&scene);
+    const auto r = engine.infer(m.mesh(m.root()), camera, s, std::nullopt);
+    CHECK(r.kind == Kind::OnFace);
+    CHECK(r.origin == Origin::Object);
+    REQUIRE(r.normal);
+    CHECK(near(*r.normal, { 0, -1, 0 }));
+}
+
+TEST_CASE("Inferență pe obiecte: obiectul transformat", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m,
+        Transform::rotation({ 3500, 500, 0 }, { 0, 0, 1 }, glm::radians(30.0))
+            * Transform::scaling({ 3500, 500, 0 }, { 2, 1, 1 }));
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    REQUIRE(scene.sources.size() == 1);
+    const Vec3d corner = scene.sources[0].toContext.applyToPoint({ 500, 500, 1000 });
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    const auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK(near(r.point, corner));
+}
+
+TEST_CASE("Inferență pe obiecte: obiectul oglindit dă normalele corecte", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m, Transform::scaling({ 3500, 500, 0 }, { -1, 1, 1 }));
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    REQUIRE(glm::determinant(glm::dmat3(scene.sources[0].toContext.matrix())) < 0.0);
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3000, 500, 500 }), std::nullopt);
+    CHECK(r.kind == Kind::OnFace);
+    REQUIRE(r.normal);
+    CHECK(near(*r.normal, { -1, 0, 0 }));
+
+    r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3000, 0, 1000 }) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK(near(r.point, { 3000, 0, 1000 }));
+}
+
+TEST_CASE("Inferență pe obiecte: prioritate față de grid", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene).withGridSnap(250.0);
+
+    const Vec3d corner { 4000, 1000, 1000 };
+    const auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK_FALSE(r.onGrid);
+    CHECK(near(r.point, corner));
+}
+
+TEST_CASE("Inferență pe obiecte: fără scenă, nimic nou", "[core][inference]")
+{
+    model::Model m;
+    placeBox(m);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+    const Vec3d corner { 4000, 1000, 1000 };
+    REQUIRE(engine.infer(m.mesh(m.root()), camera, screen(camera, corner), std::nullopt).kind == Kind::Endpoint);
+
+    engine.withScene(nullptr);
+    engine.reset();
+    const auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Ground);
+    CHECK(r.origin == Origin::Context);
+    CHECK_FALSE(r.normal);
 }
