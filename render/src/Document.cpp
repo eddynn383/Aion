@@ -15,12 +15,14 @@
 #include "aion/core/model/Parametric.h"
 #include "aion/core/model/Transfer.h"
 #include "ProceduralTextures.h"
+#include "RecoveryStore.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/MotionPaths.h"
 #include "aion/core/model/PenCurves.h"
 #include "aion/core/model/Quantities.h"
+#include "aion/core/text/Dates.h"
 #include "aion/core/units/Length.h"
 #include "aion/core/view/ModelPicking.h"
 #include "aion/core/view/Camera.h"
@@ -74,9 +76,6 @@ std::filesystem::path toPath(const QString& path)
 {
     return std::filesystem::path(path.toStdU16String());
 }
-
-// Copia de recuperare, pe web (unde fișierele nu persistă).
-const QString kRecoveryDataKey = QStringLiteral("recovery/data");
 
 
 QString plural(std::size_t n, const char* one, const char* many)
@@ -132,18 +131,9 @@ Document::Document(QObject* parent)
     retriangulate(m_model.root());
     setActiveTool(QStringLiteral("select"));
 
-    // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate.
-#ifdef Q_OS_WASM
-    // În browser, fișierele sunt doar în memorie: copia de recuperare stă în QSettings (IndexedDB / localStorage).
-    {
-        const QByteArray data = QSettings().value(kRecoveryDataKey).toByteArray();
-        QFile file(autosavePath());
-        if (!data.isEmpty() && !file.exists() && file.open(QIODevice::WriteOnly)) {
-            file.write(data);
-        }
-    }
-#endif
-    m_hasRecovery = QFile::exists(autosavePath());
+    // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate; copiile rămase de la sesiunile închise
+    // brusc se oferă la pornire (ADR 0040).
+    m_recovery = std::make_unique<RecoveryStore>();
     {
         QSettings settings;
         m_autosaveTimer.setInterval(std::clamp(settings.value(QStringLiteral("files/autosaveMinutes"), 1).toInt(), 1, 60) * 60'000);
@@ -156,10 +146,8 @@ Document::Document(QObject* parent)
 
 Document::~Document()
 {
-    // O închidere normală fără modificări nesalvate nu lasă nimic de recuperat.
-    if (!modified() && !m_hasRecovery) {
-        removeAutosave();
-    }
+    // O închidere normală nu lasă copie de recuperare (RecoveryStore o șterge): modificările au fost deja salvate sau
+    // utilizatorul a ales să renunțe la ele.
     m_model.removeObserver(this);
 }
 
@@ -345,17 +333,26 @@ namespace {
 
 constexpr int kMaxRecentFiles = 8;
 const QString kRecentKey = QStringLiteral("files/recent");
-const QString kRecoverySourceKey = QStringLiteral("recovery/source");
-const QString kRecoveryTimeKey = QStringLiteral("recovery/time");
+
+// „azi, 14:32”, „ieri, 09:05”, „12 oct.” (text::describeTime), în ora locală.
+QString describeTime(const QDateTime& time)
+{
+    const auto local = [](const QDateTime& t) {
+        const QDateTime l = t.toLocalTime();
+        return text::LocalTime { l.date().year(), l.date().month(), l.date().day(), l.time().hour(), l.time().minute() };
+    };
+    return QString::fromStdString(text::describeTime(local(time), local(QDateTime::currentDateTime())));
+}
+
+// Dosarul unui fișier, cu „~” pentru dosarul utilizatorului.
+QString displayFolder(const QString& path)
+{
+    const QString folder = QDir::toNativeSeparators(QFileInfo(path).absolutePath());
+    const QString home = QDir::toNativeSeparators(QDir::homePath());
+    return folder.startsWith(home) ? QStringLiteral("~") + folder.mid(home.size()) : folder;
+}
 
 } // namespace
-
-QString Document::autosavePath()
-{
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/autosave.aion");
-}
 
 QString Document::fileName() const
 {
@@ -369,14 +366,60 @@ QStringList Document::recentFiles() const
     return files;
 }
 
+bool Document::hasRecovery() const
+{
+    return !m_recovery->orphans().empty();
+}
+
 QString Document::recoveryInfo() const
 {
-    QSettings settings;
-    const QString source = settings.value(kRecoverySourceKey).toString();
-    const QDateTime time = settings.value(kRecoveryTimeKey).toDateTime();
-    const QString when = time.isValid() ? time.toString(QStringLiteral("d MMM, HH:mm")) : QString();
-    const QString name = source.isEmpty() ? QStringLiteral("un document nesalvat") : QFileInfo(source).fileName();
-    return when.isEmpty() ? name : name + QStringLiteral(" (") + when + QStringLiteral(")");
+    if (!hasRecovery()) {
+        return {};
+    }
+    const RecoveryStore::Entry& latest = m_recovery->orphans().front();
+    const QString name = latest.source.isEmpty() ? QStringLiteral("un document nesalvat") : QFileInfo(latest.source).fileName();
+    return name + QStringLiteral(" (") + describeTime(latest.savedAt) + QStringLiteral(")");
+}
+
+QVariantList Document::recoveries() const
+{
+    QVariantList out;
+    for (const RecoveryStore::Entry& e : m_recovery->orphans()) {
+        out.append(QVariantMap { { QStringLiteral("session"), e.session },
+            { QStringLiteral("name"), e.source.isEmpty() ? QStringLiteral("Fără titlu") : QFileInfo(e.source).completeBaseName() },
+            { QStringLiteral("source"), e.source },
+            { QStringLiteral("folder"), e.source.isEmpty() ? QStringLiteral("Document nesalvat") : displayFolder(e.source) },
+            { QStringLiteral("when"), describeTime(e.savedAt) } });
+    }
+    return out;
+}
+
+QVariantList Document::recentDocuments() const
+{
+    QVariantList out;
+    for (const QString& path : recentFiles()) {
+        const QFileInfo info(path);
+        const QDateTime modifiedAt = info.lastModified();
+        auto& cached = m_recentThumbnails[path];
+        if (cached.first != modifiedAt) {
+            QString thumbnail;
+            QFile file(path);
+            if (file.open(QIODevice::ReadOnly)) {
+                const QByteArray bytes = file.readAll();
+                const std::vector<std::uint8_t> png = io::readThumbnail(
+                    std::span(reinterpret_cast<const std::uint8_t*>(bytes.constData()), static_cast<std::size_t>(bytes.size())));
+                if (!png.empty()) {
+                    thumbnail = QStringLiteral("data:image/png;base64,")
+                        + QString::fromLatin1(QByteArray(reinterpret_cast<const char*>(png.data()), qsizetype(png.size())).toBase64());
+                }
+            }
+            cached = { modifiedAt, thumbnail };
+        }
+        out.append(QVariantMap { { QStringLiteral("path"), path }, { QStringLiteral("name"), info.completeBaseName() },
+            { QStringLiteral("folder"), displayFolder(path) }, { QStringLiteral("when"), describeTime(modifiedAt) },
+            { QStringLiteral("thumbnail"), cached.second } });
+    }
+    return out;
 }
 
 void Document::setFilePath(const QString& path)
@@ -455,7 +498,7 @@ void Document::newDocument()
     }
     replaceModel(model::Model {});
     setFilePath({});
-    removeAutosave();
+    m_recovery->clear();
 }
 
 bool Document::openFile(const QString& path)
@@ -473,7 +516,7 @@ bool Document::openFile(const QString& path)
     replaceModel(*result.model);
     setFilePath(path);
     addRecentFile(path);
-    removeAutosave();
+    m_recovery->clear();
     return true;
 }
 
@@ -495,7 +538,7 @@ bool Document::saveFile(const QString& path, const QByteArray& thumbnailPng)
     m_stack.markClean();
     setFilePath(target);
     addRecentFile(target);
-    removeAutosave();
+    m_recovery->clear();
     return true;
 }
 
@@ -584,53 +627,49 @@ void Document::autosave()
     if (!modified()) {
         return;
     }
-    if (io::saveFile(toPath(autosavePath()), m_model)) {
-        QSettings settings;
-        settings.setValue(kRecoverySourceKey, m_filePath);
-        settings.setValue(kRecoveryTimeKey, QDateTime::currentDateTime());
-#ifdef Q_OS_WASM
-        QFile file(autosavePath());
-        if (file.open(QIODevice::ReadOnly)) {
-            settings.setValue(kRecoveryDataKey, file.readAll());
-        }
-#endif
+    QString error;
+    if (!m_recovery->save(m_model, m_filePath, &error)) {
+        qWarning("Autosalvarea a eșuat: %s", qPrintable(error));
     }
 }
 
-void Document::removeAutosave()
+void Document::recoverSession(const QString& session)
 {
-    QFile::remove(autosavePath());
-    QSettings settings;
-    settings.remove(kRecoverySourceKey);
-    settings.remove(kRecoveryTimeKey);
-    settings.remove(kRecoveryDataKey);
-    if (m_hasRecovery) {
-        m_hasRecovery = false;
-        emit recoveryChanged();
-    }
-}
-
-void Document::recoverAutosave()
-{
-    const QString source = QSettings().value(kRecoverySourceKey).toString();
-    const io::LoadResult result = io::loadFile(toPath(autosavePath()));
-    if (!result.model) {
-        setError(QStringLiteral("Sesiunea nu a putut fi recuperată. %1").arg(QString::fromStdString(result.error)));
-        discardAutosave();
+    const auto& orphans = m_recovery->orphans();
+    const auto it = std::find_if(orphans.begin(), orphans.end(),
+        [&](const RecoveryStore::Entry& e) { return session.isEmpty() || e.session == session; });
+    if (it == orphans.end()) {
         return;
     }
+    const RecoveryStore::Entry entry = *it;
+    const io::LoadResult result = m_recovery->load(entry.session);
+    if (!result.model) {
+        setError(QStringLiteral("Copia nu a putut fi recuperată. %1").arg(QString::fromStdString(result.error)));
+        discardRecovery(entry.session);
+        return;
+    }
+    if (m_clipboard) {
+        m_clipboard.reset();
+        emit clipboardChanged();
+    }
     replaceModel(*result.model);
-    setFilePath(source);
-    // Recuperat, dar nesalvat: documentul rămâne marcat ca modificat.
+    setFilePath(entry.source);
+    // Recuperat, dar nesalvat: documentul rămâne marcat ca modificat. Copia trece în sesiunea curentă înainte să
+    // ștergem originalul, ca o nouă închidere bruscă să nu-l piardă.
     m_stack.markDirty();
-    m_hasRecovery = false;
-    emit recoveryChanged();
     emit historyChanged();
+    autosave();
+    discardRecovery(entry.session);
 }
 
-void Document::discardAutosave()
+void Document::discardRecovery(const QString& session)
 {
-    removeAutosave();
+    const auto& orphans = m_recovery->orphans();
+    if (orphans.empty()) {
+        return;
+    }
+    m_recovery->discard(session.isEmpty() ? orphans.front().session : session);
+    emit recoveryChanged();
 }
 
 std::uint64_t Document::modelRevision() const

@@ -82,8 +82,7 @@ int main(int argc, char* argv[])
     QGuiApplication app(argc, argv);
     // Rulările automate (capturi, scripturi AION_STARTUP) au setările, documentele recente și autosalvarea lor,
     // ca să nu schimbe preferințele utilizatorului.
-    const bool scripted = qEnvironmentVariableIsSet("AION_SCREENSHOT") || qEnvironmentVariableIsSet("AION_STARTUP");
-    QGuiApplication::setApplicationName(scripted ? QStringLiteral("Aion Test") : QStringLiteral("Aion"));
+    QGuiApplication::setApplicationName(AppInfo::automated() ? QStringLiteral("Aion Test") : QStringLiteral("Aion"));
     QGuiApplication::setOrganizationName(QStringLiteral("Aion"));
     QGuiApplication::setOrganizationDomain(QStringLiteral("aion.dev"));
 #ifndef Q_OS_MACOS
