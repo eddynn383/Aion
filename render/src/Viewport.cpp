@@ -187,10 +187,52 @@ std::pair<glm::dvec3, double> sunPosition(double hour, int month, double latitud
 
 } // namespace
 
+// Ce desenează documentul (modelul, selecția, hover-ul, unealta). Nu depinde de cameră, deci se refolosește între
+// cadre: la orbit / pan / zoom nu se mai parcurge tot modelul. Singura excepție sunt profilele (muchia dintre o față
+// văzută din față și una din spate se îngroașă): `profiles` le ține normalele, iar grosimea se alege la fiecare cadru.
+struct DocumentPass {
+    struct ProfileEdge {
+        std::size_t line; // indexul în `lines`
+        glm::dvec3 mid; // mijlocul muchiei și normalele celor două fețe, în lume
+        glm::dvec3 n0;
+        glm::dvec3 n1;
+    };
+    std::optional<glm::dvec4> section;
+    std::vector<LineInstance> lines;
+    std::vector<PointInstance> points;
+    std::vector<LineInstance> topLines;
+    std::vector<PointInstance> topPoints;
+    std::vector<MeshVertex> triangles;
+    std::vector<MeshVertex> transparent;
+    std::vector<ProfileEdge> profiles;
+    bool hasSelectedFaces = false;
+    unsigned generation = 0; // crește la fiecare reconstruire: renderer-ul reîncarcă triunghiurile doar atunci
+};
+
+struct Viewport::DocumentPassCache {
+    struct Key {
+        const void* document = nullptr;
+        unsigned revision = 0;
+        unsigned interaction = 0;
+        bool clean = false;
+        bool demo = false;
+        unsigned appearance = 0;
+        QString style;
+        std::size_t textures = 0;
+        std::optional<glm::dvec4> section;
+        bool operator==(const Key&) const = default;
+    };
+    std::optional<Key> key;
+    std::shared_ptr<const DocumentPass> pass;
+    unsigned generation = 0;
+};
+
 Viewport::Viewport(QQuickItem* parent)
     : QQuickRhiItem(parent)
+    , m_documentPass(std::make_unique<DocumentPassCache>())
 {
     setSampleCount(m_preferredSamples);
+    connect(this, &Viewport::appearanceChanged, this, [this] { ++m_appearanceGeneration; });
     m_lockCommitTimer.setSingleShot(true);
     m_lockCommitTimer.setInterval(350);
     connect(&m_lockCommitTimer, &QTimer::timeout, this, &Viewport::commitLockedView);
@@ -378,7 +420,7 @@ bool Viewport::cleanView() const
     return m_cleanCapture || (m_document != nullptr && m_document->playing());
 }
 
-void Viewport::appendDocument(ViewportFrame& f) const
+void Viewport::appendDocument(DocumentPass& f) const
 {
     const Document& doc = *m_document;
     // Exportul și redarea animației nu arată hover-ul, selecția sau ce desenează unealta: doar modelul.
@@ -445,7 +487,7 @@ void Viewport::appendDocument(ViewportFrame& f) const
     }
 }
 
-void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::DefinitionId definition,
+void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::DefinitionId definition,
     const math::Transform& toWorld, int pathIndex, DrawStyle style, const view::PickResult& hover,
     const tools::Overlay& overlay) const
 {
@@ -468,6 +510,9 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         return dim ? 3.0f : style.selected || style.marked ? 2.0f : style.hovered ? 1.0f : 0.0f;
     };
     const int displayStyle = styleIndex(m_displayStyle);
+    // Normalele trec prin inversa transpusă (scara neuniformă): o dată pe definiție, nu pe fiecare vârf.
+    const glm::dmat3 normalMatrix = glm::transpose(glm::inverse(glm::dmat3(toWorld.matrix())));
+    const auto toWorldNormal = [&](const glm::dvec3& n) { return glm::normalize(normalMatrix * n); };
     for (const auto& [faceId, tri] : doc.triangles(definition)) {
         if (displayStyle == 3) {
             break; // wireframe: fără fețe
@@ -530,8 +575,8 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
                 uv.z = static_cast<float>(t.x);
                 uv.w = static_cast<float>(-t.y);
             }
-            target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])),
-                glm::vec3(glm::normalize(toWorld.applyToNormal(n))), state, color, surface, backColor, uv, layers });
+            target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])), glm::vec3(toWorldNormal(n)), state, color,
+                surface, backColor, uv, layers });
         }
     }
 
@@ -552,22 +597,13 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
         if (e.soft && !(isMarked || (active && (isSelected || isHovered)))) {
             continue; // muchiile soft (laturile unui cilindru) nu se desenează
         }
-        // Profil: muchia de margine a unei suprafețe sau cea dintre o față văzută din față și una din spate.
-        if (m_profiles && displayStyle != 3 && !e.faces.empty()) {
-            bool profile = e.faces.size() == 1;
-            if (e.faces.size() == 2) {
-                const math::Vec3d mid = toWorld.applyToPoint((mesh.position(e.v0) + mesh.position(e.v1)) * 0.5);
-                const math::Vec3d toEye
-                    = isOrthographic() ? -m_camera.forward() : glm::normalize(m_camera.eye() - mid);
-                const auto facing = [&](geom::FaceId fid) {
-                    return glm::dot(toWorld.applyToNormal(mesh.face(fid).plane.normal), toEye) > 0.0;
-                };
-                profile = facing(e.faces[0]) != facing(e.faces[1]);
-            }
-            if (profile) {
-                width = kProfileWidth;
-            }
+        // Profil: muchia de margine a unei suprafețe sau cea dintre o față văzută din față și una din spate (aceasta
+        // depinde de cameră: se alege la fiecare cadru, din `f.profiles`).
+        const bool profiles = m_profiles && displayStyle != 3;
+        if (profiles && e.faces.size() == 1) {
+            width = kProfileWidth;
         }
+        const bool cameraProfile = profiles && e.faces.size() == 2 && !isMarked && !isSelected && !isHovered;
         if (isMarked) {
             color = toVec4(m_erase);
             width = kHighlightedEdgeWidth;
@@ -597,6 +633,11 @@ void Viewport::appendDefinition(ViewportFrame& f, const Document& doc, model::De
             }
         }
         f.lines.push_back({ glm::vec3(p0), glm::vec3(p1), color, { width, 0.0f } });
+        if (cameraProfile) {
+            f.profiles.push_back({ f.lines.size() - 1,
+                toWorld.applyToPoint((mesh.position(e.v0) + mesh.position(e.v1)) * 0.5),
+                normalMatrix * mesh.face(e.faces[0]).plane.normal, normalMatrix * mesh.face(e.faces[1]).plane.normal });
+        }
     }
 
     // Liniile de tăietură ale secțiunii: unde planul trece prin fețe.
@@ -1890,8 +1931,16 @@ void Viewport::startTurntable(double seconds)
 
 void Viewport::sceneBounds(view::Vec3d& min, view::Vec3d& max) const
 {
-    const auto bounds = m_document ? model::bounds(m_document->model(), m_document->model().root())
-                                   : std::pair { view::Vec3d { 1.0 }, view::Vec3d { -1.0 } };
+    // Cutia modelului se recalculează doar când modelul se schimbă (o cer fiecare cadru, fiecare zoom și fiecare
+    // schimbare a documentului, deci și hover-ul).
+    const std::uint64_t revision = m_document ? m_document->modelRevision() : 0U;
+    const void* document = m_document;
+    if (!m_sceneBoundsCache || std::get<0>(*m_sceneBoundsCache) != revision || std::get<1>(*m_sceneBoundsCache) != document) {
+        const auto b = m_document ? model::bounds(m_document->model(), m_document->model().root())
+                                  : std::pair { view::Vec3d { 1.0 }, view::Vec3d { -1.0 } };
+        m_sceneBoundsCache = std::tuple { revision, document, b.first, b.second };
+    }
+    const std::pair bounds { std::get<2>(*m_sceneBoundsCache), std::get<3>(*m_sceneBoundsCache) };
     if (bounds.first.x <= bounds.second.x) {
         min = bounds.first;
         max = bounds.second;
@@ -1930,6 +1979,30 @@ void Viewport::collectTextures(ViewportFrame& f, const Document& doc) const
         signature = signature * 1000003u ^ (id * 31u + key);
     }
     f.textureSignature = signature;
+}
+
+std::shared_ptr<const DocumentPass> Viewport::documentPass(const std::optional<glm::dvec4>& section, std::size_t textures) const
+{
+    // Tot ce schimbă desenul modelului: documentul (modelul, selecția, hover-ul, unealta cresc `revision`), aspectul
+    // (culori, stil, profile), texturile, secțiunea, vederea curată (export, redare) și cutia demo.
+    DocumentPassCache::Key key { m_document, m_document ? m_document->revision() : 0U,
+        m_document ? m_document->interactionRevision() : 0U, cleanView(), m_demoVisible, m_appearanceGeneration,
+        m_displayStyle, textures, section };
+    if (m_documentPass->pass && m_documentPass->key == key) {
+        return m_documentPass->pass;
+    }
+    auto pass = std::make_shared<DocumentPass>();
+    pass->section = section;
+    pass->generation = ++m_documentPass->generation;
+    if (m_document) {
+        appendDocument(*pass);
+    }
+    if (m_demoVisible) {
+        appendBox(pass->triangles, kDemoMin, kDemoMax);
+    }
+    m_documentPass->key = std::move(key);
+    m_documentPass->pass = pass;
+    return pass;
 }
 
 ViewportFrame Viewport::frameForRendering() const
@@ -2019,16 +2092,29 @@ ViewportFrame Viewport::frameForRendering() const
             }
         }
         collectTextures(f, *m_document);
-        appendDocument(f);
+    }
+    // Modelul: refolosit cât timp nu se schimbă decât camera; profilele se aleg acum, după poziția ei.
+    const std::shared_ptr<const DocumentPass> pass = documentPass(f.section, f.textureSignature);
+    f.triangles = std::shared_ptr<const std::vector<MeshVertex>>(pass, &pass->triangles);
+    f.transparent = std::shared_ptr<const std::vector<MeshVertex>>(pass, &pass->transparent);
+    f.hasSelectedFaces = pass->hasSelectedFaces;
+    const std::size_t firstLine = f.lines.size();
+    f.lines.insert(f.lines.end(), pass->lines.begin(), pass->lines.end());
+    for (const DocumentPass::ProfileEdge& e : pass->profiles) {
+        const glm::dvec3 toEye = isOrthographic() ? -m_camera.forward() : m_camera.eye() - e.mid;
+        const bool profile = (glm::dot(e.n0, toEye) > 0.0) != (glm::dot(e.n1, toEye) > 0.0);
+        f.lines[firstLine + e.line].style.x = profile ? kProfileWidth : kEdgeWidth;
+    }
+    f.points.insert(f.points.end(), pass->points.begin(), pass->points.end());
+    f.topLines.insert(f.topLines.end(), pass->topLines.begin(), pass->topLines.end());
+    f.topPoints.insert(f.topPoints.end(), pass->topPoints.begin(), pass->topPoints.end());
+    if (m_document) {
         appendModelExtras(f, *m_document);
     }
     if (m_demoVisible) {
-        appendBox(f.triangles, kDemoMin, kDemoMax);
         appendBoxEdges(f.lines, kDemoMin, kDemoMax, toVec4(m_edge), kEdgeWidth);
     }
-    f.meshRevision = ((m_document ? m_document->revision() + m_document->interactionRevision() * 7919u : 0u)) * 2u
-        + (m_demoVisible ? 1u : 0u) + (cleanView() ? 0x40000000u : 0u)
-        + static_cast<unsigned>(f.textureSignature & 0xFFFFu) * 2654435761u;
+    f.meshRevision = pass->generation;
 
     // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.
     if (m_dropPreview) {
@@ -2080,8 +2166,23 @@ void Viewport::onCameraMoved()
 {
     markMotion();
     updateAnnotations();
-    emit cameraChanged();
+    // QML (gizmo-ul, bara de stare...) află de cameră o dată pe cadru: mouse-ul trimite până la 120 de mișcări pe
+    // secundă, iar legăturile reevaluate la fiecare umpleau firul principal și opreau cadrele.
+    m_cameraNotifyPending = true;
+    polish();
+    if (isOrthographic() != m_notifiedOrthographic) {
+        m_notifiedOrthographic = isOrthographic();
+        emit projectionChanged();
+    }
     update();
+}
+
+void Viewport::updatePolish()
+{
+    QQuickRhiItem::updatePolish();
+    if (std::exchange(m_cameraNotifyPending, false)) {
+        emit cameraChanged();
+    }
 }
 
 void Viewport::requestAnimationFrame()

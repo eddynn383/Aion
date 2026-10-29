@@ -191,6 +191,15 @@ void transformInstances(Model& model, const std::set<InstanceId>& instances, con
 
 std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition)
 {
+    BoundsCache cache;
+    return bounds(model, definition, cache);
+}
+
+std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId definition, BoundsCache& cache)
+{
+    if (const auto it = cache.find(definition.value); it != cache.end()) {
+        return it->second;
+    }
     constexpr double kInf = std::numeric_limits<double>::infinity();
     math::Vec3d lo { kInf };
     math::Vec3d hi { -kInf };
@@ -200,7 +209,7 @@ std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId defi
     }
     for (InstanceId child : model.childrenOf(definition)) {
         const Instance& c = model.instance(child);
-        const auto [clo, chi] = bounds(model, c.definition);
+        const auto [clo, chi] = bounds(model, c.definition, cache);
         if (clo.x > chi.x) {
             continue;
         }
@@ -211,6 +220,7 @@ std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId defi
             hi = glm::max(hi, p);
         }
     }
+    cache.emplace(definition.value, std::pair { lo, hi });
     return { lo, hi };
 }
 

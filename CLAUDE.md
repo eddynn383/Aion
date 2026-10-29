@@ -249,6 +249,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `debug.paths`. Web: `Main.qml` fără qmlcachegen (`QT_QML_SKIP_CACHEGEN`, altfel runner-ul CI oprea build-ul).
   Pen: Esc / ⌘Z = înapoi un nod (`Tool::undoStep`, apelat de `Document::undo`), săgețile aleg planul, axa Z → plan
   vertical. O cale se editează doar în Animare.
+- **Performanța viewport-ului** (ADR 0038): `cameraChanged` o dată pe cadru (`updatePolish`), `projectionChanged`
+  separat; `DocumentPass` (desenul documentului păstrat între cadre, profilele alese pe cadru; orice stare nouă care
+  schimbă desenul trebuie să atingă documentul sau să intre în `DocumentPassCache::Key`); indexul `Model::childrenOf`,
+  `model::BoundsCache`, `Document::modelRevision()`; hover-ul fără schimbări nu atinge documentul (`ToolLook`);
+  macro-urile anunță doar la `endMacro`. Măsurare: `navbench:orbit|pan|hover,s` și `fpslog:s` (fps pe secundă; fereastra
+  vine în față — una acoperită nu primește cadre), `aion_tests "[.perf][model]"`, `sample <pid> 4` în timpul rulării.
+  `make run` e debug (UBSan, fără optimizări); pentru fps reale: `make run CONFIG=release`.
 - **Ștergerea** (ADR 0037): guma și ⌫ păstrează fețele (`geom::eraseEdgesKeepingFaces`), Delete le ia
   (`eraseEdgesWithFaces`); `tools::deleteSelection(ctx, keepFaces)`. În scripturi: `keys:,backspace` / `keys:,delete`;
   `debug.geometry` arată și titlul selecției.

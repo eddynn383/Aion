@@ -621,6 +621,11 @@ void Document::discardAutosave()
     removeAutosave();
 }
 
+std::uint64_t Document::modelRevision() const
+{
+    return m_stack.inTransaction() ? (std::uint64_t { m_revision } << 32U) ^ m_modelRevision : m_modelRevision;
+}
+
 void Document::touch()
 {
     ++m_revision;
@@ -1298,6 +1303,11 @@ void Document::afterInteraction(const geom::Selection& before)
         emit outlineChanged();
     }
     emit toolStatusChanged();
+    // O mișcare de mouse care lasă desenul la fel (aceeași față sub cursor, același overlay, nimic schimbat în model
+    // sau în selecție, nicio tranzacție deschisă): viewport-ul nu are ce reface.
+    if (m_lookBeforeMove && m_selection == before && !m_stack.inTransaction() && *m_lookBeforeMove == toolLook()) {
+        return;
+    }
     touch();
 }
 
@@ -1396,7 +1406,26 @@ void Document::pointerMove(const view::Camera& camera, const tools::PointerEvent
 {
     m_lastCamera = camera;
     m_lastPointer = e;
+    m_lookBeforeMove = toolLook();
     withTool(camera, [&](tools::Tool& t, tools::ToolContext& ctx) { t.pointerMove(ctx, e); });
+    m_lookBeforeMove.reset();
+}
+
+Document::ToolLook Document::toolLook() const
+{
+    ToolLook look;
+    if (m_tool) {
+        const view::PickResult hover = m_tool->hover();
+        look.kind = hover.kind;
+        look.vertex = hover.vertex;
+        look.edge = hover.edge;
+        look.face = hover.face;
+        look.instance = hover.instance;
+        look.vertexPoint = hover.kind == view::PickResult::Kind::Vertex ? hover.point : math::Vec3d { 0.0 };
+        look.overlay = m_tool->overlay();
+    }
+    look.model = modelRevision();
+    return look;
 }
 
 void Document::pointerUp(const view::Camera& camera, const tools::PointerEvent& e)
@@ -1580,11 +1609,12 @@ void Document::runOnModel(const std::string& name, Fn&& fn)
     ++m_modelRevision;
     const geom::Selection before = m_selection;
     if (m_macro) {
-        // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo).
+        // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo), iar endMacro
+        // anunță o singură dată selecția, Outliner-ul și viewport-ul (altfel 300 de cutii refăceau lista de 300 de ori).
         fn(m_model);
-    } else {
-        m_stack.run(name, [&](model::Model& model) { fn(model); });
+        return;
     }
+    m_stack.run(name, [&](model::Model& model) { fn(model); });
     afterInteraction(before);
     // Entity Info arată și proprietăți ale obiectelor (tag, nume, blocare), nu doar ce e selectat.
     emit selectionChanged();
@@ -2031,6 +2061,7 @@ void Document::setActiveAnimation(double id)
     }
     m_activeAnimation = m_model.animations().contains(next) ? next : model::AnimationId {};
     m_playing = false;
+    ++m_interactionRevision; // poza obiectelor (și căile) vin din altă animație: viewport-ul se reface
     emit timelineChanged();
     emit changed();
 }

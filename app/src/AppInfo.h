@@ -50,6 +50,10 @@ public:
     Q_INVOKABLE void simulateDrag(QQuickItem* item, const QPointF& from, const QPointF& to, bool release = true) const;
     // Click cu butonul drept (meniul contextual).
     Q_INVOKABLE void simulateRightClick(QQuickItem* item, const QPointF& position) const;
+    // Mouse-ul în timp real (verificare de performanță): mișcări la ~120 Hz pe un cerc de rază `radius` px în jurul
+    // lui `center`, timp de `seconds`; `mode` = "orbit" (butonul din mijloc), "pan" (Shift + mijloc) sau "hover".
+    Q_INVOKABLE void simulateNavigation(QQuickItem* item, const QPointF& center, double radius, double seconds,
+        const QString& mode) const;
     // Animația scenelor: cadrele PNG din `directory` → video MP4 la `output` (AVFoundation pe macOS, altfel ffmpeg).
     // Întoarce un text gol la succes (și șterge cadrele), altfel motivul. Fără encoder, cadrele rămân pe disc.
     Q_INVOKABLE QString encodeVideo(const QString& directory, int fps, const QString& output) const;
