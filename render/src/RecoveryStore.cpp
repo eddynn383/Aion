@@ -42,10 +42,12 @@ QString fromPath(const std::filesystem::path& path)
     return QString::fromStdU16String(path.u16string());
 }
 
+#ifndef Q_OS_WASM
 QString lockFile(const QString& dir, const QString& session)
 {
     return fromPath(io::recoveryLockPath(toPath(dir), session.toStdString()));
 }
+#endif
 
 std::int64_t nowSeconds()
 {
