@@ -172,6 +172,20 @@ void RecoveryStore::collectOrphans()
                 QDateTime::fromSecsSinceEpoch(e.info.savedAt) });
         }
     }
+#ifndef Q_OS_WASM
+    // Lock-urile sesiunilor moarte care n-au apucat să scrie o copie: nimic de oferit, doar le ștergem.
+    for (const QFileInfo& file : QDir(m_dir).entryInfoList({ QStringLiteral("*.lock") }, QDir::Files)) {
+        const QString session = file.completeBaseName();
+        if (session != m_session && !m_claimed.contains(session)
+            && !std::filesystem::exists(io::recoveryModelPath(toPath(m_dir), session.toStdString()))) {
+            QLockFile lock(file.absoluteFilePath());
+            lock.setStaleLockTime(0);
+            if (lock.tryLock(0)) {
+                lock.unlock(); // șterge fișierul
+            }
+        }
+    }
+#endif
 }
 
 bool RecoveryStore::save(const model::Model& model, const QString& source, QString* error)

@@ -19,7 +19,8 @@
 - **Cine rulează încă: un lock** (`render/src/RecoveryStore`): sesiunea ține `QLockFile` pe `<sesiune>.lock`. La
   pornire, o copie se oferă doar dacă lock-ul ei se poate lua (`staleLockTime 0`: numai un proces mort îl lasă liber,
   nu vârsta); cât e oferită, lock-ul e al nostru, ca o altă instanță să n-o ofere și ea. Pe web nu există procese:
-  copiile stau și în QSettings (`recovery/sessions/<sesiune>/data|info`), iar lock-urile lipsesc.
+  copiile stau și în QSettings (`recovery/sessions/<sesiune>/data|info`), iar lock-urile lipsesc. Lock-urile rămase
+  de la sesiuni moarte care n-au apucat să scrie o copie se șterg la pornire.
 - **Închiderea normală nu lasă copie**: `RecoveryStore` își șterge copia la distrugere (utilizatorul a ales deja la
   „Salvezi modificările?”), la Salvează, Deschide și Nou. „Nu salva” nu mai șterge nimic singur.
 - **Recuperarea** (`Document::recoverSession(session)`, gol = cea mai nouă): modelul copiei devine documentul, cu
