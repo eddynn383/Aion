@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/tools/Tool.h"
@@ -1417,4 +1418,90 @@ TEST_CASE("Unelte: guma pe o linie care împarte o față o lasă întreagă; de
         CHECK(tools::deleteSelection(s.ctx, false));
         CHECK(s.mesh.faces().empty());
     }
+}
+
+namespace {
+
+// Unealta „place” pe un model văzut de sus, cu o copie de lipit (o latură de 100 mm din origine).
+struct PlaceScene {
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    tools::ToolRequests requests;
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    std::unique_ptr<tools::Tool> place = tools::makeTool("place");
+
+    PlaceScene()
+    {
+        camera.setViewportSize(1000, 800);
+        camera.setPose(view::standardViewPose(view::StandardView::Top, { { 1000, 1000, 0 }, 0, 0, 6000 }));
+        ctx.model = &m;
+        ctx.context = m.root();
+        ctx.requests = &requests;
+        ctx.place = tools::PlaceSource { { 0, 0, 0 }, { { { 0, 0, 0 }, { 100, 0, 0 } } } };
+        REQUIRE(place);
+    }
+
+    Vec2d screen(Vec3d world) const
+    {
+        const auto s = camera.project(world);
+        REQUIRE(s.has_value());
+        return *s;
+    }
+};
+
+} // namespace
+
+TEST_CASE("Place: urmează cursorul și desenează copia", "[core][tools]")
+{
+    PlaceScene s;
+    s.place->pointerMove(s.ctx, { s.screen({ 1000, 500, 0 }), {}, 1 });
+    const tools::Overlay o = s.place->overlay();
+    const bool drawn = std::any_of(o.lines.begin(), o.lines.end(), [](const tools::OverlayLine& l) {
+        return glm::length(l.a - Vec3d { 1000, 500, 0 }) < 1.0 && glm::length(l.b - Vec3d { 1100, 500, 0 }) < 1.0;
+    });
+    CHECK(drawn);
+}
+
+TEST_CASE("Place: se prinde de colțul altui obiect", "[core][tools]")
+{
+    PlaceScene s;
+    const model::DefinitionId d = s.m.addDefinition(model::Definition { "Cutie", false });
+    geom::buildPrimitive(s.m.mesh(d), geom::Primitive::Box, { 400, 400, 400 }, 24);
+    model::Instance inst;
+    inst.parent = s.m.root();
+    inst.definition = d;
+    inst.transform = math::Transform::translation({ 1200, 1200, 0 }); // colțurile pe sol: 1000…1400
+    s.m.addInstance(inst);
+    s.place->pointerMove(s.ctx, { s.screen({ 1000, 1000, 400 }) + Vec2d { 3, 2 }, {}, 1 });
+    REQUIRE(s.place->overlay().marker);
+    CHECK(s.place->overlay().marker->label == "Colț");
+    s.place->pointerDown(s.ctx, { s.screen({ 1000, 1000, 400 }) + Vec2d { 3, 2 }, {}, 1 });
+    REQUIRE(s.requests.placeAt);
+    CHECK(std::abs(s.requests.placeAt->x - 1000.0) < 1e-6);
+    CHECK(std::abs(s.requests.placeAt->y - 1000.0) < 1e-6);
+}
+
+TEST_CASE("Place: click cere plasarea, Esc o anulează", "[core][tools]")
+{
+    PlaceScene s;
+    s.place->pointerMove(s.ctx, { s.screen({ 600, 700, 0 }), {}, 1 });
+    s.place->pointerDown(s.ctx, { s.screen({ 600, 700, 0 }), {}, 1 });
+    REQUIRE(s.requests.placeAt);
+    CHECK(glm::length(*s.requests.placeAt - Vec3d { 600, 700, 0 }) < 1.0);
+    CHECK_FALSE(s.requests.placeCancel);
+    CHECK(s.place->key(s.ctx, { tools::Key::Escape, {} }));
+    CHECK(s.requests.placeCancel);
+    CHECK(s.m.instances().empty()); // unealta nu scrie în model
+}
+
+TEST_CASE("Place: snap la grid", "[core][tools]")
+{
+    PlaceScene s;
+    s.ctx.gridStep = 500.0;
+    s.place->pointerMove(s.ctx, { s.screen({ 1130, 980, 0 }), {}, 1 });
+    s.place->pointerDown(s.ctx, { s.screen({ 1130, 980, 0 }), {}, 1 });
+    REQUIRE(s.requests.placeAt);
+    CHECK(glm::length(*s.requests.placeAt - Vec3d { 1000, 1000, 0 }) < 1e-6);
 }
