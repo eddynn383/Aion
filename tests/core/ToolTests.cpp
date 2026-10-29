@@ -1545,6 +1545,20 @@ struct ObjectScene {
         return m.addInstance(inst);
     }
 
+    // Cilindru cu baza la z = 0, diametru și înălțime 1000, 24 de laturi (centrat în `at` pe X, Y).
+    model::InstanceId addCylinder(Vec3d at)
+    {
+        model::Definition def { "Cilindru", true };
+        def.shape = "cylinder";
+        const model::DefinitionId d = m.addDefinition(def);
+        geom::buildPrimitive(m.mesh(d), geom::Primitive::Cylinder, { 1000, 1000, 1000 }, 24);
+        model::Instance inst;
+        inst.parent = m.root();
+        inst.definition = d;
+        inst.transform = math::Transform::translation(at);
+        return m.addInstance(inst);
+    }
+
     void rebuildScene(const std::set<model::InstanceId>& exclude = {}) { scene = model::snapScene(m, {}, exclude); }
 
     Vec2d screen(Vec3d world) const
@@ -1644,4 +1658,40 @@ TEST_CASE("Move: colțul obiectului mutat pe colțul altui obiect", "[core][tool
     s.click(*move, { 500, 500, 1000 });                  // colțul lui A
     s.click(*move, { 2500, 500, 1000 });                 // colțul lui B (cel din stânga)
     CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - Vec3d { 2000, 0, 0 }) < 1e-6);
+}
+
+TEST_CASE("Move: un colț real bate punctul cutiei la aceeași distanță", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId a = s.addBox({ 0, 0, 0 });
+    s.addCylinder({ 3000, 0, 0 });
+    s.rebuildScene({ a });
+    s.selection.instances.insert(a);
+
+    const Vec3d airCorner { 3500, 500, 1000 };                          // colțul cutiei cilindrului (în aer)
+    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(M_PI / 4), 500 * std::sin(M_PI / 4), 0 };
+    const Vec2d mid = (s.screen(airCorner) + s.screen(capVertex)) * 0.5; // egal departe de amândouă
+
+    auto move = tools::makeTool("move");
+    s.click(*move, { 500, 500, 1000 });
+    const tools::PointerEvent e { mid, {}, 1 };
+    move->pointerMove(s.ctx, e);
+    move->pointerDown(s.ctx, e);
+    move->pointerUp(s.ctx, e);
+    CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 })) < 1e-3);
+}
+
+TEST_CASE("Move: vârful capacului unui cilindru, pe care punctele cutiei nu-l oferă", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId a = s.addBox({ 0, 0, 0 });
+    s.addCylinder({ 3000, 0, 0 });
+    s.rebuildScene({ a });
+    s.selection.instances.insert(a);
+
+    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(M_PI / 4), 500 * std::sin(M_PI / 4), 0 };
+    auto move = tools::makeTool("move");
+    s.click(*move, { 500, 500, 1000 });
+    s.click(*move, capVertex);
+    CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 })) < 1e-3);
 }

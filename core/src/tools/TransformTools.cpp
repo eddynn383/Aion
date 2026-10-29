@@ -627,12 +627,26 @@ private:
             m_grips.insert(m_grips.begin(), own.begin(), own.end());
         }
         m_hotGrip = nearestGrip(ctx, m_grips, screen, kGripRadiusPx);
+        // Un punct real al unui obiect (vârf, mijloc de muchie, centru) bate punctul cutiei când nu e mai departe de
+        // cursor decât acesta cu mai mult de 0,5 px; punctele cutiei rămân ținte doar unde nu e niciun punct real.
+        if (m_hotGrip >= 0 && m_inference.origin == inference::Origin::Object && objectPoint(m_inference.kind)) {
+            const auto gs = ctx.camera.project(m_grips[std::size_t(m_hotGrip)].point);
+            const auto is = ctx.camera.project(m_inference.point);
+            if (gs && is && glm::length(*is - screen) <= glm::length(*gs - screen) + 0.5) {
+                m_hotGrip = -1;
+            }
+        }
         if (m_hotGrip >= 0) {
             m_grips[std::size_t(m_hotGrip)].hot = true;
             if (m_base && !m_shiftLock) {
                 m_current = m_grips[std::size_t(m_hotGrip)].point;
             }
         }
+    }
+
+    static bool objectPoint(inference::Kind k)
+    {
+        return k == inference::Kind::Endpoint || k == inference::Kind::Midpoint || k == inference::Kind::Center;
     }
 
     void commit(ToolContext& ctx)
