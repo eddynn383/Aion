@@ -487,6 +487,9 @@ public:
     std::uint64_t modelRevision() const;
     // Geometria pe care o vede inferența (obiectele din contextul editat), cu cache; `exclude` = instanțe ignorate.
     const inference::SnapScene& snapScene(const std::set<model::InstanceId>& exclude = {}) const;
+    // Inferența pentru un obiect tras din bibliotecă: scena contextului, ghidajele și grid-ul ca la unelte. Punctul
+    // întors e în coordonatele contextului editat.
+    inference::Inference inferDrop(inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const;
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
     // --- Modul interacțiune ---

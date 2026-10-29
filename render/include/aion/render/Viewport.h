@@ -214,10 +214,12 @@ public:
     Q_INVOKABLE void startTurntable(double seconds);
     // Poziția pe ecran (în coordonatele item-ului) a unui punct 3D; pentru scripturile de verificare.
     Q_INVOKABLE QPointF projectToScreen(const QVector3D& world) const;
-    // Punctul din lume sub poziția dată: pe suprafața atinsă sau pe sol (Z = 0); altfel ținta camerei.
-    Q_INVOKABLE QVector3D dropPointAt(const QPointF& position) const;
-    // Previzualizarea unui obiect tras din bibliotecă: o cutie (colțul minim și mărimea, în mm) desenată peste model.
-    Q_INVOKABLE void setDropPreview(const QVector3D& corner, const QVector3D& size);
+    // Punctul din lume (centrul bazei obiectului tras din bibliotecă) sub poziția dată: cel inferat (capăt, mijloc,
+    // muchie, față, ghidaj, grid), altfel suprafața atinsă sau solul (Z = 0), altfel ținta camerei. Ține minte
+    // inferența, ca să se deseneze (marcaj, etichetă, ghidaje) cât durează drop-ul.
+    Q_INVOKABLE QVector3D dropPointAt(const QPointF& position);
+    // Previzualizarea unui obiect tras din bibliotecă: o cutie (centrul bazei și mărimea, în mm) desenată peste model.
+    Q_INVOKABLE void setDropPreview(const QVector3D& baseCenter, const QVector3D& size);
     // Unealta activă primește un hover / un click în punctul dat (drop-ul unui material = un click cu Paint Bucket).
     Q_INVOKABLE void toolHoverAt(const QPointF& position);
     Q_INVOKABLE void toolClickAt(const QPointF& position);
@@ -297,6 +299,9 @@ private:
     // Cât se captează o imagine (PNG, cadrele unui video): fără selecție, hover și marcaje.
     bool m_cleanCapture = false;
     std::optional<std::pair<QVector3D, QVector3D>> m_dropPreview;
+    // Inferența drop-ului: motorul (cu memoria lui) și ce se desenează din ea, în coordonatele contextului editat.
+    inference::Engine m_dropEngine;
+    tools::Overlay m_dropOverlay;
     // Tragerea marcajului unei camere / lumini (cu Select): poziția de start și punctul apucat.
     struct ObjectDrag {
         math::Vec3d start { 0.0 };

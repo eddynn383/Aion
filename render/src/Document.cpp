@@ -1434,6 +1434,20 @@ const inference::SnapScene& Document::snapScene(const std::set<model::InstanceId
     return m_snapCache->second;
 }
 
+inference::Inference Document::inferDrop(inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const
+{
+    const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
+    std::vector<inference::GuideRef> guides;
+    for (const model::Guide& g : m_model.guides().values()) {
+        if (g.context == activeDefinition()) {
+            guides.push_back({ g.point, g.direction });
+        }
+    }
+    engine.withGuides(guides).withScene(&snapScene()).withGridSnap(
+        m_snapToGrid ? (m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance)) : 0.0);
+    return engine.infer(mesh(), local, screen, std::nullopt);
+}
+
 void Document::updateHiddenTags()
 {
     std::set<model::TagId> hidden;
@@ -4571,8 +4585,18 @@ double Document::createParametric(const QString& generator, const QVector3D& at,
     for (auto it = parameters.begin(); it != parameters.end(); ++it) {
         given[it.key().toStdString()] = it.value().toDouble();
     }
-    // Punctul dat, în coordonatele contextului editat.
-    const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    // `at` = centrul bazei, în coordonatele contextului editat; originea generatorului e colțul stânga-față-jos
+    // (ADR 0025), deci o mutăm cu jumătate din lățime și adâncime. Dimensiunile vin din parametrii rezolvați.
+    math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    {
+        model::Model probe;
+        if (const model::InstanceId i = model::createParametric(probe, probe.root(), info->id, given, {}); i) {
+            const auto [lo, hi] = model::bounds(probe, probe.root());
+            if (lo.x <= hi.x) {
+                point -= math::Vec3d((hi.x - lo.x) * 0.5, (hi.y - lo.y) * 0.5, 0.0);
+            }
+        }
+    }
     model::InstanceId created;
     runOnModel("Obiect dinamic: " + info->name, [&](model::Model& model) {
         created = model::createParametric(model, activeDefinition(), info->id, given, math::Transform::translation(point));
@@ -4840,7 +4864,14 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
             QString::fromStdString(loaded.error)));
         return;
     }
-    const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    // `at` = centrul bazei: translația duce centrul bazei modelului încărcat în punctul dat.
+    {
+        const auto [lo, hi] = model::bounds(*loaded.model, loaded.model->root());
+        if (lo.x <= hi.x) {
+            point -= math::Vec3d((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
+        }
+    }
     const std::string name = QFileInfo(path).completeBaseName().toStdString();
     model::InstanceId created;
     runOnModel("Din bibliotecă: " + name, [&](model::Model& model) {

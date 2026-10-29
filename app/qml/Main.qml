@@ -640,6 +640,13 @@ Window {
                     const size = doc.libraryItemSize(dp[0])
                     viewport.setDropPreview(viewport.dropPointAt(Qt.point(parseFloat(dp[1]), parseFloat(dp[2]))),
                                             Qt.vector3d(size.dx, size.dy, size.dz))
+                } else if (action.startsWith("dropat:")) {
+                    // „dropat:gen:table,700,450”: plasează obiectul din bibliotecă ca la drop (centrul bazei pe punctul inferat).
+                    const da = action.slice(7).split(",")
+                    const at = viewport.dropPointAt(Qt.point(parseFloat(da[1]), parseFloat(da[2])))
+                    doc.placeLibraryItem(da[0], at)
+                    viewport.clearDropPreview()
+                    console.info("dropat:", da[0], "→", at)
                 } else if (action.startsWith("soften:")) {
                     // „soften:120”: pragul din panoul Soften deschis (ca o mișcare a slider-ului).
                     softenPanel.angle = parseFloat(action.slice(7))
@@ -1092,8 +1099,8 @@ Window {
             if (material && toolBeforeMaterial.length > 0) window.selectTool(toolBeforeMaterial)
         }
         onDropped: (drop) => {
-            viewport.clearDropPreview()
             if (material) {
+                viewport.clearDropPreview()
                 // „mat:model:ID” / „mat:lib:INDEX”: îl alegem ca material curent și vopsim fața (sau obiectul) de sub cursor.
                 const parts = libraryGhost.itemId.split(":")
                 if (parts[1] === "model") doc.selectModelMaterial(parseFloat(parts[2]))
@@ -1103,6 +1110,7 @@ Window {
                 toolBeforeMaterial = ""
             } else {
                 doc.placeLibraryItem(libraryGhost.itemId, viewport.dropPointAt(Qt.point(drop.x, drop.y)))
+                viewport.clearDropPreview()
             }
             drop.accept()
         }

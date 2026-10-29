@@ -108,6 +108,9 @@ struct Overlay {
     bool operator==(const Overlay&) const = default;
 };
 
+// Ghidajele și marcajul inferenței, adăugate în overlay (și de viewport, pentru obiectul tras din bibliotecă).
+void appendInference(Overlay& o, const inference::Inference& inf);
+
 // Ce arată Measurements box: eticheta („Lungime”) și valoarea curentă („2.5 m”, gol dacă nu e nimic de măsurat).
 struct Measurement {
     std::string label;

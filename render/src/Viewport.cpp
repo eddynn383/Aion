@@ -789,6 +789,21 @@ void Viewport::updateAnnotations()
             }
         }
     }
+    // Eticheta inferenței obiectului tras din bibliotecă.
+    if (m_document && m_dropPreview && m_dropOverlay.marker && !m_dropOverlay.marker->label.empty()) {
+        const tools::InferenceMarker& marker = *m_dropOverlay.marker;
+        if (const auto p = m_camera.project(m_document->contextTransform().applyToPoint(marker.point))) {
+            const glm::vec4 c = markerColor(marker.kind, marker.tint);
+            list.append(QVariantMap {
+                { QStringLiteral("kind"), QStringLiteral("inference") },
+                { QStringLiteral("x"), p->x },
+                { QStringLiteral("y"), p->y },
+                { QStringLiteral("text"), QString::fromStdString(marker.label) },
+                { QStringLiteral("color"), QColor::fromRgbF(c.r, c.g, c.b, c.a) },
+                { QStringLiteral("locked"), false },
+            });
+        }
+    }
     // Etichetele adnotărilor din model (cote și texte), editabile din QML.
     if (m_document) {
         const model::Model& model = m_document->model();
@@ -1817,9 +1832,10 @@ void Viewport::beginOrbitAt(QPointF position)
     m_camera.setOrbitPivot(pivot);
 }
 
-void Viewport::setDropPreview(const QVector3D& corner, const QVector3D& size)
+void Viewport::setDropPreview(const QVector3D& baseCenter, const QVector3D& size)
 {
-    m_dropPreview = std::pair { corner, size };
+    m_dropPreview = std::pair { baseCenter, size };
+    updateAnnotations();
     update();
 }
 
@@ -1844,12 +1860,24 @@ void Viewport::toolClickAt(const QPointF& position)
 void Viewport::clearDropPreview()
 {
     m_dropPreview.reset();
+    m_dropOverlay = {};
+    m_dropEngine.reset();
+    updateAnnotations();
     update();
 }
 
-QVector3D Viewport::dropPointAt(const QPointF& position) const
+QVector3D Viewport::dropPointAt(const QPointF& position)
 {
     view::Vec3d p = m_camera.pose().target;
+    m_dropOverlay = {};
+    if (m_document) {
+        const inference::Inference inf = m_document->inferDrop(m_dropEngine, m_camera, toVec2(position));
+        if (inf.valid()) {
+            tools::appendInference(m_dropOverlay, inf);
+            p = m_document->contextTransform().applyToPoint(inf.point);
+            return QVector3D(float(p.x), float(p.y), float(p.z));
+        }
+    }
     if (m_document) {
         if (const auto surface = m_document->surfacePoint(m_camera, toVec2(position))) {
             p = *surface;
@@ -2120,8 +2148,10 @@ ViewportFrame Viewport::frameForRendering() const
 
     // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.
     if (m_dropPreview) {
-        const glm::vec3 lo(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z());
-        const glm::vec3 hi = lo + glm::vec3(m_dropPreview->second.x(), m_dropPreview->second.y(), m_dropPreview->second.z());
+        const glm::vec3 size(m_dropPreview->second.x(), m_dropPreview->second.y(), m_dropPreview->second.z());
+        const glm::vec3 lo = glm::vec3(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z())
+            - glm::vec3(size.x * 0.5f, size.y * 0.5f, 0.0f);
+        const glm::vec3 hi = lo + size;
         const glm::vec4 color = toVec4(m_accent);
         std::array<glm::vec3, 8> c {};
         for (std::size_t k = 0; k < 8; ++k) {
@@ -2132,7 +2162,22 @@ ViewportFrame Viewport::frameForRendering() const
         for (const auto& [a, b] : kEdges) {
             f.topLines.push_back({ c[std::size_t(a)], c[std::size_t(b)], color, { 1.5f, 0.0f } });
         }
-        f.topPoints.push_back({ lo, color, 7.0f });
+        f.topPoints.push_back({ lo + glm::vec3(size.x * 0.5f, size.y * 0.5f, 0.0f), color, 7.0f });
+        // Inferența punctului de plasare: ghidajele și marcajul, ca la unelte (în coordonatele contextului).
+        if (m_document) {
+            const math::Transform ctx = m_document->contextTransform();
+            for (const tools::OverlayLine& l : m_dropOverlay.lines) {
+                f.topLines.push_back({ glm::vec3(ctx.applyToPoint(l.a)), glm::vec3(ctx.applyToPoint(l.b)),
+                    tintColor(l.tint), { 1.75f, l.dashed ? 4.0f : 0.0f } });
+            }
+            if (const auto& marker = m_dropOverlay.marker) {
+                const glm::vec3 p = glm::vec3(ctx.applyToPoint(marker->point));
+                if (marker->kind != inference::Kind::Ground) {
+                    f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.9f), 13.0f });
+                    f.topPoints.push_back({ p, markerColor(marker->kind, marker->tint), 9.0f });
+                }
+            }
+        }
     }
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
     // Pivotul orbitei, cât timp se orbitează în jurul lui.
