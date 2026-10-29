@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iterator>
 #include <numbers>
+#include <regex>
 
 using namespace aion;
 using Catch::Approx;
@@ -264,4 +265,70 @@ TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân lega
     CHECK(json.find("Cărămidă") != std::string::npos);
     CHECK(json.find("baseColorTexture") != std::string::npos);
     std::filesystem::remove(text);
+}
+
+namespace {
+
+// Un model cu un obiect care pornește două animații (Comută / la infinit și Înapoi / de 3 ori).
+Model playingModel()
+{
+    Model m;
+    const model::DefinitionId d = m.addDefinition(model::Definition { "Ușă", true });
+    geom::drawLine(m.mesh(d), { 0, 0, 0 }, { 100, 0, 0 });
+    model::Instance inst;
+    inst.parent = m.root();
+    inst.definition = d;
+    model::Action toggle;
+    toggle.kind = model::ActionKind::PlayAnimation;
+    toggle.animation = model::AnimationId { 1 };
+    toggle.direction = model::PlayDirection::Toggle;
+    toggle.repeat = 0;
+    model::Action reverse = toggle;
+    reverse.direction = model::PlayDirection::Reverse;
+    reverse.repeat = 3;
+    inst.rules.push_back({ model::Trigger::Click, "", { toggle, reverse } });
+    m.addInstance(inst);
+    return m;
+}
+
+const std::vector<model::Action>& playActions(const Model& m)
+{
+    return m.instances().values()[0].rules[0].actions;
+}
+
+} // namespace
+
+TEST_CASE("Fișiere .aion: acțiunile își păstrează sensul și repetarea", "[core][io]")
+{
+    const Model m = playingModel();
+    const io::LoadResult loaded = io::fromJson(io::toJson(m));
+    INFO(loaded.error);
+    REQUIRE(loaded.model);
+    const std::vector<model::Action>& actions = playActions(*loaded.model);
+    REQUIRE(actions.size() == 2);
+    CHECK(actions[0].direction == model::PlayDirection::Toggle);
+    CHECK(actions[0].repeat == 0);
+    CHECK(actions[1].direction == model::PlayDirection::Reverse);
+    CHECK(actions[1].repeat == 3);
+    CHECK(loaded.model->sameAs(m));
+}
+
+TEST_CASE("Fișiere .aion: un fișier v4 dă Înainte / O dată", "[core][io]")
+{
+    CHECK(io::kFormatVersion == 5);
+    std::string text = io::toJson(playingModel());
+    const std::string current = "\"formatVersion\": 5";
+    REQUIRE(text.find(current) != std::string::npos);
+    text.replace(text.find(current), current.size(), "\"formatVersion\": 4");
+    text = std::regex_replace(text, std::regex(R"("direction": \d+,)"), "");
+    text = std::regex_replace(text, std::regex(R"("repeat": \d+,)"), "");
+    REQUIRE(text.find("\"direction\"") == std::string::npos);
+    REQUIRE(text.find("\"repeat\"") == std::string::npos);
+    const io::LoadResult loaded = io::fromJson(text);
+    INFO(loaded.error);
+    REQUIRE(loaded.model);
+    for (const model::Action& a : playActions(*loaded.model)) {
+        CHECK(a.direction == model::PlayDirection::Forward);
+        CHECK(a.repeat == 1);
+    }
 }

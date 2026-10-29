@@ -20,7 +20,8 @@ namespace aion::io {
 //    mută cu diferența pivot − colț.
 // 4: curbele Pen (`penCurves`: punctele și mânerele lângă muchiile lor) și căile de parcurgere (ADR 0036); fișierele
 //    mai vechi nu le au.
-inline constexpr int kFormatVersion = 4;
+// 5: sensul și repetarea blocurilor „Pornește animația” (`direction`, `repeat`); fișierele vechi: Înainte, o dată.
+inline constexpr int kFormatVersion = 5;
 
 struct LoadResult {
     std::optional<model::Model> model;

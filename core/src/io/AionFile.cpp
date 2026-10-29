@@ -597,7 +597,8 @@ json actionToJson(const model::Action& a)
     return { { "kind", static_cast<int>(a.kind) }, { "target", a.target.value },
         { "vector", { a.vector.x, a.vector.y, a.vector.z } }, { "duration", a.duration },
         { "material", a.material.value }, { "animation", a.animation.value }, { "scene", a.scene.value },
-        { "first", first }, { "second", second } };
+        { "first", first }, { "second", second }, { "direction", static_cast<int>(a.direction) },
+        { "repeat", a.repeat } };
 }
 
 model::Action actionFromJson(const json& j)
@@ -611,6 +612,9 @@ model::Action actionFromJson(const json& j)
     a.material = model::MaterialId { j.value("material", std::uint64_t { 0 }) };
     a.animation = model::AnimationId { j.value("animation", std::uint64_t { 0 }) };
     a.scene = model::SceneId { j.value("scene", std::uint64_t { 0 }) };
+    // v5: sensul și repetarea unui bloc de animație (fișierele vechi: Înainte, o dată).
+    a.direction = static_cast<model::PlayDirection>(std::clamp(j.value("direction", 0), 0, 2));
+    a.repeat = std::max(0, j.value("repeat", 1));
     for (const json& c : j.value("first", json::array())) {
         a.first.push_back(actionFromJson(c));
     }
