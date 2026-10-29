@@ -1,5 +1,6 @@
 #include "aion/core/commands/CommandStack.h"
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Operations.h"
@@ -10,6 +11,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <array>
 #include <cmath>
 
 using namespace aion;
@@ -251,6 +253,27 @@ TEST_CASE("Pen: al doilea punct pe axa Z trece desenul pe un plan vertical", "[c
     CHECK(glm::length(c.path.points[1].point - Vec3d { 0, 0, 1500 }) < 1.0);
     for (const geom::BezierPoint& p : c.path.points) {
         CHECK(std::abs(glm::dot(p.point, c.normal)) < 1e-6); // toate pe planul prin primul punct
+    }
+}
+
+TEST_CASE("Pen: după un segment vertical, al treilea punct alege planul vertical", "[core][tools][pen]")
+{
+    // Vederea iso exactă (cameră la 45°): niciuna dintre axele X / Y nu e „mai spre cameră”; planul îl dă al treilea
+    // punct, în ambele direcții.
+    for (const Vec3d third : { Vec3d { 0, 0, 1500 }, Vec3d { -1500, 1500, 1500 } }) {
+        PenScene s(view::StandardView::Iso, { 0, 0, 500 });
+        s.click({ -1500, 0, 0 });
+        s.click({ -1500, 0, 1500 });
+        s.click(third);
+        CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+        const model::PenCurve& c = s.onlyCurve();
+        REQUIRE(c.path.points.size() == 3);
+        CHECK(glm::length(c.path.points[1].point - Vec3d { -1500, 0, 1500 }) < 1.0);
+        CHECK(glm::length(c.path.points[2].point - third) < 1.0);
+        CHECK(std::abs(c.normal.z) < 1e-9);
+        for (const geom::BezierPoint& p : c.path.points) {
+            CHECK(std::abs(glm::dot(p.point - Vec3d { -1500, 0, 0 }, c.normal)) < 1e-6);
+        }
     }
 }
 
@@ -511,4 +534,48 @@ TEST_CASE("Pen edit: un punct tras puțin nu se lipește de vechile muchii ale c
     edit->pointerUp(s.ctx, PenScene::at(to));
     REQUIRE(s.requests.curveEdit);
     CHECK(std::abs(s.requests.curveEdit->points[1].point.x - (1000.0 + 7.0 * perPixel)) < 1.0);
+}
+
+TEST_CASE("Pen: pe toate fețele vizibile ale unei cutii (obiect), din vederea iso", "[core][tools][pen]")
+{
+    // Cutia ca obiect (ca `aion.box`): geometria centrată pe bază, mutată cu colțul minim în origine.
+    PenScene s(view::StandardView::Iso, { 1000, 1000, 1000 });
+    s.stack.run("Box", [&](model::Model& model) {
+        model::Definition def { "Cutie", true };
+        const model::DefinitionId d = model.addDefinition(def);
+        geom::buildPrimitive(model.mesh(d), geom::Primitive::Box, { 2000, 2000, 2000 }, 24);
+        model::Instance inst;
+        inst.parent = model.root();
+        inst.definition = d;
+        inst.transform = math::Transform::translation({ 1000, 1000, 0 });
+        model.addInstance(inst);
+    });
+    struct Case {
+        const char* name;
+        int axis;
+        double value;
+        std::array<Vec3d, 3> points;
+    };
+    const Vec3d forward = s.camera.forward();
+    std::vector<Case> cases;
+    // Fețele spre cameră: x = 0 sau 2000, y = 0 sau 2000, sus.
+    const double x = forward.x > 0 ? 0.0 : 2000.0;
+    const double y = forward.y > 0 ? 0.0 : 2000.0;
+    cases.push_back({ "fața X", 0, x, { Vec3d { x, 500, 500 }, Vec3d { x, 1500, 500 }, Vec3d { x, 1500, 1500 } } });
+    cases.push_back({ "fața Y", 1, y, { Vec3d { 500, y, 500 }, Vec3d { 1500, y, 500 }, Vec3d { 1500, y, 1500 } } });
+    cases.push_back({ "sus", 2, 2000.0, { Vec3d { 500, 500, 2000 }, Vec3d { 1500, 500, 2000 }, Vec3d { 1500, 1500, 2000 } } });
+    for (const Case& c : cases) {
+        INFO(c.name);
+        const std::size_t before = s.model.penCurves().size();
+        for (const Vec3d& p : c.points) {
+            s.click(p);
+        }
+        CHECK(s.pen->key(s.ctx, { tools::Key::Enter, {} }));
+        REQUIRE(s.model.penCurves().size() == before + 1);
+        const model::PenCurve& curve = s.model.penCurves().values().back();
+        CHECK(std::abs(std::abs(curve.normal[c.axis]) - 1.0) < 1e-9);
+        for (const geom::BezierPoint& p : curve.path.points) {
+            CHECK(std::abs(p.point[c.axis] - c.value) < 1e-6);
+        }
+    }
 }

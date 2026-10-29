@@ -91,15 +91,18 @@ std::optional<double> intersectRayTriangle(const Ray& ray, const Vec3d& a, const
     if (std::abs(det) <= kTiny) {
         return std::nullopt;
     }
+    // O margine relativă mică: o rază exact pe muchia comună a două triunghiuri (diagonala unui dreptunghi) nu trece
+    // printre ele din cauza rotunjirii.
+    constexpr double kEdge = 1e-9;
     const double inv = 1.0 / det;
     const Vec3d s = ray.origin - a;
     const double u = glm::dot(s, p) * inv;
-    if (u < 0.0 || u > 1.0) {
+    if (u < -kEdge || u > 1.0 + kEdge) {
         return std::nullopt;
     }
     const Vec3d q = glm::cross(s, e1);
     const double v = glm::dot(ray.direction, q) * inv;
-    if (v < 0.0 || u + v > 1.0) {
+    if (v < -kEdge || u + v > 1.0 + kEdge) {
         return std::nullopt;
     }
     const double t = glm::dot(e2, q) * inv;

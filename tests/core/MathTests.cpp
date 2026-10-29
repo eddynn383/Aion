@@ -113,6 +113,22 @@ TEST_CASE("Raza intersectează planul și triunghiul", "[core][math][intersect]"
     CHECK_FALSE(intersectRayTriangle({ { 4, 4, 10 }, { 0, 0, -1 } }, { 0, 0, 0 }, { 5, 0, 0 }, { 0, 5, 0 }).has_value());
 }
 
+TEST_CASE("O rază exact pe diagonala unui pătrat nu trece printre cele două triunghiuri", "[core][math][intersect]")
+{
+    // Raza din aplicație (vederea iso) spre (−1000, −500, 500): exact pe diagonala A–C a feței x = −1000 a unei cutii.
+    const Ray ray { { -3325.5095234230421, -3325.5095234230412, 4325.5095234230412 },
+        { 0.43927591820844347, 0.5337231595084595, -0.722617642108492 } };
+    const Vec3d a { -1000, -1000, 0 };
+    const Vec3d b { -1000, -1000, 2000 };
+    const Vec3d c { -1000, 1000, 2000 };
+    const Vec3d d { -1000, 1000, 0 };
+    const auto first = intersectRayTriangle(ray, c, d, a);
+    const auto second = intersectRayTriangle(ray, c, a, b);
+    CHECK((first.has_value() || second.has_value()));
+    // Dar nu „lipește” o rază care trece clar pe lângă.
+    CHECK_FALSE(intersectRayTriangle({ { -2000, 1001, 500 }, { 1, 0, 0 } }, c, d, a).has_value());
+}
+
 TEST_CASE("Punct în poligon, inclusiv pe graniță și în poligoane concave", "[core][math][polygon]")
 {
     const std::vector<Vec2d> l { { 0, 0 }, { 20, 0 }, { 20, 10 }, { 10, 10 }, { 10, 20 }, { 0, 20 } };

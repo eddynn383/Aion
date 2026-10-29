@@ -49,6 +49,7 @@ public:
             m_cursor = m_origin;
         } else if (m_points.size() == 1) {
             m_normal = effectiveNormal(ctx); // al doilea punct fixează planul (și pe cel vertical, de pe axa Z)
+            m_freeVertical = autoVertical();
         }
         if (!m_points.empty() && tol::samePoint(m_cursor, m_points.back().point)) {
             return; // un click pe ultimul punct nu adaugă un punct dublu
@@ -185,6 +186,8 @@ private:
         }
         if (m_points.size() == 1) {
             m_normal = effectiveNormal(ctx);
+        } else if (m_points.size() == 2 && m_freeVertical) {
+            m_normal = verticalNormalToward(ctx, e.screen);
         }
         if (const auto p = onPlane(ctx, e.screen)) {
             m_cursor = *p;
@@ -198,12 +201,48 @@ private:
         if (m_lock) {
             return inference::axisDirection(*m_lock);
         }
-        const bool horizontal = std::abs(std::abs(m_baseNormal.z) - 1.0) < 1e-9;
-        if (horizontal && m_inference.kind == inference::Kind::OnAxis && m_inference.axis == inference::Axis::Z) {
+        if (autoVertical()) {
             const Vec3d f = ctx.camera.forward();
             return std::abs(f.x) > std::abs(f.y) ? Vec3d { 1, 0, 0 } : Vec3d { 0, 1, 0 };
         }
         return m_baseNormal;
+    }
+
+    // Cursorul pe axa albastră din primul punct, pe un plan orizontal, fără lock: desenul trece pe un plan vertical.
+    bool autoVertical() const
+    {
+        const bool horizontal = std::abs(std::abs(m_baseNormal.z) - 1.0) < 1e-9;
+        return !m_lock && horizontal && m_inference.kind == inference::Kind::OnAxis && m_inference.axis == inference::Axis::Z;
+    }
+
+    // După un segment vertical, planul se rotește în jurul lui până la al treilea punct și îl conține: punctul inferat
+    // (pe o axă, pe o muchie...) sau, în gol, cel de pe planul vertical spre cameră.
+    Vec3d verticalNormalToward(const ToolContext& ctx, Vec2d screen) const
+    {
+        const Vec3d last = m_points.back().point;
+        std::optional<Vec3d> target;
+        if (m_inference.valid() && m_inference.kind != inference::Kind::Ground && m_inference.kind != inference::Kind::OnFace) {
+            target = m_inference.point;
+        } else {
+            const Vec3d f = ctx.camera.forward();
+            const Vec3d facing { f.x, f.y, 0.0 };
+            if (glm::length(facing) > 1e-9) {
+                const math::Plane plane = math::Plane::fromPointNormal(last, glm::normalize(facing));
+                const math::Ray ray = ctx.camera.rayAt(screen);
+                if (const auto t = math::intersectRayPlane(ray, plane)) {
+                    target = ray.at(*t);
+                } else if (const auto back = math::intersectRayPlane(ray, plane.flipped())) {
+                    target = ray.at(*back);
+                }
+            }
+        }
+        if (target) {
+            const Vec3d along { target->x - last.x, target->y - last.y, 0.0 };
+            if (glm::length(along) > tol::kLength) {
+                return glm::normalize(glm::cross(Vec3d { 0.0, 0.0, 1.0 }, along));
+            }
+        }
+        return m_normal;
     }
 
     // Esc / ⌘Z: înapoi la nodul anterior; de pe primul punct, renunță la desen.
@@ -309,6 +348,7 @@ private:
     {
         m_points.clear();
         m_lock.reset();
+        m_freeVertical = false;
         m_pressed = false;
         m_dragging = false;
         m_closing = false;
@@ -322,6 +362,7 @@ private:
     Vec3d m_baseNormal { 0.0, 0.0, 1.0 }; // planul de la primul click (fără lock-ul săgeților)
     std::optional<inference::Axis> m_lock;
     bool m_justClosed = false;
+    bool m_freeVertical = false; // al doilea punct a dus desenul pe axa Z: al treilea alege planul vertical
     Vec3d m_cursor { 0.0 };
     Vec2d m_press { 0.0 };
     bool m_pressed = false;

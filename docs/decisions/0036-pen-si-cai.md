@@ -18,8 +18,10 @@
   (`penCurveEditable`); după Push/Pull, un vârf mutat sau mutarea în alt grup rămâne o curbă obișnuită (ca arcele).
   `replacePenCurve` șterge muchiile și le redesenează cu același id; fața-gazdă (o curbă desenată pe o față) se reface
   cu `createFaces`, cu materialul ei (`eraseEdge` nu reface fețele).
-- **Uneltele**: `pen` (desenul: click = colț, tragere = punct neted, click pe primul punct = închide, Enter / Esc /
-  dublu click = termină; planul = fața de sub primul click, a geometriei sau a unui obiect, altfel solul) și `penedit`
+- **Uneltele**: `pen` (desenul: click = colț, tragere = punct neted, click pe primul punct = închide, Enter / dublu
+  click = termină deschisă, Esc / ⌘Z = înapoi un nod (`Tool::undoStep`); planul = fața de sub primul click, a
+  geometriei sau a unui obiect, altfel solul; săgețile îl schimbă înainte de al doilea punct, iar un al doilea punct pe
+  axa albastră îl face vertical, rotit în jurul segmentului spre al treilea punct) și `penedit`
   (punctele și mânerele, Option rupe / comută, click pe curbă = punct nou, ⌫ șterge). `penedit` nu scrie în model:
   cere prin `ToolRequests::curveEdit`; Document o pune în locul lui Select (dublu click pe o curbă editabilă sau pe o
   cale), ca unealta internă `pivot`. În Animare, Pen-ul cere o cale (`ToolRequests::penPath`).
@@ -53,3 +55,5 @@
   lungul curbei.
 - Copierea, gruparea sau Explode lasă curba Pen needitabilă (ca Bézier); editabilitatea se poate extinde mai târziu.
 - Camera pe cale, marșarierul și creionul cu mâna liberă rămân pe mai târziu.
+- O cale se editează (mutare, proprietăți, timp, ancore, ștergere) doar în Animare; numele și vizibilitatea oriunde.
+  Ancorarea refuzată (obiect într-un grup, deja pe o cale a animației) spune de ce.

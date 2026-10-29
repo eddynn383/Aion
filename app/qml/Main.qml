@@ -568,7 +568,7 @@ Window {
                     const kk = action.slice(5).split(",")
                     AppInfo.simulateKeys(kk[0], kk[1] ?? "")
                 } else if (action === "debug.geometry") {
-                    console.info("geometry:", JSON.stringify(doc.entityInfo.geometry), "undo:", doc.undoName)
+                    console.info("geometry:", doc.entityInfo.title ?? "-", JSON.stringify(doc.entityInfo.geometry), "undo:", doc.undoName)
                 } else if (action === "debug.anim") {
                     console.info("anim: time", doc.timelineTime.toFixed(3), "playing", doc.playing, "tool", window.activeTool,
                                  "undo:", doc.undoName, "keys:", JSON.stringify((doc.timeline.tracks ?? []).map(
