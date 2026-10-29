@@ -256,6 +256,12 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   macro-urile anunță doar la `endMacro`. Măsurare: `navbench:orbit|pan|hover,s` și `fpslog:s` (fps pe secundă; fereastra
   vine în față — una acoperită nu primește cadre), `aion_tests "[.perf][model]"`, `sample <pid> 4` în timpul rulării.
   `make run` e debug (UBSan, fără optimizări); pentru fps reale: `make run CONFIG=release`.
+- **Copii și animații din interacțiuni** (ADR 0039): `model/Copying.h` (`copyDeep` unic în adâncime pentru ⌘V și
+  Move/Rotate cu Option; `copyLinked` doar pentru ⌥D și Array; `makeUniqueDeep`, `canMakeUnique`, `copyAnimations`,
+  `instanceOutline`); unealta internă `place` (`ToolContext::place`, `ToolRequests::placeAt` / `placeCancel`);
+  `Document::copySelection` / `pasteClipboard` / `makeUnique`; `model::AnimationPlayer` (redarea din interacțiuni,
+  `Action::direction` / `repeat`, format v5). Acțiuni de script: `keys:,ctrl+c`, `keys:,ctrl+v`, `org.makeUnique`;
+  în Modul interacțiune: `mode.interaction` (F5) apoi `clickw:`.
 - **Ștergerea** (ADR 0037): guma și ⌫ păstrează fețele (`geom::eraseEdgesKeepingFaces`), Delete le ia
   (`eraseEdgesWithFaces`); `tools::deleteSelection(ctx, keepFaces)`. În scripturi: `keys:,backspace` / `keys:,delete`;
   `debug.geometry` arată și titlul selecției.

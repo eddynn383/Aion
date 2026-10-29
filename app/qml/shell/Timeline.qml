@@ -427,6 +427,8 @@ Rectangle {
                                     color: Theme.textPrimary
                                     font.pixelSize: Theme.fontSizeSm
                                     onVisibleChanged: if (visible) { forceActiveFocus(); selectAll() }
+                                    // Enter salvează, Esc renunță (numele rămâne).
+                                    Keys.onEscapePressed: { animRow.editing = false; text = animRow.modelData.name }
                                     onEditingFinished: {
                                         if (animRow.editing)
                                             root.document.renameAnimation(animRow.modelData.id, text)
@@ -434,9 +436,20 @@ Rectangle {
                                     }
                                 }
                                 IconButton {
+                                    id: renameButton
+                                    anchors.right: deleteButton.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: !animRow.editing && (animRowArea.containsMouse || hovered || deleteButton.hovered)
+                                    width: 22; height: 22; iconSize: 13
+                                    iconName: "pencil"
+                                    tooltip: "Redenumește animația"
+                                    onClicked: animRow.editing = true
+                                }
+                                IconButton {
+                                    id: deleteButton
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
-                                    visible: animRowArea.containsMouse || hovered
+                                    visible: animRowArea.containsMouse || hovered || renameButton.hovered
                                     width: 22; height: 22; iconSize: 13
                                     iconName: "trash-2"
                                     tooltip: "Șterge animația"

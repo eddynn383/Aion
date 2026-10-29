@@ -31,13 +31,7 @@ InstanceId makeGroup(Model& model, DefinitionId context, const geom::Selection& 
 // copii ai părintelui; definiția dispare dacă nu mai are instanțe. Întoarce entitățile apărute în părinte.
 geom::Selection explode(Model& model, InstanceId instance);
 
-// Make Unique: instanța primește o copie proprie a definiției (celelalte copii ale componentei nu se mai schimbă
-// împreună cu ea). Întoarce definiția nouă.
-DefinitionId makeUnique(Model& model, InstanceId instance);
-
-// O copie a instanței (aceeași definiție: o componentă rămâne legată de celelalte copii; un grup primește
-// o definiție proprie, ca în SketchUp), mutată cu `delta` (în coordonatele părintelui).
-InstanceId copyInstance(Model& model, InstanceId instance, const math::Transform& delta);
+// Copierea (unică, legată) și „Fă unic”: model/Copying.h.
 
 // Șterge o instanță. Definiția unui grup rămas fără instanțe dispare și ea (cu tot ce conține);
 // definițiile componentelor rămân în model (biblioteca „În model”).

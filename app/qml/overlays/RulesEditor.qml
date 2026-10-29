@@ -68,7 +68,8 @@ Popover {
 
     function newAction(kind) {
         const first = (list) => list.length > 0 ? list[0].id : 0
-        const a = { kind: kind, target: 0, x: 0, y: 0, z: 0, duration: 0.5, material: 0, animation: 0, scene: 0, first: [], second: [] }
+        const a = { kind: kind, target: 0, x: 0, y: 0, z: 0, duration: 0.5, material: 0, animation: 0, scene: 0, first: [], second: [],
+                    direction: "forward", repeat: 1 }
         if (kind === "moveBy") a.z = 500
         if (kind === "rotateBy") a.z = 90
         if (kind === "scaleTo") a.x = 1.5
@@ -78,6 +79,14 @@ Popover {
         if (kind === "goToScene") a.scene = first(root.document.scenes)
         return a
     }
+
+    // „Pornește animația”: sensul și repetarea (0 = la infinit).
+    readonly property var directionOptions: [{ value: "forward", label: "înainte" }, { value: "reverse", label: "înapoi" },
+        { value: "toggle", label: "comută" }]
+    readonly property var repeatOptions: [{ value: "once", label: "o dată" }, { value: "times", label: "de mai multe ori" },
+        { value: "loop", label: "la infinit" }]
+    function repeatMode(repeat) { return repeat === 0 ? "loop" : repeat === 1 ? "once" : "times" }
+    function setRepeatMode(path, mode) { root.setField(path, "repeat", mode === "loop" ? 0 : mode === "once" ? 1 : 2) }
 
     readonly property var targetOptions: [{ value: 0, label: "acest obiect" }].concat(
         (root.document ? root.document.outline : []).map(o => ({ value: o.id, label: o.name })))

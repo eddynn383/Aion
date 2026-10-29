@@ -277,6 +277,14 @@ Item {
                         root.document.setObjectProperties({ enabled: !row.modelData.enabled })
                     }
                 }
+                // Obiectele cu părți legate de altele (×N sau un grup comun înăuntru): o copie proprie.
+                RowAction {
+                    visible: !row.isSceneObject && row.modelData.canMakeUnique === true
+                    shown: rowHover.hovered
+                    iconName: "component"
+                    tooltip: "Fă unic (separă de copii)"
+                    onClicked: root.document.makeUnique(row.modelData.id)
+                }
                 // Obiectele și grupurile: blocat (se vede mereu când e blocat).
                 RowAction {
                     visible: !row.isSceneObject

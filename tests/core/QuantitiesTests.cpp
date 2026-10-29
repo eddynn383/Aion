@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Quantities.h"
 
@@ -50,7 +51,7 @@ TEST_CASE("Raport de cantități: arii, volume, materiale, copii", "[core][model
     inst.material = oak;
     m.setInstance(block, inst);
     const auto stool = box(m, { 5000, 0, 0 }, { 400, 400, 450 }, "Taburet", true);
-    model::copyInstance(m, stool, Transform::translation({ 1000, 0, 0 }));
+    model::copyLinked(m, stool, Transform::translation({ 1000, 0, 0 }));
 
     const model::QuantityReport r = model::quantityReport(m);
     REQUIRE(r.objects.size() == 2);
@@ -81,7 +82,7 @@ TEST_CASE("Lista de debitare: dimensiunile pieselor, piese identice, necesar de 
     // Un corp de mobilier: două laterale (o componentă cu două copii, una rotită), un blat și un picior masiv.
     const auto side = box(m, { 0, 0, 0 }, { 18, 560, 720 }, "Lateral", true);
     const double quarter = std::numbers::pi / 2.0;
-    model::copyInstance(m, side, Transform::translation({ 2000, 0, 0 }) * Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, quarter));
+    model::copyLinked(m, side, Transform::translation({ 2000, 0, 0 }) * Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, quarter));
     box(m, { 0, 0, 720 }, { 800, 560, 18 }, "Blat");
     box(m, { 3000, 0, 0 }, { 120, 120, 700 }, "Picior");
     // O față grupată, fără grosime: apare, dar nu contează la plăci și la cant.

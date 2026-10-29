@@ -109,7 +109,7 @@ Platform.MenuBar {
     CommandMenu {
         bar: root
         title: "Editare"
-        commandIds: ["edit.undo", "edit.redo", "-", "edit.delete", "edit.selectAll", "edit.selectNone",
+        commandIds: ["edit.undo", "edit.redo", "-", "edit.delete", "edit.copy", "edit.paste", "edit.selectAll", "edit.selectNone",
                      "edit.selectConnected", "-", "edit.reverseFaces", "edit.intersectModel", "edit.intersectSelection",
                      "guides.clear"]
     }

@@ -192,11 +192,11 @@ TEST_CASE("Fișier: curbele Pen se salvează și se încarcă (v4)", "[core][pen
     REQUIRE(loaded.model->penCurves().contains(id));
     CHECK(loaded.model->penCurves().at(id) == m.penCurves().at(id));
     CHECK(model::penCurveEditable(*loaded.model, id));
-    CHECK(io::kFormatVersion == 4);
+    CHECK(io::kFormatVersion >= 4);
 
     // Un fișier v3 (fără cheia penCurves) se încarcă fără curbe.
     std::string v3 = io::toJson(model::Model {});
-    const std::string current = "\"formatVersion\": 4";
+    const std::string current = "\"formatVersion\": " + std::to_string(io::kFormatVersion);
     const std::size_t at = v3.find(current);
     REQUIRE(at != std::string::npos);
     v3.replace(at, current.size(), "\"formatVersion\": 3");

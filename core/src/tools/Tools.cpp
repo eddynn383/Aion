@@ -910,6 +910,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "pivot") {
         return makePivotTool(); // doar pentru tragerea marcajului pivotului (nu e în toolbar)
     }
+    if (id == "place") {
+        return makePlaceTool(); // lipirea unei copii (⌘V), pusă de Document
+    }
     if (id == "circle") {
         return makeCircleTool();
     }

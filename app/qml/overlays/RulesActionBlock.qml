@@ -109,6 +109,54 @@ Item {
                         item.picked.connect((v) => root.editor.setField(root.path, field, v))
                     }
                 }
+                // „Pornește animația”: sensul, repetarea și, pentru „de mai multe ori”, numărul de ture.
+                Loader {
+                    active: root.action.kind === "playAnimation"
+                    sourceComponent: root.editor.pickComponent
+                    onLoaded: {
+                        item.options = root.editor.directionOptions
+                        item.value = Qt.binding(() => root.action.direction ?? "forward")
+                        item.picked.connect((v) => root.editor.setField(root.path, "direction", v))
+                    }
+                }
+                Loader {
+                    active: root.action.kind === "playAnimation"
+                    sourceComponent: root.editor.pickComponent
+                    onLoaded: {
+                        item.options = root.editor.repeatOptions
+                        item.value = Qt.binding(() => root.editor.repeatMode(root.action.repeat ?? 1))
+                        item.picked.connect((v) => root.editor.setRepeatMode(root.path, v))
+                    }
+                }
+                Row {
+                    visible: root.action.kind === "playAnimation" && (root.action.repeat ?? 1) >= 2
+                    spacing: 3
+                    Rectangle {
+                        width: Math.max(36, repeatInput.implicitWidth + 12)
+                        height: 24
+                        radius: 12
+                        color: Qt.rgba(1, 1, 1, 0.92)
+                        TextInput {
+                            id: repeatInput
+                            anchors.centerIn: parent
+                            text: String(root.action.repeat ?? 2)
+                            color: "#111111"
+                            font.pixelSize: Theme.fontSizeXs
+                            font.family: Theme.fontMono
+                            selectByMouse: true
+                            validator: IntValidator { bottom: 1; top: 999 }
+                            onEditingFinished: root.editor.setField(root.path, "repeat", Math.max(1, parseInt(text) || 1))
+                        }
+                    }
+                    Text {
+                        text: "ori"
+                        color: "white"
+                        opacity: 0.85
+                        font.pixelSize: Theme.fontSizeXs
+                        height: 24
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
             }
 
             // „Alternează”: două liste.

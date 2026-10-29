@@ -1,5 +1,6 @@
 #include "aion/core/commands/CommandStack.h"
 #include "aion/core/io/AionFile.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Parametric.h"
 #include "aion/core/model/Transfer.h"
@@ -34,7 +35,7 @@ TEST_CASE("Obiecte dinamice: parametrii refac geometria, copiile legate se schim
 
     // O copie legată; lățimea nouă se vede la amândouă, iar valorile sunt limitate la min / max.
     model::InstanceId copy;
-    REQUIRE(stack.run("Copie", [&](Model& model) { copy = model::copyInstance(model, door, Transform::translation({ 0, 2000, 0 })); }));
+    REQUIRE(stack.run("Copie", [&](Model& model) { copy = model::copyLinked(model, door, Transform::translation({ 0, 2000, 0 })); }));
     REQUIRE(stack.run("Lățime", [&](Model& model) { model::setParameter(model, def, "width", 1200); }));
     CHECK(model::placementOf(m, door).size.x == Approx(1200.0));
     CHECK(model::placementOf(m, copy).size.x == Approx(1200.0));

@@ -2,6 +2,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/model/Model.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 
 #include <catch2/catch_approx.hpp>
@@ -160,7 +161,7 @@ TEST_CASE("Faza 6, „gata când”: un scaun ca componentă, 4 copii, unul modi
     std::vector<InstanceId> copies { chair };
     for (int k = 1; k < 4; ++k) {
         REQUIRE(doc.stack.run("Copy", [&](Model& m) {
-            copies.push_back(model::copyInstance(m, chair, Transform::translation({ 600.0 * k, 0, 0 })));
+            copies.push_back(model::copyLinked(m, chair, Transform::translation({ 600.0 * k, 0, 0 })));
         }));
     }
     REQUIRE(doc.model.instancesOf(def).size() == 4);
@@ -184,7 +185,10 @@ TEST_CASE("Faza 6, „gata când”: un scaun ca componentă, 4 copii, unul modi
 
     // Make Unique: o copie se desparte, iar schimbările ei nu le mai afectează pe celelalte.
     DefinitionId unique;
-    REQUIRE(doc.stack.run("Make Unique", [&](Model& m) { unique = model::makeUnique(m, copies[3]); }));
+    REQUIRE(doc.stack.run("Make Unique", [&](Model& m) {
+        (void)model::makeUniqueDeep(m, copies[3]);
+        unique = m.instance(copies[3]).definition;
+    }));
     CHECK(unique != def);
     CHECK(doc.model.instancesOf(def).size() == 3);
     REQUIRE(doc.stack.run("Line", [&](Model& m) { geom::drawLine(m.mesh(unique), { 0, 0, 400 }, { 450, 450, 400 }); }));
@@ -199,7 +203,7 @@ TEST_CASE("Grupurile copiate sunt independente; Explode readuce geometria transf
     doc.stack.run("Make Group", [&](Model& m) { group = model::makeGroup(m, m.root(), all(doc.root()), false); });
     InstanceId copy;
     REQUIRE(doc.stack.run("Copy", [&](Model& m) {
-        copy = model::copyInstance(m, group, Transform::translation({ 2000, 0, 0 }));
+        copy = model::copyDeep(m, m.root(), m, { group }, Transform::translation({ 2000, 0, 0 })).roots.at(0);
     }));
     CHECK(doc.model.instance(copy).definition != doc.model.instance(group).definition);
 

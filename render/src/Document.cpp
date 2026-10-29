@@ -15,6 +15,7 @@
 #include "aion/core/model/Parametric.h"
 #include "aion/core/model/Transfer.h"
 #include "ProceduralTextures.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/MotionPaths.h"
@@ -417,6 +418,9 @@ QString Document::localPath(const QUrl& url) const
 void Document::replaceModel(const model::Model& model)
 {
     finishCurveEdit();
+    if (m_place) {
+        finishPaste(std::nullopt);
+    }
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -445,6 +449,10 @@ void Document::replaceModel(const model::Model& model)
 
 void Document::newDocument()
 {
+    if (m_clipboard) {
+        m_clipboard.reset(); // clipboard-ul ține de document
+        emit clipboardChanged();
+    }
     replaceModel(model::Model {});
     setFilePath({});
     removeAutosave();
@@ -457,6 +465,10 @@ bool Document::openFile(const QString& path)
         setError(QStringLiteral("„%1” nu a putut fi deschis. %2")
                      .arg(QFileInfo(path).fileName(), QString::fromStdString(result.error)));
         return false;
+    }
+    if (m_clipboard) {
+        m_clipboard.reset();
+        emit clipboardChanged();
     }
     replaceModel(*result.model);
     setFilePath(path);
@@ -674,11 +686,12 @@ void Document::setActiveTool(const QString& requested)
     // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare): rămâne Select.
     const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested) ? requested
                                                                                                  : QStringLiteral("select");
-    if (m_suspendedTool) { // o tragere a pivotului sau o editare de curbă întreruptă: revine unealta de dinainte
+    if (m_suspendedTool) { // o tragere a pivotului, o editare de curbă sau o lipire întreruptă: revine unealta
         m_tool = std::move(m_suspendedTool);
         m_pivotDragPoint.reset();
         m_editCurve = {};
         m_editPath = {};
+        m_place.reset();
     }
     if (id == m_toolId) {
         return;
@@ -800,6 +813,8 @@ QStringList Document::contextPath() const
 QVariantList Document::outline() const
 {
     QVariantList out;
+    // Folosirile definițiilor, numărate o dată pentru toată lista (copiile, „Fă unic”).
+    const model::DefinitionUses uses = model::definitionUses(m_model);
     const std::set<model::InstanceId> current(m_path.begin(), m_path.end());
     const auto visit = [&](auto&& self, model::DefinitionId parent, int depth) -> void {
         for (model::InstanceId id : m_model.childrenOf(parent)) {
@@ -811,7 +826,8 @@ QVariantList Document::outline() const
                 { QStringLiteral("definition"), QString::fromStdString(def.name) },
                 { QStringLiteral("kind"), def.collection ? QStringLiteral("group") : QStringLiteral("object") },
                 { QStringLiteral("shape"), QString::fromStdString(def.shape) },
-                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("copies"), static_cast<int>(uses.at(inst.definition.value)) },
+                { QStringLiteral("canMakeUnique"), model::canMakeUnique(m_model, id, uses) },
                 { QStringLiteral("parentDefinition"), static_cast<double>(inst.parent.value) },
                 { QStringLiteral("hasChildren"), !m_model.childrenOf(inst.definition).empty() },
                 { QStringLiteral("tagColor"), inst.tag && m_model.tags().contains(inst.tag)
@@ -909,6 +925,7 @@ QVariantMap Document::entityInfo() const
         info[QStringLiteral("tagId")] = static_cast<double>(inst.tag.value);
         info[QStringLiteral("locked")] = inst.locked;
         info[QStringLiteral("copies")] = static_cast<int>(m_model.instancesOf(inst.definition).size());
+        info[QStringLiteral("canMakeUnique")] = model::canMakeUnique(m_model, id);
         if (!def.group) {
             details << detail(QStringLiteral("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
         }
@@ -1152,6 +1169,7 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         ctx.editNormal = glm::normalize(toContext.applyToVector(p->normal));
     }
     ctx.pivot = selectionPivot(); // Rotate pornește din el, Scale cu Option îl ține fix
+    ctx.place = m_place;
     // O cameră sau o lumină selectată (în Modelare, la nivelul modelului): ținta lui Move / Rotate / Scale, cu pivotul
     // în poziția ei. Camerele și luminile nu se animă, deci nu și în Animare.
     const bool sceneObject = !animating && m_path.empty() && m_selection.empty()
@@ -1252,6 +1270,10 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
         enterInstance(static_cast<double>(requests.enter.value));
     } else if (requests.exit) {
         exitContext();
+    }
+    // Lipirea: copia la punctul ales sau renunțarea.
+    if (m_place && (requests.placeAt || requests.placeCancel)) {
+        finishPaste(requests.placeCancel ? std::nullopt : requests.placeAt);
     }
     // Tragerea pivotului: previzualizarea, apoi punctul ales (sau anularea).
     if (requests.pivotDone && pivotDragging()) {
@@ -1667,16 +1689,10 @@ void Document::duplicateLinked()
     runOnModel("Duplicare legată", [&](model::Model& model) {
         std::set<model::InstanceId> copies;
         for (model::InstanceId id : m_selection.instances) {
-            const model::DefinitionId def = model.instance(id).definition;
-            // Geometria devine partajată: copia și originalul se editează împreună.
-            model::Definition d = model.definition(def);
-            if (d.group && !d.collection) {
-                d.group = false;
-                model.setDefinition(def, d);
-            }
-            const auto [lo, hi] = model::bounds(model, def);
+            // Aceeași definiție (și pentru grupuri și colecții): copia și originalul se editează împreună.
+            const auto [lo, hi] = model::bounds(model, model.instance(id).definition);
             const double offset = lo.x <= hi.x ? (hi.x - lo.x) * 1.2 : 1000.0;
-            copies.insert(model::copyInstance(model, id, math::Transform::translation({ offset, 0.0, 0.0 })));
+            copies.insert(model::copyLinked(model, id, math::Transform::translation({ offset, 0.0, 0.0 })));
         }
         m_selection.clear();
         m_selection.instances = copies;
@@ -1770,9 +1786,86 @@ void Document::makeUniqueSelection()
     }
     runOnModel("Fă unic", [&](model::Model& model) {
         for (model::InstanceId id : m_selection.instances) {
-            model::makeUnique(model, id);
+            if (!model::canMakeUnique(model, id)) {
+                continue; // nimic legat: nimic de separat (și nicio animație de împărțit)
+            }
+            const model::CopyResult r = model::makeUniqueDeep(model, id);
+            model::copyAnimations(model, model, r, math::Transform {}, model::CopyKind::Unique);
         }
     });
+    emit timelineChanged();
+}
+
+void Document::makeUnique(double instanceId)
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    if (!require(Modeling) || !m_model.instances().contains(id) || !model::canMakeUnique(m_model, id)) {
+        return;
+    }
+    runOnModel("Fă unic", [&](model::Model& model) {
+        const model::CopyResult r = model::makeUniqueDeep(model, id);
+        model::copyAnimations(model, model, r, math::Transform {}, model::CopyKind::Unique);
+    });
+    emit timelineChanged();
+}
+
+void Document::copySelection()
+{
+    // Într-o tranzacție deschisă (un script, o tragere) modelul nu se poate copia: s-ar copia pe jumătate.
+    if (!require(Modeling) || m_selection.instances.empty() || m_stack.inTransaction()) {
+        return;
+    }
+    m_clipboard = Clipboard { std::make_shared<const model::Model>(m_model),
+        std::vector<model::InstanceId>(m_selection.instances.begin(), m_selection.instances.end()) };
+    emit clipboardChanged();
+}
+
+void Document::pasteClipboard()
+{
+    if (!require(Modeling) || !m_clipboard || m_suspendedTool || !m_tool) {
+        return;
+    }
+    // Copia se ține de colțul minim al cutiei comune (în coordonatele părintelui), ca să se pună colț la colț.
+    tools::PlaceSource place;
+    place.edges = model::instanceOutline(*m_clipboard->model, m_clipboard->instances);
+    if (place.edges.empty()) {
+        return;
+    }
+    math::Vec3d lo { std::numeric_limits<double>::infinity() };
+    for (const auto& [a, b] : place.edges) {
+        lo = glm::min(lo, glm::min(a, b));
+    }
+    place.base = lo;
+    m_place = place;
+    m_suspendedTool = std::exchange(m_tool, tools::makeTool("place"));
+    replayPointer();
+    emit toolStatusChanged();
+    touch();
+}
+
+void Document::finishPaste(const std::optional<math::Vec3d>& at)
+{
+    if (!m_place) {
+        return;
+    }
+    const tools::PlaceSource place = *m_place;
+    m_place.reset();
+    if (m_suspendedTool) {
+        m_tool = std::move(m_suspendedTool);
+    }
+    if (at && m_clipboard && m_workMode == Modeling) {
+        const Clipboard clip = *m_clipboard;
+        const math::Transform delta = math::Transform::translation(*at - place.base);
+        runOnModel("Lipește", [&](model::Model& model) {
+            const model::CopyResult r = model::copyDeep(model, activeDefinition(), *clip.model, clip.instances, delta);
+            model::copyAnimations(model, *clip.model, r, delta, model::CopyKind::Copy);
+            m_selection.clear();
+            m_selection.instances.insert(r.roots.begin(), r.roots.end());
+        });
+        emit timelineChanged();
+    }
+    emit toolStatusChanged();
+    touch();
 }
 
 void Document::hideSelection()
@@ -2617,13 +2710,19 @@ void Document::endPreview()
     emit changed();
 }
 
+bool Document::animationCameraActive() const
+{
+    return m_runtime ? m_player.camera(m_model).has_value() : m_previewing;
+}
+
 QVariantMap Document::animationCamera() const
 {
-    const model::Animation* a = currentAnimation();
-    if (a == nullptr || !m_previewing) {
-        return {};
+    std::optional<model::CameraKey> c;
+    if (m_runtime) {
+        c = m_player.camera(m_model);
+    } else if (const model::Animation* a = currentAnimation(); a != nullptr && m_previewing) {
+        c = model::evaluateCamera(*a, m_timelineTime);
     }
-    const auto c = model::evaluateCamera(*a, m_timelineTime);
     if (!c) {
         return {};
     }
@@ -2633,6 +2732,9 @@ QVariantMap Document::animationCamera() const
 
 std::optional<model::Color> Document::displayColor(model::InstanceId instance) const
 {
+    if (m_runtime) {
+        return m_player.color(m_model, instance);
+    }
     const model::Animation* a = m_previewing ? currentAnimation() : nullptr;
     if (a == nullptr) {
         return std::nullopt;
@@ -2762,6 +2864,9 @@ void Document::setWorkMode(int mode)
     }
     cancelOperation();
     finishCurveEdit(); // o curbă Pen se editează doar în Modelare, o cale doar în Animare
+    if (m_place) {
+        finishPaste(std::nullopt); // o lipire neterminată nu continuă în alt mod
+    }
     if (mode != Interaction) {
         setInteractionMode(false);
     }
@@ -2863,9 +2968,11 @@ void Document::setInteractionMode(bool on)
         endPreview();
         m_runtime.emplace(m_model); // o copie: nimic din ce se întâmplă aici nu ajunge în document
         m_rules.reset();
+        m_player.reset();
         m_hoverInstance = {};
     } else {
         m_rules.reset();
+        m_player.reset();
         m_interactions.clear();
         m_drag.reset();
         m_runtime.reset();
@@ -3044,6 +3151,7 @@ const char* const kTriggerNames[] = { "click", "rightClick", "doubleClick", "hov
     "drag", "key" };
 const char* const kActionNames[] = { "moveBy", "moveTo", "rotateBy", "scaleTo", "show", "hide", "toggleVisible",
     "setMaterial", "playAnimation", "goToScene", "wait", "alternate" };
+const char* const kDirectionNames[] = { "forward", "reverse", "toggle" };
 
 template <std::size_t N>
 int indexOf(const char* const (&names)[N], const QString& name)
@@ -3072,7 +3180,9 @@ QVariantMap actionToMap(const model::Action& a)
         { QStringLiteral("material"), static_cast<double>(a.material.value) },
         { QStringLiteral("animation"), static_cast<double>(a.animation.value) },
         { QStringLiteral("scene"), static_cast<double>(a.scene.value) }, { QStringLiteral("first"), first },
-        { QStringLiteral("second"), second } };
+        { QStringLiteral("second"), second },
+        { QStringLiteral("direction"), QString::fromLatin1(kDirectionNames[static_cast<int>(a.direction)]) },
+        { QStringLiteral("repeat"), a.repeat } };
 }
 
 model::Action actionFromMap(const QVariantMap& m)
@@ -3086,6 +3196,9 @@ model::Action actionFromMap(const QVariantMap& m)
     a.material = model::MaterialId { static_cast<std::uint64_t>(m.value(QStringLiteral("material")).toDouble()) };
     a.animation = model::AnimationId { static_cast<std::uint64_t>(m.value(QStringLiteral("animation")).toDouble()) };
     a.scene = model::SceneId { static_cast<std::uint64_t>(m.value(QStringLiteral("scene")).toDouble()) };
+    a.direction = static_cast<model::PlayDirection>(
+        indexOf(kDirectionNames, m.value(QStringLiteral("direction"), QStringLiteral("forward")).toString()));
+    a.repeat = std::max(0, m.value(QStringLiteral("repeat"), 1).toInt());
     for (const QVariant& c : m.value(QStringLiteral("first")).toList()) {
         a.first.push_back(actionFromMap(c.toMap()));
     }
@@ -3169,11 +3282,11 @@ QVariantList Document::interactions() const
 
 void Document::handleRuleRequests()
 {
+    // Animațiile: blocurile aceleiași declanșări pornesc împreună (Comută decide o dată pentru toate).
+    std::map<std::uint64_t, std::vector<model::PlayRequest>> plays;
     for (const model::HostRequest& r : m_rules.takeRequests()) {
-        if (r.playAnimation && m_model.animations().contains(r.playAnimation)) {
-            m_activeAnimation = r.playAnimation;
-            m_timelineTime = 0.0;
-            play();
+        if (r.playAnimation) {
+            plays[r.firing].push_back({ r.playAnimation, r.direction, r.repeat, r.action });
         }
         if (r.goToScene && m_runtime && m_model.scenes().contains(r.goToScene)) {
             const model::Scene& scene = m_model.scenes().at(r.goToScene);
@@ -3182,6 +3295,12 @@ void Document::handleRuleRequests()
             ++m_interactionRevision;
             emit changed();
         }
+    }
+    for (const auto& [firing, requests] : plays) {
+        m_player.start(m_model, requests);
+    }
+    if (!plays.empty() && m_player.active()) {
+        emit animationStarted();
     }
 }
 
@@ -3305,6 +3424,11 @@ bool Document::advanceInteractions(double dt)
         handleRuleRequests();
         moved = true;
         active = active || m_rules.active();
+    }
+    // Animațiile pornite din interacțiuni: fiecare cu ceasul ei, de la poza documentului.
+    if (m_runtime && m_player.active()) {
+        moved = m_player.update(*m_runtime, m_model, dt) || moved;
+        active = active || m_player.active();
     }
 
     if (moved) {
@@ -3492,7 +3616,7 @@ QVariantList Document::contextMenuItems() const
             {}, !inst.locked);
         separator();
         item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !inst.locked);
-        if (!group && m_model.instancesOf(inst.definition).size() > 1) {
+        if (model::canMakeUnique(m_model, id)) {
             item(QStringLiteral("org.makeUnique"), QStringLiteral("Fă unic"));
         }
         item(QStringLiteral("org.group"), QStringLiteral("Grupează"), QStringLiteral("Ctrl+Alt+G"));

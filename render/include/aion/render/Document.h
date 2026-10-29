@@ -6,6 +6,7 @@
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Model.h"
+#include "aion/core/model/AnimationPlayer.h"
 #include "aion/core/model/Rules.h"
 #include "aion/core/tools/Tool.h"
 
@@ -39,6 +40,8 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QString activeTool READ activeTool WRITE setActiveTool NOTIFY activeToolChanged)
     Q_PROPERTY(QString toolStatus READ toolStatus NOTIFY toolStatusChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
+    // ⌘C a pus ceva în clipboard-ul documentului (⌘V îl poate lipi).
+    Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
     Q_PROPERTY(QString undoName READ undoName NOTIFY historyChanged)
     Q_PROPERTY(QString redoName READ redoName NOTIFY historyChanged)
@@ -237,6 +240,12 @@ public:
     Q_INVOKABLE void selectByTag(double tagId);
     Q_INVOKABLE void explodeSelection();
     Q_INVOKABLE void makeUniqueSelection();
+    Q_INVOKABLE void makeUnique(double instanceId);
+    // ⌘C: obiectele selectate din context (starea de acum; clipboard-ul ține de document, se golește la Nou / Deschide).
+    Q_INVOKABLE void copySelection();
+    // ⌘V: copia urmează cursorul (unealta internă „place”); click o așază (un pas de undo), Esc renunță.
+    Q_INVOKABLE void pasteClipboard();
+    bool canPaste() const { return m_clipboard.has_value(); }
     Q_INVOKABLE void hideSelection();
     Q_INVOKABLE void unhideAll();
     Q_INVOKABLE void setSelectionLocked(bool locked);
@@ -422,7 +431,7 @@ public:
     // Tragerea marcajului pivotului (cu Select): până la eliberare lucrează unealta „pivot” (se prinde ca Move), apoi
     // revine Select. Punctul previzualizat e unde se desenează marcajul.
     void beginPivotDrag();
-    [[nodiscard]] bool pivotDragging() const { return m_suspendedTool != nullptr && !curveEditing(); }
+    [[nodiscard]] bool pivotDragging() const { return m_suspendedTool != nullptr && !curveEditing() && !m_place; }
     // Editarea unei curbe Pen (dublu click cu Select): unealta `penedit` până la Esc / click în afară.
     void beginCurveEdit(model::PenCurveId id);
     [[nodiscard]] bool curveEditing() const { return static_cast<bool>(m_editCurve) || static_cast<bool>(m_editPath); }
@@ -544,6 +553,9 @@ public:
     Q_INVOKABLE void endPreview(); // înapoi la model (editare)
     // Camera animației la momentul curent ({} dacă nu are pistă de cameră), ca cameraState().
     Q_INVOKABLE QVariantMap animationCamera() const;
+    // Camera vederii urmează o animație: timeline-ul în previzualizare sau, în Modul interacțiune, o animație cu chei
+    // de cameră care rulează.
+    bool animationCameraActive() const;
     // Culoarea animată a unei instanțe (pentru randare), dacă există.
     std::optional<model::Color> displayColor(model::InstanceId instance) const;
     const model::Animation* currentAnimation() const;
@@ -564,6 +576,7 @@ public:
 signals:
     void activeToolChanged();
     void toolStatusChanged();
+    void clipboardChanged();
     void historyChanged();
     void selectionChanged();
     void modelChanged();
@@ -643,6 +656,8 @@ private:
     [[nodiscard]] math::Transform shownTransform(model::InstanceId instance) const;
     [[nodiscard]] QString channelValueText(model::Property property, double value) const;
     model::RuleRuntime m_rules;
+    // Animațiile pornite din interacțiuni (fiecare cu ceasul ei), scrise în m_runtime.
+    model::AnimationPlayer m_player;
     model::InstanceId m_hoverInstance;
     struct DragState {
         model::InstanceId instance;
@@ -726,6 +741,14 @@ private:
     std::unique_ptr<tools::Tool> m_suspendedTool;
     std::optional<math::Vec3d> m_pivotDragPoint;
     void finishPivotDrag(const std::optional<math::Vec3d>& point);
+    // Lipirea: copia la punctul ales pentru colțul ei (`at`), sau renunțarea; unealta de dinainte revine.
+    void finishPaste(const std::optional<math::Vec3d>& at);
+    struct Clipboard {
+        std::shared_ptr<const model::Model> model; // modelul de la ⌘C
+        std::vector<model::InstanceId> instances;
+    };
+    std::optional<Clipboard> m_clipboard;
+    std::optional<tools::PlaceSource> m_place; // lipirea în curs (unealta „place”)
     model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
     model::MotionPathId m_editPath; // sau calea editată
     model::MotionPathId m_selectedPath;

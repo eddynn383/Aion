@@ -311,6 +311,8 @@ enum class ActionKind {
     Wait, // duration
     Alternate, // prima dată `first`, a doua oară `second`, apoi iar `first`…
 };
+// Sensul unei animații pornite dintr-o interacțiune: Comută deschide ce e la început și închide ce e la sfârșit.
+enum class PlayDirection { Forward, Reverse, Toggle };
 
 struct Action {
     ActionKind kind = ActionKind::MoveBy;
@@ -322,6 +324,8 @@ struct Action {
     SceneId scene;
     std::vector<Action> first;
     std::vector<Action> second;
+    PlayDirection direction = PlayDirection::Forward; // PlayAnimation
+    int repeat = 1; // PlayAnimation: de câte ori (0 = la infinit)
 
     bool operator==(const Action&) const = default;
 };

@@ -1,4 +1,5 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
@@ -404,7 +405,8 @@ std::vector<Grip> objectGrips(const ToolContext& ctx)
     return out;
 }
 
-// Copiile țintei, câte una pentru fiecare transformare (array). Instanțele unei componente rămân legate.
+// Copiile țintei, câte una pentru fiecare transformare (și seriile ×N): copii unice, în adâncime (doar ⌥D și Array
+// leagă copiile).
 geom::Selection copyTarget(ToolContext& ctx, const geom::Selection& source, const std::vector<Transform>& transforms)
 {
     geom::Selection copies;
@@ -419,12 +421,16 @@ geom::Selection copyTarget(ToolContext& ctx, const geom::Selection& source, cons
     }
     ctx.stack.run("Copy", [&](model::Model& model) {
         copyGeometry(model.mesh(ctx.context));
-        for (const Transform& t : transforms) {
-            for (model::InstanceId i : source.instances) {
-                if (model.instances().contains(i)) {
-                    copies.instances.insert(model::copyInstance(model, i, t));
-                }
+        std::vector<model::InstanceId> ids;
+        for (model::InstanceId i : source.instances) {
+            if (model.instances().contains(i)) {
+                ids.push_back(i);
             }
+        }
+        for (const Transform& t : transforms) {
+            const model::CopyResult copy = model::copyDeep(model, ctx.context, model, ids, t);
+            model::copyAnimations(model, model, copy, t, model::CopyKind::Copy);
+            copies.instances.insert(copy.roots.begin(), copy.roots.end());
         }
     });
     return copies;
@@ -666,6 +672,96 @@ private:
     inference::Inference m_inference;
     bool m_shiftLock = false;
     view::PickResult m_hover;
+};
+
+// --- Place (lipirea) ------------------------------------------------------------------------
+
+// Copia lipită (⌘V) urmează cursorul cu colțul ei de prindere, prinsă ca Move: de colțurile și mijloacele muchiilor
+// obiectului de sub cursor, de inferență și de grid. Click o așază, Esc renunță; Document scrie copia în model.
+class PlaceTool final : public Tool {
+public:
+    std::string_view id() const override { return "place"; }
+
+    void pointerMove(ToolContext& ctx, const PointerEvent& e) override { track(ctx, e); }
+
+    void pointerDown(ToolContext& ctx, const PointerEvent& e) override
+    {
+        track(ctx, e);
+        if (m_current && ctx.requests != nullptr) {
+            ctx.requests->placeAt = *m_current;
+        }
+    }
+
+    void pointerUp(ToolContext& /*ctx*/, const PointerEvent& /*e*/) override {}
+
+    bool key(ToolContext& ctx, const KeyEvent& e) override
+    {
+        if (e.key == Key::Escape) {
+            if (ctx.requests != nullptr) {
+                ctx.requests->placeCancel = true;
+            }
+            return true;
+        }
+        return Tool::key(ctx, e);
+    }
+
+    void cancel(ToolContext& /*ctx*/) override
+    {
+        m_current.reset();
+        m_grips.clear();
+        m_hotGrip = -1;
+    }
+
+    Overlay overlay() const override
+    {
+        Overlay o;
+        if (m_current) {
+            const Vec3d d = *m_current - m_source.base;
+            for (const auto& [a, b] : m_source.edges) {
+                o.lines.push_back({ a + d, b + d, false });
+            }
+            o.points.push_back(*m_current);
+        }
+        appendInference(o, m_inference);
+        o.grips = m_grips;
+        if (m_hotGrip >= 0) {
+            const Grip& g = m_grips[std::size_t(m_hotGrip)];
+            o.marker = InferenceMarker { g.point, g.kind, inference::Tint::Neutral,
+                g.kind == inference::Kind::Endpoint ? "Colț" : "Mijlocul muchiei", false };
+        }
+        return o;
+    }
+
+    std::string status() const override
+    {
+        return "Alege unde pui copia: un colț sau mijlocul unei muchii al altui obiect, grid-ul sau orice punct · Esc: "
+               "renunță";
+    }
+
+private:
+    void track(ToolContext& ctx, const PointerEvent& e)
+    {
+        m_source = ctx.place.value_or(PlaceSource {});
+        m_inference = m_engine.withGuides(ctx.guides).withGridSnap(ctx.gridStep).infer(ctx.mesh, ctx.camera, e.screen,
+            std::nullopt);
+        if (m_inference.valid()) {
+            m_current = m_inference.point;
+        }
+        const model::InstanceId owner = gripObjectNear(ctx, e.screen, {});
+        m_grips = owner ? instanceGrips(ctx, { owner }) : std::vector<Grip> {};
+        m_hotGrip = nearestGrip(ctx, m_grips, e.screen, kGripRadiusPx);
+        if (m_hotGrip >= 0) {
+            m_grips[std::size_t(m_hotGrip)].hot = true;
+            m_current = m_grips[std::size_t(m_hotGrip)].point;
+        }
+    }
+
+    PlaceSource m_source;
+    std::optional<Vec3d> m_current;
+    std::vector<Grip> m_grips;
+    int m_hotGrip = -1;
+    inference::Engine m_engine;
+    inference::Inference m_inference;
 };
 
 // --- Rotate ---------------------------------------------------------------------------------
@@ -1560,6 +1656,11 @@ std::unique_ptr<Tool> makeScaleTool()
 std::unique_ptr<Tool> makePivotTool()
 {
     return std::make_unique<PivotTool>();
+}
+
+std::unique_ptr<Tool> makePlaceTool()
+{
+    return std::make_unique<PlaceTool>();
 }
 
 } // namespace aion::tools

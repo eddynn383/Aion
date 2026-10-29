@@ -469,7 +469,7 @@ TEST_CASE("Fișier: un fișier v3 (fără căi și curbe Pen) se încarcă", "[c
         const std::size_t comma = text.rfind(',', at);
         text.erase(comma, at + std::string(key).size() - comma);
     }
-    const std::string current = "\"formatVersion\": 4";
+    const std::string current = "\"formatVersion\": " + std::to_string(io::kFormatVersion);
     text.replace(text.find(current), current.size(), "\"formatVersion\": 3");
     REQUIRE(text.find("penCurves") == std::string::npos);
     REQUIRE(text.find("motionPaths") == std::string::npos);

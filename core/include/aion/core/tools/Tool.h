@@ -85,6 +85,12 @@ struct Dimension {
     bool operator==(const Dimension&) const = default;
 };
 
+// Ce se lipește (unealta `place`): colțul de prindere și muchiile copiei, în coordonatele contextului.
+struct PlaceSource {
+    Vec3d base { 0.0 };
+    std::vector<std::pair<Vec3d, Vec3d>> edges;
+};
+
 struct Overlay {
     std::vector<OverlayLine> lines;
     std::vector<Vec3d> points;
@@ -121,6 +127,9 @@ struct ToolRequests {
     // s-a terminat — cu `pivot` = punctul ales, fără = anulată.
     std::optional<math::Vec3d> pivot;
     bool pivotDone = false;
+    // Lipirea (unealta internă `place`): punctul ales pentru colțul copiei (click) sau renunțarea (Esc).
+    std::optional<Vec3d> placeAt;
+    bool placeCancel = false;
     // Pen în Animare: curba terminată (în coordonatele contextului) și normala planului ei; Document face din ea o cale.
     std::optional<geom::BezierPath> penPath;
     math::Vec3d penNormal { 0.0, 0.0, 1.0 };
@@ -167,6 +176,8 @@ struct ToolContext {
     // Curba editată (penedit), în coordonatele contextului, și normala planului ei; Document le pune la fiecare apel.
     std::optional<geom::BezierPath> editCurve;
     math::Vec3d editNormal { 0.0, 0.0, 1.0 };
+    // Lipirea: colțul de prindere al copiei și muchiile ei (previzualizarea), în coordonatele contextului.
+    std::optional<PlaceSource> place;
 };
 
 class Tool {
