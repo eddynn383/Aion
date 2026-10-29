@@ -1,10 +1,13 @@
 #include "aion/core/model/Copying.h"
 
 #include "aion/core/geom/Operations.h"
+#include "aion/core/model/AnimationEval.h"
+#include "aion/core/model/Operations.h"
 
 #include <algorithm>
 #include <functional>
 #include <set>
+#include <string>
 
 namespace aion::model {
 
@@ -84,6 +87,107 @@ DefinitionId cloneShallow(Model& model, DefinitionId source, std::map<InstanceId
     return id;
 }
 
+// Animațiile pornite de blocurile PlayAnimation (recursiv în Alternează).
+void collectPlayed(const std::vector<Action>& actions, std::set<AnimationId>& out)
+{
+    for (const Action& a : actions) {
+        if (a.kind == ActionKind::PlayAnimation && a.animation) {
+            out.insert(a.animation);
+        }
+        collectPlayed(a.first, out);
+        collectPlayed(a.second, out);
+    }
+}
+
+bool remapPlayed(std::vector<Action>& actions, const std::map<AnimationId, AnimationId>& animations)
+{
+    bool changed = false;
+    for (Action& a : actions) {
+        if (a.kind == ActionKind::PlayAnimation) {
+            if (const auto it = animations.find(a.animation); it != animations.end()) {
+                a.animation = it->second;
+                changed = true;
+            }
+        }
+        changed = remapPlayed(a.first, animations) || changed;
+        changed = remapPlayed(a.second, animations) || changed;
+    }
+    return changed;
+}
+
+// După fiecare bloc care pornește `from`, unul identic care pornește `to`.
+bool addPlayed(std::vector<Action>& actions, AnimationId from, AnimationId to)
+{
+    bool changed = false;
+    for (std::size_t i = 0; i < actions.size(); ++i) {
+        changed = addPlayed(actions[i].first, from, to) || changed;
+        changed = addPlayed(actions[i].second, from, to) || changed;
+        if (actions[i].kind == ActionKind::PlayAnimation && actions[i].animation == from) {
+            Action extra = actions[i];
+            extra.animation = to;
+            actions.insert(actions.begin() + static_cast<std::ptrdiff_t>(i) + 1, extra);
+            ++i;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+// „<nume> (copie)”, apoi „(copie 2)”…; copia unei copii pornește de la numele original.
+std::string copyName(const Model& model, std::string name)
+{
+    if (const auto at = name.rfind(" (copie"); at != std::string::npos && !name.empty() && name.back() == ')') {
+        name.erase(at);
+    }
+    const auto taken = [&](const std::string& candidate) {
+        const auto& all = model.animations().values();
+        return std::any_of(all.begin(), all.end(), [&](const Animation& a) { return a.name == candidate; });
+    };
+    std::string candidate = name + " (copie)";
+    for (int n = 2; taken(candidate); ++n) {
+        candidate = name + " (copie " + std::to_string(n) + ")";
+    }
+    return candidate;
+}
+
+// Cheile de poziție ale pistei (punctul pivotului, în coordonatele părintelui) trec prin `delta`.
+void moveTrack(ObjectTrack& track, const math::Transform& delta, const math::Vec3d& base)
+{
+    const ObjectTrack original = track;
+    const auto valueAt = [&](Property p, double time, double fallback) {
+        const Channel* c = findChannel(original, p);
+        const std::optional<double> v = c ? evaluateChannel(*c, time) : std::nullopt;
+        return v.value_or(fallback);
+    };
+    for (Channel& c : track.channels) {
+        const int axis = c.property == Property::PositionX ? 0 : c.property == Property::PositionY ? 1
+            : c.property == Property::PositionZ                                                  ? 2
+                                                                                                 : -1;
+        if (axis < 0) {
+            continue;
+        }
+        for (Key& k : c.keys) {
+            const math::Vec3d p { valueAt(Property::PositionX, k.time, base.x), valueAt(Property::PositionY, k.time, base.y),
+                valueAt(Property::PositionZ, k.time, base.z) };
+            k.value = delta.applyToPoint(p)[axis];
+        }
+    }
+}
+
+bool containsAny(const std::set<InstanceId>& inside, const std::set<InstanceId>& instances)
+{
+    return std::any_of(instances.begin(), instances.end(), [&](InstanceId i) { return inside.contains(i); });
+}
+
+std::set<InstanceId> animated(const Animation& a)
+{
+    std::set<InstanceId> out;
+    for (const ObjectTrack& t : a.tracks) {
+        out.insert(t.instance);
+    }
+    return out;
+}
+
 } // namespace
 
 CopyResult copyDeep(Model& target, DefinitionId context, const Model& source, const std::vector<InstanceId>& sources,
@@ -146,6 +250,133 @@ CopyResult copyDeep(Model& target, DefinitionId context, const Model& source, co
         remapRules(target, to, result.instances);
     }
     return result;
+}
+
+void copyAnimations(
+    Model& target, const Model& source, const CopyResult& copy, const math::Transform& delta, CopyKind kind)
+{
+    // Din sursă (poate fi ținta): animațiile pornite de regulile subarborelui și pistele de copiat.
+    std::set<AnimationId> started;
+    std::set<InstanceId> roots;
+    for (const auto& [from, to] : copy.instances) {
+        if (source.instances().contains(from)) {
+            for (const Rule& r : source.instance(from).rules) {
+                collectPlayed(r.actions, started);
+            }
+        }
+        if (std::find(copy.roots.begin(), copy.roots.end(), to) != copy.roots.end()) {
+            roots.insert(from);
+        }
+    }
+    struct Planned {
+        AnimationId id;
+        Animation value;
+        std::vector<ObjectTrack> tracks;
+        bool movesRoot = false; // Unique: pista obiectului însuși trece pe copie
+    };
+    std::vector<Planned> planned;
+    for (std::size_t i = 0; i < source.animations().size(); ++i) {
+        const AnimationId id = source.animations().keys()[i];
+        const Animation& a = source.animations().values()[i];
+        const bool isStarted = started.contains(id);
+        Planned p { id, a, {}, false };
+        for (const ObjectTrack& t : a.tracks) {
+            const auto it = copy.instances.find(t.instance);
+            if (it == copy.instances.end()) {
+                continue;
+            }
+            if (it->first == it->second) { // Unique: obiectul rămâne același
+                if (isStarted) {
+                    p.tracks.push_back(t);
+                    p.movesRoot = true;
+                }
+                continue;
+            }
+            ObjectTrack moved = t;
+            moved.instance = it->second;
+            if (kind == CopyKind::Copy && roots.contains(t.instance)) {
+                moveTrack(moved, delta, transformValues(source.instance(t.instance).transform,
+                    pivotLocal(source, t.instance)).position);
+            }
+            p.tracks.push_back(std::move(moved));
+        }
+        if (!p.tracks.empty()) {
+            planned.push_back(std::move(p));
+        }
+    }
+
+    // Animațiile noi (pornite de reguli) și pistele adăugate la cele din timeline.
+    std::map<AnimationId, AnimationId> copies;
+    for (const Planned& p : planned) {
+        if (started.contains(p.id)) {
+            Animation a = p.value;
+            a.name = copyName(target, a.name);
+            a.tracks = p.tracks;
+            a.camera.clear();
+            copies[p.id] = target.addAnimation(a);
+            if (p.movesRoot && target.animations().contains(p.id)) {
+                Animation original = target.animations().at(p.id);
+                std::erase_if(original.tracks, [&](const ObjectTrack& t) { return copy.instances.contains(t.instance)
+                    && copy.instances.at(t.instance) == t.instance; });
+                target.setAnimation(p.id, original);
+            }
+        } else if (target.animations().contains(p.id)) {
+            Animation a = target.animations().at(p.id);
+            a.tracks.insert(a.tracks.end(), p.tracks.begin(), p.tracks.end());
+            target.setAnimation(p.id, a);
+        }
+    }
+    if (copies.empty()) {
+        return;
+    }
+
+    // Regulile: ale copiilor trec pe animațiile noi; la Fă unic, și cele din afară, după ce conțin.
+    std::set<InstanceId> inside;
+    for (const auto& [from, to] : copy.instances) {
+        inside.insert(to);
+    }
+    if (kind == CopyKind::Unique) {
+        for (InstanceId root : copy.roots) {
+            const std::set<InstanceId> below = subtree(target, root);
+            inside.insert(below.begin(), below.end());
+        }
+    }
+    for (InstanceId id : inside) {
+        Instance inst = target.instance(id);
+        bool changed = false;
+        for (Rule& r : inst.rules) {
+            changed = remapPlayed(r.actions, copies) || changed;
+        }
+        if (changed) {
+            target.setInstance(id, inst);
+        }
+    }
+    if (kind != CopyKind::Unique) {
+        return;
+    }
+    const std::vector<InstanceId> all(target.instances().keys().begin(), target.instances().keys().end());
+    for (InstanceId id : all) {
+        if (inside.contains(id) || target.instance(id).rules.empty()) {
+            continue;
+        }
+        Instance inst = target.instance(id);
+        const std::set<InstanceId> below = subtree(target, id);
+        bool changed = false;
+        for (const auto& [from, to] : copies) {
+            const bool hasOriginal = containsAny(below, animated(target.animations().at(from)));
+            const bool hasCopy = containsAny(below, animated(target.animations().at(to)));
+            for (Rule& r : inst.rules) {
+                if (hasCopy && !hasOriginal) {
+                    changed = remapPlayed(r.actions, { { from, to } }) || changed;
+                } else if (hasCopy == hasOriginal) {
+                    changed = addPlayed(r.actions, from, to) || changed;
+                }
+            }
+        }
+        if (changed) {
+            target.setInstance(id, inst);
+        }
+    }
 }
 
 InstanceId copyLinked(Model& model, InstanceId id, const math::Transform& delta)

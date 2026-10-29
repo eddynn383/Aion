@@ -1,5 +1,6 @@
 #include "aion/core/commands/CommandStack.h"
 #include "aion/core/geom/Primitives.h"
+#include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Operations.h"
@@ -241,4 +242,209 @@ TEST_CASE("instanceOutline: muchiile în coordonatele părintelui", "[core][copy
         minX = std::min({ minX, p.x, q.x });
     }
     CHECK(minX > 600.0); // cel mai din stânga: ușa stângă, la 1000 − 150 − 150
+}
+
+namespace {
+
+model::Channel channel(model::Property p, std::vector<std::pair<double, double>> keys)
+{
+    model::Channel c;
+    c.property = p;
+    for (const auto& [t, v] : keys) {
+        c.keys.push_back({ t, v, {}, {} });
+    }
+    return c;
+}
+
+// O pistă de rotație (0 → 90°) pe obiectul dat.
+model::ObjectTrack swing(InstanceId instance)
+{
+    return { instance, { channel(model::Property::RotationZ, { { 0.0, 0.0 }, { 1.0, 90.0 } }) } };
+}
+
+model::Action play(model::AnimationId animation)
+{
+    model::Action a;
+    a.kind = model::ActionKind::PlayAnimation;
+    a.animation = animation;
+    return a;
+}
+
+void addRule(Model& m, InstanceId id, model::Rule rule)
+{
+    model::Instance inst = m.instance(id);
+    inst.rules.push_back(std::move(rule));
+    m.setInstance(id, inst);
+}
+
+const model::Animation* animationNamed(const Model& m, const std::string& name)
+{
+    for (const model::Animation& a : m.animations().values()) {
+        if (a.name == name) {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+model::AnimationId idOf(const Model& m, const std::string& name)
+{
+    for (std::size_t i = 0; i < m.animations().size(); ++i) {
+        if (m.animations().values()[i].name == name) {
+            return m.animations().keys()[i];
+        }
+    }
+    return {};
+}
+
+// Mobila cu „Animația 1” (ușile, plus un obiect X din afară), pornită de o regulă pe Usi lui A.
+struct Animated : Mobila {
+    InstanceId x;
+    model::AnimationId doors;
+
+    Animated()
+    {
+        x = place(m, m.root(), door, { 0, 4000, 0 });
+        model::Animation a;
+        a.name = "Animația 1";
+        a.duration = 1.0;
+        a.tracks = { swing(doorL), swing(doorR), swing(x) };
+        doors = m.addAnimation(a);
+        addRule(m, usiA, clickRule({ play(doors) }));
+    }
+};
+
+} // namespace
+
+TEST_CASE("copyAnimations: animația pornită de regulă se duplică", "[core][copying]")
+{
+    Animated s;
+    const model::Animation original = s.m.animations().at(s.doors);
+    const Transform delta = Transform::translation({ 0, 5000, 0 });
+    const model::CopyResult r = model::copyDeep(s.m, s.m.root(), s.m, { s.corpA }, delta);
+    model::copyAnimations(s.m, s.m, r, delta, model::CopyKind::Copy);
+
+    const model::Animation* copy = animationNamed(s.m, "Animația 1 (copie)");
+    REQUIRE(copy != nullptr);
+    REQUIRE(copy->tracks.size() == 2);
+    std::set<InstanceId> animated;
+    for (const model::ObjectTrack& t : copy->tracks) {
+        animated.insert(t.instance);
+    }
+    CHECK(animated == std::set<InstanceId> { r.instances.at(s.doorL), r.instances.at(s.doorR) });
+    CHECK(copy->duration == 1.0);
+    const model::Instance& usiCopy = s.m.instance(r.instances.at(s.usiA));
+    REQUIRE(usiCopy.rules.size() == 1);
+    CHECK(usiCopy.rules[0].actions[0].animation == idOf(s.m, "Animația 1 (copie)"));
+    CHECK(s.m.instance(s.usiA).rules[0].actions[0].animation == s.doors);
+    CHECK(s.m.animations().at(s.doors) == original);
+}
+
+TEST_CASE("copyAnimations: numele nu se repetă", "[core][copying]")
+{
+    Animated s;
+    for (int k = 1; k <= 2; ++k) {
+        const Transform delta = Transform::translation({ 0, 5000.0 * k, 0 });
+        const model::CopyResult r = model::copyDeep(s.m, s.m.root(), s.m, { s.corpA }, delta);
+        model::copyAnimations(s.m, s.m, r, delta, model::CopyKind::Copy);
+    }
+    CHECK(animationNamed(s.m, "Animația 1 (copie)") != nullptr);
+    CHECK(animationNamed(s.m, "Animația 1 (copie 2)") != nullptr);
+    CHECK(s.m.animations().size() == 3);
+}
+
+TEST_CASE("copyAnimations: filmul din timeline primește pistele copiei", "[core][copying]")
+{
+    Mobila s;
+    model::Animation film;
+    film.name = "Animația 2";
+    film.tracks = { swing(s.doorL) };
+    const model::AnimationId id = s.m.addAnimation(film);
+    const Transform delta = Transform::translation({ 0, 5000, 0 });
+    const model::CopyResult r = model::copyDeep(s.m, s.m.root(), s.m, { s.corpA }, delta);
+    model::copyAnimations(s.m, s.m, r, delta, model::CopyKind::Copy);
+    CHECK(s.m.animations().size() == 1);
+    const model::Animation& after = s.m.animations().at(id);
+    REQUIRE(after.tracks.size() == 2);
+    CHECK(after.tracks[1].instance == r.instances.at(s.doorL));
+    CHECK(after.tracks[1].channels == after.tracks[0].channels);
+}
+
+TEST_CASE("copyAnimations: pista obiectului de sus se mută cu copia", "[core][copying]")
+{
+    Animated s;
+    model::Animation a = s.m.animations().at(s.doors);
+    a.tracks.push_back({ s.corpA, { channel(model::Property::PositionX, { { 0.0, 0.0 }, { 1.0, 1000.0 } }) } });
+    s.m.setAnimation(s.doors, a);
+    const Transform delta = Transform::translation({ 5000, 0, 0 });
+    const model::CopyResult r = model::copyDeep(s.m, s.m.root(), s.m, { s.corpA }, delta);
+    model::copyAnimations(s.m, s.m, r, delta, model::CopyKind::Copy);
+
+    const model::Animation* copy = animationNamed(s.m, "Animația 1 (copie)");
+    REQUIRE(copy != nullptr);
+    const model::ObjectTrack* top = model::findTrack(*copy, r.roots[0]);
+    REQUIRE(top != nullptr);
+    REQUIRE(top->channels[0].keys.size() == 2);
+    CHECK(top->channels[0].keys[0].value == 5000.0);
+    CHECK(top->channels[0].keys[1].value == 6000.0);
+    const model::ObjectTrack* door = model::findTrack(*copy, r.instances.at(s.doorL));
+    REQUIRE(door != nullptr);
+    CHECK(door->channels == swing(s.doorL).channels);
+}
+
+TEST_CASE("copyAnimations: căile și camera nu se copiază", "[core][copying]")
+{
+    Animated s;
+    model::Animation a = s.m.animations().at(s.doors);
+    a.camera.push_back(model::CameraKey {});
+    s.m.setAnimation(s.doors, a);
+    model::MotionPath path;
+    path.animation = s.doors;
+    path.curve.points = { { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, false }, { { 1000, 0, 0 }, { 1000, 0, 0 }, { 1000, 0, 0 }, false } };
+    s.m.addMotionPath(path);
+    const Transform delta = Transform::translation({ 0, 5000, 0 });
+    const model::CopyResult r = model::copyDeep(s.m, s.m.root(), s.m, { s.corpA }, delta);
+    model::copyAnimations(s.m, s.m, r, delta, model::CopyKind::Copy);
+    const model::AnimationId copy = idOf(s.m, "Animația 1 (copie)");
+    REQUIRE(copy);
+    CHECK(s.m.animations().at(copy).camera.empty());
+    CHECK(s.m.motionPaths().size() == 1);
+    CHECK(s.m.motionPaths().values()[0].animation == s.doors);
+}
+
+TEST_CASE("Fă unic: regulile din afară", "[core][copying]")
+{
+    Animated s;
+    addRule(s.m, s.usiB, clickRule({ play(s.doors) })); // în definiția proprie a lui B
+    addRule(s.m, s.corpB, clickRule({ play(s.doors) })); // obiectul făcut unic
+    const DefinitionId cube = boxDefinition(s.m, "Întrerupător", { 50, 50, 50 });
+    const InstanceId toggle = place(s.m, s.m.root(), cube, { 0, -2000, 0 });
+    model::Action switchAction = play(s.doors);
+    switchAction.duration = 0.25; // „aceleași setări”: blocul în plus le păstrează
+    addRule(s.m, toggle, clickRule({ switchAction }));
+
+    const model::CopyResult r = model::makeUniqueDeep(s.m, s.corpB);
+    model::copyAnimations(s.m, s.m, r, Transform {}, model::CopyKind::Unique);
+    const model::AnimationId copy = idOf(s.m, "Animația 1 (copie)");
+    REQUIRE(copy);
+    CHECK(s.m.animations().at(copy).tracks.size() == 2); // ușile lui B
+    CHECK(s.m.animations().at(s.doors).tracks.size() == 3); // ușile lui A și X, neschimbate
+    CHECK(s.m.instance(s.usiA).rules[0].actions[0].animation == s.doors);
+    CHECK(s.m.instance(s.usiB).rules[0].actions[0].animation == copy);
+    CHECK(s.m.instance(s.corpB).rules[0].actions[0].animation == copy);
+    const std::vector<model::Action>& both = s.m.instance(toggle).rules[0].actions;
+    REQUIRE(both.size() == 2);
+    CHECK(both[0].animation == s.doors);
+    CHECK(both[1].animation == copy);
+    CHECK(both[1].duration == 0.25);
+}
+
+TEST_CASE("copyAnimations: regulă cu animație ștearsă", "[core][copying]")
+{
+    Mobila s;
+    addRule(s.m, s.usiA, clickRule({ play(model::AnimationId { 999 }) }));
+    const model::CopyResult r = model::copyDeep(s.m, s.m.root(), s.m, { s.corpA }, Transform {});
+    model::copyAnimations(s.m, s.m, r, Transform {}, model::CopyKind::Copy);
+    CHECK(s.m.animations().empty());
+    CHECK(s.m.instance(r.instances.at(s.usiA)).rules[0].actions[0].animation == model::AnimationId { 999 });
 }

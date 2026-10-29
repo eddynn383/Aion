@@ -36,6 +36,15 @@ InstanceId copyLinked(Model& model, InstanceId instance, const math::Transform& 
 CopyResult makeUniqueDeep(Model& model, InstanceId instance);
 [[nodiscard]] bool canMakeUnique(const Model& model, InstanceId instance);
 
+// Animațiile copiilor (secțiunea 2 din design). `source` = modelul din care s-a copiat (poate fi `target`); `delta` =
+// deplasarea copiei. Copy: o animație pornită de o regulă din subarbore → „<nume> (copie)” cu pistele subarborelui (pe
+// copii; pista obiectului de sus își mută pozițiile cu `delta`), iar regulile copiilor trec pe ea; celelalte animații cu
+// piste în subarbore primesc pistele copiilor (aceeași animație). Căile și cheile de cameră nu se copiază.
+// Unique (după makeUniqueDeep): la fel, iar o regulă din afara obiectului care pornea animația separată trece pe copie
+// dacă își conține doar copiile, rămâne dacă își conține doar originalele, altfel primește un bloc în plus pentru copie.
+void copyAnimations(
+    Model& target, const Model& source, const CopyResult& copy, const math::Transform& delta, CopyKind kind);
+
 // Muchiile obiectelor (cu tot ce conțin), în coordonatele părintelui lor: previzualizarea lipirii.
 [[nodiscard]] std::vector<std::pair<math::Vec3d, math::Vec3d>> instanceOutline(
     const Model& model, const std::vector<InstanceId>& instances);

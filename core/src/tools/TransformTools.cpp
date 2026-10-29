@@ -429,6 +429,7 @@ geom::Selection copyTarget(ToolContext& ctx, const geom::Selection& source, cons
         }
         for (const Transform& t : transforms) {
             const model::CopyResult copy = model::copyDeep(model, ctx.context, model, ids, t);
+            model::copyAnimations(model, model, copy, t, model::CopyKind::Copy);
             copies.instances.insert(copy.roots.begin(), copy.roots.end());
         }
     });
