@@ -116,6 +116,14 @@ struct Options {
     std::size_t maxReferences = 4;
 };
 
+// Muchia de referință pentru Parallel / Perpendicular, în coordonatele contextului (poate veni dintr-un obiect).
+// `normal`: normala primei fețe a muchiei, sau (0, 0, 1) dacă muchia nu are fețe.
+struct ReferenceEdge {
+    Vec3d a { 0.0 };
+    Vec3d b { 0.0 };
+    Vec3d normal { 0.0, 0.0, 1.0 };
+};
+
 class Engine {
 public:
     explicit Engine(Options options = {})
@@ -170,7 +178,7 @@ public:
 
     [[nodiscard]] const Inference& last() const { return m_last; }
     [[nodiscard]] const std::deque<Vec3d>& references() const { return m_references; }
-    [[nodiscard]] std::optional<geom::EdgeId> referenceEdge() const { return m_referenceEdge; }
+    [[nodiscard]] std::optional<ReferenceEdge> referenceEdge() const { return m_referenceEdge; }
 
 private:
     enum class LockKind { None, Line, Plane };
@@ -188,7 +196,7 @@ private:
         std::optional<Vec3d> from, const std::optional<math::Plane>& plane);
     Inference inferLocked(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
         std::optional<Vec3d> from);
-    void remember(const geom::Mesh& mesh, const Inference& result);
+    void remember(const Inference& result);
     void applyGrid(Inference& result, const std::optional<Vec3d>& from) const;
 
     Options m_options;
@@ -196,8 +204,9 @@ private:
     std::optional<Vec3d> m_lastFrom;
     Lock m_lock;
     std::deque<Vec3d> m_references;
-    std::optional<geom::EdgeId> m_referenceEdge;
-    std::optional<Vec3d> m_referenceDirection;
+    std::optional<ReferenceEdge> m_referenceEdge;
+    // Muchia atinsă de ultima inferență liberă (Midpoint / OnEdge), din orice strat; devine referință în remember().
+    std::optional<ReferenceEdge> m_hitEdge;
     std::optional<math::Plane> m_lastFacePlane;
     std::vector<GuideRef> m_guides;
     const SnapScene* m_scene = nullptr;

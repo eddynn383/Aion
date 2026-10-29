@@ -2,6 +2,7 @@
 #include "aion/core/geom/Primitives.h"
 #include "aion/core/inference/Inference.h"
 #include "aion/core/math/Intersect.h"
+#include "aion/core/math/Tolerance.h"
 #include "aion/core/model/SnapSources.h"
 
 #include <catch2/catch_approx.hpp>
@@ -358,6 +359,55 @@ TEST_CASE("Inferență pe obiecte: mijloc și pe muchie", "[core][inference]")
     CHECK_FALSE(r.edge);
     CHECK(math::projectOnSegment(r.point, { { 3000, 0, 1000 }, { 4000, 0, 1000 } }).distance < 1e-6);
     CHECK(r.point.x == Approx(3200).margin(30));
+}
+
+TEST_CASE("Inferență pe obiecte: paralel cu muchia unui obiect", "[core][inference]")
+{
+    model::Model m;
+    constexpr double kPi = 3.14159265358979323846;
+    const double angle = 30.0 * kPi / 180.0;
+    placeBox(m, Transform::rotation({ 3500, 500, 0 }, { 0, 0, 1 }, angle));
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = topCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    // Muchia de sus (oblică) a cutiei rotite; o atingem într-un punct oarecare, departe de capete și de mijloc.
+    const Vec3d a = Transform::rotation({ 3500, 500, 0 }, { 0, 0, 1 }, angle).applyToPoint({ 3000, 0, 1000 });
+    const Vec3d b = Transform::rotation({ 3500, 500, 0 }, { 0, 0, 1 }, angle).applyToPoint({ 4000, 0, 1000 });
+    const Vec3d onEdge = a + (b - a) * 0.25;
+    auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, onEdge), std::nullopt);
+    REQUIRE(r.kind == Kind::OnEdge);
+    REQUIRE(r.origin == Origin::Object);
+    REQUIRE(engine.referenceEdge());
+    const Vec3d dir = glm::normalize(b - a);
+    CHECK(near(engine.referenceEdge()->a, a, 1e-6));
+    CHECK(near(engine.referenceEdge()->b, b, 1e-6));
+    const Vec3d normal = engine.referenceEdge()->normal; // a primei fețe a muchiei (sus sau lateral)
+    CHECK(glm::length(normal) == Approx(1.0).margin(1e-9));
+    CHECK(tol::perpendicular(normal, dir, 1e-6));
+
+    const Vec3d from { 500, 1500, 0 };
+    r = engine.infer(m.mesh(m.root()), camera, screen(camera, from + dir * 1200.0), from);
+    CHECK(r.kind == Kind::Parallel);
+    REQUIRE(r.direction);
+    CHECK(tol::parallel(*r.direction, dir, 1e-6));
+    REQUIRE(r.guides.size() == 2);
+    CHECK(r.guides[1].tint == inference::Tint::Magenta);
+    CHECK(near(r.guides[1].a, a, 1e-6));
+    CHECK(near(r.guides[1].b, b, 1e-6));
+
+    // Perpendicular: în planul primei fețe, normal pe muchie; dacă ar cădea pe o axă, nu se oferă (ca la ctx.mesh).
+    const Vec3d perp = glm::normalize(glm::cross(normal, dir));
+    if (std::abs(perp.z) < 0.99) {
+        r = engine.infer(m.mesh(m.root()), camera, screen(camera, from + perp * 900.0), from);
+        CHECK(r.kind == Kind::Perpendicular);
+        REQUIRE(r.direction);
+        CHECK(tol::parallel(*r.direction, perp, 1e-6));
+    }
+
+    engine.reset();
+    CHECK_FALSE(engine.referenceEdge());
 }
 
 TEST_CASE("Inferență pe obiecte: pe față, cu normala", "[core][inference]")

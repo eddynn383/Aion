@@ -142,10 +142,27 @@ bool visible(const math::Ray& ray, const FaceHit& faceHit, const Vec3d& p)
     return depth <= faceDepth + 1.0 + faceDepth * 1e-4;
 }
 
-Vec3d edgeDirection(const geom::Mesh& mesh, geom::EdgeId id)
+// Muchia unui strat, trecută în coordonatele contextului.
+ReferenceEdge referenceOf(const detail::Layer& l, geom::EdgeId id)
 {
-    const geom::Edge& e = mesh.edge(id);
-    return glm::normalize(mesh.position(e.v1) - mesh.position(e.v0));
+    const geom::Edge& e = l.mesh->edge(id);
+    ReferenceEdge ref;
+    ref.a = l.point(l.mesh->position(e.v0));
+    ref.b = l.point(l.mesh->position(e.v1));
+    if (!e.faces.empty()) {
+        const Vec3d n = l.normal(l.mesh->face(e.faces.front()).plane.normal);
+        if (glm::length(n) > 1e-12) {
+            ref.normal = glm::normalize(n);
+        }
+    }
+    return ref;
+}
+
+// Direcția unitară a muchiei; vectorul nul pentru o muchie degenerată.
+Vec3d referenceDirection(const ReferenceEdge& ref)
+{
+    const Vec3d d = ref.b - ref.a;
+    return glm::length(d) > tol::kLength ? glm::normalize(d) : Vec3d { 0.0 };
 }
 
 bool isAxisAligned(const Vec3d& dir)
@@ -346,10 +363,7 @@ void Engine::applyGrid(Inference& result, const std::optional<Vec3d>& from) cons
 Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2d screen, std::optional<Vec3d> from,
     std::optional<math::Plane> plane)
 {
-    if (m_referenceEdge && !mesh.edges().contains(*m_referenceEdge)) {
-        m_referenceEdge.reset();
-        m_referenceDirection.reset();
-    }
+    m_hitEdge.reset();
     std::vector<detail::Layer> layers { { &mesh, camera, nullptr, {} } };
     if (m_scene) {
         for (const SnapSource& source : m_scene->sources) {
@@ -362,7 +376,7 @@ Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2
     Inference result
         = locked() ? inferLocked(layers, camera, screen, from) : inferFree(layers, camera, screen, from, plane);
     applyGrid(result, from);
-    remember(mesh, result);
+    remember(result);
     m_last = result;
     return result;
 }
@@ -370,7 +384,6 @@ Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2
 Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view::Camera& camera, Vec2d screen,
     std::optional<Vec3d> from, const std::optional<math::Plane>& plane)
 {
-    const geom::Mesh& mesh = *layers.front().mesh;
     const math::Ray ray = camera.rayAt(screen);
     Inference out;
     const FaceHit faceHit = nearestFace(layers, ray, screen, out.pick);
@@ -483,6 +496,7 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
         if (bestLayer) {
             out.kind = Kind::Midpoint;
             out.point = bestPoint;
+            m_hitEdge = referenceOf(*bestLayer, bestEdge);
             if (bestLayer->context()) {
                 out.edge = bestEdge;
             }
@@ -499,15 +513,11 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
             { axisDirection(Axis::Y), Kind::OnAxis, Axis::Y },
             { axisDirection(Axis::Z), Kind::OnAxis, Axis::Z },
         };
-        if (m_referenceEdge && m_referenceDirection && !isAxisAligned(*m_referenceDirection)) {
-            const Vec3d d = *m_referenceDirection;
+        const Vec3d refDir = m_referenceEdge ? referenceDirection(*m_referenceEdge) : Vec3d { 0.0 };
+        if (m_referenceEdge && glm::length(refDir) > 0.5 && !isAxisAligned(refDir)) {
+            const Vec3d d = refDir;
             directions.push_back({ d, Kind::Parallel });
-            const geom::Edge& e = mesh.edge(*m_referenceEdge);
-            Vec3d normal { 0.0, 0.0, 1.0 };
-            if (!e.faces.empty()) {
-                normal = mesh.face(e.faces.front()).plane.normal;
-            }
-            const Vec3d perp = glm::cross(normal, d);
+            const Vec3d perp = glm::cross(m_referenceEdge->normal, d);
             if (glm::length(perp) > 1e-6 && !isAxisAligned(glm::normalize(perp))) {
                 directions.push_back({ glm::normalize(perp), Kind::Perpendicular });
             }
@@ -544,8 +554,7 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
         inf.axis = l.direction.axis;
         inf.guides.push_back({ *from, inf.point, directionTint(l.direction.kind, l.direction.axis), false });
         if (l.direction.kind != Kind::OnAxis && m_referenceEdge) {
-            const geom::Edge& e = mesh.edge(*m_referenceEdge);
-            inf.guides.push_back({ mesh.position(e.v0), mesh.position(e.v1), Tint::Magenta, false });
+            inf.guides.push_back({ m_referenceEdge->a, m_referenceEdge->b, Tint::Magenta, false });
         }
     };
 
@@ -669,6 +678,7 @@ Inference Engine::inferFree(const std::vector<detail::Layer>& layers, const view
         if (bestLayer && (!linear || bestDistance < linear->distance)) {
             out.kind = Kind::OnEdge;
             out.point = bestPoint;
+            m_hitEdge = referenceOf(*bestLayer, bestPick.edge);
             if (bestLayer->context()) {
                 out.edge = bestPick.edge;
             }
@@ -851,7 +861,7 @@ Inference Engine::inferLocked(const std::vector<detail::Layer>& layers, const vi
     return keep;
 }
 
-void Engine::remember(const geom::Mesh& mesh, const Inference& result)
+void Engine::remember(const Inference& result)
 {
     std::optional<Vec3d> reference;
     if (result.kind == Kind::Endpoint || result.kind == Kind::Midpoint) {
@@ -869,9 +879,8 @@ void Engine::remember(const geom::Mesh& mesh, const Inference& result)
     if (result.kind == Kind::OnFace && result.normal) {
         m_lastFacePlane = math::Plane::fromPointNormal(result.point, *result.normal);
     }
-    if ((result.kind == Kind::OnEdge || result.kind == Kind::Midpoint) && result.edge) {
-        m_referenceEdge = result.edge;
-        m_referenceDirection = edgeDirection(mesh, result.edge);
+    if ((result.kind == Kind::OnEdge || result.kind == Kind::Midpoint) && m_hitEdge) {
+        m_referenceEdge = m_hitEdge;
     }
 }
 
@@ -917,10 +926,10 @@ void Engine::toggleReferenceLock()
         unlock();
         return;
     }
-    if (!m_lastFrom || !m_referenceDirection) {
+    if (!m_lastFrom || !m_referenceEdge || glm::length(referenceDirection(*m_referenceEdge)) < 0.5) {
         return;
     }
-    m_lock = { LockKind::Line, *m_lastFrom, *m_referenceDirection, {}, Kind::Parallel, Axis::None };
+    m_lock = { LockKind::Line, *m_lastFrom, referenceDirection(*m_referenceEdge), {}, Kind::Parallel, Axis::None };
 }
 
 void Engine::unlock()
@@ -933,7 +942,6 @@ void Engine::reset()
     resetLock();
     m_references.clear();
     m_referenceEdge.reset();
-    m_referenceDirection.reset();
 }
 
 void Engine::restartFrom(const Vec3d& from)
