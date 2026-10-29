@@ -262,6 +262,13 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `Document::copySelection` / `pasteClipboard` / `makeUnique`; `model::AnimationPlayer` (redarea din interacțiuni,
   `Action::direction` / `repeat`, format v5). Acțiuni de script: `keys:,ctrl+c`, `keys:,ctrl+v`, `org.makeUnique`;
   în Modul interacțiune: `mode.interaction` (F5) apoi `clickw:`.
+- **Ecranul de start și recuperarea** (ADR 0040): `overlays/StartScreen.qml` (la pornire, dacă `UserPrefs.startScreen`
+  sau dacă a rămas o copie; niciodată în rulările automate sau când pornește cu un fișier); `core/io/Recovery.h` (copii pe
+  sesiune: `Recuperare/<sesiune>.aion|json`), `render/src/RecoveryStore` (QLockFile pe sesiune, migrarea vechiului
+  `autosave.aion`, QSettings pe web), `Document::recoveries` / `recoverSession` / `discardRecovery` / `autosave` /
+  `recentDocuments`, `text::describeTime`. Acțiuni de script: `app.start`, `debug.autosave`, `debug.crash` (închidere
+  bruscă, doar în rulările automate). Clicurile reale date în altă fereastră în timpul unei rulări automate pot ajunge la
+  fereastra Aion și închid pop-up-urile (ecranul de start, Despre) — o captură fără el înseamnă de obicei asta.
 - **Ștergerea** (ADR 0037): guma și ⌫ păstrează fețele (`geom::eraseEdgesKeepingFaces`), Delete le ia
   (`eraseEdgesWithFaces`); `tools::deleteSelection(ctx, keepFaces)`. În scripturi: `keys:,backspace` / `keys:,delete`;
   `debug.geometry` arată și titlul selecției.

@@ -4,6 +4,8 @@ add_library(aion_render STATIC
     include/aion/render/ScriptEngine.h
     include/aion/render/Viewport.h
     src/Document.cpp
+    src/RecoveryStore.cpp
+    src/RecoveryStore.h
     src/ProceduralTextures.cpp
     src/ScriptEngine.cpp
     src/GraphicsApi.cpp

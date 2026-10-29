@@ -705,6 +705,8 @@ ADR 0036.
 - [ ] (Opțional) Desen păstrat pe definiție, refolosit de instanțe: hover și editare rapide pe modele foarte mari
 - [x] Copii unice și animații pornite din interacțiuni (cerința din 2026-10-29, ADR 0039): ⌘C / ⌘V cu plasare, Fă unic
   la vedere, animațiile și regulile copiilor, sens / repetări / redare paralelă, redenumirea animațiilor
+- [x] Ecranul de start și recuperarea (cerința din 2026-10-29, ADR 0040): splash ca în Blender (nou, deschide,
+  ultimul fișier, recente cu miniaturi), copii de recuperare pe sesiune cu lock, oferite după o închidere bruscă
 
 ---
 

@@ -30,6 +30,7 @@ Faza 7: salvarea și deschiderea modelelor, exportul și importul în formate de
   salvat (și după undo până acolo devine iar nemodificat). Titlul arată un punct după nume.
 - Autosalvare la fiecare minut în `AppData/autosave.aion` (doar cu modificări). La pornire, un fișier rămas înseamnă o
   sesiune neîncheiată normal: un banner oferă recuperarea. Salvarea, deschiderea și „Nu salva” îl șterg.
+  **Înlocuit de ADR 0040**: copii pe sesiune în `AppData/Recuperare/`, cu lock, oferite din ecranul de start.
 - Documente recente (8) în QSettings; în command palette apar ca „Deschide recent: …”.
 
 ## Consecințe

@@ -11,6 +11,7 @@
 #include "aion/core/tools/Tool.h"
 
 #include <QColor>
+#include <QDateTime>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -28,6 +29,8 @@
 #include <unordered_map>
 
 namespace aion::render {
+
+class RecoveryStore;
 
 // Documentul deschis: modelul, istoricul undo/redo, contextul de editare, selecția și unealta activă.
 // Puntea dintre nucleu (fără Qt) și interfață: QML îl folosește pentru comenzi și stare,
@@ -72,9 +75,11 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY historyChanged)
     Q_PROPERTY(QStringList recentFiles READ recentFiles NOTIFY recentFilesChanged)
-    // O sesiune nesalvată, găsită la pornire (autosalvarea unei rulări care nu s-a închis normal).
+    // Copiile de recuperare găsite la pornire: autosalvările sesiunilor care nu s-au închis normal (ADR 0040).
+    // `recoveryInfo` descrie cea mai nouă; `recoveries`: { session, name, source, folder, when }, cele mai noi întâi.
     Q_PROPERTY(bool hasRecovery READ hasRecovery NOTIFY recoveryChanged)
     Q_PROPERTY(QString recoveryInfo READ recoveryInfo NOTIFY recoveryChanged)
+    Q_PROPERTY(QVariantList recoveries READ recoveries NOTIFY recoveryChanged)
     // --- Materiale (Faza 8) ---
     // Biblioteca inclusă: { index, name, color, roughness, metallic }.
     Q_PROPERTY(QVariantList libraryMaterials READ libraryMaterials CONSTANT)
@@ -166,8 +171,9 @@ public:
     QString fileName() const;
     bool modified() const { return !m_stack.isClean(); }
     QStringList recentFiles() const;
-    bool hasRecovery() const { return m_hasRecovery; }
+    bool hasRecovery() const;
     QString recoveryInfo() const;
+    QVariantList recoveries() const;
     QString lastError() const { return m_lastError; }
     bool autosaveEnabled() const { return m_autosaveTimer.isActive(); }
     void setAutosaveEnabled(bool enabled);
@@ -274,9 +280,14 @@ public:
     Q_INVOKABLE bool importFile(const QString& path);
     // Export după extensie: .obj (+ .mtl alături), .gltf, .glb.
     Q_INVOKABLE bool exportFile(const QString& path);
-    Q_INVOKABLE void recoverAutosave();
-    Q_INVOKABLE void discardAutosave();
+    // Deschide o copie de recuperare (`session` gol = cea mai nouă) ca document nesalvat, cu fișierul ei de origine.
+    Q_INVOKABLE void recoverSession(const QString& session = {});
+    Q_INVOKABLE void discardRecovery(const QString& session = {});
+    // Scrie acum copia de recuperare a sesiunii (doar dacă documentul are modificări); altfel o face timer-ul.
+    Q_INVOKABLE void autosave();
     Q_INVOKABLE void clearRecentFiles();
+    // Documentele recente pentru ecranul de start: { path, name, folder, when, thumbnail (data URL sau "") }.
+    Q_INVOKABLE QVariantList recentDocuments() const;
     // Calea locală dintr-un URL de fișier (dialogurile QML dau URL-uri).
     Q_INVOKABLE QString localPath(const QUrl& url) const;
 
@@ -728,9 +739,6 @@ private:
     void setFilePath(const QString& path);
     void addRecentFile(const QString& path);
     void setError(const QString& message);
-    void autosave();
-    void removeAutosave();
-    static QString autosavePath();
 
     model::Model m_model;
     commands::CommandStack m_stack { m_model };
@@ -770,8 +778,10 @@ private:
     std::optional<tools::PointerEvent> m_lastPointer;
     QString m_filePath;
     QString m_lastError;
-    bool m_hasRecovery = false;
+    std::unique_ptr<RecoveryStore> m_recovery;
     QTimer m_autosaveTimer;
+    // Miniaturile documentelor recente, după cale: (data modificării, data URL).
+    mutable std::map<QString, std::pair<QDateTime, QString>> m_recentThumbnails;
     model::MaterialId m_currentMaterial;
     model::AnnotationId m_editingAnnotation;
     std::vector<inference::GuideRef> m_contextGuides;

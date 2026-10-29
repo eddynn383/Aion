@@ -46,6 +46,7 @@ add_library(aion_core STATIC
     src/math/Plane.cpp
     src/math/Transform.cpp
     src/text/FuzzyMatch.cpp
+    src/text/Dates.cpp
     src/view/Camera.cpp
     src/view/CameraMotion.cpp
     src/view/SceneAnimation.cpp
@@ -56,6 +57,7 @@ add_library(aion_core STATIC
     src/io/AionFile.cpp
     src/io/Gltf.cpp
     src/io/Obj.cpp
+    src/io/Recovery.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp
     src/tools/ToolHelpers.cpp

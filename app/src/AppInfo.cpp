@@ -23,6 +23,7 @@
 #include <QQuickWindow>
 
 #include <cmath>
+#include <cstdlib>
 #include <memory>
 #include <utility>
 
@@ -106,6 +107,18 @@ bool AppInfo::storybookOnStart() const
 QStringList AppInfo::startupActions() const
 {
     return qEnvironmentVariable("AION_STARTUP").split(QLatin1Char(';'), Qt::SkipEmptyParts);
+}
+
+bool AppInfo::automated()
+{
+    return qEnvironmentVariableIsSet("AION_SCREENSHOT") || qEnvironmentVariableIsSet("AION_STARTUP");
+}
+
+void AppInfo::simulateCrash() const
+{
+    if (automated()) {
+        std::_Exit(EXIT_FAILURE);
+    }
 }
 
 QString AppInfo::shortcutText(const QString& sequence) const

@@ -91,6 +91,7 @@ qt_add_qml_module(aion_app
         qml/overlays/MeasurementsBox.qml
         qml/overlays/PreferencesPage.qml
         qml/overlays/AboutDialog.qml
+        qml/overlays/StartScreen.qml
         qml/overlays/ToolTour.qml
         qml/overlays/QuantitiesDialog.qml
         qml/shell/ObjectInfo.qml

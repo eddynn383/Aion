@@ -20,6 +20,7 @@ class AppInfo : public QObject {
     Q_PROPERTY(bool debugBuild READ debugBuild CONSTANT)
     Q_PROPERTY(bool storybookOnStart READ storybookOnStart CONSTANT)
     Q_PROPERTY(QStringList startupActions READ startupActions CONSTANT)
+    Q_PROPERTY(bool automated READ automated CONSTANT)
 
 public:
     explicit AppInfo(QObject* parent = nullptr);
@@ -35,6 +36,8 @@ public:
     bool storybookOnStart() const;
     // AION_STARTUP="view.top;palette:zoom" rulează comenzi la pornire (pentru verificări automate).
     QStringList startupActions() const;
+    // O rulare automată (AION_SCREENSHOT sau AION_STARTUP): are profilul „Aion Test” și nu arată ecranul de start.
+    static bool automated();
 
     // Textul unei scurtături în forma platformei („Ctrl+K” devine „⌘K” pe macOS).
     Q_INVOKABLE QString shortcutText(const QString& sequence) const;
@@ -62,6 +65,10 @@ public:
     // („enter”, „escape”, „up”, „down” sau gol).
     Q_INVOKABLE void simulateKeys(const QString& text, const QString& finalKey) const;
     Q_INVOKABLE void simulateWheel(QQuickItem* item, const QPointF& position, int angleDelta) const;
+
+    // Doar în rulările automate: oprește procesul pe loc, fără curățenie, ca o închidere bruscă (verificarea
+    // recuperării: copia de autosalvare și lock-ul sesiunii rămân pe disc).
+    Q_INVOKABLE void simulateCrash() const;
 
     // Fișierele cerute din afară (Finder, Dock, linia de comandă) până să le preia interfața.
     static void queueFileOpen(const QString& path);
