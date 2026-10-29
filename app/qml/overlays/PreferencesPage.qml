@@ -24,7 +24,7 @@ Item {
     property string shortcutNotice: ""
 
     readonly property var categories: [
-        { name: "General", icon: "settings", description: "Ajutorul din aplicație și documentele recente." },
+        { name: "General", icon: "settings", description: "Ajutorul din aplicație, ecranul de start și documentele recente." },
         { name: "Unități", icon: "ruler", description: "Cum se afișează și cum se citesc lungimile." },
         { name: "Salvare", icon: "check", description: "Copiile de recuperare ale documentului deschis." },
         { name: "Aspect", icon: "palette", description: "Tema, culoarea de accent și culorile interfeței." },
@@ -239,6 +239,18 @@ Item {
                             Toggle {
                                 checked: UserPrefs.hoverGuides
                                 onToggled: UserPrefs.hoverGuides = checked
+                            }
+                        }
+                    }
+                    SettingsGroup {
+                        width: parent.width
+                        title: "Pornire"
+                        SettingsRow {
+                            title: "Ecranul de start"
+                            description: "La pornire: document nou, deschide, ultimul fișier și documentele recente. După o închidere bruscă apare oricum, cu copia de recuperare."
+                            Toggle {
+                                checked: UserPrefs.startScreen
+                                onToggled: UserPrefs.startScreen = checked
                             }
                         }
                     }

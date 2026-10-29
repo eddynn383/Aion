@@ -151,6 +151,10 @@ Platform.MenuBar {
     Platform.Menu {
         title: "Ajutor"
         Platform.MenuItem {
+            text: "Ecranul de start"
+            onTriggered: root.host.runCommand("app.start")
+        }
+        Platform.MenuItem {
             text: "Turul uneltelor"
             onTriggered: root.host.runCommand("app.tour")
         }

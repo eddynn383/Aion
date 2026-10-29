@@ -147,7 +147,8 @@ Window {
             { id: "nav.pivotCursor", title: "Orbitează în jurul punctului de sub cursor", category: "Vedere", shortcut: "", icon: "orbit" },
             { id: "app.preferences", title: "Preferințe…", category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
             { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" },
-            { id: "app.tour", title: "Turul uneltelor (cum se folosește fiecare)", category: "Ajutor", shortcut: "", icon: "info" }
+            { id: "app.tour", title: "Turul uneltelor (cum se folosește fiecare)", category: "Ajutor", shortcut: "", icon: "info" },
+            { id: "app.start", title: "Ecranul de start (document nou, deschide, recente)", category: "Fișier", shortcut: "", icon: "app-window" }
         ]
         // Toate uneltele din toolbar, cu scurtăturile lor.
         for (const t of toolbar.allTools)
@@ -408,6 +409,7 @@ Window {
         case "app.preferences": preferencesPage.active = true; break
         case "app.about": aboutDialog.open(); break
         case "app.tour": toolTour.open(); break
+        case "app.start": startScreen.open(); break
         case "debug.storybook": storybookLoader.active = true; break
         case "debug.demos": demoGalleryLoader.active = true; break
         case "debug.menus": if (menuBarInstantiator.object) menuBarInstantiator.object.dump(); break
@@ -458,6 +460,12 @@ Window {
                     viewport.displayStyle = action.slice(6)
                 } else if (action === "file.newNow") {
                     doc.newDocument()
+                } else if (action === "debug.autosave") {
+                    // Copia de recuperare acum, nu după intervalul autosalvării.
+                    doc.autosave()
+                } else if (action === "debug.crash") {
+                    // O închidere bruscă: copia și lock-ul sesiunii rămân (ecranul de start le oferă la repornire).
+                    AppInfo.simulateCrash()
                 } else if (action === "anchor:") {
                     // Ancorează obiectul selectat pe ultima cale.
                     const ps = doc.paths
@@ -961,6 +969,17 @@ Window {
         doc.snapToGrid = preferences.snapToGrid
         doc.gridStep = preferences.gridStep
         window.openPendingFiles()
+        Qt.callLater(window.showStartScreen)
+    }
+
+    // Ecranul de start (ADR 0040): la pornire, dacă e cerut în Preferințe sau dacă a rămas o copie de recuperare.
+    // Nu apare în rulările automate (capturi, scripturi; acolo îl deschide `app.start`), nici când aplicația a pornit
+    // cu un fișier. În browser recentele nu persistă: apare doar pentru recuperare.
+    function showStartScreen() {
+        if (AppInfo.automated || doc.filePath.length > 0)
+            return
+        if (doc.hasRecovery || (UserPrefs.startScreen && !WebFiles.available))
+            startScreen.open()
     }
     Connections {
         target: Theme
@@ -980,6 +999,8 @@ Window {
     // Fișierele deschise din Finder (dublu-click pe un .aion, „Open With”) sau date în linia de comandă.
     function openPendingFiles() {
         const files = AppInfo.takePendingFiles()
+        if (files.length > 0)
+            startScreen.close()
         for (const path of files) {
             if (path.toLowerCase().endsWith(".aion"))
                 window.confirmDiscard(() => doc.openFile(path))
@@ -1021,6 +1042,17 @@ Window {
     AboutDialog {
         id: aboutDialog
         parent: window.contentItem
+    }
+    StartScreen {
+        id: startScreen
+        parent: window.contentItem
+        document: doc
+        onNewRequested: window.runCommand("file.new")
+        onOpenRequested: window.runCommand("file.open")
+        onRecentRequested: (path) => window.confirmDiscard(() => doc.openFile(path))
+        onRecoverRequested: (session) => window.confirmDiscard(() => doc.recoverSession(session))
+        onTourRequested: window.runCommand("app.tour")
+        onPreferencesRequested: window.runCommand("app.preferences")
     }
     // Drop din bibliotecă: obiectul se pune pe suprafața (sau solul) de sub cursor.
     DropArea {
@@ -1773,9 +1805,9 @@ Window {
             }
         }
 
-        // O sesiune nesalvată găsită la pornire.
+        // O copie de recuperare rămasă (ecranul de start închis fără să aleagă).
         Rectangle {
-            visible: doc.hasRecovery
+            visible: doc.hasRecovery && !startScreen.visible
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.topMargin: 56 // sub bara de vizualizare din colț
@@ -1797,7 +1829,7 @@ Window {
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Am găsit o sesiune nesalvată: " + doc.recoveryInfo
+                    text: "Copie de recuperare: " + doc.recoveryInfo
                     color: Theme.textPrimary
                     font.pixelSize: Theme.fontSizeSm
                 }
@@ -1805,12 +1837,12 @@ Window {
                     small: true
                     variant: "primary"
                     text: "Recuperează"
-                    onClicked: doc.recoverAutosave()
+                    onClicked: window.confirmDiscard(() => doc.recoverSession(""))
                 }
                 Button {
                     small: true
                     text: "Renunță"
-                    onClicked: doc.discardAutosave()
+                    onClicked: doc.discardRecovery("")
                 }
             }
         }
@@ -2122,7 +2154,6 @@ Window {
                     onClicked: {
                         const action = unsavedDialog.action
                         unsavedDialog.close()
-                        doc.discardAutosave()
                         if (action) action()
                     }
                 }
