@@ -4,6 +4,7 @@
 #include "aion/core/model/SnapSources.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/tools/Tool.h"
+#include "aion/core/units/Length.h"
 #include "aion/core/view/Picking.h"
 
 #include <catch2/catch_approx.hpp>
@@ -1646,6 +1647,27 @@ TEST_CASE("Primitive: înălțimea în dreptul colțului altui obiect", "[core][
     const model::InstanceId id = *s.selection.instances.begin();
     CHECK(model::placementOf(s.m, id).size.z == Approx(2500.0).margin(1e-6));
     CHECK(s.m.definition(s.m.instance(id).definition).shape == "cylinder");
+}
+
+TEST_CASE("Primitive: sub bază, înălțimea rămâne 0 și click-ul nu face nimic", "[core][tools][primitives]")
+{
+    ObjectScene s;
+    auto cube = s.make("cube");
+    s.click(*cube, { 1000, 1000, 0 });
+    s.click(*cube, { 1400, 1000, 0 });
+    CHECK(cube->status().find("deasupra bazei") != std::string::npos);
+
+    const Vec3d below { 1000, 1000, -1500 };
+    cube->pointerMove(s.ctx, tools::PointerEvent { s.screen(below), {}, 1 });
+    CHECK(cube->measurement()->value == units::formatLength(0.0));
+    const tools::Overlay o = cube->overlay();
+    CHECK(std::ranges::none_of(o.lines, [](const tools::OverlayLine& l) { return l.a.z < -1e-6 || l.b.z < -1e-6; }));
+    s.click(*cube, below);
+    CHECK(s.m.instances().empty());
+    CHECK(cube->measurement()->label == "Înălțime"); // tot la pasul înălțimii
+
+    s.click(*cube, { 1000, 1000, 1500 });
+    CHECK(s.m.instances().size() == 1);
 }
 
 TEST_CASE("Primitive: sfera rămâne cu două clicuri", "[core][tools][primitives]")

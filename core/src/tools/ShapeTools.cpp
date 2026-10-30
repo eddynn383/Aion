@@ -685,7 +685,7 @@ public:
     std::string status() const override
     {
         if (m_heightStep) {
-            return "Alege înălțimea sau tastează-o · Esc anulează";
+            return "Alege înălțimea deasupra bazei sau tastează-o · Esc anulează";
         }
         if (m_center) {
             return "Alege mărimea bazei sau tastează-o (1000, sau 1000,500 cu înălțimea) · Esc anulează";
@@ -883,12 +883,13 @@ private:
     }
 
     // Înălțimea, ca la Push/Pull: în dreptul unui punct al geometriei (capăt, mijloc, centru, muchie), cu ghidaj
-    // punctat până la vârful înălțimii; altfel punctul de pe normala bazei cel mai apropiat de cursor.
+    // punctat până la vârful înălțimii; altfel punctul de pe normala bazei cel mai apropiat de cursor. Doar deasupra
+    // bazei: sub ea, înălțimea rămâne 0 (fără corp) și click-ul nu face nimic.
     void trackHeight(ToolContext& ctx, Vec2d screen)
     {
         inference::Inference inf = inferAt(m_engine, ctx, screen, std::nullopt);
         const double depth = glm::dot(inf.point - *m_center, m_normal);
-        if ((inf.isPoint() || inf.kind == inference::Kind::OnEdge) && std::abs(depth) > tol::kLength) {
+        if ((inf.isPoint() || inf.kind == inference::Kind::OnEdge) && depth > tol::kLength) {
             m_height = depth;
             const Vec3d top = *m_center + m_normal * m_height;
             if (!tol::samePoint(top, inf.point)) {
@@ -899,7 +900,7 @@ private:
         }
         m_inference = {};
         if (const auto p = inference::pointOnLineUnderCursor(ctx.camera, screen, *m_center, m_normal)) {
-            m_height = glm::dot(*p - *m_center, m_normal);
+            m_height = std::max(glm::dot(*p - *m_center, m_normal), 0.0);
         }
     }
 
