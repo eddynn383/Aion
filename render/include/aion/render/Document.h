@@ -435,6 +435,8 @@ public:
     // "" = ca placa) sau toate patru (o presetare: listă de { bandKey, decor } pe L1, L2, W1, W2).
     Q_INVOKABLE void setBand(int side, const QString& bandKey, const QString& decor);
     Q_INVOKABLE void setBands(const QVariantList& sides);
+    // Altă variantă a feroneriei selectate (toate aparițiile ei legate).
+    Q_INVOKABLE void setHardwareVariant(const QString& typeKey);
     // Presetările de cant incluse: { name, sides }.
     Q_INVOKABLE QVariantList bandPresets() const;
     // Toate tipurile de cant: { key, label }.

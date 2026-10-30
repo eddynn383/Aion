@@ -66,6 +66,12 @@ struct HardwareType {
 InstanceId createHardware(
     Model& model, DefinitionId context, std::string_view typeKey, const math::Transform& placement);
 
+// Altă variantă de feronerie pe definiție (deci pe toate instanțele ei): forma, `typeKey`, numele. False dacă
+// definiția nu e feronerie sau tipul nu există.
+bool replaceHardwareVariant(Model& model, DefinitionId definition, std::string_view typeKey);
+// Familia unui tip de feronerie: "hinge", "slide", "handle" (prefixul cheii).
+[[nodiscard]] std::string_view hardwareFamily(std::string_view typeKey);
+
 // Dimensiunile unei piese (mm), măsurate pe geometria proprie a definiției (fără sub-piese), cu transformarea
 // dată (scările se înmulțesc). O placă (PartSpec de placă): grosimea pe axa grosimii, lungimea pe axa fibrei
 // (chiar dacă e latura mai scurtă). Fără PartSpec: regula din ADR 0017 (fața cea mai mare: grosimea pe

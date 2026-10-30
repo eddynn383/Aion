@@ -1184,6 +1184,22 @@ QVariantMap Document::entityInfo() const
                 { QStringLiteral("bandDecors"), bandDecors() },
             };
         }
+        // Feronerie (pasul 9): varianta și celelalte variante din aceeași familie.
+        if (definition.part && definition.part->kind == model::PartSpec::Kind::Hardware) {
+            const std::string_view family = model::hardwareFamily(definition.part->typeKey);
+            QVariantList variants;
+            for (const model::HardwareType& t : model::hardwareTypes()) {
+                if (model::hardwareFamily(t.key) == family) {
+                    variants.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(t.key) },
+                        { QStringLiteral("label"), QString::fromStdString(t.label) } });
+                }
+            }
+            info[QStringLiteral("hardware")] = QVariantMap {
+                { QStringLiteral("type"), QString::fromStdString(definition.part->typeKey) },
+                { QStringLiteral("variants"), variants },
+                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+            };
+        }
         // Sferă / cilindru / con nemodificate: numărul de segmente (0 = nu se poate schimba).
         info[QStringLiteral("segments")] = model::primitiveSegments(m_model, inst.definition);
     } else if (m_selection.instances.empty() && m_selection.edges.empty()) {
@@ -5765,6 +5781,17 @@ void Document::setBands(const QVariantList& sides)
         setError(QStringLiteral("%1 laturi au rămas fără cant: cantul nu se potrivește tipului plăcii.")
                 .arg(skipped));
     }
+    emit selectionChanged();
+}
+
+void Document::setHardwareVariant(const QString& typeKey)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Variantă de feronerie",
+        [&](model::Model& model) { model::replaceHardwareVariant(model, def, typeKey.toStdString()); });
     emit selectionChanged();
 }
 

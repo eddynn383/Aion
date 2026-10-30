@@ -149,6 +149,45 @@ InstanceId createHardware(
     return model.addInstance(inst);
 }
 
+bool replaceHardwareVariant(Model& model, DefinitionId definition, std::string_view typeKey)
+{
+    const HardwareType* type = findHardwareType(typeKey);
+    Definition def = model.definition(definition);
+    if (type == nullptr || !def.part || def.part->kind != PartSpec::Kind::Hardware) {
+        return false;
+    }
+    if (def.part->typeKey == type->key) {
+        return true;
+    }
+    def.part->typeKey = type->key;
+    def.name = type->label;
+    model.setDefinition(definition, def);
+    geom::Mesh& mesh = model.mesh(definition);
+    for (geom::FaceId f : std::vector(mesh.faces().keys())) {
+        mesh.removeFace(f);
+    }
+    for (geom::EdgeId e : std::vector(mesh.edges().keys())) {
+        mesh.removeEdge(e);
+    }
+    for (geom::VertexId v : std::vector(mesh.vertices().keys())) {
+        mesh.removeVertex(v);
+    }
+    geom::buildPrimitive(mesh, geom::Primitive::Box, type->size, 4);
+    for (InstanceId id : model.instancesOf(definition)) {
+        Instance inst = model.instance(id);
+        if (inst.nameKey.starts_with("hardware.")) {
+            inst.nameKey = "hardware." + type->key;
+            model.setInstance(id, inst);
+        }
+    }
+    return true;
+}
+
+std::string_view hardwareFamily(std::string_view typeKey)
+{
+    return typeKey.substr(0, typeKey.find('.'));
+}
+
 namespace {
 
 struct LocalBox {

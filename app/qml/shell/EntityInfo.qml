@@ -310,6 +310,53 @@ Column {
         }
     }
 
+    // Feronerie (pasul 9): varianta (balama aplicată / încastrată…, lungimea glisierei); se schimbă pe toate aparițiile.
+    PropertyGroup {
+        id: hardwareBox
+        readonly property var hardware: root.isInstance ? (root.info.hardware ?? null) : null
+        visible: hardware !== null && root.modeling
+        title: "Feronerie"
+        Flow {
+            width: hardwareBox.width
+            spacing: 4
+            Repeater {
+                model: hardwareBox.hardware ? hardwareBox.hardware.variants : []
+                delegate: Rectangle {
+                    id: variant
+                    required property var modelData
+                    readonly property bool current: hardwareBox.hardware && hardwareBox.hardware.type === modelData.key
+                    width: variantLabel.implicitWidth + Theme.space3 * 2
+                    height: 24
+                    radius: 12
+                    color: current ? Theme.accentSubtle : variantArea.containsMouse ? Theme.bgHover : "transparent"
+                    border.color: current ? Theme.accent : Theme.borderStrong
+                    Text {
+                        id: variantLabel
+                        anchors.centerIn: parent
+                        text: variant.modelData.label
+                        color: variant.current ? Theme.textPrimary : Theme.textSecondary
+                        font.pixelSize: Theme.fontSizeXs
+                    }
+                    MouseArea {
+                        id: variantArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.document.setHardwareVariant(variant.modelData.key)
+                    }
+                }
+            }
+        }
+        Text {
+            visible: hardwareBox.hardware !== null && hardwareBox.hardware.copies > 1
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Afectează " + (hardwareBox.hardware ? hardwareBox.hardware.copies : 1) + " apariții legate."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
     // Cantul plăcii (pasul 7): pe fiecare latură, tipul și decorul; presetări.
     PropertyGroup {
         id: bandBox

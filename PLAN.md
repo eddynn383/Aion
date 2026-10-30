@@ -726,7 +726,7 @@ Designul aprobat: [`docs/plans/mobilier-pe-corp.md`](docs/plans/mobilier-pe-corp
 - [x] Pasul 6: corpurile din bibliotecă (reconciliere, separatoare)
 - [x] Pasul 7: cantul (date, Inspector, viewport, listă) — **punct de control al autorului**
 - [x] Pasul 8: legarea componentelor salvate, lista „În model”
-- [ ] Pasul 9: feroneria în bibliotecă, variante, deviz
+- [x] Pasul 9: feroneria în bibliotecă, variante, deviz
 - [ ] Pasul 10: unealta „Placă pe față”
 - [ ] Pasul 11: „Întinde”
 - [ ] Pasul 12: traducerea (RO, EN complete; DE, PL, IT, FR, ES, PT beta)

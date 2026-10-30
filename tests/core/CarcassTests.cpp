@@ -501,3 +501,48 @@ TEST_CASE("Legare: plăcile și corpurile din bibliotecă nu au cheie; inserarea
     CHECK(m.definition(m.instance(placed).definition).sourceKey == "k2");
     CHECK(model::findLinkedDefinition(m, "k2", m.root()) == m.instance(placed).definition);
 }
+
+// --- Feroneria (pasul 9) ---
+
+TEST_CASE("Feronerie: corpurile legate numără toate balamalele", "[core][carcass][hardware]")
+{
+    Body b = makeBody("base", { { "doors", 2 } });
+    for (int i = 1; i <= 3; ++i) {
+        model::placeLinked(b.m, b.def, b.m.root(), Transform::translation({ i * 700.0, 0, 0 }));
+    }
+    const model::CutList list = model::cutList(b.m);
+    int hinges = 0;
+    for (const model::HardwareNeed& h : list.hardware) {
+        if (h.typeKey == "hinge.overlay.110") {
+            hinges = h.count;
+        }
+    }
+    CHECK(hinges == 16);
+    for (const model::CutPart& p : list.parts) {
+        if (p.section == model::CutSection::Board) {
+            CHECK(p.typeKey != "hinge.overlay.110"); // feroneria nu e printre plăci
+        }
+    }
+}
+
+TEST_CASE("Feronerie: altă variantă pe o balama schimbă toate aparițiile", "[core][carcass][hardware]")
+{
+    Body b = makeBody("base");
+    model::placeLinked(b.m, b.def, b.m.root(), Transform::translation({ 700.0, 0, 0 }));
+    const model::InstanceId hinge = role(b.m, b.def, "door.1.hinge.1");
+    const model::DefinitionId d = b.m.instance(hinge).definition;
+    REQUIRE(model::replaceHardwareVariant(b.m, d, "hinge.inset.165"));
+    CHECK(b.m.definition(d).part->typeKey == "hinge.inset.165");
+    CHECK(model::partName(b.m, hinge) == "Balama încastrată 165°");
+    const model::CutList list = model::cutList(b.m);
+    int inset = 0;
+    for (const model::HardwareNeed& h : list.hardware) {
+        if (h.typeKey == "hinge.inset.165") {
+            inset = h.count;
+        }
+    }
+    CHECK(inset == 2); // aceeași balama în ambele corpuri legate
+    CHECK_FALSE(model::replaceHardwareVariant(
+        b.m, b.m.instance(role(b.m, b.def, "side.left")).definition, "handle.128"));
+    CHECK(model::hardwareFamily("hinge.inset.165") == "hinge");
+}
