@@ -51,7 +51,7 @@ Canvas {
 
         const view = { cx: W * 0.5, cy: H * 0.56, s: H / 6, yaw: 0, zoom: 1, panX: 0, panY: 0 }
         const d = makeDraw(ctx, view, c)
-        const scene = scenes[tool] || (["sphere", "cone", "cylinder"].includes(tool) ? scenes.cube : scenes.select)
+        const scene = scenes[tool] || (["cone", "cylinder"].includes(tool) ? scenes.cube : scenes.select)
         scene(d, t, c)
     }
 
@@ -409,6 +409,47 @@ Canvas {
             const cur = t < 0.2 ? approach(d, t, [0, 0, 0], 0.18)
                       : t < 0.54 ? d.p(half, 0, 0) : d.p(half, 0, h)
             d.cursor(cur, Math.max(d.clickK(t, 0.2), d.clickK(t, 0.52), d.clickK(t, 0.86)))
+        },
+        sphere: function(d, t, c) {
+            d.grid()
+            // Doi pași: centrul bazei, apoi lățimea (sfera stă pe bază, fără pasul înălțimii).
+            const r = 1.1 * phase(t, 0.24, 0.56)
+            const ring = function(f) {
+                const pts = []
+                for (let i = 0; i < 32; ++i) pts.push(f(i / 32 * 2 * Math.PI))
+                return pts
+            }
+            if (t > 0.2 && r > 0.02) {
+                if (t < 0.62) {
+                    // Previzualizarea: cercul bazei, ecuatorul și două meridiane.
+                    d.polygon(ring(a => [Math.cos(a) * r, Math.sin(a) * r, 0]), Qt.rgba(0.23, 0.51, 0.96, 0.10), c.accent, 1.4)
+                    d.polygon(ring(a => [Math.cos(a) * r, Math.sin(a) * r, r]), null, c.accent, 1.1)
+                    d.polygon(ring(a => [Math.cos(a) * r, 0, r + Math.sin(a) * r]), null, c.accent, 1.1)
+                    d.polygon(ring(a => [0, Math.cos(a) * r, r + Math.sin(a) * r]), null, c.accent, 1.1)
+                    d.label([0, -r - 0.3, 0], Math.round(2 * r * 1000) + " mm")
+                } else {
+                    // Sfera gata: conturul de pe ecran (proiecția unei sfere e un disc).
+                    const o = d.p(0, 0, r)
+                    let rs = 0
+                    for (const q of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.7071, 0.7071, 0], [0.7071, -0.7071, 0]]) {
+                        const e = d.p(q[0] * r, q[1] * r, r + q[2] * r)
+                        rs = Math.max(rs, Math.hypot(e[0] - o[0], e[1] - o[1]))
+                    }
+                    d.ctx.save()
+                    d.ctx.beginPath()
+                    d.ctx.arc(o[0], o[1], rs, 0, Math.PI * 2)
+                    d.ctx.fillStyle = d.shade([0.3, -0.4, 0.85], c.face)
+                    d.ctx.fill()
+                    d.ctx.strokeStyle = t > 0.9 ? c.edge : c.accent
+                    d.ctx.lineWidth = t > 0.9 ? 1.1 : 2
+                    d.ctx.stroke()
+                    d.ctx.restore()
+                    d.polygon(ring(a => [Math.cos(a) * r, Math.sin(a) * r, r]), null, c.edge, 0.8)
+                }
+            }
+            if (t > 0.3) d.vcb("Lățime", "2200")
+            d.dot([0, 0, 0], c.cyan, 3)
+            d.cursor(t < 0.2 ? approach(d, t, [0, 0, 0], 0.18) : d.p(r, 0, 0), Math.max(d.clickK(t, 0.2), d.clickK(t, 0.6)))
         },
         pushpull: function(d, t, c) {
             d.grid()
