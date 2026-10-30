@@ -13,7 +13,7 @@ prin SDK-ul oficial, într-un modul opțional numai pentru desktop (ADR 0007, Fa
 - Decizii de arhitectură: `docs/decisions/` (ADR). Adaugă un ADR pentru orice decizie importantă nouă.
 
 ## Decizii deja luate (nu le redeschide fără motiv)
-- Platforme: **macOS întâi**, apoi Windows, apoi Web, din același cod.
+- Platforme: **macOS întâi**, apoi Web, apoi Windows, din același cod (ordinea schimbată de ADR 0043).
 - Stack: **C++20, Qt 6 (≥ 6.9) cu Qt Quick/QML** (nu Qt Widgets), randare cu **Qt RHI** (`QQuickRhiItem`, Metal pe macOS),
   **CMake + Ninja + vcpkg**, **Catch2**, glm, earcut, Manifold (mai târziu), nlohmann-json, tinygltf.
 - `core/` **nu include niciodată Qt** (ca să poată fi compilat și pentru WebAssembly).
@@ -291,9 +291,9 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `debug.geometry` arată și titlul selecției.
 
 ## Următorii pași
-0. **Făcut (2026-10-28): Animare, timeline, cameră, rotația față de pivot** — `docs/plans/animatie.md` (și `PLAN.md` →
-   Etapa 6). Rămân funcțiile P2 din plan (traiectoria în viewport, faze de construcție, camera pe traseu, însorire,
-   vizibilitate / opacitate, editor de curbe, markeri, export video; C7), în ordinea din secțiunea 6, la cerere.
+0. **În lucru (din 2026-10-30): mobilier pe corp** — `docs/plans/mobilier-pe-corp.md`, ADR 0043 / 0044, `PLAN.md` →
+   Etapa 8, ramura `feature/mobilier`. Animația, interacțiunile și asistentul AI sunt înghețate (funcționale, fără
+   funcții noi); funcțiile rămase din planul de animație sunt amânate (`PLAN.md`, Etapa 8).
 1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic
    redistribuirea SDK-ului și folosirea lui într-o aplicație terță care replică SketchUp, fără aprobare scrisă.
    Alternativa propusă utilizatorului: import COLLADA (.dae), fără SDK. SDK-ul NU se pune în repo.

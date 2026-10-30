@@ -22,7 +22,8 @@ Nu trecem la faza următoare până nu sunt îndeplinite criteriile fazei curent
 ### Ce NU facem (cel puțin în primele versiuni)
 - Randare fotorealistă, animații, plugin-uri Ruby, colaborare în timp real.
 - Export `.skp` și citirea lui fără SDK-ul oficial (formatul e închis). Importul prin SDK e în Faza 7b.
-- Modelare parametrică/NURBS (rămânem la geometrie poligonală, ca SketchUp).
+- NURBS (rămânem la geometrie poligonală, ca SketchUp). Modelarea parametrică a intrat prin obiectele dinamice
+  (ADR 0025) și plăcile / corpurile de mobilier (ADR 0043, 0044).
 
 ---
 
@@ -710,6 +711,30 @@ ADR 0036.
 - [x] Inferența pe obiecte (cerința din 2026-10-29, ADR 0042, `docs/plans/inferenta-pe-obiecte.md`): inferența vede capetele,
   muchiile și fețele obiectelor (`SnapScene`), centrul cercurilor, alinierea cu două puncte, Move cu colțuri reale,
   Cub / Cilindru / Con cu al treilea clic (înălțimea) și previzualizarea corpului, drop din Bibliotecă pe centrul bazei
+
+## 6h. Etapa 8 – Mobilier pe corp (cerința din 2026-10-30)
+
+Designul aprobat: [`docs/plans/mobilier-pe-corp.md`](docs/plans/mobilier-pe-corp.md); ADR 0043, 0044. Criteriile de
+„gata” ale fiecărui pas sunt testele din planul detaliat al designului. Pașii 1–4 se unesc în `main` în același timp.
+
+- [x] Pasul 0: ADR 0043 și 0044, această etapă, `CLAUDE.md`, `docs/plans/mobilier-de-verificat.md`
+- [x] Pasul 1: formatul v6 și datele de piesă (`PartSpec`, chei, categorii), păstrate la copiere / inserare / extragere
+- [x] Pasul 2: tabelele de plăci / canturi / feronerie, categoria materialelor, feroneria construită în cod
+- [x] Pasul 3: măsurarea pieselor, „Fă placă”
+- [x] Pasul 4: lista de debitare v1.5 (piese ascunse, bife, CSV) — **punct de control al autorului**
+- [ ] Pasul 5: placa parametrică (finalizator, compensare, Inspector)
+- [ ] Pasul 6: corpurile din bibliotecă (reconciliere, separatoare)
+- [ ] Pasul 7: cantul (date, Inspector, viewport, listă) — **punct de control al autorului**
+- [ ] Pasul 8: legarea componentelor salvate, lista „În model”
+- [ ] Pasul 9: feroneria în bibliotecă, variante, deviz
+- [ ] Pasul 10: unealta „Placă pe față”
+- [ ] Pasul 11: „Întinde”
+- [ ] Pasul 12: traducerea (RO, EN complete; DE, PL, IT, FR, ES, PT beta)
+
+**Înghețate în această etapă** (funcționale, reparate, fără funcții noi; primesc doar traducerea): animația,
+timeline-ul, regulile, Modul Interacțiune, DOF, video, asistentul AI, colaborarea, importurile. Funcțiile rămase din
+planul de animație (traiectoria în viewport, faze de construcție, camera pe traseu, însorire, vizibilitate / opacitate,
+editor de curbe, markeri, export video) sunt amânate.
 
 ---
 
