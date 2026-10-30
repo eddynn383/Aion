@@ -1538,6 +1538,18 @@ struct ObjectScene {
         tool.pointerDown(ctx, e);
         tool.pointerUp(ctx, e);
     }
+
+    // Ca Document: scena se reface înaintea fiecărui eveniment, fără ce transformă unealta acum.
+    void clickLive(tools::Tool& tool, Vec3d world)
+    {
+        const tools::PointerEvent e { screen(world), {}, 1 };
+        rebuildScene(tool.snapExclude());
+        tool.pointerMove(ctx, e);
+        rebuildScene(tool.snapExclude());
+        tool.pointerDown(ctx, e);
+        rebuildScene(tool.snapExclude());
+        tool.pointerUp(ctx, e);
+    }
 };
 
 } // namespace
@@ -1775,4 +1787,53 @@ TEST_CASE("Move: vârful capacului unui cilindru, pe care punctele cutiei nu-l o
     s.click(*move, { 500, 500, 1000 });
     s.click(*move, capVertex);
     CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 })) < 1e-3);
+}
+
+TEST_CASE("Move fără selecție: obiectul mutat nu se prinde de el însuși", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId a = s.addBox({ 0, 0, 0 });
+    auto move = tools::makeTool("move");
+    CHECK(move->snapExclude().empty());
+
+    // Baza pe colțul de sus al lui A (obiectul de sub cursor, fără selecție), apoi cursorul pe colțul lui de jos.
+    s.clickLive(*move, { 500, 500, 1000 });
+    CHECK(move->snapExclude() == std::set<model::InstanceId> { a });
+    CHECK(s.selection.instances.empty());
+    s.clickLive(*move, { -500, -500, 0 });
+    // Prins de el însuși, A s-ar fi mutat exact cu (−1000, −1000, −1000).
+    const Vec3d moved = s.m.instance(a).transform.applyToPoint({ 0, 0, 0 });
+    CHECK(glm::length(moved - Vec3d { -1000, -1000, -1000 }) > 1.0);
+    CHECK(move->snapExclude().empty()); // operația s-a terminat
+}
+
+TEST_CASE("Move cu selecție: înainte de bază, vârfurile obiectului selectat se prind", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId c = s.addCylinder({ 0, 0, 0 });
+    s.addBox({ 3000, 0, 0 });
+    s.selection.instances.insert(c);
+    auto move = tools::makeTool("move");
+    CHECK(move->snapExclude().empty());
+
+    // Vârful capacului nu e un punct al cutiei: baza vine doar din geometria lui C, deci C e încă în scenă.
+    const Vec3d capVertex
+        = Vec3d { 0, 0, 1000 } + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
+    s.clickLive(*move, capVertex);
+    CHECK(move->snapExclude() == std::set<model::InstanceId> { c });
+    const Vec3d target { 2500, -500, 1000 }; // colțul lui B
+    s.clickLive(*move, target);
+    CHECK(glm::length(s.m.instance(c).transform.applyToPoint({ 0, 0, 0 }) - (target - capVertex)) < 1e-3);
+}
+
+TEST_CASE("Rotate fără selecție: obiectul rotit iese din scenă după alegerea centrului", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId a = s.addBox({ 0, 0, 0 });
+    auto rotate = tools::makeTool("rotate");
+    CHECK(rotate->snapExclude().empty());
+    s.clickLive(*rotate, { 500, 500, 1000 });
+    CHECK(rotate->snapExclude() == std::set<model::InstanceId> { a });
+    rotate->cancel(s.ctx);
+    CHECK(rotate->snapExclude().empty());
 }

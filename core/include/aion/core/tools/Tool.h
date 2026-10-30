@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -217,6 +218,9 @@ public:
     // Undo (⌘Z) cât unealta e în mijlocul unei operații: un pas înapoi în ea (Pen: ultimul punct). false = undo-ul
     // obișnuit, din istoric.
     virtual bool undoStep(ToolContext& /*ctx*/) { return false; }
+    // Obiectele pe care operația în curs le transformă (Move / Rotate / Scale, după ce baza sau centrul e ales): nu
+    // sunt surse de inferență, ca să nu se prindă de ele însele. Înainte, vârfurile lor se prind (colțul apucat).
+    [[nodiscard]] virtual std::set<model::InstanceId> snapExclude() const { return {}; }
 };
 
 // "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale", "eraser";

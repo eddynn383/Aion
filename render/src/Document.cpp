@@ -1412,10 +1412,8 @@ void Document::repairContext()
 
 std::set<model::InstanceId> Document::snapExclude() const
 {
-    // Obiectele mutate / rotite / scalate / puse nu se prind de ele însele.
-    const bool own = m_place.has_value() || m_toolId == QLatin1String("move") || m_toolId == QLatin1String("rotate")
-        || m_toolId == QLatin1String("scale") || m_toolId == QLatin1String("place");
-    return own ? m_selection.instances : std::set<model::InstanceId> {};
+    // Obiectele pe care unealta activă le transformă acum nu se prind de ele însele (le spune unealta).
+    return m_tool ? m_tool->snapExclude() : std::set<model::InstanceId> {};
 }
 
 const inference::SnapScene& Document::snapScene(const std::set<model::InstanceId>& exclude) const

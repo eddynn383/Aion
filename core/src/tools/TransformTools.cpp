@@ -562,6 +562,11 @@ public:
 
     view::PickResult hover() const override { return m_base ? view::PickResult {} : m_hover; }
 
+    std::set<model::InstanceId> snapExclude() const override
+    {
+        return m_base ? m_target.selection.instances : std::set<model::InstanceId> {};
+    }
+
     bool ownsArrowKeys() const override { return m_base.has_value(); }
 
     std::string status() const override
@@ -726,6 +731,10 @@ public:
         m_hotGrip = -1;
     }
 
+    // Copiile nu sunt încă în model (doar conturul lor, desenat de unealtă), deci nu sunt surse; originalele rămân
+    // ținte (lipirea colț pe colț pe original).
+    std::set<model::InstanceId> snapExclude() const override { return {}; }
+
     Overlay overlay() const override
     {
         Overlay o;
@@ -850,6 +859,11 @@ public:
         m_engine.reset();
         m_grips.clear();
         m_hotGrip = -1;
+    }
+
+    std::set<model::InstanceId> snapExclude() const override
+    {
+        return m_phase != Phase::Center ? m_target.selection.instances : std::set<model::InstanceId> {};
     }
 
     Overlay overlay() const override
@@ -1163,6 +1177,11 @@ public:
     {
         m_dragging = false;
         m_factors = Vec3d { 1.0 };
+    }
+
+    std::set<model::InstanceId> snapExclude() const override
+    {
+        return m_dragging ? m_target.selection.instances : std::set<model::InstanceId> {};
     }
 
     Overlay overlay() const override
