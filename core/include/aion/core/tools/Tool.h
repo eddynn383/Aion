@@ -5,9 +5,9 @@
 #include "aion/core/geom/Selection.h"
 #include "aion/core/inference/Inference.h"
 #include "aion/core/inference/SnapScene.h"
+#include "aion/core/math/Vec.h"
 #include "aion/core/model/Model.h"
 #include "aion/core/model/Operations.h"
-#include "aion/core/math/Vec.h"
 #include "aion/core/view/Camera.h"
 #include "aion/core/view/Picking.h"
 
@@ -68,7 +68,8 @@ struct InferenceMarker {
     bool operator==(const InferenceMarker&) const = default;
 };
 
-// Un punct de prindere al unui obiect (Move): colț sau mijloc de muchie al cutiei lui, desenat mare și vizibil.
+// Un punct de prindere al unui obiect (Move): colț sau mijloc de muchie al cutiei lui, desenat mare și
+// vizibil.
 struct Grip {
     Vec3d point { 0.0 };
     inference::Kind kind = inference::Kind::Endpoint; // Endpoint = colț, Midpoint = mijloc de muchie
@@ -109,10 +110,12 @@ struct Overlay {
     bool operator==(const Overlay&) const = default;
 };
 
-// Ghidajele și marcajul inferenței, adăugate în overlay (și de viewport, pentru obiectul tras din bibliotecă).
+// Ghidajele și marcajul inferenței, adăugate în overlay (și de viewport, pentru obiectul tras din
+// bibliotecă).
 void appendInference(Overlay& o, const inference::Inference& inf);
 
-// Ce arată Measurements box: eticheta („Lungime”) și valoarea curentă („2.5 m”, gol dacă nu e nimic de măsurat).
+// Ce arată Measurements box: eticheta („Lungime”) și valoarea curentă („2.5 m”, gol dacă nu e nimic de
+// măsurat).
 struct Measurement {
     std::string label;
     std::string value;
@@ -128,25 +131,33 @@ struct ToolRequests {
     // Paint Bucket: materialul luat cu pipeta (Option) sau materialul nou intrat în model la vopsire.
     std::optional<model::MaterialId> sampledMaterial;
     model::MaterialId addedMaterial;
-    // Tragerea pivotului: punctul nou (în coordonatele contextului), pentru previzualizare; `pivotDone` = tragerea
-    // s-a terminat — cu `pivot` = punctul ales, fără = anulată.
+    // Tragerea pivotului: punctul nou (în coordonatele contextului), pentru previzualizare; `pivotDone` =
+    // tragerea s-a terminat — cu `pivot` = punctul ales, fără = anulată.
     std::optional<math::Vec3d> pivot;
     bool pivotDone = false;
     // Lipirea (unealta internă `place`): punctul ales pentru colțul copiei (click) sau renunțarea (Esc).
     std::optional<Vec3d> placeAt;
     bool placeCancel = false;
-    // Pen în Animare: curba terminată (în coordonatele contextului) și normala planului ei; Document face din ea o cale.
+    // Pen în Animare: curba terminată (în coordonatele contextului) și normala planului ei; Document face din
+    // ea o cale.
     std::optional<geom::BezierPath> penPath;
     math::Vec3d penNormal { 0.0, 0.0, 1.0 };
-    // Editarea unei curbe (penedit): forma nouă, după o tragere / inserare / ștergere (un pas de undo), și ieșirea.
+    // Editarea unei curbe (penedit): forma nouă, după o tragere / inserare / ștergere (un pas de undo), și
+    // ieșirea.
     std::optional<geom::BezierPath> curveEdit;
     bool curveEditDone = false;
     // Select: dublu click pe o curbă Pen editabilă → Document intră în editarea ei.
     model::PenCurveId editPenCurve;
+    // „Adaugă separator” (unealta internă `divider`): punctul clicului (coordonatele contextului), cu ⌥ = la
+    // poziția clicului, altfel la mijlocul spațiului; sau renunțarea (Esc).
+    std::optional<Vec3d> dividerAt;
+    bool dividerAtClick = false;
+    bool dividerCancel = false;
 };
 
 struct ToolContext {
-    ToolContext(geom::Mesh& mesh, commands::CommandStack& stack, geom::Selection& selection, const view::Camera& camera)
+    ToolContext(geom::Mesh& mesh, commands::CommandStack& stack, geom::Selection& selection,
+        const view::Camera& camera)
         : mesh(mesh)
         , stack(stack)
         , selection(selection)
@@ -162,25 +173,28 @@ struct ToolContext {
     model::Model* model = nullptr;
     model::DefinitionId context;
     ToolRequests* requests = nullptr;
-    // Paint Bucket: materialul curent (din model), sau unul din bibliotecă care intră în model la prima folosire.
+    // Paint Bucket: materialul curent (din model), sau unul din bibliotecă care intră în model la prima
+    // folosire.
     model::MaterialId paintMaterial;
     const model::Material* libraryMaterial = nullptr;
     // Ghidajele contextului, pentru inferență.
     std::span<const inference::GuideRef> guides;
     // Snap la grid: pasul în mm (0 = oprit).
     double gridStep = 0.0;
-    // Scena de prindere: geometria obiectelor (grupuri, componente, primitive) văzută de inferență. Nul = doar mesh-ul.
+    // Scena de prindere: geometria obiectelor (grupuri, componente, primitive) văzută de inferență. Nul =
+    // doar mesh-ul.
     const inference::SnapScene* snap = nullptr;
     // Transformarea contextului editat (local → model), pentru ce se păstrează în coordonatele modelului.
     math::Transform toWorld;
-    // Pivotul selecției (marcajul din viewport), în coordonatele contextului: centrul implicit pentru Rotate și
-    // punctul fix pentru Scale cu Option. Gol dacă nu e nimic selectat.
+    // Pivotul selecției (marcajul din viewport), în coordonatele contextului: centrul implicit pentru Rotate
+    // și punctul fix pentru Scale cu Option. Gol dacă nu e nimic selectat.
     std::optional<Vec3d> pivot;
     // Camera sau lumina selectată (fără altă selecție): ținta lui Move / Rotate / Scale.
     std::optional<model::SceneObjectRef> object;
     // Animare: Pen-ul desenează o cale de parcurgere (o cere prin ToolRequests::penPath), nu geometrie.
     bool drawsPaths = false;
-    // Curba editată (penedit), în coordonatele contextului, și normala planului ei; Document le pune la fiecare apel.
+    // Curba editată (penedit), în coordonatele contextului, și normala planului ei; Document le pune la
+    // fiecare apel.
     std::optional<geom::BezierPath> editCurve;
     math::Vec3d editNormal { 0.0, 0.0, 1.0 };
     // Lipirea: colțul de prindere al copiei și muchiile ei (previzualizarea), în coordonatele contextului.
@@ -207,24 +221,25 @@ public:
     [[nodiscard]] virtual view::PickResult hover() const { return {}; }
     // Indicația din status bar („Alege punctul de început”).
     [[nodiscard]] virtual std::string status() const = 0;
-    // Săgețile sunt acum ale uneltei (o operație în curs, sau aleg ceva, ca axa la Rotate)? Altfel, în Animare,
-    // merg la timeline (cadre, chei).
+    // Săgețile sunt acum ale uneltei (o operație în curs, sau aleg ceva, ca axa la Rotate)? Altfel, în
+    // Animare, merg la timeline (cadre, chei).
     [[nodiscard]] virtual bool ownsArrowKeys() const { return false; }
 
     // Measurements box: nullopt dacă unealta nu primește valori tastate.
     [[nodiscard]] virtual std::optional<Measurement> measurement() const { return std::nullopt; }
     // Aplică o valoare tastată („2500”, „2.5m”, „3000,2000”). Întoarce false dacă textul nu e valid acum.
     virtual bool applyMeasurement(ToolContext& /*ctx*/, std::string_view /*text*/) { return false; }
-    // Undo (⌘Z) cât unealta e în mijlocul unei operații: un pas înapoi în ea (Pen: ultimul punct). false = undo-ul
-    // obișnuit, din istoric.
+    // Undo (⌘Z) cât unealta e în mijlocul unei operații: un pas înapoi în ea (Pen: ultimul punct). false =
+    // undo-ul obișnuit, din istoric.
     virtual bool undoStep(ToolContext& /*ctx*/) { return false; }
-    // Obiectele pe care operația în curs le transformă (Move / Rotate / Scale, după ce baza sau centrul e ales): nu
-    // sunt surse de inferență, ca să nu se prindă de ele însele. Înainte, vârfurile lor se prind (colțul apucat).
+    // Obiectele pe care operația în curs le transformă (Move / Rotate / Scale, după ce baza sau centrul e
+    // ales): nu sunt surse de inferență, ca să nu se prindă de ele însele. Înainte, vârfurile lor se prind
+    // (colțul apucat).
     [[nodiscard]] virtual std::set<model::InstanceId> snapExclude() const { return {}; }
 };
 
-// "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale", "eraser";
-// nullptr pentru o unealtă necunoscută.
+// "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale",
+// "eraser"; nullptr pentru o unealtă necunoscută.
 [[nodiscard]] std::unique_ptr<Tool> makeTool(std::string_view id);
 
 // Punctul 3D de sub cursor: pe geometrie dacă există, altfel pe planul solului (Z = 0).
@@ -234,15 +249,17 @@ struct SurfacePoint {
 };
 [[nodiscard]] std::optional<SurfacePoint> surfacePoint(const ToolContext& ctx, Vec2d screen);
 
-// Ce e sub cursor, inclusiv grupurile și obiectele din context (cea mai apropiată dintre geometrie și instanțe).
-[[nodiscard]] view::PickResult pickWithInstances(const ToolContext& ctx, Vec2d screen, view::PickOptions options = {});
+// Ce e sub cursor, inclusiv grupurile și obiectele din context (cea mai apropiată dintre geometrie și
+// instanțe).
+[[nodiscard]] view::PickResult pickWithInstances(
+    const ToolContext& ctx, Vec2d screen, view::PickOptions options = {});
 
 // Ce selectează un click (Select): o muchie (cu toată curba ei), o față sau o instanță.
 [[nodiscard]] geom::Selection selectionAt(const ToolContext& ctx, Vec2d screen);
 
 // Șterge selecția: fețele selectate, apoi muchiile selectate (cu fețele lor). O singură comandă.
-// Șterge selecția (un pas de undo). keepFaces (⌫, guma): fața pe care sunt desenate liniile rămâne; altfel (Delete)
-// liniile pleacă cu fețele lor.
+// Șterge selecția (un pas de undo). keepFaces (⌫, guma): fața pe care sunt desenate liniile rămâne; altfel
+// (Delete) liniile pleacă cu fețele lor.
 bool deleteSelection(ToolContext& ctx, bool keepFaces = false);
 
 } // namespace aion::tools

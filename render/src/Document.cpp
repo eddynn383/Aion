@@ -13,6 +13,7 @@
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/CameraLens.h"
+#include "aion/core/model/Carcass.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/Interaction.h"
@@ -556,6 +557,9 @@ void Document::replaceModel(const model::Model& model)
     if (m_place) {
         finishPaste(std::nullopt);
     }
+    if (m_dividerActive) {
+        finishDivider(std::nullopt, false);
+    }
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -834,6 +838,7 @@ void Document::setActiveTool(const QString& requested)
         m_editCurve = {};
         m_editPath = {};
         m_place.reset();
+        m_dividerActive = false;
     }
     if (id == m_toolId) {
         return;
@@ -951,9 +956,7 @@ QStringList Document::contextPath() const
 {
     QStringList out;
     for (model::InstanceId id : m_path) {
-        const model::Instance& inst = m_model.instance(id);
-        out << QString::fromStdString(
-            inst.name.empty() ? m_model.definition(inst.definition).name : inst.name);
+        out << QString::fromStdString(model::partName(m_model, id));
     }
     return out;
 }
@@ -970,7 +973,7 @@ QVariantList Document::outline() const
             const model::Definition& def = m_model.definition(inst.definition);
             out.append(QVariantMap {
                 { QStringLiteral("id"), static_cast<double>(id.value) },
-                { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
+                { QStringLiteral("name"), QString::fromStdString(model::partName(m_model, id)) },
                 { QStringLiteral("definition"), QString::fromStdString(def.name) },
                 { QStringLiteral("kind"),
                     def.collection ? QStringLiteral("group") : QStringLiteral("object") },
@@ -1133,7 +1136,8 @@ QVariantMap Document::entityInfo() const
                                                                    QString::fromStdString(g->id) },
                 { QStringLiteral("name"), QString::fromStdString(g->name) },
                 { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
-                { QStringLiteral("parameters"), parameters } };
+                { QStringLiteral("parameters"), parameters }, { QStringLiteral("legacy"), g->legacy },
+                { QStringLiteral("carcass"), model::isCarcassGenerator(g->id) } };
         }
         // Placă parametrică sau desprinsă (ADR 0044): tipul, grosimea, dimensiunile și starea.
         if (definition.part && definition.part->kind == model::PartSpec::Kind::Board) {
@@ -1488,6 +1492,9 @@ template <class Fn> void Document::withTool(const view::Camera& camera, Fn&& fn)
     // Lipirea: copia la punctul ales sau renunțarea.
     if (m_place && (requests.placeAt || requests.placeCancel)) {
         finishPaste(requests.placeCancel ? std::nullopt : requests.placeAt);
+    }
+    if (m_dividerActive && (requests.dividerAt || requests.dividerCancel)) {
+        finishDivider(requests.dividerCancel ? std::nullopt : requests.dividerAt, requests.dividerAtClick);
     }
     // Tragerea pivotului: previzualizarea, apoi punctul ales (sau anularea).
     if (requests.pivotDone && pivotDragging()) {
@@ -2090,6 +2097,136 @@ void Document::makeBoardSelection()
     emit selectionChanged();
 }
 
+model::DefinitionId Document::carcassTarget(math::Transform* bodyFromContext) const
+{
+    const std::size_t valid = validPathLength();
+    const std::vector<model::InstanceId> path(
+        m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid));
+    if (const model::InstanceId body = model::carcassInPath(m_model, path)) {
+        if (bodyFromContext != nullptr) {
+            std::vector<model::InstanceId> prefix;
+            for (model::InstanceId id : path) {
+                prefix.push_back(id);
+                if (id == body) {
+                    break;
+                }
+            }
+            *bodyFromContext = model::worldTransform(m_model, prefix).inverse() * contextTransform();
+        }
+        return m_model.instance(body).definition;
+    }
+    if (m_selection.instances.size() == 1) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        if (m_model.instances().contains(id)
+            && model::isCarcassGenerator(m_model.definition(m_model.instance(id).definition).generator)) {
+            if (bodyFromContext != nullptr) {
+                *bodyFromContext = m_model.instance(id).transform.inverse();
+            }
+            return m_model.instance(id).definition;
+        }
+    }
+    return {};
+}
+
+void Document::upgradeGenerator()
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Actualizează corpul", [&](model::Model& model) { model::upgradeGenerator(model, def); });
+    emit selectionChanged();
+}
+
+void Document::makePlainBody()
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Corp obișnuit", [&](model::Model& model) { model::makePlainBody(model, def); });
+    emit selectionChanged();
+}
+
+bool Document::rolePiecesDiffer() const
+{
+    if (m_selection.instances.size() != 1) {
+        return false;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    return m_model.instances().contains(id)
+        && model::rolePiecesDiffer(m_model, m_model.instance(id).definition);
+}
+
+bool Document::selectionBreaksCarcass() const
+{
+    math::Transform unused;
+    const model::DefinitionId body = carcassTarget(&unused);
+    if (!body || body != activeDefinition()) {
+        return false; // doar piesele directe ale corpului (contextul de editare e corpul)
+    }
+    for (model::InstanceId id : m_selection.instances) {
+        if (m_model.instances().contains(id) && !m_model.instance(id).roleKey.empty()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Document::makeContextPlain()
+{
+    const model::DefinitionId body = carcassTarget(nullptr);
+    if (!require(Modeling) || !body || body != activeDefinition()) {
+        return;
+    }
+    runOnModel("Corp obișnuit", [&](model::Model& model) { model::makePlainBody(model, body); });
+}
+
+void Document::beginAddDivider()
+{
+    if (!require(Modeling) || m_suspendedTool || !m_tool) {
+        return;
+    }
+    if (!carcassTarget(nullptr)) {
+        setError(QStringLiteral(
+            "Selectează un corp din bibliotecă (sau intră în el) ca să-i adaugi un separator."));
+        return;
+    }
+    m_dividerActive = true;
+    m_suspendedTool = std::exchange(m_tool, tools::makeTool("divider"));
+    replayPointer();
+    emit toolStatusChanged();
+    touch();
+}
+
+void Document::finishDivider(const std::optional<math::Vec3d>& at, bool atClick)
+{
+    if (!m_dividerActive) {
+        return;
+    }
+    m_dividerActive = false;
+    if (m_suspendedTool) {
+        m_tool = std::move(m_suspendedTool);
+    }
+    math::Transform bodyFromContext;
+    const model::DefinitionId body = carcassTarget(&bodyFromContext);
+    if (at && body && m_workMode == Modeling) {
+        model::DividerResult result = model::DividerResult::NotCarcass;
+        runOnModel("Adaugă separator", [&](model::Model& model) {
+            result = model::addDivider(model, body, bodyFromContext.applyToPoint(*at), atClick);
+        });
+        if (result == model::DividerResult::TooClose) {
+            setError(QStringLiteral("Separatorul ar fi la mai puțin de 50 mm de altul sau de o laterală."));
+        } else if (result == model::DividerResult::Outside) {
+            setError(QStringLiteral("Clicul nu e între lateralele corpului."));
+        } else if (result == model::DividerResult::NotCarcass) {
+            setError(QStringLiteral("Corpul acesta nu are separatoare."));
+        }
+    }
+    emit toolStatusChanged();
+    touch();
+}
+
 void Document::makeUniqueSelection()
 {
     if (!require(Modeling)) {
@@ -2549,8 +2686,7 @@ QVariantMap Document::timeline() const
         const model::Instance* inst = m_model.instances().find(t.instance);
         QString name = QStringLiteral("(șters)");
         if (inst != nullptr) {
-            const model::Definition& def = m_model.definition(inst->definition);
-            name = QString::fromStdString(inst->name.empty() ? def.name : inst->name);
+            name = QString::fromStdString(model::partName(m_model, t.instance));
         }
         const model::TransformValues now
             = inst != nullptr ? currentValues(t.instance) : model::TransformValues {};
@@ -2597,9 +2733,8 @@ QVariantMap Document::timeline() const
         }
         QStringList anchors;
         for (const model::PathAnchor& anchor : p.anchors) {
-            if (const model::Instance* inst = m_model.instances().find(anchor.instance)) {
-                const model::Definition& def = m_model.definition(inst->definition);
-                anchors.append(QString::fromStdString(inst->name.empty() ? def.name : inst->name));
+            if (m_model.instances().contains(anchor.instance)) {
+                anchors.append(QString::fromStdString(model::partName(m_model, anchor.instance)));
             }
         }
         paths.append(QVariantMap {
@@ -3210,6 +3345,9 @@ void Document::setWorkMode(int mode)
     if (m_place) {
         finishPaste(std::nullopt); // o lipire neterminată nu continuă în alt mod
     }
+    if (m_dividerActive) {
+        finishDivider(std::nullopt, false);
+    }
     if (mode != Interaction) {
         setInteractionMode(false);
     }
@@ -3632,7 +3770,8 @@ QVariantList Document::interactions() const
         const model::Definition& def = m_model.definition(inst.definition);
         out.append(
             QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.instances().keys()[i].value) },
-                { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
+                { QStringLiteral("name"),
+                    QString::fromStdString(model::partName(m_model, m_model.instances().keys()[i])) },
                 { QStringLiteral("shape"), QString::fromStdString(def.shape) },
                 { QStringLiteral("rules"), rules } });
     }
@@ -4892,6 +5031,9 @@ QVariantList Document::generators() const
 {
     QVariantList out;
     for (const model::GeneratorInfo& g : model::generators()) {
+        if (g.legacy) {
+            continue; // doar pentru fișierele vechi
+        }
         QVariantList parameters;
         for (const model::ParameterSpec& spec : g.parameters) {
             parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
@@ -5141,12 +5283,9 @@ QVariantList Document::objectList() const
 {
     QVariantList out;
     for (model::InstanceId id : m_model.childrenOf(activeDefinition())) {
-        const model::Instance& inst = m_model.instance(id);
         const model::Placement p = model::placementOf(m_model, id);
         out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(id.value) },
-            { QStringLiteral("name"),
-                QString::fromStdString(
-                    inst.name.empty() ? m_model.definition(inst.definition).name : inst.name) },
+            { QStringLiteral("name"), QString::fromStdString(model::partName(m_model, id)) },
             { QStringLiteral("x"), p.position.x }, { QStringLiteral("y"), p.position.y },
             { QStringLiteral("z"), p.position.z }, { QStringLiteral("width"), p.size.x },
             { QStringLiteral("depth"), p.size.y }, { QStringLiteral("height"), p.size.z } });
@@ -5179,6 +5318,9 @@ QVariantList Document::libraryItems() const
 {
     QVariantList out;
     for (const model::GeneratorInfo& g : model::generators()) {
+        if (g.legacy) {
+            continue;
+        }
         out.append(
             QVariantMap { { QStringLiteral("id"), QStringLiteral("gen:") + QString::fromStdString(g.id) },
                 { QStringLiteral("name"), QString::fromStdString(g.name) },
@@ -6639,9 +6781,8 @@ QVariantMap Document::pathInfo(model::MotionPathId id) const
         if (inst == nullptr) {
             continue;
         }
-        const model::Definition& def = m_model.definition(inst->definition);
         anchors.append(QVariantMap { { QStringLiteral("instance"), static_cast<double>(a.instance.value) },
-            { QStringLiteral("name"), QString::fromStdString(inst->name.empty() ? def.name : inst->name) },
+            { QStringLiteral("name"), QString::fromStdString(model::partName(m_model, a.instance)) },
             { QStringLiteral("along"), a.along }, { QStringLiteral("lateral"), a.lateral },
             { QStringLiteral("up"), a.up }, { QStringLiteral("yaw"), a.yaw } });
     }

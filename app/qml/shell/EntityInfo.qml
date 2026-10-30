@@ -15,6 +15,8 @@ Column {
     signal editRules()
     signal toolRequested(string id)
     signal commandRequested(string id)
+    // Un câmp al unui obiect dinamic: Main.qml cere confirmarea dacă refacerea unui corp pierde modificări de mână.
+    signal parameterRequested(string key, real value)
 
     readonly property var info: document ? document.entityInfo : ({ kind: "none" })
     readonly property bool isInstance: info.kind === "instance"
@@ -139,7 +141,7 @@ Column {
                 step: modelData.step
                 decimals: 0
                 value: modelData.value
-                onValueModified: (v) => root.document.setParameter(modelData.key, v)
+                onValueModified: (v) => root.parameterRequested(modelData.key, v)
             }
         }
         Text {
@@ -150,6 +152,34 @@ Column {
                   + " copii legate. „Fă unic” pentru o variantă separată."
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
+        }
+        // Corpurile din bibliotecă (ADR 0043): separator cu clic, oprirea refacerii; generatoarele vechi.
+        Text {
+            visible: parametersBox.parametric !== null && parametersBox.parametric.legacy
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Generator vechi: plăcile nu au tip, spate HDF și feronerie. „Actualizează” îl reface ca "
+                  + "„Dulap cu uși” / „Raft”, cu aceleași dimensiuni."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+        Button {
+            visible: parametersBox.parametric !== null && parametersBox.parametric.legacy
+            text: "Actualizează"
+            onClicked: root.commandRequested("furniture.upgrade")
+        }
+        Flow {
+            visible: parametersBox.parametric !== null && parametersBox.parametric.carcass
+            width: parametersBox.width
+            spacing: Theme.space2
+            Button {
+                text: "Adaugă separator"
+                onClicked: root.commandRequested("furniture.addDivider")
+            }
+            Button {
+                text: "Transformă în corp obișnuit"
+                onClicked: root.commandRequested("furniture.makePlain")
+            }
         }
     }
 

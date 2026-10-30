@@ -266,6 +266,18 @@ public:
     Q_INVOKABLE void makeUniqueSelection();
     // „Fă placă” (ADR 0044): obiectele selectate devin plăci PAL pentru lista de debitare.
     Q_INVOKABLE void makeBoardSelection();
+    // Corpurile din bibliotecă (pasul 6, ADR 0043). Corpul = cel din contextul de editare sau obiectul
+    // selectat.
+    Q_INVOKABLE void upgradeGenerator(); // „Generator vechi — Actualizează”
+    Q_INVOKABLE void makePlainBody(); // „Transformă în corp obișnuit”
+    // O schimbare de câmp ar pierde modificările de mână din piesele corpului selectat.
+    Q_INVOKABLE bool rolePiecesDiffer() const;
+    // Explode / Make Group pe piese dintr-un corp (contextul de editare e în corp): corpul nu se mai poate
+    // reface.
+    Q_INVOKABLE bool selectionBreaksCarcass() const;
+    Q_INVOKABLE void makeContextPlain();
+    // „Adaugă separator”: următorul clic în corp pune separatorul (unealta internă `divider`).
+    Q_INVOKABLE void beginAddDivider();
     Q_INVOKABLE void makeUnique(double instanceId);
     // ⌘C: obiectele selectate din context (starea de acum; clipboard-ul ține de document, se golește la Nou /
     // Deschide).
@@ -834,12 +846,16 @@ private:
     void finishPivotDrag(const std::optional<math::Vec3d>& point);
     // Lipirea: copia la punctul ales pentru colțul ei (`at`), sau renunțarea; unealta de dinainte revine.
     void finishPaste(const std::optional<math::Vec3d>& at);
+    void finishDivider(const std::optional<math::Vec3d>& at, bool atClick);
+    // Corpul ales pentru „Adaugă separator” și trecerea din coordonatele contextului în ale lui.
+    model::DefinitionId carcassTarget(math::Transform* bodyFromContext) const;
     struct Clipboard {
         std::shared_ptr<const model::Model> model; // modelul de la ⌘C
         std::vector<model::InstanceId> instances;
     };
     std::optional<Clipboard> m_clipboard;
     std::optional<tools::PlaceSource> m_place; // lipirea în curs (unealta „place”)
+    bool m_dividerActive = false; // „Adaugă separator” în curs (unealta „divider”)
     model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
     model::MotionPathId m_editPath; // sau calea editată
     model::MotionPathId m_selectedPath;

@@ -1,6 +1,7 @@
 #include "aion/core/model/Quantities.h"
 
 #include "aion/core/geom/Mesh.h"
+#include "aion/core/model/Carcass.h"
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/Operations.h"
@@ -13,8 +14,8 @@
 #include <functional>
 #include <limits>
 #include <map>
-#include <string_view>
 #include <optional>
+#include <string_view>
 #include <tuple>
 
 namespace aion::model {
@@ -61,7 +62,8 @@ FaceInfo faceInfo(const geom::Mesh& mesh, const geom::Face& face, const Transfor
     const std::vector<Vec3d> outer = ringPoints(mesh, face.outer, t);
     Vec3d n = newell(outer);
     // Normala transformată a planului feței dă orientarea (o oglindire ar inversa ordinea vârfurilor).
-    const Vec3d planeNormal = glm::normalize(glm::transpose(glm::inverse(glm::dmat3(t.matrix()))) * face.plane.normal);
+    const Vec3d planeNormal
+        = glm::normalize(glm::transpose(glm::inverse(glm::dmat3(t.matrix()))) * face.plane.normal);
     if (glm::dot(n, planeNormal) < 0.0) {
         n = -n;
     }
@@ -86,15 +88,7 @@ std::string materialName(const Model& model, MaterialId id)
 
 std::string instanceName(const Model& model, InstanceId id)
 {
-    const Instance& inst = model.instance(id);
-    if (!inst.name.empty()) {
-        return inst.name;
-    }
-    const Definition& def = model.definition(inst.definition);
-    if (!def.name.empty()) {
-        return def.name;
-    }
-    return def.group ? "Grup" : "Obiect";
+    return partName(model, id);
 }
 
 // O apariție a unei definiții în model (o instanță, cu toate transformările părinților).
@@ -110,7 +104,8 @@ struct Occurrence {
 };
 
 void collect(const Model& model, DefinitionId definition, const Transform& toWorld, const std::string& path,
-    MaterialId inherited, bool includeHidden, bool hidden, bool inHardware, bool inBoard, std::vector<Occurrence>& out)
+    MaterialId inherited, bool includeHidden, bool hidden, bool inHardware, bool inBoard,
+    std::vector<Occurrence>& out)
 {
     for (InstanceId id : model.childrenOf(definition)) {
         const bool isHidden = hidden || !model.isVisible(id);
@@ -119,7 +114,8 @@ void collect(const Model& model, DefinitionId definition, const Transform& toWor
         }
         const Instance& inst = model.instance(id);
         const Transform world = toWorld * inst.transform;
-        const std::string name = path.empty() ? instanceName(model, id) : path + " / " + instanceName(model, id);
+        const std::string name
+            = path.empty() ? instanceName(model, id) : path + " / " + instanceName(model, id);
         const MaterialId material = inst.material ? inst.material : inherited;
         out.push_back({ id, inst.definition, world, name, material, isHidden, inHardware, inBoard });
         const std::optional<PartSpec>& part = model.definition(inst.definition).part;
@@ -137,8 +133,9 @@ std::vector<Occurrence> occurrences(const Model& model, bool includeHidden = fal
     return out;
 }
 
-// Materialul predominant (după arie) al fețelor unei apariții, cu materialul efectiv (al feței, altfel moștenit); la
-// egalitate, după cheia din bibliotecă și apoi după nume, ca rezultatul să nu depindă de ordine.
+// Materialul predominant (după arie) al fețelor unei apariții, cu materialul efectiv (al feței, altfel
+// moștenit); la egalitate, după cheia din bibliotecă și apoi după nume, ca rezultatul să nu depindă de
+// ordine.
 MaterialId dominantMaterialId(const Model& model, const Occurrence& o)
 {
     const geom::Mesh& mesh = model.mesh(o.definition);
@@ -194,7 +191,8 @@ std::string formatNumber(double value, int decimals, CsvFormat format)
 
 std::string csvField(const std::string& raw, CsvFormat format)
 {
-    // Un text care începe ca o formulă (=, +, -, @, TAB, CR) primește un apostrof: foaia de calcul îl arată ca text.
+    // Un text care începe ca o formulă (=, +, -, @, TAB, CR) primește un apostrof: foaia de calcul îl arată
+    // ca text.
     std::string text = raw;
     if (!text.empty() && std::string_view("=+-@\t\r").find(text.front()) != std::string_view::npos) {
         text.insert(text.begin(), '\'');
@@ -436,7 +434,8 @@ CutList cutList(const Model& model, const CutListOptions& options)
             double deductL = 0.0;
             double deductW = 0.0;
             for (int k = 0; k < 4; ++k) {
-                const BandSide& side = spec.bands[static_cast<std::size_t>(slots[static_cast<std::size_t>(k)])];
+                const BandSide& side
+                    = spec.bands[static_cast<std::size_t>(slots[static_cast<std::size_t>(k)])];
                 part.bands[static_cast<std::size_t>(k)] = side.bandKey;
                 if (side.bandKey.empty()) {
                     continue;
@@ -449,14 +448,16 @@ CutList cutList(const Model& model, const CutListOptions& options)
                 }
                 part.bandDecors[static_cast<std::size_t>(k)] = decorName;
                 if (const BandType* band = findBandType(side.bandKey); band != nullptr && band->deduct) {
-                    (k < 2 ? deductW : deductL) += band->thickness; // L1/L2 scad din lățime, W1/W2 din lungime
+                    (k < 2 ? deductW : deductL)
+                        += band->thickness; // L1/L2 scad din lățime, W1/W2 din lungime
                 }
             }
             part.cutLength = part.length - deductL;
             part.cutWidth = part.width - deductW;
             identity = spec.typeKey + "|" + roundKey(spec.nominalThickness);
             for (int k = 0; k < 4; ++k) {
-                identity += "|" + part.bands[static_cast<std::size_t>(k)] + "/" + part.bandDecors[static_cast<std::size_t>(k)];
+                identity += "|" + part.bands[static_cast<std::size_t>(k)] + "/"
+                    + part.bandDecors[static_cast<std::size_t>(k)];
             }
         } else {
             // Fără date de piesă: după categoria materialului (D10), altfel regula din ADR 0017.
@@ -470,7 +471,8 @@ CutList cutList(const Model& model, const CutListOptions& options)
                 part.section = CutSection::Undefined;
                 part.panel = false;
                 part.flags.push_back("tip necunoscut");
-            } else if (category == "metal" || category == "glass" || category == "plastic" || category == "stone") {
+            } else if (category == "metal" || category == "glass" || category == "plastic"
+                || category == "stone") {
                 part.section = CutSection::Other;
                 part.panel = false;
             } else if (category == "wood") {
@@ -490,9 +492,11 @@ CutList cutList(const Model& model, const CutListOptions& options)
             part.flags.push_back("ascunsă");
         }
         if (part.section != CutSection::Hardware && part.section != CutSection::Other) {
-            identity += "|" + roundKey(part.length) + "|" + roundKey(part.width) + "|" + roundKey(part.thickness);
+            identity
+                += "|" + roundKey(part.length) + "|" + roundKey(part.width) + "|" + roundKey(part.thickness);
         } else if (part.section == CutSection::Other) {
-            identity += "|" + roundKey(part.length) + "|" + roundKey(part.width) + "|" + roundKey(part.thickness);
+            identity
+                += "|" + roundKey(part.length) + "|" + roundKey(part.width) + "|" + roundKey(part.thickness);
         }
         part.rowKey = std::string(sectionKey(part.section)) + "|" + identity + "|" + part.material + "|"
             + (o.hidden ? "hidden" : "visible");
@@ -551,7 +555,8 @@ CutList cutList(const Model& model, const CutListOptions& options)
                 continue;
             }
             const auto allowance = options.bandAllowanceByType.find(key);
-            const double extra = allowance != options.bandAllowanceByType.end() ? allowance->second : options.bandAllowance;
+            const double extra
+                = allowance != options.bandAllowanceByType.end() ? allowance->second : options.bandAllowance;
             BandNeed& need = bands[{ key, part.bandDecors[static_cast<std::size_t>(k)] }];
             need.bandKey = key;
             need.decor = part.bandDecors[static_cast<std::size_t>(k)];
@@ -561,7 +566,9 @@ CutList cutList(const Model& model, const CutListOptions& options)
     }
     for (auto& [k, need] : needs) {
         const double sheetArea = need.sheetLength * need.sheetWidth;
-        need.sheets = sheetArea > 0.0 ? static_cast<int>(std::ceil(need.partsArea * (1.0 + options.waste) / sheetArea)) : 0;
+        need.sheets = sheetArea > 0.0
+            ? static_cast<int>(std::ceil(need.partsArea * (1.0 + options.waste) / sheetArea))
+            : 0;
         list.sheets.push_back(need);
     }
     for (auto& [k, need] : bands) {
@@ -581,12 +588,28 @@ CutList cutList(const Model& model, const CutListOptions& options)
 std::string toCsv(const QuantityReport& report, CsvFormat format)
 {
     CsvWriter csv(format);
-    csv.text("Obiect").text("Tip").text("Buc.").text("Material").text("Tag").text("Lungime X (mm)")
-        .text("Lățime Y (mm)").text("Înălțime Z (mm)").text("Arie (m²)").text("Volum (m³)").endRow();
+    csv.text("Obiect")
+        .text("Tip")
+        .text("Buc.")
+        .text("Material")
+        .text("Tag")
+        .text("Lungime X (mm)")
+        .text("Lățime Y (mm)")
+        .text("Înălțime Z (mm)")
+        .text("Arie (m²)")
+        .text("Volum (m³)")
+        .endRow();
     for (const ObjectQuantity& o : report.objects) {
-        csv.text(o.name).text(o.component ? "Obiect" : "Grup").number(o.count, 0).text(o.material).text(o.tag)
-            .number(o.size.x, 1).number(o.size.y, 1).number(o.size.z, 1)
-            .number(o.area / kMm2PerM2, 3).text(o.solid ? formatNumber(o.volume / kMm3PerM3, 4, format) : "")
+        csv.text(o.name)
+            .text(o.component ? "Obiect" : "Grup")
+            .number(o.count, 0)
+            .text(o.material)
+            .text(o.tag)
+            .number(o.size.x, 1)
+            .number(o.size.y, 1)
+            .number(o.size.z, 1)
+            .number(o.area / kMm2PerM2, 3)
+            .text(o.solid ? formatNumber(o.volume / kMm3PerM3, 4, format) : "")
             .endRow();
     }
     csv.endRow();
@@ -621,9 +644,22 @@ std::string toCsv(const CutList& list, const CutListOptions& options, CsvFormat 
     if (options.headerRow) {
         csv.text(options.cutDimensions ? "Dimensiuni: de tăiere" : "Dimensiuni: finite").endRow();
     }
-    csv.text("Secțiune").text("Nume (folosită în)").text("Tip").text("Grosime (mm)").text("Lungime (mm)")
-        .text("Lățime (mm)").text("Buc.").text("Decor").text("L1").text("L2").text("W1").text("W2")
-        .text("Lungime de tăiere (mm)").text("Lățime de tăiere (mm)").text("Motiv").endRow();
+    csv.text("Secțiune")
+        .text("Nume (folosită în)")
+        .text("Tip")
+        .text("Grosime (mm)")
+        .text("Lungime (mm)")
+        .text("Lățime (mm)")
+        .text("Buc.")
+        .text("Decor")
+        .text("L1")
+        .text("L2")
+        .text("W1")
+        .text("W2")
+        .text("Lungime de tăiere (mm)")
+        .text("Lățime de tăiere (mm)")
+        .text("Motiv")
+        .endRow();
     for (const CutPart& p : list.parts) {
         if (options.excluded.contains(p.rowKey)) {
             continue;
@@ -659,18 +695,31 @@ std::string toCsv(const CutList& list, const CutListOptions& options, CsvFormat 
         csv.text(reasons).endRow();
     }
     csv.endRow();
-    csv.text("Necesar plăci").text("Grosime (mm)").text("Arie piese (m²)").text("Plăci").text("Placă (mm)")
-        .text("Pierderi").endRow();
+    csv.text("Necesar plăci")
+        .text("Grosime (mm)")
+        .text("Arie piese (m²)")
+        .text("Plăci")
+        .text("Placă (mm)")
+        .text("Pierderi")
+        .endRow();
     for (const SheetNeed& s : list.sheets) {
-        csv.text(s.material).number(s.thickness, 1).number(s.partsArea / kMm2PerM2, 3).number(s.sheets, 0)
+        csv.text(s.material)
+            .number(s.thickness, 1)
+            .number(s.partsArea / kMm2PerM2, 3)
+            .number(s.sheets, 0)
             .text(formatNumber(s.sheetLength, 0, format) + " x " + formatNumber(s.sheetWidth, 0, format))
-            .text(formatNumber(options.waste * 100.0, 0, format) + "%").endRow();
+            .text(formatNumber(options.waste * 100.0, 0, format) + "%")
+            .endRow();
     }
     if (!list.bands.empty()) {
         csv.endRow();
         csv.text("Cant").text("Decor").text("Muchii").text("Lungime (m)").endRow();
         for (const BandNeed& b : list.bands) {
-            csv.text(bandLabel(b.bandKey)).text(b.decor).number(b.edges, 0).number(b.length / 1000.0, 2).endRow();
+            csv.text(bandLabel(b.bandKey))
+                .text(b.decor)
+                .number(b.edges, 0)
+                .number(b.length / 1000.0, 2)
+                .endRow();
         }
     }
     if (!list.hardware.empty()) {

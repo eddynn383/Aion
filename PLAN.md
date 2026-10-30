@@ -723,7 +723,7 @@ Designul aprobat: [`docs/plans/mobilier-pe-corp.md`](docs/plans/mobilier-pe-corp
 - [x] Pasul 3: măsurarea pieselor, „Fă placă”
 - [x] Pasul 4: lista de debitare v1.5 (piese ascunse, bife, CSV) — **punct de control al autorului**
 - [x] Pasul 5: placa parametrică (finalizator, compensare, Inspector)
-- [ ] Pasul 6: corpurile din bibliotecă (reconciliere, separatoare)
+- [x] Pasul 6: corpurile din bibliotecă (reconciliere, separatoare)
 - [ ] Pasul 7: cantul (date, Inspector, viewport, listă) — **punct de control al autorului**
 - [ ] Pasul 8: legarea componentelor salvate, lista „În model”
 - [ ] Pasul 9: feroneria în bibliotecă, variante, deviz

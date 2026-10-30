@@ -1,6 +1,7 @@
 #include "aion/core/model/Parametric.h"
 
 #include "aion/core/geom/Primitives.h"
+#include "aion/core/model/Carcass.h"
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/MaterialLibrary.h"
 
@@ -14,6 +15,35 @@
 namespace aion::model {
 
 namespace {
+
+// Câmpurile unui corp (docs/plans/mobilier-pe-corp.md, §4): dimensiunile, ușile, polițele pe spațiu,
+// separatoarele, grosimea corpului (PAL) și a spatelui (HDF).
+std::vector<ParameterSpec> carcass(double w, double wMin, double wMax, double h, double hMin, double hMax,
+    double d, double dMin, double dMax, double doors, double doorsMax, double shelves, double shelvesMax,
+    double dividers, double dividersMax)
+{
+    std::vector<ParameterSpec> specs { { "width", "Lățime", "mm", w, wMin, wMax, 1 },
+        { "height", "Înălțime", "mm", h, hMin, hMax, 1 }, { "depth", "Adâncime", "mm", d, dMin, dMax, 1 } };
+    if (doorsMax > 0) {
+        specs.push_back({ "doors", "Uși", "buc.", doors, 0, doorsMax, 1 });
+    }
+    specs.push_back({ "shelves", "Polițe (pe spațiu)", "buc.", shelves, 0, shelvesMax, 1 });
+    if (dividersMax > 0) {
+        specs.push_back({ "dividers", "Separatoare", "buc.", dividers, 0, dividersMax, 1 });
+    }
+    specs.push_back({ "board", "Grosimea corpului", "mm", 18, 16, 25, 1 });
+    specs.push_back({ "back", "Grosimea spatelui", "mm", 3, 3, 4, 1 });
+    return specs;
+}
+
+std::vector<ParameterSpec> appliance()
+{
+    std::vector<ParameterSpec> specs
+        = carcass(600, 450, 900, 2100, 1200, 2600, 560, 450, 700, 0, 0, 1, 4, 0, 0);
+    specs.insert(specs.end() - 2, { "nicheBottom", "Nișa de la", "mm", 850, 0, 1500, 1 });
+    specs.insert(specs.end() - 2, { "nicheHeight", "Înălțimea nișei", "mm", 600, 300, 900, 1 });
+    return specs;
+}
 
 const std::vector<GeneratorInfo>& registry()
 {
@@ -41,12 +71,25 @@ const std::vector<GeneratorInfo>& registry()
                 { "height", "Înălțime", "mm", 1800, 300, 3000, 10 },
                 { "depth", "Adâncime", "mm", 300, 150, 800, 10 },
                 { "shelves", "Polițe", "buc.", 5, 1, 12, 1 },
-                { "board", "Grosimea plăcii", "mm", 18, 10, 50, 1 } } },
+                { "board", "Grosimea plăcii", "mm", 18, 10, 50, 1 } },
+            true },
         { "cabinet", "Dulap", "Mobilier",
             { { "width", "Lățime", "mm", 1000, 400, 3000, 10 },
                 { "height", "Înălțime", "mm", 2000, 500, 3000, 10 },
                 { "depth", "Adâncime", "mm", 600, 300, 900, 10 }, { "doors", "Uși", "buc.", 2, 1, 6, 1 },
-                { "board", "Grosimea plăcii", "mm", 18, 10, 50, 1 } } },
+                { "board", "Grosimea plăcii", "mm", 18, 10, 50, 1 } },
+            true },
+        { "base", "Corp la sol", "Corpuri",
+            carcass(600, 150, 1200, 720, 300, 1000, 560, 300, 700, 1, 4, 1, 6, 0, 4) },
+        { "wall", "Corp suspendat", "Corpuri",
+            carcass(600, 150, 1200, 720, 300, 1000, 320, 200, 450, 1, 4, 1, 6, 0, 4) },
+        { "tall", "Soldat", "Corpuri",
+            carcass(600, 300, 900, 2100, 1200, 2600, 560, 300, 700, 1, 2, 4, 10, 0, 2) },
+        { "appliance", "Corp pentru electrocasnice", "Corpuri", appliance() },
+        { "wardrobe", "Dulap cu uși", "Corpuri",
+            carcass(1000, 400, 3000, 2000, 500, 2700, 600, 300, 700, 2, 6, 0, 8, 0, 5) },
+        { "rack", "Raft", "Corpuri",
+            carcass(800, 300, 2000, 1800, 300, 2700, 300, 150, 600, 0, 4, 4, 12, 0, 5) },
         { "stairs", "Scară dreaptă", "Scări",
             { { "width", "Lățime", "mm", 1000, 600, 3000, 10 },
                 { "height", "Înălțime totală", "mm", 2800, 300, 6000, 10 },
@@ -380,6 +423,13 @@ bool setParameter(Model& model, DefinitionId definition, const std::string& key,
     if (info == nullptr) {
         return false;
     }
+    if (isCarcassGenerator(def.generator)) {
+        refreshDividerPositions(model, definition); // o mutare de mână a separatoarelor se păstrează
+        def = model.definition(definition);
+        if (key == "board" || key == "back") {
+            value = nearestThickness(key == "board" ? "pal" : "hdf", value);
+        }
+    }
     std::map<std::string, double> given = def.parameters;
     given[key] = value;
     def.parameters = resolvedParameters(*info, given);
@@ -393,6 +443,10 @@ void regenerate(Model& model, DefinitionId definition)
     const Definition& def = model.definition(definition);
     if (def.generator == kBoardGenerator) {
         rebuildBoard(model, definition); // geometria plăcii e în mesh-ul ei, nu în subgrupuri
+        return;
+    }
+    if (isCarcassGenerator(def.generator)) {
+        reconcileCarcass(model, definition); // piesele se recunosc după rol (ADR 0043)
         return;
     }
     const Builder build = builderFor(def.generator);

@@ -13,7 +13,8 @@ inline constexpr double kDragThresholdPx = 4.0;
 // Inferența cu ghidajele, grid-ul și scena contextului.
 [[nodiscard]] inference::Inference inferAt(inference::Engine& engine, const ToolContext& ctx, Vec2d screen,
     std::optional<Vec3d> from, std::optional<math::Plane> plane = std::nullopt);
-// Normala feței de sub inferență: `inf.normal`, altfel fața din ctx.mesh (`inf.face` / `inf.pick.face`), altfel `fallback`.
+// Normala feței de sub inferență: `inf.normal`, altfel fața din ctx.mesh (`inf.face` / `inf.pick.face`),
+// altfel `fallback`.
 [[nodiscard]] Vec3d inferenceNormal(const ToolContext& ctx, const inference::Inference& inf, Vec3d fallback);
 // Ce se evidențiază sub cursor: muchia sau fața pe care stă punctul inferat (capetele au marcajul lor).
 [[nodiscard]] view::PickResult inferenceHover(const inference::Inference& inf);
@@ -27,6 +28,7 @@ void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock);
 [[nodiscard]] std::unique_ptr<Tool> makeScaleTool();
 [[nodiscard]] std::unique_ptr<Tool> makePivotTool();
 [[nodiscard]] std::unique_ptr<Tool> makePlaceTool();
+[[nodiscard]] std::unique_ptr<Tool> makeDividerTool();
 [[nodiscard]] std::unique_ptr<Tool> makePenTool();
 [[nodiscard]] std::unique_ptr<Tool> makePenEditTool();
 [[nodiscard]] std::unique_ptr<Tool> makeCircleTool();

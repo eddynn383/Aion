@@ -18,3 +18,6 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Pierderile la plăci | 15% | §5 | |
 | Feroneria din piesele ascunse intră în deviz? | Nu, până la „Include toate” | D17, D22 | |
 | Corpurile identice dintr-o bucătărie: legate sau independente? | Legate (componentă salvată) | Obiectivul 6, pasul 8 | |
+| Baza și capacul: pe toată adâncimea sau cât polițele? | Pe toată adâncimea (964 × 600 la dulapul de referință); polițele și separatoarele = adâncimea − spatele | §4 (tabelul de orientare spune altceva; s-a ales dulapul de referință) | |
+| Polițele corpului pentru electrocasnice | În spațiul de sub nișă; ușa de jos acoperă și polița de sub nișă | §4, pasul 6 | |
+| Balamaua și mânerul pe ușă | Balamaua la 5 mm de latura ei, pe spatele ușii; mânerul vertical, la 40 mm de marginea liberă, centrat | §4, pasul 6 | |

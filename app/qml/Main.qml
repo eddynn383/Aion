@@ -115,6 +115,8 @@ Window {
             { id: "org.explode", title: "Desface (grup sau obiect)", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
             { id: "furniture.makeBoard", title: "Fă placă (PAL, pentru lista de debitare)", category: "Mobilier", shortcut: "", icon: "box" },
+            { id: "furniture.addDivider", title: "Adaugă separator (clic în corp)", category: "Mobilier", shortcut: "", icon: "box" },
+            { id: "furniture.makePlain", title: "Transformă în corp obișnuit", category: "Mobilier", shortcut: "", icon: "box" },
             { id: "org.enter", title: "Editează grupul sau obiectul selectat", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.exit", title: "Ieși din grupul sau obiectul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
             { id: "org.hide", title: "Ascunde selecția", category: "Organizare", shortcut: "", icon: "eye-off" },
@@ -239,13 +241,43 @@ Window {
 
     // Explode cu confirmare când s-ar pierde date de mobilier (ADR 0044).
     function explodeChecked() {
-        if (!doc.explodeLosesPartData()) {
+        const breaks = doc.selectionBreaksCarcass()
+        const loses = doc.explodeLosesPartData()
+        if (!breaks && !loses) {
             doc.explodeSelection()
             return
         }
-        confirmDialog.ask("Desfaci obiectul?",
-            "Datele de piesă (tip, grosime, cant) sau legătura cu biblioteca se pierd. Poți anula cu ⌘Z.",
-            "Desface", () => doc.explodeSelection())
+        const messages = []
+        if (loses) messages.push("Datele de piesă (tip, grosime, cant) sau legătura cu biblioteca se pierd.")
+        if (breaks) messages.push("Corpul devine obișnuit: nu se mai reface din câmpurile lui.")
+        confirmDialog.ask("Desfaci obiectul?", messages.join(" ") + " Poți anula cu ⌘Z.", "Desface", () => {
+            if (breaks) doc.makeContextPlain()
+            doc.explodeSelection()
+        })
+    }
+
+    // Make Group / Grupează pe piese dintr-un corp: corpul devine obișnuit (după confirmare).
+    function groupChecked(action) {
+        if (!doc.selectionBreaksCarcass()) {
+            action()
+            return
+        }
+        confirmDialog.ask("Grupezi piese din corp?",
+            "Corpul devine obișnuit: nu se mai reface din câmpurile lui. Poți anula cu ⌘Z.", "Grupează", () => {
+                doc.makeContextPlain()
+                action()
+            })
+    }
+
+    // Un câmp al unui obiect dinamic: refacerea unui corp pierde modificările de mână din piesele lui.
+    function setParameterChecked(key, value) {
+        if (!doc.rolePiecesDiffer()) {
+            doc.setParameter(key, value)
+            return
+        }
+        confirmDialog.ask("Refaci corpul?",
+            "Unele piese au fost modificate de mână (formă, dimensiuni sau poziție); la refacere, modificările se "
+            + "pierd. Ca să le păstrezi: „Transformă în corp obișnuit”.", "Continuă", () => doc.setParameter(key, value))
     }
 
     function runCommand(id) {
@@ -376,12 +408,15 @@ Window {
         case "edit.paste": doc.pasteClipboard(); break
         case "edit.selectAll": doc.selectAll(); break
         case "edit.selectNone": doc.clearSelection(); break
-        case "org.makeGroup": doc.makeGroup(); break
-        case "org.group": doc.groupSelection(); break
+        case "org.makeGroup": window.groupChecked(() => doc.makeGroup()); break
+        case "org.group": window.groupChecked(() => doc.groupSelection()); break
         case "org.duplicateLinked": doc.duplicateLinked(); break
         case "org.explode": window.explodeChecked(); break
         case "org.makeUnique": doc.makeUniqueSelection(); break
         case "furniture.makeBoard": doc.makeBoardSelection(); break
+        case "furniture.addDivider": doc.beginAddDivider(); break
+        case "furniture.upgrade": doc.upgradeGenerator(); break
+        case "furniture.makePlain": doc.makePlainBody(); break
         case "org.enter": doc.enterInstance(0); break
         case "org.exit": doc.exitContext(); break
         case "org.hide": doc.hideSelection(); break
@@ -2083,6 +2118,7 @@ Window {
                 onEditRules: window.openRulesEditor()
                 onToolRequested: (id) => window.selectTool(id)
                 onCommandRequested: (id) => window.runCommand(id)
+                onParameterRequested: (key, value) => window.setParameterChecked(key, value)
             }
 
             // Fără selecție, Inspector-ul descrie modelul întreg.
