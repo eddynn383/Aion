@@ -1806,6 +1806,27 @@ TEST_CASE("Text pe fața unui obiect nu arată aria feței din ctx.mesh de sub e
     CHECK(a.text == "1100, 1150, 1000");
 }
 
+TEST_CASE("Move: colțul real pe un punct al cutiei ține punctul aprins, cu marcajul inferenței", "[core][tools][snap]")
+{
+    ObjectScene s;
+    const model::InstanceId a = s.addBox({ 0, 0, 0 });
+    s.addBox({ 3000, 0, 0 });
+    s.selection.instances.insert(a);
+    auto move = tools::makeTool("move");
+    s.clickLive(*move, { 500, 500, 1000 });
+
+    const Vec3d corner { 2500, -500, 1000 }; // colțul lui B: vârf real și punct al cutiei în același loc
+    s.rebuildScene(move->snapExclude());
+    move->pointerMove(s.ctx, { s.screen(corner) + Vec2d { 2, 1 }, {}, 1 });
+    const tools::Overlay o = move->overlay();
+    const auto hot = std::find_if(o.grips.begin(), o.grips.end(), [](const tools::Grip& g) { return g.hot; });
+    REQUIRE(hot != o.grips.end());
+    CHECK(glm::length(hot->point - corner) < 1e-6);
+    REQUIRE(o.marker.has_value());
+    CHECK(o.marker->label == "Endpoint"); // punctul real a câștigat
+    CHECK(glm::length(o.marker->point - corner) < 1e-6);
+}
+
 TEST_CASE("Move fără selecție: obiectul mutat nu se prinde de el însuși", "[core][tools][snap]")
 {
     ObjectScene s;

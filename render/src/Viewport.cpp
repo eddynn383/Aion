@@ -449,11 +449,8 @@ void Viewport::appendDocument(DocumentPass& f) const
     }
 
     const glm::vec4 accent = toVec4(m_accent);
-    appendInferenceDrawing(f.lines, f.topLines, f.topPoints, overlay, ctx);
-    for (const math::Vec3d& p : overlay.points) {
-        f.points.push_back({ w(p), accent, 7.0f });
-    }
     // Punctele de prindere ale obiectelor (Move): discuri mari cu margine, ca în SketchUp; cel de sub cursor mai mare.
+    // Înaintea marcajului inferenței, care rămâne deasupra lor.
     for (const tools::Grip& g : overlay.grips) {
         const glm::vec3 p = w(g.point);
         const glm::vec4 color = markerColor(g.kind, inference::Tint::Neutral);
@@ -464,6 +461,10 @@ void Viewport::appendDocument(DocumentPass& f) const
         f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.95f), g.hot ? 19.0f : 13.0f });
         f.topPoints.push_back({ p, glm::vec4(1.0f), g.hot ? 16.0f : 10.5f });
         f.topPoints.push_back({ p, color, g.hot ? 12.5f : 8.0f });
+    }
+    appendInferenceDrawing(f.lines, f.topLines, f.topPoints, overlay, ctx);
+    for (const math::Vec3d& p : overlay.points) {
+        f.points.push_back({ w(p), accent, 7.0f });
     }
     if (hover.kind == view::PickResult::Kind::Vertex) {
         f.points.push_back({ w(hover.point), accent, 9.0f });

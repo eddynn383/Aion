@@ -638,6 +638,10 @@ private:
             const auto gs = ctx.camera.project(m_grips[std::size_t(m_hotGrip)].point);
             const auto is = ctx.camera.project(m_inference.point);
             if (gs && is && glm::length(*is - screen) <= glm::length(*gs - screen) + 0.5) {
+                // În același loc (colțul unei cutii), punctul rămâne aprins; marcajul e al inferenței.
+                if (tol::samePoint(m_grips[std::size_t(m_hotGrip)].point, m_inference.point)) {
+                    m_grips[std::size_t(m_hotGrip)].hot = true;
+                }
                 m_hotGrip = -1;
             }
         }
