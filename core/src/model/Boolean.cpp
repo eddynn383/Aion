@@ -100,20 +100,27 @@ BooleanResult booleanOperation(Model& model, InstanceId a, InstanceId b, Boolean
     }
     const manifold::MeshGL64 mesh = out.GetMeshGL64();
 
-    const DefinitionId definition = model.addDefinition({ "Grup", true });
+    // Datele de piesă ale primului obiect trec pe rezultat, desprinse de parametri (ADR 0044).
+    Definition resultDefinition { "Grup", true };
+    resultDefinition.part = model.definition(ia.definition).part;
+    const DefinitionId definition = model.addDefinition(resultDefinition);
+    // O piesă își păstrează axele: rezultatul are transformarea primului obiect, geometria e în coordonatele lui.
+    const bool keepFrame = resultDefinition.part.has_value();
+    const math::Transform toLocal = keepFrame ? ia.transform.inverse() : math::Transform {};
     geom::MeshBuilder builder(model.mesh(definition));
     for (std::size_t t = 0; t + 2 < mesh.triVerts.size(); t += 3) {
         std::vector<math::Vec3d> pts;
         for (int k = 0; k < 3; ++k) {
             const std::size_t v = mesh.triVerts[t + static_cast<std::size_t>(k)];
-            pts.push_back({ mesh.vertProperties[v * mesh.numProp], mesh.vertProperties[v * mesh.numProp + 1],
-                mesh.vertProperties[v * mesh.numProp + 2] });
+            pts.push_back(toLocal.applyToPoint({ mesh.vertProperties[v * mesh.numProp],
+                mesh.vertProperties[v * mesh.numProp + 1], mesh.vertProperties[v * mesh.numProp + 2] }));
         }
         builder.face(pts);
     }
     builder.finish();
     // Materialul primului obiect trece pe grupul nou.
-    result.instance = model.addInstance({ ia.parent, definition, {}, {}, ia.tag, false, false, ia.material, {}, {} });
+    result.instance = model.addInstance({ ia.parent, definition, keepFrame ? ia.transform : math::Transform {}, {}, ia.tag,
+        false, false, ia.material, {}, {} });
     eraseInstance(model, a);
     eraseInstance(model, b);
     return result;

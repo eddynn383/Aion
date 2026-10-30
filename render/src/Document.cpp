@@ -8,6 +8,7 @@
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
 #include "aion/core/geom/Primitives.h"
+#include "aion/core/model/Furniture.h"
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/CameraLens.h"
@@ -237,6 +238,16 @@ model::CutListOptions cutListOptions(const QVariantMap& options)
     o.sheetWidth = options.value(QStringLiteral("sheetWidth"), o.sheetWidth).toDouble();
     o.waste = options.value(QStringLiteral("waste"), o.waste).toDouble();
     o.maxThickness = options.value(QStringLiteral("maxThickness"), o.maxThickness).toDouble();
+    for (const QVariant& key : options.value(QStringLiteral("excluded")).toList()) {
+        o.excluded.insert(key.toString().toStdString());
+    }
+    o.cutDimensions = options.value(QStringLiteral("cutDimensions"), false).toBool();
+    o.headerRow = options.value(QStringLiteral("headerRow"), true).toBool();
+    o.bandAllowance = options.value(QStringLiteral("bandAllowance"), o.bandAllowance).toDouble();
+    const QVariantMap byType = options.value(QStringLiteral("bandAllowanceByType")).toMap();
+    for (auto it = byType.begin(); it != byType.end(); ++it) {
+        o.bandAllowanceByType[it.key().toStdString()] = it.value().toDouble();
+    }
     return o;
 }
 
@@ -295,6 +306,40 @@ QVariantMap Document::cutList(const QVariantMap& options) const
             { QStringLiteral("count"), p.count },
             { QStringLiteral("panel"), p.panel },
             { QStringLiteral("flat"), p.flat },
+            { QStringLiteral("section"), static_cast<int>(p.section) },
+            { QStringLiteral("type"), [&] {
+                 if (const model::BoardType* t = model::findBoardType(p.typeKey)) {
+                     return QString::fromStdString(t->label);
+                 }
+                 return QString::fromStdString(p.typeKey);
+             }() },
+            { QStringLiteral("nominalThickness"), p.nominalThickness },
+            { QStringLiteral("cutLength"), p.cutLength },
+            { QStringLiteral("cutWidth"), p.cutWidth },
+            { QStringLiteral("bands"), [&] {
+                 QStringList labels;
+                 for (const std::string& b : p.bands) {
+                     const model::BandType* band = model::findBandType(b);
+                     labels.append(band ? QString::fromStdString(band->label) : QString::fromStdString(b));
+                 }
+                 return labels;
+             }() },
+            { QStringLiteral("hidden"), p.hidden },
+            { QStringLiteral("rowKey"), QString::fromStdString(p.rowKey) },
+            { QStringLiteral("usedIn"), [&] {
+                 QStringList names;
+                 for (const std::string& n : p.usedIn) {
+                     names.append(QString::fromStdString(n));
+                 }
+                 return names.join(QStringLiteral(", "));
+             }() },
+            { QStringLiteral("flags"), [&] {
+                 QStringList flags;
+                 for (const std::string& f : p.flags) {
+                     flags.append(QString::fromStdString(f));
+                 }
+                 return flags.join(QStringLiteral(", "));
+             }() },
         });
     }
     QVariantList sheets;
@@ -304,10 +349,27 @@ QVariantMap Document::cutList(const QVariantMap& options) const
             { QStringLiteral("thickness"), s.thickness },
             { QStringLiteral("area"), s.partsArea / 1e6 },
             { QStringLiteral("sheets"), s.sheets },
+            { QStringLiteral("sheetSize"), QStringLiteral("%1 × %2").arg(s.sheetLength).arg(s.sheetWidth) },
         });
     }
+    QVariantList bands;
+    for (const model::BandNeed& b : list.bands) {
+        const model::BandType* band = model::findBandType(b.bandKey);
+        bands.append(QVariantMap {
+            { QStringLiteral("band"), band ? QString::fromStdString(band->label) : QString::fromStdString(b.bandKey) },
+            { QStringLiteral("decor"), QString::fromStdString(b.decor) },
+            { QStringLiteral("edges"), b.edges },
+            { QStringLiteral("meters"), b.length / 1000.0 },
+        });
+    }
+    QVariantList hardware;
+    for (const model::HardwareNeed& h : list.hardware) {
+        hardware.append(QVariantMap { { QStringLiteral("label"), QString::fromStdString(h.label) },
+            { QStringLiteral("count"), h.count } });
+    }
     return { { QStringLiteral("parts"), parts }, { QStringLiteral("sheets"), sheets },
-        { QStringLiteral("edgeBanding"), list.edgeBanding / 1000.0 } };
+        { QStringLiteral("edgeBanding"), list.edgeBanding / 1000.0 }, { QStringLiteral("bands"), bands },
+        { QStringLiteral("hardware"), hardware }, { QStringLiteral("hiddenPieces"), list.hiddenPieces } };
 }
 
 bool Document::exportReport(const QString& path, const QString& kind, const QVariantMap& options)
@@ -1854,6 +1916,16 @@ void Document::makeComponent(const QString& name)
     });
 }
 
+bool Document::explodeLosesPartData() const
+{
+    for (model::InstanceId id : m_selection.instances) {
+        if (m_model.instances().contains(id) && model::explodeLosesPartData(m_model, id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Document::explodeSelection()
 {
     if (!require(Modeling)) {
@@ -1871,6 +1943,29 @@ void Document::explodeSelection()
         }
         m_selection = result;
     });
+}
+
+void Document::makeBoardSelection()
+{
+    if (!require(Modeling)) {
+        return;
+    }
+    if (m_selection.instances.empty()) {
+        setError(QStringLiteral("Selectează obiectele care trebuie să devină plăci."));
+        return;
+    }
+    int refused = 0;
+    runOnModel("Fă placă", [&](model::Model& model) {
+        for (model::InstanceId id : m_selection.instances) {
+            if (model.instances().contains(id) && !model::makeBoard(model, id, "pal")) {
+                ++refused;
+            }
+        }
+    });
+    if (refused > 0) {
+        setError(QStringLiteral("%1 obiecte nu pot deveni plăci (au alte obiecte în ele sau nu au fețe).").arg(refused));
+    }
+    emit selectionChanged();
 }
 
 void Document::makeUniqueSelection()
@@ -3036,7 +3131,7 @@ QList<int> Document::commandModes(const QString& id)
     }
     static const QStringList modelingPrefixes { QStringLiteral("edit."), QStringLiteral("org."), QStringLiteral("solid."),
         QStringLiteral("guides."), QStringLiteral("material."), QStringLiteral("library."), QStringLiteral("object."),
-        QStringLiteral("texture.") };
+        QStringLiteral("texture."), QStringLiteral("furniture.") };
     for (const QString& prefix : modelingPrefixes) {
         if (id.startsWith(prefix)) {
             return modeling;
@@ -3793,6 +3888,7 @@ QVariantMap materialEntry(const model::Material& m)
         { QStringLiteral("color"), QColor(m.color.r, m.color.g, m.color.b, m.color.a) },
         { QStringLiteral("roughness"), m.roughness },
         { QStringLiteral("metallic"), m.metallic },
+        { QStringLiteral("category"), QString::fromStdString(m.category) },
     };
 }
 
@@ -4024,14 +4120,25 @@ model::TextureId proceduralTextureIn(model::Model& model, const std::string& key
     return model.addTexture(std::move(texture));
 }
 
-// Materialul din bibliotecă, în model (după nume; cu textura lui, dacă are).
+// Materialul din model care vine din materialul inclus `lib`: după cheie (ADR 0044) sau, în fișierele vechi fără cheie,
+// după nume.
+model::MaterialId modelMaterialFor(const model::Model& model, const model::Material& lib)
+{
+    for (std::size_t i = 0; i < model.materials().size(); ++i) {
+        const model::Material& mine = model.materials().values()[i];
+        if (mine.libraryKey == lib.libraryKey || (mine.libraryKey.empty() && mine.name == lib.name)) {
+            return model.materials().keys()[i];
+        }
+    }
+    return {};
+}
+
+// Materialul din bibliotecă, în model (cu textura lui, dacă are).
 model::MaterialId libraryMaterialIn(model::Model& model, std::size_t index)
 {
     const model::Material& lib = model::builtinMaterials()[index];
-    for (std::size_t i = 0; i < model.materials().size(); ++i) {
-        if (model.materials().values()[i].name == lib.name) {
-            return model.materials().keys()[i];
-        }
+    if (const model::MaterialId existing = modelMaterialFor(model, lib)) {
+        return existing;
     }
     model::Material copy = lib;
     if (const std::string_view key = model::builtinTexture(index); !key.empty()) {
@@ -4085,13 +4192,11 @@ void Document::selectLibraryMaterial(int index)
     if (index < 0 || index >= static_cast<int>(model::builtinMaterials().size())) {
         return;
     }
-    // Dacă modelul are deja un material cu același nume, îl folosim pe acela.
-    const std::string& name = model::builtinMaterials()[static_cast<std::size_t>(index)].name;
-    for (std::size_t i = 0; i < m_model.materials().size(); ++i) {
-        if (m_model.materials().values()[i].name == name) {
-            selectModelMaterial(static_cast<double>(m_model.materials().keys()[i].value));
-            return;
-        }
+    // Dacă modelul are deja materialul (după cheie sau, în fișierele vechi, după nume), îl folosim pe acela.
+    if (const model::MaterialId existing
+        = modelMaterialFor(m_model, model::builtinMaterials()[static_cast<std::size_t>(index)])) {
+        selectModelMaterial(static_cast<double>(existing.value));
+        return;
     }
     // Cu textură: intră în model acum (Paint Bucket vopsește apoi cu un material din model).
     if (!model::builtinTexture(static_cast<std::size_t>(index)).empty()) {
@@ -4142,6 +4247,14 @@ void applyMaterialProperties(model::Material& m, const QVariantMap& p)
     }
     if (p.contains(QStringLiteral("metallic"))) {
         m.metallic = static_cast<float>(std::clamp(p.value(QStringLiteral("metallic")).toDouble(), 0.0, 1.0));
+    }
+    if (p.contains(QStringLiteral("category"))) {
+        static const QStringList kCategories { QString(), QStringLiteral("wood"), QStringLiteral("metal"),
+            QStringLiteral("glass"), QStringLiteral("plastic"), QStringLiteral("stone"), QStringLiteral("board-decor") };
+        const QString category = p.value(QStringLiteral("category")).toString();
+        if (kCategories.contains(category)) {
+            m.category = category.toStdString();
+        }
     }
     if (p.contains(QStringLiteral("textureWidth"))) {
         m.textureSize.x = std::max(1.0, p.value(QStringLiteral("textureWidth")).toDouble());
@@ -4839,6 +4952,11 @@ QVariantList Document::libraryItems() const
             { QStringLiteral("category"), QString::fromStdString(g.category) }, { QStringLiteral("user"), false },
             { QStringLiteral("dynamic"), true } });
     }
+    for (const model::HardwareType& h : model::hardwareTypes()) {
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("hardware:") + QString::fromStdString(h.key) },
+            { QStringLiteral("name"), QString::fromStdString(h.label) }, { QStringLiteral("category"), QStringLiteral("Feronerie") },
+            { QStringLiteral("user"), false }, { QStringLiteral("dynamic"), false } });
+    }
     const QDir dir(libraryFolder());
     for (const QFileInfo& file : dir.entryInfoList({ QStringLiteral("*.aion") }, QDir::Files, QDir::Name)) {
         QFile f(file.absoluteFilePath());
@@ -4866,6 +4984,25 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
     }
     if (id.startsWith(QLatin1String("gen:"))) {
         createParametric(id.mid(4), at);
+        return;
+    }
+    if (id.startsWith(QLatin1String("hardware:"))) {
+        const std::string key = id.mid(9).toStdString();
+        const model::HardwareType* type = model::findHardwareType(key);
+        if (type == nullptr) {
+            return;
+        }
+        const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+        model::InstanceId created;
+        runOnModel("Din bibliotecă: " + type->label, [&](model::Model& model) {
+            created = model::createHardware(model, activeDefinition(), key, math::Transform::translation(point));
+        });
+        if (created) {
+            const geom::Selection before = m_selection;
+            m_selection.clear();
+            m_selection.instances.insert(created);
+            afterInteraction(before);
+        }
         return;
     }
     if (!id.startsWith(QLatin1String("file:"))) {
@@ -4931,6 +5068,9 @@ QVariantMap Document::libraryItemSize(const QString& id) const
     if (id.startsWith(QLatin1String("gen:"))) {
         temp.emplace();
         model::createParametric(*temp, temp->root(), id.mid(4).toStdString(), {}, {});
+    } else if (id.startsWith(QLatin1String("hardware:"))) {
+        temp.emplace();
+        model::createHardware(*temp, temp->root(), id.mid(9).toStdString(), {});
     } else if (id.startsWith(QLatin1String("file:"))) {
         io::LoadResult loaded = io::loadFile(toPath(id.mid(5)));
         if (loaded.model) {

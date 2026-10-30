@@ -44,6 +44,7 @@ add_library(aion_core STATIC
     src/model/SnapSources.cpp
     src/model/Texturing.cpp
     src/model/Parametric.cpp
+    src/model/Furniture.cpp
     src/model/Transfer.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp

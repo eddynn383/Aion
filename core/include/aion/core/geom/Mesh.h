@@ -85,6 +85,8 @@ public:
 
     void beginRecording();
     [[nodiscard]] bool isRecording() const { return m_recording.has_value(); }
+    // Înregistrarea curentă are cel puțin o schimbare.
+    [[nodiscard]] bool hasRecordedChanges() const { return m_recording && !m_recording->empty(); }
     ChangeSet endRecording();
     // Aplică o înregistrare înainte (redo) sau înapoi (undo).
     void apply(const ChangeSet& changes, ChangeDirection direction);

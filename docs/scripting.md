@@ -25,6 +25,7 @@ Aion rulează JavaScript (motorul QJSEngine din Qt, la fel pe macOS, Windows și
 | `line([x, y, z], [x, y, z])` | O muchie liberă (geometrie, ca unealta Line). |
 | `face([[x, y, z], …])` | O față plană din puncte (ca un poligon desenat). |
 | `objects()` | Obiectele din context: `{ id, name, x, y, z, width, depth, height }`. |
+| `cutList(options)` | Lista de debitare (doar citire): `{ parts, sheets, bands, hardware, hiddenPieces }`; `options` ca în fereastră (`excluded`, `cutDimensions`, `sheetLength`…). |
 | `selection()` / `select([id…])` | Obiectele selectate / selectează. |
 | `command(id)` | O comandă din palette (de exemplu `"view.top"`, `"view.extents"`). |
 | `message(text)` | Un mesaj scurt (toast). |

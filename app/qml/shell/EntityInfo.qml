@@ -14,6 +14,7 @@ Column {
     readonly property bool modeling: workMode === 0
     signal editRules()
     signal toolRequested(string id)
+    signal commandRequested(string id)
 
     readonly property var info: document ? document.entityInfo : ({ kind: "none" })
     readonly property bool isInstance: info.kind === "instance"
@@ -765,7 +766,7 @@ Column {
         Button {
             small: true
             text: "Desface"
-            onClicked: root.document.explodeSelection()
+            onClicked: root.commandRequested("org.explode")
         }
         Button {
             small: true

@@ -45,9 +45,14 @@ public:
         if (const auto it = m_materials.find(id); it != m_materials.end()) {
             return it->second;
         }
-        // Același nume în modelul țintă = același material (ca la bibliotecă).
+        // Același material în modelul țintă (ADR 0044): după cheia din bibliotecă, altfel după nume și categorie; un
+        // „Nuc” decor nu se unește cu un „Nuc” lemn masiv.
         for (std::size_t i = 0; i < m_target.materials().size(); ++i) {
-            if (m_target.materials().values()[i].name == m->name) {
+            const Material& mine = m_target.materials().values()[i];
+            const bool same = !m->libraryKey.empty() ? mine.libraryKey == m->libraryKey
+                                                     : mine.libraryKey.empty() && mine.name == m->name
+                    && mine.category == m->category;
+            if (same) {
                 return m_materials[id] = m_target.materials().keys()[i];
             }
         }
@@ -150,13 +155,29 @@ Model extractInstance(const Model& source, InstanceId instance)
     const Instance& inst = source.instance(instance);
     // Un model intermediar cu obiectul în origine, apoi conținutul lui devine rădăcina modelului nou.
     Copier copier(out, source);
-    Definition root = out.definition(out.root());
-    const Definition& def = source.definition(inst.definition);
-    root.generator = def.generator;
-    root.parameters = def.parameters;
-    root.shape = def.shape;
+    // Definiția întreagă (generator, date de piesă, cheia componentei), fără nume și fără `group` (ADR 0044).
+    Definition root = source.definition(inst.definition);
+    root.name = out.definition(out.root()).name;
+    root.group = out.definition(out.root()).group;
+    root.collection = out.definition(out.root()).collection;
     out.setDefinition(out.root(), root);
     copier.contents(inst.definition, out.root());
+    // Materialul obiectului („vopsirea” lui) trece pe ce l-ar fi moștenit: fețele și obiectele fără material propriu.
+    if (const MaterialId painted = copier.material(inst.material)) {
+        geom::Mesh& mesh = out.mesh(out.root());
+        for (std::size_t i = 0; i < mesh.faces().size(); ++i) {
+            if (!mesh.faces().values()[i].material) {
+                mesh.setFaceMaterial(mesh.faces().keys()[i], painted);
+            }
+        }
+        for (InstanceId child : out.childrenOf(out.root())) {
+            Instance c = out.instance(child);
+            if (!c.material) {
+                c.material = painted;
+                out.setInstance(child, c);
+            }
+        }
+    }
     // Colțul minim în origine.
     const auto [lo, hi] = bounds(out, out.root());
     if (lo.x <= hi.x && (lo.x != 0.0 || lo.y != 0.0 || lo.z != 0.0)) {

@@ -90,12 +90,15 @@ TEST_CASE("Biblioteca: un obiect extras și inserat în alt model rămâne la fe
     CHECK(hi.x - lo.x == Approx(1400.0));
     CHECK(extracted.validate().ok());
 
-    // Inserat într-un model care are deja un material cu același nume: îl refolosește.
+    // Inserat într-un model care are deja materialul din bibliotecă (aceeași cheie, ADR 0044): îl refolosește.
     Model b;
     commands::CommandStack stack(b);
     stack.setValidation(true, geom::ValidationLevel::Full);
     stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
-    b.addMaterial({ "Lemn de stejar", { 1, 2, 3, 255 }, 0.5f, 0.0f });
+    model::Material oak { "Lemn de stejar", { 1, 2, 3, 255 }, 0.5f, 0.0f };
+    oak.category = "board-decor";
+    oak.libraryKey = "lemn-de-stejar";
+    b.addMaterial(oak);
     model::InstanceId inserted;
     REQUIRE(stack.run("Inserează", [&](Model& m) {
         inserted = model::insertModel(m, m.root(), extracted, "Masă", Transform::translation({ -500, 0, 0 }));

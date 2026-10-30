@@ -37,6 +37,8 @@ public:
     Q_INVOKABLE bool line(const QVariantList& from, const QVariantList& to);
     Q_INVOKABLE bool face(const QVariantList& points);
     Q_INVOKABLE QVariantList objects() const;
+    // Lista de debitare (ADR 0044), cu aceleași chei ca fereastra: parts, sheets, bands, hardware (doar citire).
+    Q_INVOKABLE QVariantMap cutList(const QVariantMap& options = {}) const;
     Q_INVOKABLE QVariantList selection() const;
     Q_INVOKABLE void select(const QVariantList& ids);
     Q_INVOKABLE void command(const QString& id);

@@ -114,6 +114,7 @@ Window {
             { id: "org.duplicateLinked", title: "Duplicare legată (copie editată împreună)", category: "Organizare", shortcut: "Alt+D", icon: "component" },
             { id: "org.explode", title: "Desface (grup sau obiect)", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
+            { id: "furniture.makeBoard", title: "Fă placă (PAL, pentru lista de debitare)", category: "Mobilier", shortcut: "", icon: "box" },
             { id: "org.enter", title: "Editează grupul sau obiectul selectat", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.exit", title: "Ieși din grupul sau obiectul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
             { id: "org.hide", title: "Ascunde selecția", category: "Organizare", shortcut: "", icon: "eye-off" },
@@ -234,6 +235,17 @@ Window {
     }
     function resetShortcuts() {
         preferences.customShortcuts = "{}"
+    }
+
+    // Explode cu confirmare când s-ar pierde date de mobilier (ADR 0044).
+    function explodeChecked() {
+        if (!doc.explodeLosesPartData()) {
+            doc.explodeSelection()
+            return
+        }
+        confirmDialog.ask("Desfaci obiectul?",
+            "Datele de piesă (tip, grosime, cant) sau legătura cu biblioteca se pierd. Poți anula cu ⌘Z.",
+            "Desface", () => doc.explodeSelection())
     }
 
     function runCommand(id) {
@@ -366,8 +378,9 @@ Window {
         case "org.makeGroup": doc.makeGroup(); break
         case "org.group": doc.groupSelection(); break
         case "org.duplicateLinked": doc.duplicateLinked(); break
-        case "org.explode": doc.explodeSelection(); break
+        case "org.explode": window.explodeChecked(); break
         case "org.makeUnique": doc.makeUniqueSelection(); break
+        case "furniture.makeBoard": doc.makeBoardSelection(); break
         case "org.enter": doc.enterInstance(0); break
         case "org.exit": doc.exitContext(); break
         case "org.hide": doc.hideSelection(); break
@@ -2068,6 +2081,7 @@ Window {
                 workMode: doc.workMode
                 onEditRules: window.openRulesEditor()
                 onToolRequested: (id) => window.selectTool(id)
+                onCommandRequested: (id) => window.runCommand(id)
             }
 
             // Fără selecție, Inspector-ul descrie modelul întreg.
@@ -2162,6 +2176,62 @@ Window {
         active: false
         sourceComponent: DemoGallery {
             onCloseRequested: demoGalleryLoader.active = false
+        }
+    }
+
+    // O întrebare cu „Anulează” / acțiune, pentru operații care pierd date.
+    Popover {
+        id: confirmDialog
+        property var action: null
+        property string title: ""
+        property string message: ""
+        property string actionText: ""
+        function ask(title, message, actionText, action) {
+            confirmDialog.title = title
+            confirmDialog.message = message
+            confirmDialog.actionText = actionText
+            confirmDialog.action = action
+            confirmDialog.open()
+        }
+        modal: true
+        anchors.centerIn: parent
+        width: 380
+        padding: Theme.space6
+
+        contentItem: Column {
+            spacing: Theme.space4
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: confirmDialog.title
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeLg
+                font.weight: Font.DemiBold
+            }
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: confirmDialog.message
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeMd
+            }
+            Row {
+                anchors.right: parent.right
+                spacing: Theme.space2
+                Button {
+                    text: "Anulează"
+                    onClicked: confirmDialog.close()
+                }
+                Button {
+                    variant: "primary"
+                    text: confirmDialog.actionText
+                    onClicked: {
+                        const action = confirmDialog.action
+                        confirmDialog.close()
+                        if (action) action()
+                    }
+                }
+            }
         }
     }
 

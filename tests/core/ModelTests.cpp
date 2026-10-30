@@ -523,3 +523,81 @@ TEST_CASE("Pivot: implicit în centru, rotația și scara îl țin pe loc, se po
     CHECK(glm::length(model::placementOf(m, id).position - math::Vec3d { 1000, 0, 0 }) < 1e-6);
     CHECK(glm::length(model::pivotPoint(m, id) - math::Vec3d { 1000, 0, 0 }) < 1e-6);
 }
+
+// --- Datele de mobilier (ADR 0044) ---
+
+TEST_CASE("Booleene pe o piesă: rezultatul păstrează datele și axele primului obiect", "[core][model][boolean][furniture]")
+{
+    Doc doc;
+    model::BooleanResult r;
+    model::InstanceId a;
+    doc.stack.run("Setup", [&](Model& m) {
+        geom::Mesh& root = m.mesh(m.root());
+        box(root, { 0, 0, 0 }, 600, 400, 18);
+        a = model::makeGroup(m, m.root(), all(root), false);
+        model::Definition d = m.definition(m.instance(a).definition);
+        model::PartSpec spec;
+        spec.typeKey = "pal";
+        spec.nominalThickness = 18.0;
+        d.part = spec;
+        d.generator = "board";
+        m.setDefinition(m.instance(a).definition, d);
+        // Placa rotită 90° în jurul lui Y, ca o laterală.
+        model::Instance ia = m.instance(a);
+        ia.transform = Transform::rotation(Vec3d { 0, 0, 0 }, Vec3d { 0, 1, 0 }, std::numbers::pi / 2) * ia.transform;
+        m.setInstance(a, ia);
+        box(root, { -50, 100, 100 }, 100, 100, 100);
+        const model::InstanceId b = model::makeGroup(m, m.root(), all(root), false);
+        r = model::booleanOperation(m, a, b, model::BooleanKind::Subtract);
+    });
+    INFO(r.error);
+    REQUIRE(r.instance);
+    const model::Definition& def = doc.model.definition(doc.model.instance(r.instance).definition);
+    REQUIRE(def.part);
+    CHECK(def.part->typeKey == "pal");
+    CHECK(def.generator.empty()); // desprinsă de parametri
+    // Geometria e în axele plăcii: grosimea (18) rămâne pe Z local.
+    const auto [lo, hi] = model::bounds(doc.model, doc.model.instance(r.instance).definition);
+    CHECK(std::abs((hi.z - lo.z) - 18.0) < 1e-3);
+}
+
+TEST_CASE("definitionsWithMeshChanges: doar definițiile cu geometria schimbată în tranzacție", "[core][model][furniture]")
+{
+    Model m;
+    const DefinitionId a = m.addDefinition({ "A", false });
+    const DefinitionId b = m.addDefinition({ "B", false });
+    box(m.mesh(a), { 0, 0, 0 }, 100, 100, 100);
+    box(m.mesh(b), { 0, 0, 0 }, 100, 100, 100);
+    m.beginRecording();
+    CHECK(m.definitionsWithMeshChanges().empty());
+    geom::drawLine(m.mesh(a), { 0, 0, 100 }, { 100, 100, 100 });
+    const auto changed = m.definitionsWithMeshChanges();
+    REQUIRE(changed.size() == 1);
+    CHECK(changed.front() == a);
+    (void)m.endRecording();
+    CHECK(m.definitionsWithMeshChanges().empty());
+}
+
+TEST_CASE("explodeLosesPartData: plăcile, feroneria și componentele salvate", "[core][model][furniture]")
+{
+    Model m;
+    const DefinitionId plain = m.addDefinition({ "Grup", true });
+    model::Definition saved { "Corp", false };
+    saved.sourceKey = "cheie";
+    const DefinitionId savedId = m.addDefinition(saved);
+    model::Definition hinge { "Balama", false };
+    model::PartSpec hw;
+    hw.kind = model::PartSpec::Kind::Hardware;
+    hw.typeKey = "hinge.overlay.110";
+    hinge.part = hw;
+    const DefinitionId hingeId = m.addDefinition(hinge);
+    const auto place = [&](DefinitionId d) {
+        model::Instance inst;
+        inst.parent = m.root();
+        inst.definition = d;
+        return m.addInstance(inst);
+    };
+    CHECK_FALSE(model::explodeLosesPartData(m, place(plain)));
+    CHECK(model::explodeLosesPartData(m, place(savedId)));
+    CHECK(model::explodeLosesPartData(m, place(hingeId)));
+}

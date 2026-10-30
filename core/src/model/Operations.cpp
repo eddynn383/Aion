@@ -125,6 +125,12 @@ geom::Selection explode(Model& model, InstanceId id)
     return result;
 }
 
+bool explodeLosesPartData(const Model& model, InstanceId instance)
+{
+    const Definition& d = model.definition(model.instance(instance).definition);
+    return d.part.has_value() || !d.sourceKey.empty() || d.generator == "board";
+}
+
 void eraseInstance(Model& model, InstanceId id)
 {
     const DefinitionId definition = model.instance(id).definition;

@@ -248,7 +248,11 @@ public:
     // Selectează ce are tag-ul în contextul editat (obiecte, fețe, muchii).
     Q_INVOKABLE void selectByTag(double tagId);
     Q_INVOKABLE void explodeSelection();
+    // Explode pe selecție ar pierde date de mobilier (ADR 0044); interfața cere confirmare.
+    Q_INVOKABLE bool explodeLosesPartData() const;
     Q_INVOKABLE void makeUniqueSelection();
+    // „Fă placă” (ADR 0044): obiectele selectate devin plăci PAL pentru lista de debitare.
+    Q_INVOKABLE void makeBoardSelection();
     Q_INVOKABLE void makeUnique(double instanceId);
     // ⌘C: obiectele selectate din context (starea de acum; clipboard-ul ține de document, se golește la Nou / Deschide).
     Q_INVOKABLE void copySelection();

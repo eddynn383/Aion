@@ -54,20 +54,20 @@ const std::vector<GeneratorInfo>& registry()
     return kGenerators;
 }
 
-// Un material al bibliotecii (după nume), adus în model dacă lipsește.
+// Un material al bibliotecii (după nume), adus în model dacă lipsește; cel din model se recunoaște după cheie (ADR 0044),
+// iar pentru fișierele vechi, fără cheie, după nume.
 MaterialId libraryMaterial(Model& model, std::string_view name)
 {
+    const auto library = builtinMaterials();
+    const auto lib = std::find_if(library.begin(), library.end(), [&](const Material& m) { return m.name == name; });
     for (std::size_t i = 0; i < model.materials().size(); ++i) {
-        if (model.materials().values()[i].name == name) {
+        const Material& mine = model.materials().values()[i];
+        if (lib != library.end() ? mine.libraryKey == lib->libraryKey || (mine.libraryKey.empty() && mine.name == name)
+                                 : mine.name == name) {
             return model.materials().keys()[i];
         }
     }
-    for (const Material& m : builtinMaterials()) {
-        if (m.name == name) {
-            return model.addMaterial(m);
-        }
-    }
-    return {};
+    return lib != library.end() ? model.addMaterial(*lib) : MaterialId {};
 }
 
 // Constructorul părților: fiecare parte e un subgrup cu o cutie (colțurile `lo`, `hi`) și un material.

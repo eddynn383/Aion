@@ -14,17 +14,36 @@ Popover {
     property real sheetWidth: 2070
     property real waste: 15
     property real maxThickness: 100
+    // Rândurile debifate (cheile lor): la deschidere, piesele ascunse (ADR 0044). Rămân la „Recalculează” și la
+    // schimbarea opțiunilor; se refac la fiecare deschidere.
+    property var excludedKeys: []
+    property bool cutDimensions: false
 
     signal exportRequested(string kind, var options)
 
     readonly property var cutOptions: ({ sheetLength: sheetLength, sheetWidth: sheetWidth, waste: waste / 100,
-                                         maxThickness: maxThickness })
+                                         maxThickness: maxThickness, excluded: excludedKeys,
+                                         cutDimensions: cutDimensions })
+    readonly property var checkedKeys: {
+        const out = {}
+        for (const p of (root.cuts.parts ?? []))
+            if (!root.excludedKeys.includes(p.rowKey))
+                out[p.rowKey] = true
+        return out
+    }
+    readonly property var sectionNames: ["Placă", "Feronerie", "Altele", "Nedefinit"]
 
     function refresh() {
         if (!root.document)
             return
         root.report = root.document.quantityReport()
         root.cuts = root.document.cutList(root.cutOptions)
+    }
+    function setIncluded(key, included) {
+        const keys = root.excludedKeys.filter(k => k !== key)
+        if (!included)
+            keys.push(key)
+        root.excludedKeys = keys
     }
     function num(value, decimals) {
         return Number(value).toLocaleString(Qt.locale("ro_RO"), "f", decimals)
@@ -36,7 +55,11 @@ Popover {
     height: Math.min(700, (parent ? parent.height : 700) - 80)
     padding: Theme.space6
 
-    onAboutToShow: refresh()
+    onAboutToShow: {
+        root.excludedKeys = []
+        refresh()
+        root.excludedKeys = (root.cuts.parts ?? []).filter(p => p.hidden).map(p => p.rowKey)
+    }
     onCutOptionsChanged: if (opened) cuts = document.cutList(cutOptions)
 
     contentItem: Item {
@@ -220,35 +243,75 @@ Popover {
                 anchors.topMargin: Theme.space2
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Fiecare grup sau obiect cu fețe e o piesă (fă câte un grup pentru fiecare panou). Dimensiunile se "
-                      + "măsoară pe fața cea mai mare: grosimea pe normala ei, lungimea pe muchia cea mai lungă. "
-                      + "Piesele identice se adună; cele mai groase decât „Placă până la” sunt masive (fără necesar de plăci)."
+                text: "Plăcile cu tip (din Bibliotecă sau „Fă placă”) se măsoară pe axele lor și se grupează după tip, "
+                      + "grosime, dimensiuni, decor și cant; feroneria se numără pe bucăți. Obiectele fără tip apar după "
+                      + "categoria materialului; cele de lemn sau decor, marcate „tip nedefinit”. Debifează rândurile "
+                      + "care nu intră în deviz și în CSV."
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
 
-            DataTable {
+            Rectangle {
+                id: hiddenBanner
                 anchors.top: hint.bottom
+                anchors.topMargin: visible ? Theme.space2 : 0
+                width: parent.width * 0.64
+                height: visible ? 36 : 0
+                visible: (root.cuts.hiddenPieces ?? 0) > 0
+                radius: Theme.radiusMd
+                color: Theme.bgHover
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.space3
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: (root.cuts.hiddenPieces ?? 0) + " piese ascunse nu sunt incluse."
+                    color: Theme.textSecondary
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Button {
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.space2
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Include toate"
+                    onClicked: root.excludedKeys = []
+                }
+            }
+
+            DataTable {
+                anchors.top: hiddenBanner.bottom
                 anchors.topMargin: Theme.space3
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
                 width: parent.width * 0.64
+                checkColumn: true
+                rowKeys: (root.cuts.parts ?? []).map(p => p.rowKey)
+                checkedKeys: root.checkedKeys
+                dimmedRows: {
+                    const out = {}
+                    ;(root.cuts.parts ?? []).forEach((p, i) => { if (p.hidden) out[i] = true })
+                    return out
+                }
+                onRowToggled: (key, checked) => root.setIncluded(key, checked)
                 columns: [
-                    { title: "Nr.", width: 0.06, align: "right" },
-                    { title: "Piesă", width: 0.26 },
-                    { title: "Material", width: 0.18 },
+                    { title: "Secț.", width: 0.08 },
+                    { title: "Piesă", width: 0.21 },
+                    { title: "Tip", width: 0.07 },
+                    { title: "Decor", width: 0.12 },
                     { title: "L (mm)", width: 0.11, align: "right" },
-                    { title: "l (mm)", width: 0.11, align: "right" },
-                    { title: "g (mm)", width: 0.10, align: "right" },
-                    { title: "Buc.", width: 0.07, align: "right" },
-                    { title: "Arie (m²)", width: 0.11, align: "right" }
+                    { title: "l (mm)", width: 0.09, align: "right" },
+                    { title: "g (mm)", width: 0.08, align: "right" },
+                    { title: "Buc.", width: 0.05, align: "right" },
+                    { title: "Motiv", width: 0.19 }
                 ]
-                rows: (root.cuts.parts ?? []).map((p, i) => [
-                    String(i + 1), p.name + (p.flat ? " (fără grosime)" : p.panel ? "" : " (masiv)"), p.material, root.num(p.length, 1),
-                    root.num(p.width, 1), root.num(p.thickness, 1), String(p.count),
-                    root.num(p.length * p.width * p.count / 1e6, 3)
-                ])
-                emptyText: "Nicio piesă. Grupează fiecare panou (⌘G) ca să apară în lista de debitare."
+                rows: (root.cuts.parts ?? []).map(p => {
+                    const measured = p.section !== 1
+                    const length = root.cutDimensions ? p.cutLength : p.length
+                    const width = root.cutDimensions ? p.cutWidth : p.width
+                    return [root.sectionNames[p.section] ?? "", p.usedIn, p.type, p.material,
+                            measured ? root.num(length, 1) : "", measured ? root.num(width, 1) : "",
+                            measured ? root.num(p.thickness, 1) : "", String(p.count), p.flags]
+                })
+                emptyText: "Nicio piesă. Adaugă plăci din Bibliotecă sau grupează fiecare panou (⌘G) și folosește „Fă placă”."
             }
 
             Column {
@@ -260,39 +323,38 @@ Popover {
                 spacing: Theme.space3
                 DataTable {
                     width: parent.width
-                    height: parent.height - bandingCard.height - Theme.space3
+                    height: (parent.height - Theme.space3 * 2) * 0.4
                     columns: [
-                        { title: "Necesar plăci", width: 0.38 },
-                        { title: "g (mm)", width: 0.18, align: "right" },
-                        { title: "Arie (m²)", width: 0.24, align: "right" },
-                        { title: "Plăci", width: 0.2, align: "right" }
+                        { title: "Plăci brute", width: 0.3 },
+                        { title: "g (mm)", width: 0.16, align: "right" },
+                        { title: "Arie (m²)", width: 0.2, align: "right" },
+                        { title: "Plăci", width: 0.14, align: "right" },
+                        { title: "Format", width: 0.2, align: "right" }
                     ]
                     rows: (root.cuts.sheets ?? []).map(s => [s.material, root.num(s.thickness, 1), root.num(s.area, 2),
-                                                              String(s.sheets)])
+                                                              String(s.sheets), s.sheetSize])
+                    emptyText: "Nicio placă inclusă."
                 }
-                Rectangle {
-                    id: bandingCard
+                DataTable {
                     width: parent.width
-                    height: 58
-                    radius: Theme.radiusMd
-                    color: Theme.bgHover
-                    Column {
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.space3
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
-                        Text {
-                            text: "Cant maxim (perimetrul pieselor)"
-                            color: Theme.textTertiary
-                            font.pixelSize: Theme.fontSizeXs
-                        }
-                        Text {
-                            text: root.num(root.cuts.edgeBanding ?? 0, 2) + " m"
-                            color: Theme.textPrimary
-                            font.pixelSize: Theme.fontSizeLg
-                            font.family: Theme.fontMono
-                        }
-                    }
+                    height: (parent.height - Theme.space3 * 2) * 0.3
+                    columns: [
+                        { title: "Cant", width: 0.34 },
+                        { title: "Decor", width: 0.3 },
+                        { title: "Muchii", width: 0.16, align: "right" },
+                        { title: "m", width: 0.2, align: "right" }
+                    ]
+                    rows: (root.cuts.bands ?? []).map(b => [b.band, b.decor, String(b.edges), root.num(b.meters, 2)])
+                        .concat((root.cuts.edgeBanding ?? 0) > 0
+                                ? [["Estimat, fără tip", "", "", root.num(root.cuts.edgeBanding, 2)]] : [])
+                    emptyText: "Fără cant."
+                }
+                DataTable {
+                    width: parent.width
+                    height: (parent.height - Theme.space3 * 2) * 0.3
+                    columns: [{ title: "Feronerie", width: 0.75 }, { title: "Buc.", width: 0.25, align: "right" }]
+                    rows: (root.cuts.hardware ?? []).map(h => [h.label, String(h.count)])
+                    emptyText: "Fără feronerie."
                 }
             }
         }
@@ -302,18 +364,31 @@ Popover {
             anchors.bottom: parent.bottom
             width: parent.width
             height: Theme.controlHeight
-            Text {
+            Row {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "CSV pentru Excel: separator „;”, virgulă zecimală, UTF-8."
-                color: Theme.textTertiary
-                font.pixelSize: Theme.fontSizeXs
+                spacing: Theme.space4
+                Toggle {
+                    visible: root.tab === 1
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Dimensiuni de tăiere (fără cantul care se scade)"
+                    checked: root.cutDimensions
+                    onToggled: root.cutDimensions = checked
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.tab === 1 && (root.cuts.hiddenPieces ?? 0) > 0
+                          ? "Piesele ascunse debifate nu intră în CSV."
+                          : "CSV pentru Excel: separator „;”, virgulă zecimală, UTF-8."
+                    color: Theme.textTertiary
+                    font.pixelSize: Theme.fontSizeXs
+                }
             }
             Row {
                 anchors.right: parent.right
                 spacing: Theme.space2
                 Button {
-                    text: "Actualizează"
+                    text: "Recalculează"
                     iconName: "rotate-ccw"
                     onClicked: root.refresh()
                 }

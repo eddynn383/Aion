@@ -107,6 +107,7 @@ qt_add_qml_module(aion_app
         qml/overlays/RulesActionBlock.qml
         qml/overlays/RulesActionList.qml
         qml/components/DataTable.qml
+        qml/components/CheckBox.qml
         qml/components/MaterialSwatch.qml
         qml/components/AccordionSection.qml
         qml/components/RowAction.qml

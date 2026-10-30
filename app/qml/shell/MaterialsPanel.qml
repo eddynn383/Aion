@@ -197,6 +197,12 @@ Item {
         property real alpha: 1
         property real roughness: 0.6
         property real metallic: 0
+        // Categoria (ADR 0044): decide cum apar în lista de debitare obiectele fără date de piesă.
+        property string category: ""
+        readonly property var categories: [
+            { value: "", label: "Fără" }, { value: "board-decor", label: "Decor de placă" },
+            { value: "wood", label: "Lemn masiv" }, { value: "metal", label: "Metal" }, { value: "glass", label: "Sticlă" },
+            { value: "plastic", label: "Plastic" }, { value: "stone", label: "Piatră" } ]
         // Textura: "" = fără, „procedural:brick”…, „file:/cale”; mărimea unei repetiții, în mm.
         property string texture: ""
         property string textureThumbnail: ""
@@ -217,6 +223,7 @@ Item {
             alpha = m ? m.color.a : 1
             roughness = m ? m.roughness : 0.6
             metallic = m ? m.metallic : 0
+            category = m ? (m.category ?? "") : ""
             texture = m && m.textureSource ? (m.textureSource.startsWith("procedural:") ? m.textureSource : "file:" + m.textureSource) : ""
             textureThumbnail = m ? (m.thumbnail ?? "") : ""
             textureWidth = m ? (m.textureWidth ?? 1000) : 1000
@@ -226,7 +233,8 @@ Item {
         }
         function properties() {
             return { name: editor.name, color: editor.color.toString(), opacity: editor.alpha,
-                     roughness: editor.roughness, metallic: editor.metallic, texture: editor.texture,
+                     roughness: editor.roughness, metallic: editor.metallic, category: editor.category,
+                     texture: editor.texture,
                      textureWidth: editor.textureWidth, textureHeight: editor.textureHeight }
         }
         function save() {
@@ -307,6 +315,42 @@ Item {
                 width: parent.width
                 placeholderText: "#RRGGBB"
                 onTextChanged: if (/^#[0-9a-fA-F]{6}$/.test(text)) editor.color = text
+            }
+            // Categoria.
+            Text {
+                text: "Categorie (pentru lista de debitare)"
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            Flow {
+                width: parent.width
+                spacing: 4
+                Repeater {
+                    model: editor.categories
+                    delegate: Rectangle {
+                        id: categoryChip
+                        required property var modelData
+                        readonly property bool current: editor.category === modelData.value
+                        width: categoryText.implicitWidth + Theme.space3 * 2
+                        height: 24
+                        radius: 12
+                        color: current ? Theme.accentSubtle : categoryArea.containsMouse ? Theme.bgHover : "transparent"
+                        border.color: current ? Theme.accent : Theme.borderStrong
+                        Text {
+                            id: categoryText
+                            anchors.centerIn: parent
+                            text: categoryChip.modelData.label
+                            color: categoryChip.current ? Theme.textPrimary : Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        MouseArea {
+                            id: categoryArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: editor.category = categoryChip.modelData.value
+                        }
+                    }
+                }
             }
             // Textura.
             Text {

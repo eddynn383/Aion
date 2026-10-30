@@ -21,7 +21,9 @@ namespace aion::io {
 // 4: curbele Pen (`penCurves`: punctele și mânerele lângă muchiile lor) și căile de parcurgere (ADR 0036); fișierele
 //    mai vechi nu le au.
 // 5: sensul și repetarea blocurilor „Pornește animația” (`direction`, `repeat`); fișierele vechi: Înainte, o dată.
-inline constexpr int kFormatVersion = 5;
+// 6: datele de mobilier (ADR 0044): `part` și `sourceKey` pe definiții, `roleKey` / `nameKey` / `relativePosition` pe
+//    instanțe, `category` / `libraryKey` pe materiale; fișierele vechi nu le au.
+inline constexpr int kFormatVersion = 6;
 
 struct LoadResult {
     std::optional<model::Model> model;

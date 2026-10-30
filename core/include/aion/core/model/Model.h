@@ -8,6 +8,7 @@
 #include "aion/core/math/Transform.h"
 #include "aion/core/model/Ids.h"
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -58,6 +59,11 @@ struct Material {
     float metallic = 0.0f;
     TextureId texture {};
     math::Vec2d textureSize { 1000.0 };
+    // Categoria (ADR 0044): "wood", "metal", "glass", "plastic", "stone", "board-decor" sau "" (necunoscută). Decide
+    // clasa obiectelor fără date de piesă în lista de debitare.
+    std::string category {};
+    // Cheia materialului inclus din care vine ("otel-periat"); "" = creat de utilizator.
+    std::string libraryKey {};
 
     bool operator==(const Material&) const = default;
 };
@@ -262,6 +268,32 @@ struct MotionPath {
     bool operator==(const MotionPath&) const = default;
 };
 
+// O latură cu cant a unei plăci (ADR 0044): cheia tipului de cant ("" = fără) și decorul ("" = ca placa, altfel
+// libraryKey-ul unui material inclus).
+struct BandSide {
+    std::string bandKey;
+    std::string decor;
+
+    bool operator==(const BandSide&) const = default;
+};
+
+// Datele de piesă ale unei definiții de mobilier (ADR 0044): o placă (tip, grosime, axe, cant) sau o bucată de
+// feronerie (tipul în `typeKey`). Ordinea laturilor din `bands` e în docs/plans/mobilier-pe-corp.md, §5.
+struct PartSpec {
+    enum class Kind { Board, Hardware };
+    static constexpr std::uint8_t kNoGrain = 255;
+
+    Kind kind = Kind::Board;
+    std::string typeKey; // placă: "pal", "mdf", "hdf", "plywood", "solid"; feronerie: "hinge.overlay.110"…
+    double nominalThickness = 0.0; // mm (doar plăci)
+    std::uint8_t thicknessAxis = 2; // axa locală a grosimii
+    std::uint8_t grainAxis = 0; // axa locală a fibrei; kNoGrain = fără fibră
+    std::array<BandSide, 4> bands {};
+    std::string rawKind; // un `kind` necunoscut din fișier, păstrat și scris înapoi; "" altfel
+
+    bool operator==(const PartSpec&) const = default;
+};
+
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
@@ -274,6 +306,10 @@ struct Definition {
     // subgrupuri) se reface din ei. Gol = obiect obișnuit. Vezi model/Parametric.h.
     std::string generator {};
     std::map<std::string, double> parameters {};
+    // Datele de piesă de mobilier (placă sau feronerie); nul = obiect obișnuit (ADR 0044).
+    std::optional<PartSpec> part {};
+    // UUID-ul unei componente salvate în bibliotecă; legătura dintre plasările ei (ADR 0044). "" = fără.
+    std::string sourceKey {};
 
     bool operator==(const Definition&) const = default;
 };
@@ -356,6 +392,13 @@ struct Instance {
     std::uint16_t placementLocks = 0;
     // Pivotul (punctul fix la rotire și scalare din Inspector), în coordonatele definiției. Gol = centrul cutiei.
     std::optional<math::Vec3d> pivot {};
+    // Rolul piesei într-un corp din bibliotecă ("side.left", "door.1.hinge.2"), după care corpul își recunoaște piesele
+    // la refacere; "" = pusă de utilizator (ADR 0043).
+    std::string roleKey {};
+    // Cheia numelui dat de program; afișat (tradus) când `name` e gol.
+    std::string nameKey {};
+    // Separator pus cu clic: poziția centrului, ca fracție din lățimea interioară a corpului.
+    std::optional<double> relativePosition {};
 
     bool operator==(const Instance&) const = default;
 };
@@ -488,6 +531,9 @@ public:
     void beginRecording();
     [[nodiscard]] bool isRecording() const { return m_recording.has_value(); }
     ChangeSet endRecording();
+    // În timpul înregistrării: definițiile încă existente al căror mesh are schimbări, plus cele schimbate sau create
+    // structural, sortate (pentru finalizatorul din CommandStack).
+    [[nodiscard]] std::vector<DefinitionId> definitionsWithMeshChanges() const;
     void apply(const ChangeSet& changes, geom::ChangeDirection direction);
 
     void addObserver(ModelObserver* observer);

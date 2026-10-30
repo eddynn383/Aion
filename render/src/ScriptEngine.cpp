@@ -173,6 +173,11 @@ bool ScriptApi::face(const QVariantList& points)
     return m_document && m_document->drawFace(points);
 }
 
+QVariantMap ScriptApi::cutList(const QVariantMap& options) const
+{
+    return m_document ? m_document->cutList(options) : QVariantMap {};
+}
+
 QVariantList ScriptApi::objects() const
 {
     return m_document ? m_document->objectList() : QVariantList {};

@@ -1,5 +1,7 @@
 #include "aion/core/io/AionFile.h"
 
+#include "aion/core/model/Furniture.h"
+
 #include "aion/core/Version.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/CameraLens.h"
@@ -626,6 +628,47 @@ model::Action actionFromJson(const json& j)
 
 } // namespace
 
+namespace {
+
+// Datele de piesă (ADR 0044). `kind` ca text: un tip necunoscut se păstrează în `rawKind` și se scrie înapoi.
+json partToJson(const model::PartSpec& p)
+{
+    json bands = json::array();
+    for (const model::BandSide& b : p.bands) {
+        bands.push_back({ { "band", b.bandKey }, { "decor", b.decor } });
+    }
+    const std::string kind = !p.rawKind.empty() ? p.rawKind
+        : p.kind == model::PartSpec::Kind::Hardware ? std::string("hardware")
+                                                     : std::string("board");
+    return { { "kind", kind }, { "type", p.typeKey }, { "thickness", p.nominalThickness },
+        { "thicknessAxis", p.thicknessAxis }, { "grainAxis", p.grainAxis }, { "bands", bands } };
+}
+
+model::PartSpec partFromJson(const json& j)
+{
+    model::PartSpec p;
+    const std::string kind = j.value("kind", std::string("board"));
+    if (kind == "hardware") {
+        p.kind = model::PartSpec::Kind::Hardware;
+    } else if (kind != "board") {
+        p.rawKind = kind;
+    }
+    p.typeKey = j.value("type", std::string());
+    p.nominalThickness = j.value("thickness", 0.0);
+    p.thicknessAxis = static_cast<std::uint8_t>(std::clamp(j.value("thicknessAxis", 2), 0, 2));
+    const int grain = j.value("grainAxis", 0);
+    p.grainAxis = grain == model::PartSpec::kNoGrain ? model::PartSpec::kNoGrain
+                                                     : static_cast<std::uint8_t>(std::clamp(grain, 0, 2));
+    const json bands = j.value("bands", json::array());
+    for (std::size_t k = 0; k < p.bands.size() && k < bands.size(); ++k) {
+        p.bands[k].bandKey = bands[k].value("band", std::string());
+        p.bands[k].decor = bands[k].value("decor", std::string());
+    }
+    return p;
+}
+
+} // namespace
+
 std::string toJson(const model::Model& model)
 {
     json definitions = json::array();
@@ -642,6 +685,12 @@ std::string toJson(const model::Model& model)
             { "parameters", d.parameters },
             { "mesh", meshToJson(model.mesh(id)) },
         });
+        if (d.part) {
+            definitions.back()["part"] = partToJson(*d.part);
+        }
+        if (!d.sourceKey.empty()) {
+            definitions.back()["sourceKey"] = d.sourceKey;
+        }
     }
     json instances = json::array();
     for (std::size_t i : sortedIndices(model.instances())) {
@@ -666,6 +715,15 @@ std::string toJson(const model::Model& model)
         });
         if (inst.pivot) {
             instances.back()["pivot"] = { inst.pivot->x, inst.pivot->y, inst.pivot->z };
+        }
+        if (!inst.roleKey.empty()) {
+            instances.back()["roleKey"] = inst.roleKey;
+        }
+        if (!inst.nameKey.empty()) {
+            instances.back()["nameKey"] = inst.nameKey;
+        }
+        if (inst.relativePosition) {
+            instances.back()["relativePosition"] = *inst.relativePosition;
         }
         if (!inst.rules.empty()) {
             json rules = json::array();
@@ -710,6 +768,12 @@ std::string toJson(const model::Model& model)
             { "texture", m.texture.value },
             { "textureSize", { m.textureSize.x, m.textureSize.y } },
         });
+        if (!m.category.empty()) {
+            materials.back()["category"] = m.category;
+        }
+        if (!m.libraryKey.empty()) {
+            materials.back()["libraryKey"] = m.libraryKey;
+        }
     }
     // Texturile: doar numele și fișierul din arhivă (imaginile le scrie writeArchive).
     json textures = json::array();
@@ -818,6 +882,10 @@ LoadResult fromJson(std::string_view text)
             model::Definition def { d.at("name").get<std::string>(), d.at("group").get<bool>(),
                 d.value("collection", false), d.value("shape", std::string()), d.value("generator", std::string()),
                 d.value("parameters", std::map<std::string, double> {}) };
+            if (const auto pj = d.find("part"); pj != d.end() && pj->is_object()) {
+                def.part = partFromJson(*pj);
+            }
+            def.sourceKey = d.value("sourceKey", std::string());
             auto& change = changes.definitions[id];
             if (id == model.root()) {
                 change.before = model.definition(id);
@@ -846,6 +914,11 @@ LoadResult fromJson(std::string_view text)
                 inst.pivot = math::Vec3d { (*pv)[0].get<double>(), (*pv)[1].get<double>(), (*pv)[2].get<double>() };
             }
             inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
+            inst.roleKey = i.value("roleKey", std::string());
+            inst.nameKey = i.value("nameKey", std::string());
+            if (const auto rp = i.find("relativePosition"); rp != i.end() && rp->is_number()) {
+                inst.relativePosition = rp->get<double>();
+            }
             for (const json& r : i.value("rules", json::array())) {
                 model::Rule rule;
                 rule.trigger = static_cast<model::Trigger>(std::clamp(r.value("trigger", 0), 0, 7));
@@ -888,6 +961,8 @@ LoadResult fromJson(std::string_view text)
             if (const auto ts = mj.find("textureSize"); ts != mj.end() && ts->is_array() && ts->size() == 2) {
                 material.textureSize = { ts->at(0).get<double>(), ts->at(1).get<double>() };
             }
+            material.category = mj.value("category", std::string());
+            material.libraryKey = mj.value("libraryKey", std::string());
             changes.materials[model::MaterialId { mj.at("id").get<std::uint64_t>() }].after = std::move(material);
         }
         const auto vec = [](const json& v) {
@@ -950,6 +1025,9 @@ LoadResult fromJson(std::string_view text)
         migrateLegacyTracks(model, legacy);
         if (doc.value("formatVersion", 0) < 3) {
             migrateMoveToRules(model);
+        }
+        if (doc.value("formatVersion", 0) < 6) {
+            model::backfillMaterials(model); // categoriile materialelor incluse (ADR 0044)
         }
         const geom::ValidationReport report = model.validate(geom::ValidationLevel::Topology);
         if (!report.ok()) {
