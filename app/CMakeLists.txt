@@ -122,6 +122,7 @@ qt_add_qml_module(aion_app
         qml/overlays/EasingEditor.qml
         qml/components/EasingCurve.qml
         qml/components/EasingMath.js
+        qml/components/MathExpr.js
         qml/shell/TimelineKey.qml
         qml/shell/TimelineRow.qml
         qml/shell/TimelineRuler.qml

@@ -1,9 +1,11 @@
 import QtQuick
 import QtQuick.Templates as T
 import Aion
+import "MathExpr.js" as MathExpr
 
 // Câmp numeric în stil Figma: etichetă scurtă în stânga (trage de ea pentru a modifica valoarea),
-// valoarea în Geist Mono, unitatea în dreapta. Săgețile ↑/↓ modifică cu `step` (Shift = ×10).
+// valoarea în Geist Mono, unitatea în dreapta. Acceptă expresii („1000 - 30” → 970, la Enter sau la ieșire).
+// Săgețile ↑/↓ adaugă / scad 1 (Ctrl 10, Shift 100); cu zecimale, cea mai mică zecimală (Scara: 0.01 / 0.1 / 1).
 T.TextField {
     id: root
 
@@ -24,6 +26,25 @@ T.TextField {
     signal valueModified(real value)
 
     function format(v) { return Number(v).toFixed(root.decimals) }
+    // Valoarea textului (un număr sau o expresie); NaN dacă nu e una validă.
+    function parsed() { return MathExpr.evaluate(root.text) }
+    // Pasul săgeților: 1 (sau cea mai mică zecimală), ×10 cu Ctrl (pe Mac și Cmd), ×100 cu Shift.
+    function arrowStep(modifiers) {
+        const unitStep = Math.pow(10, -root.decimals)
+        if (modifiers & Qt.ShiftModifier)
+            return unitStep * 100
+        if (modifiers & (Qt.ControlModifier | Qt.MetaModifier))
+            return unitStep * 10
+        return unitStep
+    }
+    // O săgeată pornește din ce e scris acum în câmp (și o expresie neterminată de aplicat), altfel din valoare.
+    function nudge(delta) {
+        liveCommit.stop()
+        const current = root.activeFocus ? root.parsed() : NaN
+        root.commit((isNaN(current) ? root.value : current) + delta)
+        if (root.activeFocus)
+            root.selectAll()
+    }
 
     // Trimite valoarea. `value` rămâne legat de sursa lui (Inspector-ul îl citește din document), ca să urmeze mereu
     // obiectul selectat; numai dacă nimeni nu-l actualizează (câmp de sine stătător) îl ține câmpul. `keepText`: cât
@@ -42,9 +63,9 @@ T.TextField {
         id: liveCommit
         interval: 600
         onTriggered: {
-            const parsed = Number(root.text.replace(",", "."))
-            if (root.activeFocus && root.text.trim().length > 0 && !isNaN(parsed) && Math.abs(parsed - root.value) > 1e-9)
-                root.commit(parsed, true)
+            const v = root.parsed()
+            if (root.activeFocus && !isNaN(v) && Math.abs(v - root.value) > 1e-9)
+                root.commit(v, true)
         }
     }
     onTextEdited: liveCommit.restart()
@@ -62,9 +83,10 @@ T.TextField {
     font.family: Theme.fontMono
     font.pixelSize: compact ? Theme.fontSizeSm : Theme.fontSizeMd
     inputMethodHints: Qt.ImhFormattedNumbersOnly
-    // Punct sau virgulă ca separator zecimal (DoubleValidator ar accepta doar separatorul limbii sistemului: în
-    // română virgula, deci „1.5” ar deveni „15”). Limitele (from / to) le aplică commit().
-    validator: RegularExpressionValidator { regularExpression: /^-?\d*([.,]\d*)?$/ }
+    // Cifre, punct sau virgulă ca separator zecimal (DoubleValidator ar accepta doar separatorul limbii sistemului: în
+    // română virgula, deci „1.5” ar deveni „15”), operatori și paranteze pentru expresii. Expresia o verifică
+    // MathExpr la aplicare; limitele (from / to) le aplică commit().
+    validator: RegularExpressionValidator { regularExpression: /^[-+*\/()\d.,\s]*$/ }
 
     text: format(value)
     onValueChanged: if (!activeFocus) text = format(value)
@@ -74,19 +96,19 @@ T.TextField {
     Component.onCompleted: text = format(value)
     onEditingFinished: {
         liveCommit.stop()
-        const parsed = Number(text.replace(",", "."))
-        if (isNaN(parsed))
+        const v = parsed()
+        if (isNaN(v))
             text = format(value)
         else
-            commit(parsed)
+            commit(v)
         // Rămas în câmp (după Enter): textul selectat, ca valoarea următoare să-l înlocuiască.
         if (activeFocus)
             selectAll()
     }
     onActiveFocusChanged: if (activeFocus) selectAll()
 
-    Keys.onUpPressed: (event) => commit(value + step * (event.modifiers & Qt.ShiftModifier ? 10 : 1))
-    Keys.onDownPressed: (event) => commit(value - step * (event.modifiers & Qt.ShiftModifier ? 10 : 1))
+    Keys.onUpPressed: (event) => nudge(arrowStep(event.modifiers))
+    Keys.onDownPressed: (event) => nudge(-arrowStep(event.modifiers))
     Keys.onEscapePressed: { text = format(value); focus = false }
 
     Text {
