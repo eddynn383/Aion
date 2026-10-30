@@ -206,8 +206,8 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   Testul de performanță: `aion_tests "[.perf]"`.
 - **Inferența pe obiecte** (ADR 0042, `docs/plans/inferenta-pe-obiecte.md`): `inference/SnapScene.h` (`SnapSource` = mesh +
   `toContext` + instanța; `SnapScene`), `model/SnapSources.h` (`model::snapScene`: obiectele vizibile la orice adâncime
-  plus geometria liberă a părinților, fără selecția care se transformă), `Engine::withScene`, `Document::snapScene(exclude)`
-  (cache pe `modelRevision`), `ToolContext::snap`. Rezultatul are `Inference::origin` (`Context` | `Object`),
+  plus geometria liberă a părinților, fără ce transformă unealta: `Tool::snapExclude()`; cutia fiecărei surse, ca
+  hover-ul să sară sursele departe de cursor), `Engine::withScene`, `Document::snapScene(exclude)` (cache pe `modelRevision`), `ToolContext::snap`. Rezultatul are `Inference::origin` (`Context` | `Object`),
   `sourceInstance` și `normal`; ID-urile de vârf / muchie / față sunt mereu din `ctx.mesh` (o inferență pe un obiect le are
   goale), deci uneltele aleg doar PUNCTUL din ea. Uneltele cheamă `tools::inferAt` / `inferenceNormal` (ToolHelpers.h),
   nu `Engine::infer` direct. `Kind::Center` (centrul cercurilor / arcelor / poligoanelor, după ce cursorul a atins curba;
