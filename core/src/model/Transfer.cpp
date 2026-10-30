@@ -4,6 +4,7 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <map>
 
 namespace aion::model {
@@ -45,13 +46,13 @@ public:
         if (const auto it = m_materials.find(id); it != m_materials.end()) {
             return it->second;
         }
-        // Același material în modelul țintă (ADR 0044): după cheia din bibliotecă, altfel după nume și categorie; un
-        // „Nuc” decor nu se unește cu un „Nuc” lemn masiv.
+        // Același material în modelul țintă (ADR 0044): după cheia din bibliotecă, altfel după nume și
+        // categorie; un „Nuc” decor nu se unește cu un „Nuc” lemn masiv.
         for (std::size_t i = 0; i < m_target.materials().size(); ++i) {
             const Material& mine = m_target.materials().values()[i];
-            const bool same = !m->libraryKey.empty() ? mine.libraryKey == m->libraryKey
-                                                     : mine.libraryKey.empty() && mine.name == m->name
-                    && mine.category == m->category;
+            const bool same = !m->libraryKey.empty()
+                ? mine.libraryKey == m->libraryKey
+                : mine.libraryKey.empty() && mine.name == m->name && mine.category == m->category;
             if (same) {
                 return m_materials[id] = m_target.materials().keys()[i];
             }
@@ -89,8 +90,8 @@ public:
             for (const geom::Loop& h : f.inner) {
                 inner.push_back(loop(h));
             }
-            const geom::FaceId id = dst.addFace(f.plane, loop(f.outer), std::move(inner), material(f.material),
-                material(f.backMaterial));
+            const geom::FaceId id = dst.addFace(
+                f.plane, loop(f.outer), std::move(inner), material(f.material), material(f.backMaterial));
             dst.setFaceTexture(id, f.texture);
         }
     }
@@ -162,7 +163,8 @@ Model extractInstance(const Model& source, InstanceId instance)
     root.collection = out.definition(out.root()).collection;
     out.setDefinition(out.root(), root);
     copier.contents(inst.definition, out.root());
-    // Materialul obiectului („vopsirea” lui) trece pe ce l-ar fi moștenit: fețele și obiectele fără material propriu.
+    // Materialul obiectului („vopsirea” lui) trece pe ce l-ar fi moștenit: fețele și obiectele fără material
+    // propriu.
     if (const MaterialId painted = copier.material(inst.material)) {
         geom::Mesh& mesh = out.mesh(out.root());
         for (std::size_t i = 0; i < mesh.faces().size(); ++i) {
@@ -184,7 +186,8 @@ Model extractInstance(const Model& source, InstanceId instance)
         const math::Transform shift = math::Transform::translation(-lo);
         geom::Mesh& mesh = out.mesh(out.root());
         for (std::size_t i = 0; i < mesh.vertices().size(); ++i) {
-            mesh.setPosition(mesh.vertices().keys()[i], shift.applyToPoint(mesh.vertices().values()[i].position));
+            mesh.setPosition(
+                mesh.vertices().keys()[i], shift.applyToPoint(mesh.vertices().values()[i].position));
         }
         for (std::size_t i = 0; i < mesh.faces().size(); ++i) {
             const geom::FaceId f = mesh.faces().keys()[i];
@@ -197,6 +200,89 @@ Model extractInstance(const Model& source, InstanceId instance)
             c.transform = shift * c.transform;
             out.setInstance(child, c);
         }
+    }
+    return out;
+}
+
+namespace {
+
+// Câte instanțe are fiecare definiție în arborele modelului (de la rădăcină; o definiție folosită de N ori
+// într-o definiție folosită de M ori are N × M apariții).
+std::map<DefinitionId, int> occurrences(const Model& model)
+{
+    std::map<DefinitionId, int> out;
+    const auto visit = [&](auto&& self, DefinitionId parent, int times) -> void {
+        for (InstanceId id : model.childrenOf(parent)) {
+            const DefinitionId d = model.instance(id).definition;
+            out[d] += times;
+            self(self, d, times);
+        }
+    };
+    visit(visit, model.root(), 1);
+    return out;
+}
+
+// `ancestor` e `definition` sau o conține (la orice adâncime).
+bool contains(const Model& model, DefinitionId ancestor, DefinitionId definition)
+{
+    if (ancestor == definition) {
+        return true;
+    }
+    for (InstanceId id : model.childrenOf(ancestor)) {
+        if (contains(model, model.instance(id).definition, definition)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+DefinitionId findLinkedDefinition(const Model& model, std::string_view sourceKey, DefinitionId context)
+{
+    if (sourceKey.empty()) {
+        return {};
+    }
+    const std::map<DefinitionId, int> used = occurrences(model);
+    DefinitionId best;
+    for (std::size_t i = 0; i < model.definitions().size(); ++i) {
+        const DefinitionId d = model.definitions().keys()[i];
+        if (model.definitions().values()[i].sourceKey != sourceKey || !used.contains(d)
+            || contains(model, d, context)) {
+            continue;
+        }
+        if (!best || d.value < best.value) {
+            best = d;
+        }
+    }
+    return best;
+}
+
+InstanceId placeLinked(
+    Model& model, DefinitionId definition, DefinitionId context, const math::Transform& placement)
+{
+    Instance inst;
+    inst.parent = context;
+    inst.definition = definition;
+    inst.transform = placement;
+    return model.addInstance(inst);
+}
+
+std::vector<std::pair<DefinitionId, int>> userComponents(const Model& model)
+{
+    std::vector<std::pair<DefinitionId, int>> out;
+    for (const auto& [d, count] : occurrences(model)) {
+        const Definition& def = model.definition(d);
+        if (def.group || def.collection || def.part || !def.generator.empty()) {
+            continue;
+        }
+        // Piesele corpurilor din bibliotecă (ușile, cu rol) nu sunt componente ale utilizatorului.
+        const std::vector<InstanceId> instances = model.instancesOf(d);
+        if (std::any_of(instances.begin(), instances.end(),
+                [&](InstanceId id) { return !model.instance(id).roleKey.empty(); })) {
+            continue;
+        }
+        out.emplace_back(d, count);
     }
     return out;
 }

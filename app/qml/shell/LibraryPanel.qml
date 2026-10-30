@@ -20,13 +20,15 @@ Item {
                                     "gen:shelf": "library", "gen:cabinet": "archive", "gen:stairs": "stairs",
                                     "gen:tree": "tree-deciduous", "gen:conifer": "tree-pine", "gen:bush": "shrub",
                                     "gen:person": "person-standing" })
-    readonly property var items: (root.document ? root.document.libraryItems : [])
+    // „În model”: componentele din document (plasarea face o copie legată).
+    readonly property var allItems: (root.document ? root.document.libraryItems.concat(root.document.modelComponents) : [])
+    readonly property var items: root.allItems
         .filter(i => (root.category.length === 0 || i.category === root.category)
                      && (root.query.length === 0 || i.name.toLowerCase().indexOf(root.query) >= 0
                          || i.category.toLowerCase().indexOf(root.query) >= 0))
     readonly property var categories: {
         const names = []
-        for (const i of (root.document ? root.document.libraryItems : []))
+        for (const i of root.allItems)
             if (!names.includes(i.category))
                 names.push(i.category)
         return names
@@ -117,6 +119,15 @@ Item {
                                         name: root.icons[tile.modelData.id] ?? "box"
                                         size: Math.min(26, parent.height * 0.6)
                                         color: Theme.textSecondary
+                                    }
+                                    // „În model”: câte apariții are componenta.
+                                    Text {
+                                        visible: (tile.modelData.count ?? 0) > 0
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        text: "×" + (tile.modelData.count ?? 0)
+                                        color: Theme.accent
+                                        font.pixelSize: Theme.fontSizeXs
                                     }
                                     // Obiectele dinamice au parametri (lățime, înălțime…) în Inspector.
                                     Icon {

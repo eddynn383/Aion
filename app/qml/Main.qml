@@ -111,6 +111,7 @@ Window {
             { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
             { id: "org.makeGroup", title: "Creează obiect (din formele selectate)", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
             { id: "org.group", title: "Grupează obiectele", category: "Organizare", shortcut: "Ctrl+Alt+G", icon: "folder" },
+            { id: "org.makeComponent", title: "Creează componentă (copiile rămân legate; apare în Bibliotecă → În model)", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.duplicateLinked", title: "Duplicare legată (copie editată împreună)", category: "Organizare", shortcut: "Alt+D", icon: "component" },
             { id: "org.explode", title: "Desface (grup sau obiect)", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
@@ -390,6 +391,7 @@ Window {
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
         case "debug.board": console.log("board:", JSON.stringify(doc.entityInfo.board ?? null)); break
+        case "debug.components": console.log("components:", JSON.stringify(doc.modelComponents)); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
         case "view.front": viewport.setStandardView(Viewport.Front); break
@@ -410,6 +412,7 @@ Window {
         case "edit.selectNone": doc.clearSelection(); break
         case "org.makeGroup": window.groupChecked(() => doc.makeGroup()); break
         case "org.group": window.groupChecked(() => doc.groupSelection()); break
+        case "org.makeComponent": window.groupChecked(() => doc.makeComponent()); break
         case "org.duplicateLinked": doc.duplicateLinked(); break
         case "org.explode": window.explodeChecked(); break
         case "org.makeUnique": doc.makeUniqueSelection(); break

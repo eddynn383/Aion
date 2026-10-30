@@ -3,6 +3,7 @@
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/Parametric.h"
 #include "aion/core/model/Quantities.h"
+#include "aion/core/model/Transfer.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -416,4 +417,87 @@ TEST_CASE("Cant: decorul „ca placa” pe copii legate cu decoruri diferite", "
     m.setInstance(a, first);
     const model::CutList list = model::cutList(m);
     CHECK(list.bands.size() == 2);
+}
+
+// --- Componentele legate din bibliotecă (pasul 8) ---
+
+namespace {
+
+// O componentă salvată în bibliotecă (cheia `k`), cu o cutie, plasată o dată în rădăcină.
+model::InstanceId savedComponent(Model& m)
+{
+    model::Definition def { "Noptieră", false };
+    def.sourceKey = "k";
+    const model::DefinitionId d = m.addDefinition(def);
+    model::createBoard(m, d, "pal", 18, 400, 300, Transform {});
+    model::Instance inst;
+    inst.parent = m.root();
+    inst.definition = d;
+    return m.addInstance(inst);
+}
+
+} // namespace
+
+TEST_CASE("Legare: plasările cu aceeași cheie folosesc o definiție", "[core][carcass][linking]")
+{
+    Model m;
+    const model::InstanceId first = savedComponent(m);
+    const model::DefinitionId d = m.instance(first).definition;
+    for (int i = 1; i < 4; ++i) {
+        const model::DefinitionId found = model::findLinkedDefinition(m, "k", m.root());
+        REQUIRE(found == d);
+        model::placeLinked(m, found, m.root(), Transform::translation({ i * 500.0, 0, 0 }));
+    }
+    CHECK(m.instancesOf(d).size() == 4);
+    const auto list = model::userComponents(m);
+    REQUIRE(list.size() == 1);
+    CHECK(list[0].first == d);
+    CHECK(list[0].second == 4);
+    CHECK(m.validate().ok());
+}
+
+TEST_CASE("Legare: definițiile orfane și strămoșii nu se refolosesc", "[core][carcass][linking]")
+{
+    Model m;
+    const model::InstanceId first = savedComponent(m);
+    const model::DefinitionId d = m.instance(first).definition;
+    // Plasare în interiorul definiției legate: ar face un ciclu.
+    CHECK_FALSE(model::findLinkedDefinition(m, "k", d));
+    // O instanță doar într-o definiție fără instanțe (orfană).
+    const model::DefinitionId orphan = m.addDefinition({ "Orfană", false });
+    model::placeLinked(m, d, orphan, Transform {});
+    m.removeInstance(first);
+    CHECK_FALSE(model::findLinkedDefinition(m, "k", m.root()));
+    CHECK(model::userComponents(m).empty());
+}
+
+TEST_CASE("Legare: ⌘V golește cheia, iar plasarea se leagă de original", "[core][carcass][linking]")
+{
+    Model m;
+    const model::InstanceId first = savedComponent(m);
+    const model::DefinitionId d = m.instance(first).definition;
+    const model::CopyResult copy
+        = model::copyDeep(m, m.root(), m, { first }, Transform::translation({ 0, 800, 0 }));
+    REQUIRE(copy.roots.size() == 1);
+    CHECK(m.definition(m.instance(copy.roots[0]).definition).sourceKey.empty());
+    CHECK(model::findLinkedDefinition(m, "k", m.root()) == d);
+}
+
+TEST_CASE("Legare: plăcile și corpurile din bibliotecă nu au cheie; inserarea o păstrează",
+    "[core][carcass][linking]")
+{
+    Body b = makeBody("base");
+    CHECK(b.m.definition(b.def).sourceKey.empty());
+    CHECK(b.m.definition(b.m.instance(role(b.m, b.def, "side.left")).definition).sourceKey.empty());
+    CHECK(model::userComponents(b.m).empty()); // corpurile și piesele lor nu sunt în „În model”
+
+    Model file;
+    model::Definition root = file.definition(file.root());
+    root.sourceKey = "k2";
+    file.setDefinition(file.root(), root);
+    model::createBoard(file, file.root(), "pal", 18, 400, 300, Transform {});
+    Model m;
+    const model::InstanceId placed = model::insertModel(m, m.root(), file, "Raft mic", Transform {});
+    CHECK(m.definition(m.instance(placed).definition).sourceKey == "k2");
+    CHECK(model::findLinkedDefinition(m, "k2", m.root()) == m.instance(placed).definition);
 }

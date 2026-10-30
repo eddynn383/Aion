@@ -23,3 +23,5 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Balamaua și mânerul pe ușă | Balamaua la 5 mm de latura ei, pe spatele ușii; mânerul vertical, la 40 mm de marginea liberă, centrat | §4, pasul 6 | |
 | Liniile de cant în viewport | Pe mijlocul feței înguste, 0,3 mm în afara plăcii, cu adâncime (nu se văd prin alte piese); comutatorul e în Preferințe → Mobilier (nu în bara viewport-ului) | §7 al planului, pasul 7 | |
 | Decorul cantului | Doar materialele incluse de tip decor sau lemn | Pasul 7 | |
+| Lista „În model” | Dalele au iconița și „×N”, fără miniatură randată (amânată); doar componentele (Creează componentă sau copiile ⌥D), nu obiectele simple ⌘G | Pasul 8 | |
+| Mutarea unei piese cu rol în alt părinte (Outliner) | Fără confirmarea „Corpul devine obișnuit” încă (doar Explode și grupările o cer) | Pasul 6 | |

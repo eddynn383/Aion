@@ -455,6 +455,10 @@ public:
     // }.
     Q_PROPERTY(QVariantList libraryItems READ libraryItems NOTIFY libraryChanged)
     QVariantList libraryItems() const;
+    // „În model” (pasul 8): componentele utilizatorului din document, ca intrări de bibliotecă `def:<id>` cu
+    // `count`.
+    Q_PROPERTY(QVariantList modelComponents READ modelComponents NOTIFY changed)
+    QVariantList modelComponents() const;
     // Dosarul bibliotecii utilizatorului (fișiere .aion).
     Q_INVOKABLE QString libraryFolder() const;
     // Pune elementul în punctul dat (pe sol sau pe o suprafață), selectat.
@@ -863,6 +867,8 @@ private:
     void finishDivider(const std::optional<math::Vec3d>& at, bool atClick);
     // Corpul ales pentru „Adaugă separator” și trecerea din coordonatele contextului în ale lui.
     model::DefinitionId carcassTarget(math::Transform* bodyFromContext) const;
+    // O copie legată a definiției, cu centrul bazei în `at` (lume).
+    void placeDefinitionAt(model::DefinitionId definition, const QVector3D& at, const std::string& label);
     [[nodiscard]] QVariantList boardBandsInfo(model::DefinitionId definition) const;
     [[nodiscard]] QVariantList bandTypesFor(const std::string& boardType) const;
     [[nodiscard]] QVariantList bandDecors() const;

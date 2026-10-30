@@ -43,6 +43,7 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QUuid>
 
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
@@ -5419,6 +5420,10 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
         }
         return;
     }
+    if (id.startsWith(QLatin1String("def:"))) {
+        placeDefinitionAt(model::DefinitionId { id.mid(4).toULongLong() }, at, "Din model");
+        return;
+    }
     if (!id.startsWith(QLatin1String("file:"))) {
         return;
     }
@@ -5428,6 +5433,18 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
         setError(QStringLiteral("„%1” nu a putut fi citit. %2")
                 .arg(QFileInfo(path).fileName(), QString::fromStdString(loaded.error)));
         return;
+    }
+    // O componentă salvată deja în model (aceeași cheie): o copie legată a ei, nu una nouă (§6). Definiția
+    // din model câștigă față de fișier.
+    const std::string& key = loaded.model->definition(loaded.model->root()).sourceKey;
+    if (const model::DefinitionId linked = model::findLinkedDefinition(m_model, key, activeDefinition())) {
+        qInfo("Bibliotecă: definiție refolosită %llu (%s)", static_cast<unsigned long long>(linked.value),
+            key.c_str());
+        placeDefinitionAt(linked, at, "Din bibliotecă: " + QFileInfo(path).completeBaseName().toStdString());
+        return;
+    }
+    if (!key.empty()) {
+        qInfo("Bibliotecă: definiție nouă (%s; niciuna accesibilă)", key.c_str());
     }
     math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
     // `at` = centrul bazei: translația duce centrul bazei modelului încărcat în punctul dat.
@@ -5451,11 +5468,71 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
     }
 }
 
+void Document::placeDefinitionAt(
+    model::DefinitionId definition, const QVector3D& at, const std::string& label)
+{
+    if (!m_model.definitions().contains(definition)) {
+        return;
+    }
+    // O componentă nu se pune în ea însăși (contextul de editare e în ea).
+    const std::size_t valid = validPathLength();
+    for (std::size_t i = 0; i < valid; ++i) {
+        if (m_model.instance(m_path[i]).definition == definition) {
+            setError(QStringLiteral("O componentă nu se poate pune în ea însăși."));
+            return;
+        }
+    }
+    // `at` = centrul bazei componentei.
+    math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    const auto [lo, hi] = model::bounds(m_model, definition);
+    if (lo.x <= hi.x) {
+        point -= math::Vec3d((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
+    }
+    model::InstanceId created;
+    runOnModel(label, [&](model::Model& model) {
+        created
+            = model::placeLinked(model, definition, activeDefinition(), math::Transform::translation(point));
+    });
+    if (created) {
+        const geom::Selection before = m_selection;
+        m_selection.clear();
+        m_selection.instances.insert(created);
+        afterInteraction(before);
+    }
+}
+
+QVariantList Document::modelComponents() const
+{
+    QVariantList out;
+    for (const auto& [d, count] : model::userComponents(m_model)) {
+        const model::Definition& def = m_model.definition(d);
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("def:%1").arg(d.value) },
+            { QStringLiteral("name"), QString::fromStdString(def.name.empty() ? "Componentă" : def.name) },
+            { QStringLiteral("category"), QStringLiteral("În model") }, { QStringLiteral("user"), false },
+            { QStringLiteral("dynamic"), false }, { QStringLiteral("count"), count } });
+    }
+    return out;
+}
+
 bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng)
 {
     if (m_selection.instances.size() != 1 || name.trimmed().isEmpty()) {
         setError(QStringLiteral("Selectează un singur obiect ca să-l salvezi în bibliotecă."));
         return false;
+    }
+    // Cheia componentei (§6): nouă, sau păstrată la resalvarea aceleiași definiții; un grup devine
+    // componentă.
+    const model::InstanceId selected = *m_selection.instances.begin();
+    const model::DefinitionId savedDef = m_model.instance(selected).definition;
+    if (m_model.definition(savedDef).sourceKey.empty() || m_model.definition(savedDef).group) {
+        runOnModel("Salvează în bibliotecă", [&](model::Model& model) {
+            model::Definition def = model.definition(savedDef);
+            if (def.sourceKey.empty()) {
+                def.sourceKey = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+            }
+            def.group = false;
+            model.setDefinition(savedDef, def);
+        });
     }
     const model::Model extracted = model::extractInstance(m_model, *m_selection.instances.begin());
     QString safe = name.trimmed();
@@ -5477,6 +5554,19 @@ bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thu
 
 QVariantMap Document::libraryItemSize(const QString& id) const
 {
+    // O componentă din model: mărimea ei de acum (se poate schimba, deci fără cache).
+    if (id.startsWith(QLatin1String("def:"))) {
+        const model::DefinitionId d { id.mid(4).toULongLong() };
+        if (!m_model.definitions().contains(d)) {
+            return {};
+        }
+        const auto [lo, hi] = model::bounds(m_model, d);
+        if (lo.x > hi.x) {
+            return {};
+        }
+        return { { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
+            { QStringLiteral("dz"), hi.z - lo.z } };
+    }
     if (const auto it = m_librarySizes.find(id); it != m_librarySizes.end()) {
         return it->second;
     }
