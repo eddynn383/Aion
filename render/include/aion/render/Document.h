@@ -6,8 +6,8 @@
 #include "aion/core/geom/Triangulate.h"
 #include "aion/core/inference/SnapScene.h"
 #include "aion/core/model/AnimationEval.h"
-#include "aion/core/model/Model.h"
 #include "aion/core/model/AnimationPlayer.h"
+#include "aion/core/model/Model.h"
 #include "aion/core/model/Rules.h"
 #include "aion/core/tools/Tool.h"
 
@@ -18,18 +18,18 @@
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
-#include <QVector3D>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QVector3D>
 #include <QtQml/qqmlregistration.h>
 
 #include <map>
-#include <set>
-#include <vector>
-#include <tuple>
 #include <memory>
 #include <optional>
+#include <set>
+#include <tuple>
 #include <unordered_map>
+#include <vector>
 
 namespace aion::render {
 
@@ -42,7 +42,8 @@ class Document : public QObject, private model::ModelObserver {
     Q_OBJECT
     QML_ELEMENT
 
-    // "select", "line", "rectangle", ... (vezi tools::makeTool); alte valori = nicio unealtă de modelare activă.
+    // "select", "line", "rectangle", ... (vezi tools::makeTool); alte valori = nicio unealtă de modelare
+    // activă.
     Q_PROPERTY(QString activeTool READ activeTool WRITE setActiveTool NOTIFY activeToolChanged)
     Q_PROPERTY(QString toolStatus READ toolStatus NOTIFY toolStatusChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
@@ -78,8 +79,9 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY historyChanged)
     Q_PROPERTY(QStringList recentFiles READ recentFiles NOTIFY recentFilesChanged)
-    // Copiile de recuperare găsite la pornire: autosalvările sesiunilor care nu s-au închis normal (ADR 0040).
-    // `recoveryInfo` descrie cea mai nouă; `recoveries`: { session, name, source, folder, when }, cele mai noi întâi.
+    // Copiile de recuperare găsite la pornire: autosalvările sesiunilor care nu s-au închis normal (ADR
+    // 0040). `recoveryInfo` descrie cea mai nouă; `recoveries`: { session, name, source, folder, when }, cele
+    // mai noi întâi.
     Q_PROPERTY(bool hasRecovery READ hasRecovery NOTIFY recoveryChanged)
     Q_PROPERTY(QString recoveryInfo READ recoveryInfo NOTIFY recoveryChanged)
     Q_PROPERTY(QVariantList recoveries READ recoveries NOTIFY recoveryChanged)
@@ -88,11 +90,13 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(QVariantList libraryMaterials READ libraryMaterials CONSTANT)
     // Materialele din model: { id, name, color, roughness, metallic, count }.
     Q_PROPERTY(QVariantList modelMaterials READ modelMaterials NOTIFY outlineChanged)
-    // Materialul cu care vopsește Paint Bucket: { source: "default"|"model"|"library", id, index, name, color }.
+    // Materialul cu care vopsește Paint Bucket: { source: "default"|"model"|"library", id, index, name, color
+    // }.
     Q_PROPERTY(QVariantMap currentMaterial READ currentMaterial NOTIFY materialChanged)
 
     // --- Faza 9 ---
-    // Generatoarele de obiecte dinamice: { id, name, category, parameters: [{ key, label, unit, value, min, max, step }] }.
+    // Generatoarele de obiecte dinamice: { id, name, category, parameters: [{ key, label, unit, value, min,
+    // max, step }] }.
     Q_PROPERTY(QVariantList generators READ generators CONSTANT)
     // Camerele și luminile: { id, name, kind, enabled, visible } (pentru Outliner).
     // Obiectele cu interacțiuni: { id, name, rules: [{ trigger, summary }] } (secțiunea Interacțiuni).
@@ -113,37 +117,42 @@ class Document : public QObject, private model::ModelObserver {
     Q_PROPERTY(bool playing READ playing NOTIFY timelineChanged)
     // Săgețile sunt ale uneltei active (o operație în curs); altfel, în Animare, ← → mută playhead-ul.
     Q_PROPERTY(bool toolOwnsArrows READ toolOwnsArrows NOTIFY toolStatusChanged)
-    // Valoarea fiecărui canal la timpul curent („id:proprietate” → număr sau culoare), urmând playhead-ul (fără să
-    // refacă tot timeline-ul la fiecare cadru).
+    // Valoarea fiecărui canal la timpul curent („id:proprietate” → număr sau culoare), urmând playhead-ul
+    // (fără să refacă tot timeline-ul la fiecare cadru).
     Q_PROPERTY(QVariantMap channelValues READ channelValues NOTIFY playheadValuesChanged)
-    // Pivotul selectat (click pe marcajul lui, ținut cât rămâne aceeași selecție): Inspector-ul îi arată coordonatele
-    // (ca Poziția: în coordonatele contextului), editabile — mută doar pivotul, obiectul rămâne pe loc.
+    // Pivotul selectat (click pe marcajul lui, ținut cât rămâne aceeași selecție): Inspector-ul îi arată
+    // coordonatele (ca Poziția: în coordonatele contextului), editabile — mută doar pivotul, obiectul rămâne
+    // pe loc.
     Q_PROPERTY(QVariantList pivotPosition READ pivotPosition NOTIFY selectionChanged)
-    // Auto-key (Animare): pornit, Move / Rotate / Scale / Inspector pun chei; oprit, schimbă poza de bază (iar
-    // proprietățile animate își mută toate cheile).
+    // Auto-key (Animare): pornit, Move / Rotate / Scale / Inspector pun chei; oprit, schimbă poza de bază
+    // (iar proprietățile animate își mută toate cheile).
     Q_PROPERTY(bool autoKey READ autoKey WRITE setAutoKey NOTIFY autoKeyChanged)
-    // Modul de lucru: 0 Modelare, 1 Animare, 2 Interacțiune. Decide ce unelte, comenzi și operații sunt permise
-    // (docs/plans/moduri-de-lucru.md). Nu e un pas de undo și nu se salvează în fișier.
+    // Modul de lucru: 0 Modelare, 1 Animare, 2 Interacțiune. Decide ce unelte, comenzi și operații sunt
+    // permise (docs/plans/moduri-de-lucru.md). Nu e un pas de undo și nu se salvează în fișier.
     Q_PROPERTY(int workMode READ workMode WRITE setWorkMode NOTIFY workModeChanged)
     // Modul interacțiune: modelul nu se mai editează; evenimentele pornesc regulile obiectelor.
-    Q_PROPERTY(bool interactionMode READ interactionMode WRITE setInteractionMode NOTIFY interactionModeChanged)
+    Q_PROPERTY(
+        bool interactionMode READ interactionMode WRITE setInteractionMode NOTIFY interactionModeChanged)
     // Planurile de secțiune: { id, name, active }.
     Q_PROPERTY(QVariantList sections READ sections NOTIFY outlineChanged)
     Q_PROPERTY(int guideCount READ guideCount NOTIFY outlineChanged)
     // Adnotarea al cărei text se editează acum (după unealta Text), 0 = niciuna.
-    Q_PROPERTY(double editingAnnotation READ editingAnnotation WRITE setEditingAnnotation NOTIFY editingAnnotationChanged)
+    Q_PROPERTY(double editingAnnotation READ editingAnnotation WRITE setEditingAnnotation NOTIFY
+            editingAnnotationChanged)
 
     // Ultima eroare de fișier (pentru un mesaj în interfață).
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorChanged)
 
-    // Preferințe de afișare a lungimilor (păstrate în QSettings): 0 Auto, 1 mm, 2 cm, 3 m, 4 inci, 5 picioare;
-    // zecimale: -1 = implicit.
-    // Snap la grid: activ sau nu; pasul în mm (0 = automat, după grid-ul vizibil).
+    // Preferințe de afișare a lungimilor (păstrate în QSettings): 0 Auto, 1 mm, 2 cm, 3 m, 4 inci, 5
+    // picioare; zecimale: -1 = implicit. Snap la grid: activ sau nu; pasul în mm (0 = automat, după grid-ul
+    // vizibil).
     Q_PROPERTY(bool snapToGrid MEMBER m_snapToGrid NOTIFY gridSnapChanged)
     Q_PROPERTY(double gridStep MEMBER m_gridStep NOTIFY gridSnapChanged)
     // Autosalvarea (Preferințe → Salvare), păstrată în QSettings.
-    Q_PROPERTY(bool autosaveEnabled READ autosaveEnabled WRITE setAutosaveEnabled NOTIFY autosaveSettingsChanged)
-    Q_PROPERTY(int autosaveMinutes READ autosaveMinutes WRITE setAutosaveMinutes NOTIFY autosaveSettingsChanged)
+    Q_PROPERTY(
+        bool autosaveEnabled READ autosaveEnabled WRITE setAutosaveEnabled NOTIFY autosaveSettingsChanged)
+    Q_PROPERTY(
+        int autosaveMinutes READ autosaveMinutes WRITE setAutosaveMinutes NOTIFY autosaveSettingsChanged)
     Q_PROPERTY(int displayUnit READ displayUnit WRITE setDisplayUnit NOTIFY unitsChanged)
     Q_PROPERTY(int displayDecimals READ displayDecimals WRITE setDisplayDecimals NOTIFY unitsChanged)
 
@@ -190,7 +199,8 @@ public:
     // arii în m², volume în m³. `options`: sheetLength, sheetWidth (mm), waste (0..1), maxThickness (mm).
     Q_INVOKABLE QVariantMap quantityReport() const;
     Q_INVOKABLE QVariantMap cutList(const QVariantMap& options) const;
-    // Scrie raportul („general” sau „cutlist”) ca CSV (separator „;”, virgulă zecimală, pentru Excel în română).
+    // Scrie raportul („general” sau „cutlist”) ca CSV (separator „;”, virgulă zecimală, pentru Excel în
+    // română).
     Q_INVOKABLE bool exportReport(const QString& path, const QString& kind, const QVariantMap& options);
     // Exemplu de lungime formatată cu setările curente (pentru dialogul de preferințe).
     Q_INVOKABLE QString formatLength(double mm) const;
@@ -229,7 +239,8 @@ public:
     Q_INVOKABLE void deleteSelection(bool keepFaces = false);
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void clearSelection();
-    // Esc: anulează operația uneltei; dacă nu era nimic de anulat, unealta decide (Select deselectează sau iese din grup).
+    // Esc: anulează operația uneltei; dacă nu era nimic de anulat, unealta decide (Select deselectează sau
+    // iese din grup).
     Q_INVOKABLE void escape();
     Q_INVOKABLE void enter();
     // "left", "right", "up", "down": lock-ul inferenței pe o axă. Întoarce true dacă unealta a folosit tasta.
@@ -238,8 +249,10 @@ public:
     Q_INVOKABLE bool applyMeasurement(const QString& text);
 
     // --- Organizare (Faza 6). ID-urile vin din QML ca numere. ---
-    // Organizarea (ca în Blender): obiect = geometrie încapsulată; grup = colecție de obiecte (folder în Outliner).
-    Q_INVOKABLE void makeGroup(); // ⌘G: Creează obiect din formele selectate (cu doar obiecte selectate: Grupează)
+    // Organizarea (ca în Blender): obiect = geometrie încapsulată; grup = colecție de obiecte (folder în
+    // Outliner).
+    Q_INVOKABLE void
+    makeGroup(); // ⌘G: Creează obiect din formele selectate (cu doar obiecte selectate: Grupează)
     Q_INVOKABLE void makeComponent(const QString& name = {});
     Q_INVOKABLE void groupSelection(); // ⌥⌘G: Grupează obiectele selectate
     Q_INVOKABLE void duplicateLinked(); // ⌥D: copie legată (aceeași geometrie, editată împreună)
@@ -254,7 +267,8 @@ public:
     // „Fă placă” (ADR 0044): obiectele selectate devin plăci PAL pentru lista de debitare.
     Q_INVOKABLE void makeBoardSelection();
     Q_INVOKABLE void makeUnique(double instanceId);
-    // ⌘C: obiectele selectate din context (starea de acum; clipboard-ul ține de document, se golește la Nou / Deschide).
+    // ⌘C: obiectele selectate din context (starea de acum; clipboard-ul ține de document, se golește la Nou /
+    // Deschide).
     Q_INVOKABLE void copySelection();
     // ⌘V: copia urmează cursorul (unealta internă „place”); click o așază (un pas de undo), Esc renunță.
     Q_INVOKABLE void pasteClipboard();
@@ -287,10 +301,12 @@ public:
     Q_INVOKABLE bool importFile(const QString& path);
     // Export după extensie: .obj (+ .mtl alături), .gltf, .glb.
     Q_INVOKABLE bool exportFile(const QString& path);
-    // Deschide o copie de recuperare (`session` gol = cea mai nouă) ca document nesalvat, cu fișierul ei de origine.
+    // Deschide o copie de recuperare (`session` gol = cea mai nouă) ca document nesalvat, cu fișierul ei de
+    // origine.
     Q_INVOKABLE void recoverSession(const QString& session = {});
     Q_INVOKABLE void discardRecovery(const QString& session = {});
-    // Scrie acum copia de recuperare a sesiunii (doar dacă documentul are modificări); altfel o face timer-ul.
+    // Scrie acum copia de recuperare a sesiunii (doar dacă documentul are modificări); altfel o face
+    // timer-ul.
     Q_INVOKABLE void autosave();
     Q_INVOKABLE void clearRecentFiles();
     // Documentele recente pentru ecranul de start: { path, name, folder, when, thumbnail (data URL sau "") }.
@@ -300,8 +316,8 @@ public:
 
     // --- Materiale ---
     // Inspector: plasarea instanței selectate (px, py, pz, rotation, sx, sy, sz, dx, dy, dz; dimensiunile au
-    // prioritate față de scară) și materialul selecției. `material`: { id } din model sau { library } din bibliotecă,
-    // gol = fără material; `side`: "front" sau "back" (pentru fețe).
+    // prioritate față de scară) și materialul selecției. `material`: { id } din model sau { library } din
+    // bibliotecă, gol = fără material; `side`: "front" sau "back" (pentru fețe).
     Q_INVOKABLE void setPlacement(const QVariantMap& placement);
     // Lacătul unei valori de plasare a instanței selectate (bitul din model::PlacementLock, 0–11).
     Q_INVOKABLE void setPlacementLock(int bit, bool locked);
@@ -340,7 +356,8 @@ public:
     // --- Camere și lumini (obiecte ale modelului) ---
     // camera: ca la addScene; fov în grade. Camera nouă privește ca vederea curentă și devine selectată.
     Q_INVOKABLE void addCamera(const QVariantMap& camera, double fovDegrees);
-    // kind: "point", "spot", "directional", "area"; `at` = punctul spre care privește vederea (ținta camerei).
+    // kind: "point", "spot", "directional", "area"; `at` = punctul spre care privește vederea (ținta
+    // camerei).
     Q_INVOKABLE void addLight(const QString& kind, const QVector3D& at);
     // kind: "camera" sau "light"; id 0 = nimic.
     Q_INVOKABLE void selectObject(const QString& kind, double id);
@@ -356,7 +373,8 @@ public:
     // Presetările de format ({ name, width, height }) și de senzor ({ name, width }) ale camerelor.
     Q_INVOKABLE QVariantList cameraFormatPresets() const;
     Q_INVOKABLE QVariantList cameraSensorPresets() const;
-    // Mută camera sau lumina selectată în punctul dat (camera își mută și ținta, ca direcția să rămână aceeași).
+    // Mută camera sau lumina selectată în punctul dat (camera își mută și ținta, ca direcția să rămână
+    // aceeași).
     void moveSelectedObjectTo(const math::Vec3d& position);
     [[nodiscard]] std::optional<math::Vec3d> selectedObjectPosition() const;
     // Pune camera selectată (sau lumina) unde e vederea curentă.
@@ -374,28 +392,42 @@ public:
     // --- Modelare pe selecție (ADR 0023) ---
     // Oglindește selecția față de centrul ei, pe axa 0 (X), 1 (Y) sau 2 (Z).
     Q_INVOKABLE void mirrorSelection(int axis);
-    // Forma selectată (linie, arc, cerc, poligon, dreptunghi): key = "length", "radius", "segments", "width", "height".
+    // Forma selectată (linie, arc, cerc, poligon, dreptunghi): key = "length", "radius", "segments", "width",
+    // "height".
     Q_INVOKABLE void setShapeValue(const QString& key, double value);
-    // Geometria liberă selectată (fețe, muchii): px/py/pz = colțul minim nou, dx/dy/dz = mărimea nouă (scară pe axă
-    // față de colțul minim), rx/ry/rz = rotirea în grade (în jurul centrului), sx/sy/sz = scara (față de colțul minim).
-    // Geometria nu are o orientare salvată: rotirea și scara sunt cele aplicate selecției curente din Inspector (se
-    // pornește de la 0° / 1 când se schimbă selecția sau după undo); o valoare nouă aplică diferența.
+    // Geometria liberă selectată (fețe, muchii): px/py/pz = colțul minim nou, dx/dy/dz = mărimea nouă (scară
+    // pe axă față de colțul minim), rx/ry/rz = rotirea în grade (în jurul centrului), sx/sy/sz = scara (față
+    // de colțul minim). Geometria nu are o orientare salvată: rotirea și scara sunt cele aplicate selecției
+    // curente din Inspector (se pornește de la 0° / 1 când se schimbă selecția sau după undo); o valoare nouă
+    // aplică diferența.
     Q_INVOKABLE void setGeometryPlacement(const QVariantMap& changes);
     // Muchiile selectate devin soft (ascunse, umbrire netedă) sau vizibile.
     Q_INVOKABLE void setSelectedEdgesSoft(bool soft);
     // Reface fețele în buclele închise ale muchiilor selectate (după ce o față a fost ștearsă).
     Q_INVOKABLE void createFacesFromSelection();
-    // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului selectat.
-    // `at` = centrul bazei obiectului.
-    Q_INVOKABLE double createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
+    // Obiecte dinamice (ADR 0025): unul nou în punctul dat (pe sol), selectat; parametrul obiectului
+    // selectat. `at` = centrul bazei obiectului.
+    Q_INVOKABLE double createParametric(
+        const QString& generator, const QVector3D& at, const QVariantMap& parameters = {});
     // Ca `createParametric`, dar punctul dat e colțul minim (API-ul de scripting: ca aion.box).
-    double createParametricAtCorner(const QString& generator, const QVector3D& corner, const QVariantMap& parameters = {});
+    double createParametricAtCorner(
+        const QString& generator, const QVector3D& corner, const QVariantMap& parameters = {});
     Q_INVOKABLE void setParameter(const QString& key, double value);
-    // Segmentele sferei / cilindrului / conului selectat (cât geometria e încă a primitivei; vezi model::primitiveSegments).
+    // Placa parametrică selectată (ADR 0044): "length", "width", "thickness" (număr) sau "type" (cheia
+    // tipului).
+    Q_INVOKABLE void setBoardValue(const QString& key, const QVariant& value);
+    Q_INVOKABLE void restoreBoard();
+    // O placă nouă cu colțul minim în `corner` (coordonatele contextului); întoarce id-ul obiectului.
+    double createBoardAt(
+        const QString& type, double thickness, double length, double width, const QVector3D& corner);
+    Q_INVOKABLE void detachBoard();
+    // Segmentele sferei / cilindrului / conului selectat (cât geometria e încă a primitivei; vezi
+    // model::primitiveSegments).
     Q_INVOKABLE void setPrimitiveSegments(int segments);
 
     // --- Biblioteca de obiecte (ADR 0026) ---
-    // Elementele: { id ("gen:door" | "file:/cale.aion"), name, category, thumbnail (data URL, opțional), user }.
+    // Elementele: { id ("gen:door" | "file:/cale.aion"), name, category, thumbnail (data URL, opțional), user
+    // }.
     Q_PROPERTY(QVariantList libraryItems READ libraryItems NOTIFY libraryChanged)
     QVariantList libraryItems() const;
     // Dosarul bibliotecii utilizatorului (fișiere .aion).
@@ -405,16 +437,20 @@ public:
     // Salvează obiectul selectat în bibliotecă (cu miniatura dată, PNG). Întoarce false dacă nu se poate.
     Q_INVOKABLE bool saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng);
     Q_INVOKABLE void removeLibraryItem(const QString& id);
-    // Mărimea obiectului din bibliotecă (pentru previzualizarea la tragere): { dx, dy, dz } în mm, păstrată între apeluri.
+    // Mărimea obiectului din bibliotecă (pentru previzualizarea la tragere): { dx, dy, dz } în mm, păstrată
+    // între apeluri.
     Q_INVOKABLE QVariantMap libraryItemSize(const QString& id) const;
 
     // --- Scripturi (ADR 0027) ---
-    // Tot ce face un script între beginMacro și endMacro e un singur pas de undo (endMacro(false) îl anulează).
+    // Tot ce face un script între beginMacro și endMacro e un singur pas de undo (endMacro(false) îl
+    // anulează).
     void beginMacro(const std::string& name);
     void endMacro(bool keep);
     [[nodiscard]] bool inMacro() const { return m_macro; }
-    // Operații pe obiecte după id (în contextul editat), folosite de API-ul scripturilor. Întorc id-ul creat (0 = eșec).
-    Q_INVOKABLE double createPrimitive(const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name);
+    // Operații pe obiecte după id (în contextul editat), folosite de API-ul scripturilor. Întorc id-ul creat
+    // (0 = eșec).
+    Q_INVOKABLE double createPrimitive(
+        const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name);
     bool setInstancePlacement(double instanceId, const QVariantMap& placement);
     bool transformInstance(double instanceId, const math::Transform& delta);
     bool removeInstanceById(double instanceId);
@@ -425,18 +461,21 @@ public:
     void selectInstances(const QVariantList& ids);
     // Poziționarea texturii pe fețele selectate: { ox, oy (mm), rotation (°), sx, sy } sau { reset: true }.
     Q_INVOKABLE void setFaceTexture(const QVariantMap& changes);
-    // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până la
-    // commitOperation() / cancelOperation(). options: { mode: "linear"|"polar", count, dx, dy, dz (pasul liniar, mm),
-    // axis: 0|1|2, angle (grade între copii), rotate, aroundOrigin (altfel în jurul centrului selecției) }.
+    // Array cu previzualizare: fiecare apel înlocuiește copiile de la apelul anterior (undo + refacere), până
+    // la commitOperation() / cancelOperation(). options: { mode: "linear"|"polar", count, dx, dy, dz (pasul
+    // liniar, mm), axis: 0|1|2, angle (grade între copii), rotate, aroundOrigin (altfel în jurul centrului
+    // selecției) }.
     Q_INVOKABLE void previewArray(const QVariantMap& options);
-    // Soften / Smooth cu previzualizare: muchiile selecției (sau toate muchiile obiectelor selectate, cu subobiectele).
-    // Întoarce { soft, total }: câte muchii dintre două fețe au rămas soft din câte s-au verificat.
+    // Soften / Smooth cu previzualizare: muchiile selecției (sau toate muchiile obiectelor selectate, cu
+    // subobiectele). Întoarce { soft, total }: câte muchii dintre două fețe au rămas soft din câte s-au
+    // verificat.
     Q_INVOKABLE QVariantMap previewSoften(double maxAngleDegrees, bool includeCoplanar);
-    // Subdivide (Catmull-Clark) cu previzualizare: obiectele selectate (cu subobiectele) sau fețele conectate de selecție.
-    // Întoarce { faces, error }: câte fețe are rezultatul sau de ce nu se poate.
+    // Subdivide (Catmull-Clark) cu previzualizare: obiectele selectate (cu subobiectele) sau fețele conectate
+    // de selecție. Întoarce { faces, error }: câte fețe are rezultatul sau de ce nu se poate.
     Q_INVOKABLE QVariantMap previewSubdivide(int levels);
-    // Bevel / chamfer cu previzualizare: muchiile selectate sau toate laturile feței selectate. segments = 1 e chamfer
-    // (o teșitură plată), mai multe = o rotunjire. Un caz nepermis lasă modelul neschimbat și arată motivul.
+    // Bevel / chamfer cu previzualizare: muchiile selectate sau toate laturile feței selectate. segments = 1
+    // e chamfer (o teșitură plată), mai multe = o rotunjire. Un caz nepermis lasă modelul neschimbat și arată
+    // motivul.
     Q_INVOKABLE void previewBevel(double distance, int segments);
     Q_INVOKABLE void commitOperation();
     Q_INVOKABLE void cancelOperation();
@@ -448,20 +487,28 @@ public:
     // În Modul interacțiune: copia pe care rulează interacțiunile (documentul rămâne neatins).
     const model::Model& model() const { return m_runtime ? *m_runtime : m_model; }
     model::DefinitionId activeDefinition() const;
-    // Pivotul selecției (un obiect sau geometrie liberă), în coordonatele contextului activ; gol = nimic de arătat.
+    // Pivotul selecției (un obiect sau geometrie liberă), în coordonatele contextului activ; gol = nimic de
+    // arătat.
     [[nodiscard]] std::optional<math::Vec3d> selectionPivot() const;
-    // Marcajul pivotului în coordonatele lumii ([x, y, z]; gol fără selecție), pentru scripturile de verificare.
+    // Marcajul pivotului în coordonatele lumii ([x, y, z]; gol fără selecție), pentru scripturile de
+    // verificare.
     Q_INVOKABLE QVariantList pivotMarker() const;
     QVariantList pivotPosition() const;
     // { x, y, z } (oricare): coordonatele noi ale pivotului, în coordonatele contextului (pentru scripturi).
     Q_INVOKABLE void setPivotPosition(const QVariantMap& coordinates);
-    // Tragerea marcajului pivotului (cu Select): până la eliberare lucrează unealta „pivot” (se prinde ca Move), apoi
-    // revine Select. Punctul previzualizat e unde se desenează marcajul.
+    // Tragerea marcajului pivotului (cu Select): până la eliberare lucrează unealta „pivot” (se prinde ca
+    // Move), apoi revine Select. Punctul previzualizat e unde se desenează marcajul.
     void beginPivotDrag();
-    [[nodiscard]] bool pivotDragging() const { return m_suspendedTool != nullptr && !curveEditing() && !m_place; }
+    [[nodiscard]] bool pivotDragging() const
+    {
+        return m_suspendedTool != nullptr && !curveEditing() && !m_place;
+    }
     // Editarea unei curbe Pen (dublu click cu Select): unealta `penedit` până la Esc / click în afară.
     void beginCurveEdit(model::PenCurveId id);
-    [[nodiscard]] bool curveEditing() const { return static_cast<bool>(m_editCurve) || static_cast<bool>(m_editPath); }
+    [[nodiscard]] bool curveEditing() const
+    {
+        return static_cast<bool>(m_editCurve) || static_cast<bool>(m_editPath);
+    }
     [[nodiscard]] std::optional<math::Vec3d> pivotDragPoint() const { return m_pivotDragPoint; }
     // Mută pivotul selecției în punctul dat (coordonatele contextului). Obiectul nu se mișcă.
     void setSelectionPivot(const math::Vec3d& point);
@@ -472,8 +519,10 @@ public:
     const geom::Selection& selection() const { return m_selection; }
     const tools::Tool* tool() const { return m_tool.get(); }
     bool hasTool() const { return m_tool != nullptr; }
-    // Triangularea fiecărei fețe a unei definiții (coordonate locale), refăcută numai pentru fețele schimbate.
-    const std::unordered_map<geom::FaceId, geom::FaceTriangles>& triangles(model::DefinitionId definition) const;
+    // Triangularea fiecărei fețe a unei definiții (coordonate locale), refăcută numai pentru fețele
+    // schimbate.
+    const std::unordered_map<geom::FaceId, geom::FaceTriangles>& triangles(
+        model::DefinitionId definition) const;
     // Crește la orice schimbare care trebuie redesenată (model, selecție, hover, overlay).
     unsigned revision() const { return m_revision; }
 
@@ -482,29 +531,33 @@ public:
     // Cutia selecției în coordonate globale (pentru „Zoom la selecție”); nullopt dacă selecția e goală.
     std::optional<std::pair<math::Vec3d, math::Vec3d>> selectionBounds() const;
     // --- Interacțiuni (unealta Interact) ---
-    // Click: comută instanța interactivă de sub cursor, cu animație. Întoarce false dacă nu e nimic interactiv.
+    // Click: comută instanța interactivă de sub cursor, cu animație. Întoarce false dacă nu e nimic
+    // interactiv.
     bool interactAt(const view::Camera& camera, math::Vec2d screen);
     // Avansează animațiile; întoarce true cât timp mai există una (viewport-ul cere cadre).
     bool advanceInteractions(double dt);
     // Transformarea de afișat pentru o instanță în mișcare (altfel nullopt: cea din model).
     std::optional<math::Transform> displayTransform(model::InstanceId instance) const;
     unsigned interactionRevision() const { return m_interactionRevision; }
-    // Se schimbă doar când se schimbă modelul (istoricul, runOnModel, înlocuirea lui), nu și la hover sau la selecție.
-    // Cât e deschisă o tranzacție (o unealtă trage și modifică modelul pe loc), urmează orice atingere a documentului.
+    // Se schimbă doar când se schimbă modelul (istoricul, runOnModel, înlocuirea lui), nu și la hover sau la
+    // selecție. Cât e deschisă o tranzacție (o unealtă trage și modifică modelul pe loc), urmează orice
+    // atingere a documentului.
     std::uint64_t modelRevision() const;
-    // Geometria pe care o vede inferența (obiectele din contextul editat), cu cache; `exclude` = instanțe ignorate.
+    // Geometria pe care o vede inferența (obiectele din contextul editat), cu cache; `exclude` = instanțe
+    // ignorate.
     const inference::SnapScene& snapScene(const std::set<model::InstanceId>& exclude = {}) const;
-    // Inferența pentru un obiect tras din bibliotecă: scena contextului, ghidajele și grid-ul ca la unelte. Punctul
-    // întors e în coordonatele contextului editat.
-    inference::Inference inferDrop(inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const;
+    // Inferența pentru un obiect tras din bibliotecă: scena contextului, ghidajele și grid-ul ca la unelte.
+    // Punctul întors e în coordonatele contextului editat.
+    inference::Inference inferDrop(
+        inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const;
     // Comportamentul instanței selectate: kind ("none", "rotate", "slide"), anchor, amount, duration.
     Q_INVOKABLE void setBehavior(const QVariantMap& behavior);
     // --- Modul interacțiune ---
     enum WorkMode { Modeling = 0, Animation = 1, Interaction = 2 };
     int workMode() const { return m_workMode; }
     void setWorkMode(int mode);
-    // Operațiile modului dat sunt permise acum? (Modul curent e acela, sau rulează un script: scripturile sunt
-    // cerute explicit de utilizator și ocolesc regula.)
+    // Operațiile modului dat sunt permise acum? (Modul curent e acela, sau rulează un script: scripturile
+    // sunt cerute explicit de utilizator și ocolesc regula.)
     Q_INVOKABLE bool allows(int mode) const { return m_workMode == mode || m_macro; }
     // Comanda (id din palette: „edit.bevel”, „tool.line”, „mode.animate”…) e disponibilă în modul curent?
     // Sursa unică a regulii: palette, scurtăturile, meniurile și gărzile o folosesc.
@@ -519,14 +572,16 @@ public:
     QString interactionHover(const view::Camera& camera, math::Vec2d screen);
     // event: "click", "rightClick", "doubleClick", "longPress". Întoarce true dacă a pornit ceva.
     bool interactionEvent(const view::Camera& camera, math::Vec2d screen, const QString& event);
-    // Sub cursor e un obiect, dar nici el, nici cele din care face parte nu au interacțiuni (pentru un mesaj).
+    // Sub cursor e un obiect, dar nici el, nici cele din care face parte nu au interacțiuni (pentru un
+    // mesaj).
     bool objectWithoutInteractionsAt(const view::Camera& camera, math::Vec2d screen) const;
     bool interactionDragStart(const view::Camera& camera, math::Vec2d screen);
     void interactionDragMove(const view::Camera& camera, math::Vec2d screen);
     void interactionDragEnd();
     Q_INVOKABLE void interactionKey(const QString& key);
-    // Editorul de blocuri: regulile unei instanțe ca liste de hărți ({ trigger, key, actions: [{ kind, target, x, y,
-    // z, duration, material, animation, scene, first, second }] }); trigger și kind sunt nume („click”, „moveBy”…).
+    // Editorul de blocuri: regulile unei instanțe ca liste de hărți ({ trigger, key, actions: [{ kind,
+    // target, x, y, z, duration, material, animation, scene, first, second }] }); trigger și kind sunt nume
+    // („click”, „moveBy”…).
     Q_INVOKABLE QVariantList rulesOf(double instanceId) const;
     Q_INVOKABLE void setRules(double instanceId, const QVariantList& rules);
 
@@ -534,8 +589,8 @@ public:
     QVariantList animations() const;
     double activeAnimation() const { return static_cast<double>(m_activeAnimation.value); }
     void setActiveAnimation(double id);
-    // Pistele animației active: { name, duration, fps, loop, tracks: [{ instance, name, transform: [t…], color: [t…] }],
-    // camera: [t…] }.
+    // Pistele animației active: { name, duration, fps, loop, tracks: [{ instance, name, transform: [t…],
+    // color: [t…] }], camera: [t…] }.
     QVariantMap timeline() const;
     double timelineTime() const { return m_timelineTime; }
     void setTimelineTime(double seconds); // mută playhead-ul și pornește previzualizarea
@@ -545,14 +600,15 @@ public:
     Q_INVOKABLE void renameAnimation(double id, const QString& name);
     Q_INVOKABLE void removeAnimation(double id);
     Q_INVOKABLE void setAnimationSettings(double duration, int fps, bool loop);
-    // Keyframe-uri la momentul curent: toate canalele de transformare / culoarea obiectelor selectate, camera dată
-    // (cameraState()).
+    // Keyframe-uri la momentul curent: toate canalele de transformare / culoarea obiectelor selectate, camera
+    // dată (cameraState()).
     Q_INVOKABLE void keySelection();
     Q_INVOKABLE void keyInstance(double instance);
     Q_INVOKABLE void keySelectionColor();
     Q_INVOKABLE void keyCamera(const QVariantMap& camera);
-    // Cheile de pe timeline, ca liste de referințe { instance, property, time }: instance 0 = camera; property ""
-    // = rândul sumar al obiectului (toate canalele lui de la acel moment), altfel „position.x” … „color”.
+    // Cheile de pe timeline, ca liste de referințe { instance, property, time }: instance 0 = camera;
+    // property "" = rândul sumar al obiectului (toate canalele lui de la acel moment), altfel „position.x” …
+    // „color”.
     Q_INVOKABLE void removeKeys(const QVariantList& keys);
     // Mută cheile cu `delta` secunde; întoarce referințele noi (pentru selecție).
     Q_INVOKABLE QVariantList moveKeys(const QVariantList& keys, double delta);
@@ -560,13 +616,14 @@ public:
     Q_INVOKABLE void setKeysEasing(const QVariantList& keys, const QVariant& easing);
     // Easing-ul cheilor noi din animația activă.
     Q_INVOKABLE void setDefaultEasing(const QVariant& easing);
-    // Valoarea unei chei de pe un canal numeric; valoarea curentă a unui canal (scrie o cheie la timpul curent).
+    // Valoarea unei chei de pe un canal numeric; valoarea curentă a unui canal (scrie o cheie la timpul
+    // curent).
     Q_INVOKABLE void setKeyValue(const QVariantMap& key, double value);
     Q_INVOKABLE void setChannelValue(double instance, const QString& property, double value);
     // Presetările de easing (ale aplicației), ca listă de { name, x1, y1, x2, y2, step }.
     Q_INVOKABLE QVariantList easingPresets() const;
-    // Copiere / lipire de chei: lipirea se face la timpul curent, pe aceleași canale (pe obiectul selectat, dacă
-    // cheile copiate sunt ale unui singur alt obiect). Întoarce referințele cheilor lipite.
+    // Copiere / lipire de chei: lipirea se face la timpul curent, pe aceleași canale (pe obiectul selectat,
+    // dacă cheile copiate sunt ale unui singur alt obiect). Întoarce referințele cheilor lipite.
     Q_INVOKABLE void copyKeys(const QVariantList& keys);
     Q_INVOKABLE QVariantList pasteKeys();
     Q_INVOKABLE bool hasCopiedKeys() const { return !m_keyClipboard.empty(); }
@@ -575,8 +632,8 @@ public:
     Q_INVOKABLE void play();
     Q_INVOKABLE void pause();
     Q_INVOKABLE void togglePlay();
-    // Tastatura timeline-ului: `frames` cadre înainte / înapoi (oprește redarea); cheia următoare (+1) sau anterioară
-    // (−1) a selecției (sau a tuturor, fără selecție); începutul / sfârșitul.
+    // Tastatura timeline-ului: `frames` cadre înainte / înapoi (oprește redarea); cheia următoare (+1) sau
+    // anterioară (−1) a selecției (sau a tuturor, fără selecție); începutul / sfârșitul.
     Q_INVOKABLE void stepFrames(int frames);
     Q_INVOKABLE bool jumpToKey(int direction);
     Q_INVOKABLE void jumpToEdge(bool end);
@@ -585,8 +642,8 @@ public:
     Q_INVOKABLE void endPreview(); // înapoi la model (editare)
     // Camera animației la momentul curent ({} dacă nu are pistă de cameră), ca cameraState().
     Q_INVOKABLE QVariantMap animationCamera() const;
-    // Camera vederii urmează o animație: timeline-ul în previzualizare sau, în Modul interacțiune, o animație cu chei
-    // de cameră care rulează.
+    // Camera vederii urmează o animație: timeline-ul în previzualizare sau, în Modul interacțiune, o animație
+    // cu chei de cameră care rulează.
     bool animationCameraActive() const;
     // Culoarea animată a unei instanțe (pentru randare), dacă există.
     std::optional<model::Color> displayColor(model::InstanceId instance) const;
@@ -658,7 +715,8 @@ private:
     bool m_previewApplied = false;
     bool m_macro = false;
     bool m_keepPreview = false; // editAnimation: keyframe-urile nu ies din previzualizare
-    // Rotirea și scara aplicate din Inspector geometriei libere selectate (cheia = muchiile și fețele selecției).
+    // Rotirea și scara aplicate din Inspector geometriei libere selectate (cheia = muchiile și fețele
+    // selecției).
     std::vector<std::uint64_t> m_geometryKey;
     math::Vec3d m_geometryRotation { 0.0 };
     // Pivotul geometriei libere selectate (în lume), ales din Inspector; gol = centrul cutiei selecției.
@@ -670,24 +728,26 @@ private:
     model::LightId m_selectedLight;
     std::optional<model::Model> m_runtime;
     int m_workMode = Modeling;
-    // Modul Animare: o copie a modelului cu obiectele animate în poza de la timpul curent. Uneltele de transformare
-    // și Inspector-ul lucrează pe ea; rezultatul devine keyframe-uri (modelul de bază nu se schimbă). Se reface doar
-    // când se schimbă modelul (m_modelRevision: crește la orice schimbare a istoricului — m_stack.setOnChanged —,
-    // în runOnModel și la înlocuirea modelului), timpul sau animația.
+    // Modul Animare: o copie a modelului cu obiectele animate în poza de la timpul curent. Uneltele de
+    // transformare și Inspector-ul lucrează pe ea; rezultatul devine keyframe-uri (modelul de bază nu se
+    // schimbă). Se reface doar când se schimbă modelul (m_modelRevision: crește la orice schimbare a
+    // istoricului — m_stack.setOnChanged —, în runOnModel și la înlocuirea modelului), timpul sau animația.
     mutable std::optional<model::Model> m_pose;
     mutable std::tuple<std::uint64_t, double, std::uint64_t> m_poseKey { ~std::uint64_t { 0 }, 0.0, 0 };
     std::uint64_t m_modelRevision = 0;
-    using SnapKey = std::tuple<std::uint64_t, std::vector<model::InstanceId>, std::set<model::InstanceId>, std::set<model::TagId>>;
+    using SnapKey = std::tuple<std::uint64_t, std::vector<model::InstanceId>, std::set<model::InstanceId>,
+        std::set<model::TagId>>;
     mutable std::optional<std::pair<SnapKey, inference::SnapScene>> m_snapCache;
     std::set<model::InstanceId> snapExclude() const;
     model::Model& pose() const;
-    // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează animația).
-    // Auto-key: transformările noi ale obiectelor (la timpul curent) devin chei, doar pe canalele schimbate.
+    // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează
+    // animația). Auto-key: transformările noi ale obiectelor (la timpul curent) devin chei, doar pe canalele
+    // schimbate.
     void keyTransforms(const std::map<model::InstanceId, math::Transform>& transforms, const char* name);
     // Valorile de transformare ale instanței la timpul curent (canalele animației peste modelul de bază).
     [[nodiscard]] model::TransformValues currentValues(model::InstanceId instance) const;
-    // Transformarea instanței așa cum se vede: în Animare, poza de la timpul curent (fără copia modelului, deci
-    // merge și în timpul unei tranzacții); altfel cea din model.
+    // Transformarea instanței așa cum se vede: în Animare, poza de la timpul curent (fără copia modelului,
+    // deci merge și în timpul unei tranzacții); altfel cea din model.
     [[nodiscard]] math::Transform shownTransform(model::InstanceId instance) const;
     [[nodiscard]] QString channelValueText(model::Property property, double value) const;
     model::RuleRuntime m_rules;
@@ -708,21 +768,20 @@ private:
     bool m_playing = false;
     bool m_autoKey = true;
     std::vector<model::ClipboardKey> m_keyClipboard;
-    template <class Fn>
-    void editAnimation(const char* name, Fn&& fn);
+    template <class Fn> void editAnimation(const char* name, Fn&& fn);
     void finishSceneTransition();
     unsigned m_interactionRevision = 0;
 
     bool m_snapToGrid = false;
     double m_gridStep = 0.0;
 
-    void meshChanged(model::DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary) override;
+    void meshChanged(
+        model::DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary) override;
     void structureChanged(const model::Model& model) override;
-    template <class Fn>
-    void withTool(const view::Camera& camera, Fn&& fn);
+    template <class Fn> void withTool(const view::Camera& camera, Fn&& fn);
     void afterInteraction(const geom::Selection& before);
-    // Ce se vede din unealtă (hover-ul și overlay-ul). O mișcare de mouse care nu-l schimbă, fără schimbări în model
-    // sau în selecție, nu atinge documentul: altfel fiecare hover refăcea tot desenul modelului.
+    // Ce se vede din unealtă (hover-ul și overlay-ul). O mișcare de mouse care nu-l schimbă, fără schimbări
+    // în model sau în selecție, nu atinge documentul: altfel fiecare hover refăcea tot desenul modelului.
     struct ToolLook {
         view::PickResult::Kind kind = view::PickResult::Kind::None;
         geom::VertexId vertex;
@@ -738,8 +797,7 @@ private:
     ToolLook toolLook() const;
     std::optional<ToolLook> m_lookBeforeMove;
     // Undo / redo: pasul din istoric și tot ce depinde de model (animația activă, timeline-ul, panourile).
-    template <class Fn>
-    void stepHistory(Fn&& step);
+    template <class Fn> void stepHistory(Fn&& step);
     // După undo/redo sau ștergeri: calea și selecția nu trebuie să indice entități dispărute.
     void repairContext();
     // Varianta sigură în mijlocul unei notificări de la model (fără să anuleze unealta).
@@ -786,8 +844,8 @@ private:
     model::MotionPathId m_editPath; // sau calea editată
     model::MotionPathId m_selectedPath;
     QVariantMap pathInfo(model::MotionPathId id) const;
-    // Pozele obiectelor ancorate pe căile animației active, la timpul curent (refăcute la o schimbare a modelului sau
-    // a timpului): se citesc de mai multe ori pe cadru (randare, Inspector, unelte).
+    // Pozele obiectelor ancorate pe căile animației active, la timpul curent (refăcute la o schimbare a
+    // modelului sau a timpului): se citesc de mai multe ori pe cadru (randare, Inspector, unelte).
     mutable std::map<model::InstanceId, math::Transform> m_pathPoses;
     mutable std::tuple<std::uint64_t, double, std::uint64_t> m_pathPosesKey { ~std::uint64_t { 0 }, 0.0, 0 };
     [[nodiscard]] const math::Transform* pathPoseOf(model::InstanceId instance) const;
@@ -813,7 +871,8 @@ private:
     // Ghidajele contextului editat și pasul grid-ului pentru inferență (unelte și drop).
     std::vector<inference::GuideRef> inferenceGuides() const;
     double inferenceGridStep(const view::Camera& camera) const;
-    double createParametricAt(const QString& generator, const QVector3D& at, const QVariantMap& parameters, bool baseCenter);
+    double createParametricAt(
+        const QString& generator, const QVector3D& at, const QVariantMap& parameters, bool baseCenter);
     int m_libraryMaterial = -1;
 };
 

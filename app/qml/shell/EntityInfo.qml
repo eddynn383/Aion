@@ -153,6 +153,133 @@ Column {
         }
     }
 
+    // Placă (ADR 0044): tipul, grosimea din lista tipului, lungimea și lățimea; starea față de parametri.
+    PropertyGroup {
+        id: boardBox
+        readonly property var board: root.isInstance ? (root.info.board ?? null) : null
+        visible: board !== null && root.modeling
+        title: board && board.parametric ? "Parametri · Placă" : "Placă (desprinsă de parametri)"
+
+        component Chip: Rectangle {
+            id: chip
+            property string label: ""
+            property bool current: false
+            property bool enabledChip: true
+            signal clicked()
+            width: chipLabel.implicitWidth + Theme.space3 * 2
+            height: 24
+            radius: 12
+            opacity: enabledChip ? 1 : 0.5
+            color: current ? Theme.accentSubtle : chipArea.containsMouse ? Theme.bgHover : "transparent"
+            border.color: current ? Theme.accent : Theme.borderStrong
+            Text {
+                id: chipLabel
+                anchors.centerIn: parent
+                text: chip.label
+                color: chip.current ? Theme.textPrimary : Theme.textSecondary
+                font.pixelSize: Theme.fontSizeXs
+            }
+            MouseArea {
+                id: chipArea
+                anchors.fill: parent
+                enabled: chip.enabledChip
+                hoverEnabled: true
+                onClicked: chip.clicked()
+            }
+        }
+
+        Flow {
+            width: boardBox.width
+            spacing: 4
+            visible: boardBox.board && boardBox.board.parametric
+            Repeater {
+                model: boardBox.board ? boardBox.board.types : []
+                delegate: Chip {
+                    required property var modelData
+                    label: modelData.label
+                    current: boardBox.board && boardBox.board.type === modelData.key
+                    enabledChip: boardBox.board && boardBox.board.matches
+                    onClicked: root.document.setBoardValue("type", modelData.key)
+                }
+            }
+        }
+        Flow {
+            width: boardBox.width
+            spacing: 4
+            visible: boardBox.board && boardBox.board.parametric
+            Repeater {
+                model: boardBox.board ? boardBox.board.thicknesses : []
+                delegate: Chip {
+                    required property var modelData
+                    label: modelData + " mm"
+                    current: boardBox.board && Math.abs(boardBox.board.thickness - modelData) < 0.01
+                    enabledChip: boardBox.board && boardBox.board.matches
+                    onClicked: root.document.setBoardValue("thickness", modelData)
+                }
+            }
+        }
+        NumberField {
+            width: boardBox.width
+            visible: boardBox.board && boardBox.board.parametric
+            enabled: boardBox.board && boardBox.board.matches
+            label: "Lungime (fibra)"
+            unit: "mm"
+            from: 1
+            to: 10000
+            decimals: 1
+            value: boardBox.board ? boardBox.board.length : 0
+            onValueModified: (v) => root.document.setBoardValue("length", v)
+        }
+        NumberField {
+            width: boardBox.width
+            visible: boardBox.board && boardBox.board.parametric
+            enabled: boardBox.board && boardBox.board.matches
+            label: "Lățime"
+            unit: "mm"
+            from: 1
+            to: 10000
+            decimals: 1
+            value: boardBox.board ? boardBox.board.width : 0
+            onValueModified: (v) => root.document.setBoardValue("width", v)
+        }
+        Text {
+            visible: boardBox.board && boardBox.board.parametric && !boardBox.board.matches
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Modificată manual: " + (boardBox.board ? boardBox.board.reason : "") + "."
+            color: Theme.danger
+            font.pixelSize: Theme.fontSizeXs
+        }
+        Row {
+            visible: boardBox.board && boardBox.board.parametric && !boardBox.board.matches
+            spacing: Theme.space2
+            Button {
+                text: "Readu la parametri"
+                onClicked: root.document.restoreBoard()
+            }
+            Button {
+                text: "Desprinde"
+                onClicked: root.document.detachBoard()
+            }
+        }
+        Text {
+            visible: boardBox.board && !boardBox.board.parametric
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Dimensiunile se măsoară din geometrie; tipul și grosimea rămân pentru lista de debitare."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+        Text {
+            visible: boardBox.board !== null && boardBox.board.copies > 1
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "Afectează " + (boardBox.board ? boardBox.board.copies : 1) + " apariții legate."
+            color: Theme.textTertiary
+            font.pixelSize: Theme.fontSizeXs
+        }
+    }
+
     // Sferă / cilindru / con: câte laturi au cercurile (mai multe = mai fină). Doar cât geometria e a primitivei.
     PropertyGroup {
         id: segmentsBox

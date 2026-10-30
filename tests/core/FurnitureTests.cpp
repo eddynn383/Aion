@@ -1,21 +1,25 @@
+#include "aion/core/commands/CommandStack.h"
 #include "aion/core/geom/Bevel.h"
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Primitives.h"
 #include "aion/core/io/AionFile.h"
+#include "aion/core/model/AnimationEval.h"
+#include "aion/core/model/Copying.h"
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Parametric.h"
 #include "aion/core/model/Quantities.h"
 #include "aion/core/model/Transfer.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-
 #include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <numbers>
 #include <set>
+#include <stdexcept>
 #include <string>
 
 using namespace aion;
@@ -27,7 +31,8 @@ using model::Model;
 namespace {
 
 // O placă PAL 18 (cutia 600 × 400 × 18, cu grosimea pe Z), cu datele ei de piesă.
-model::DefinitionId boardDefinition(Model& m, Vec3d size = { 600, 400, 18 }, int thicknessAxis = 2, int grainAxis = 0)
+model::DefinitionId boardDefinition(
+    Model& m, Vec3d size = { 600, 400, 18 }, int thicknessAxis = 2, int grainAxis = 0)
 {
     model::Definition def { "Placă", false };
     model::PartSpec spec;
@@ -88,7 +93,8 @@ TEST_CASE("Mobilier: categoriile și cheile materialelor incluse", "[core][furni
 {
     const auto library = model::builtinMaterials();
     const auto find = [&](const std::string& name) {
-        const auto it = std::find_if(library.begin(), library.end(), [&](const model::Material& m) { return m.name == name; });
+        const auto it = std::find_if(
+            library.begin(), library.end(), [&](const model::Material& m) { return m.name == name; });
         REQUIRE(it != library.end());
         return *it;
     };
@@ -129,7 +135,8 @@ TEST_CASE("Mobilier: feroneria construită în cod", "[core][furniture]")
     CHECK(m.materials().size() == 1);
 }
 
-TEST_CASE("Mobilier: un fișier v5 își primește categoriile materialelor la încărcare", "[core][furniture][io]")
+TEST_CASE(
+    "Mobilier: un fișier v5 își primește categoriile materialelor la încărcare", "[core][furniture][io]")
 {
     Model m;
     model::Material steel { "Oțel periat", { 170, 172, 176, 255 } };
@@ -154,7 +161,8 @@ TEST_CASE("Mobilier: un fișier v5 își primește categoriile materialelor la �
     }
 }
 
-TEST_CASE("Mobilier: la inserare, un decor nu se unește cu un lemn masiv cu același nume", "[core][furniture]")
+TEST_CASE(
+    "Mobilier: la inserare, un decor nu se unește cu un lemn masiv cu același nume", "[core][furniture]")
 {
     // Sursa: un obiect cu decorul „Nuc (decor)” din bibliotecă.
     Model source;
@@ -194,7 +202,8 @@ TEST_CASE("Mobilier: măsurarea unei plăci pe axele ei", "[core][furniture]")
 
     SECTION("rotită 37° în jurul lui Z: aceleași dimensiuni")
     {
-        const auto r = model::measurePart(m, d, Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, 37.0 * std::numbers::pi / 180.0));
+        const auto r = model::measurePart(
+            m, d, Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, 37.0 * std::numbers::pi / 180.0));
         CHECK(r.length == Approx(600.0));
         CHECK(r.width == Approx(400.0));
         CHECK(r.thickness == Approx(18.0));
@@ -272,8 +281,8 @@ TEST_CASE("Mobilier: „Fă placă” găsește axa grosimii și fibra", "[core]
 namespace {
 
 // O placă etichetată, plasată în `parent`: `size` în axele lumii, cu axa grosimii și a fibrei date.
-model::InstanceId placeBoard(Model& m, model::DefinitionId parent, const std::string& name, Vec3d size, int thick,
-    int grain, Vec3d at, const std::string& type = "pal", double nominal = 18.0)
+model::InstanceId placeBoard(Model& m, model::DefinitionId parent, const std::string& name, Vec3d size,
+    int thick, int grain, Vec3d at, const std::string& type = "pal", double nominal = 18.0)
 {
     model::Definition def { name, false };
     model::PartSpec spec;
@@ -299,8 +308,8 @@ struct ReferenceCabinet {
     std::vector<model::InstanceId> doors;
 };
 
-// Dulapul de referință (docs/plans/mobilier-pe-corp.md, §4): 1000 × 2000 × 600, PAL 18, spate HDF 3, 2 uși cu câte 4
-// balamale și un mâner în grupul ușii.
+// Dulapul de referință (docs/plans/mobilier-pe-corp.md, §4): 1000 × 2000 × 600, PAL 18, spate HDF 3, 2 uși cu
+// câte 4 balamale și un mâner în grupul ușii.
 ReferenceCabinet referenceCabinet()
 {
     ReferenceCabinet c;
@@ -315,7 +324,8 @@ ReferenceCabinet referenceCabinet()
         const model::DefinitionId door = m.addDefinition({ "Ușă", false });
         placeBoard(m, door, "Ușă", { 498.5, 18, 2000 }, 1, 2, { 249.25, -9, 0 });
         for (int h = 0; h < 4; ++h) {
-            model::createHardware(m, door, "hinge.overlay.110", Transform::translation({ 30, 0, 100.0 + h * 600 }));
+            model::createHardware(
+                m, door, "hinge.overlay.110", Transform::translation({ 30, 0, 100.0 + h * 600 }));
         }
         model::createHardware(m, door, "handle.128", Transform::translation({ 460, -30, 1000 }));
         model::Instance inst;
@@ -423,7 +433,8 @@ TEST_CASE("Lista de debitare v1.5: piesele ascunse și bifele", "[core][furnitur
     }
 }
 
-TEST_CASE("Lista de debitare v1.5: obiectele fără date, după categoria materialului", "[core][furniture][quantities]")
+TEST_CASE("Lista de debitare v1.5: obiectele fără date, după categoria materialului",
+    "[core][furniture][quantities]")
 {
     Model m;
     const auto box = [&](const std::string& name, Vec3d size, const std::string& materialKey) {
@@ -469,4 +480,273 @@ TEST_CASE("Lista de debitare v1.5: CSV-ul nu lasă formulele să ruleze", "[core
     const std::string csv = model::toCsv(model::cutList(m), {});
     CHECK(csv.find(";'=1+1;") != std::string::npos);
     CHECK(csv.find(";'\tTab;") != std::string::npos);
+}
+
+// --- Placa parametrică (pasul 5) ---
+
+namespace {
+
+struct BoardDoc {
+    Model model;
+    commands::CommandStack stack { model };
+    model::InstanceId board;
+
+    BoardDoc()
+    {
+        stack.setValidation(true, geom::ValidationLevel::Full);
+        stack.setOnInvalid([](const geom::ValidationReport& r) { FAIL(r.text()); });
+        stack.setFinalizer([](Model& m, std::span<const model::DefinitionId> changed) {
+            model::finalizeBoards(m, changed);
+        });
+        stack.run("Placă", [&](Model& m) {
+            board = model::createBoard(
+                m, m.root(), "pal", 18.0, 600.0, 400.0, Transform::translation({ 1000, 0, 0 }));
+        });
+    }
+    model::DefinitionId def() const { return model.instance(board).definition; }
+    const model::Definition& definition() const { return model.definition(def()); }
+    double param(const char* key) const { return definition().parameters.at(key); }
+    model::BoardStatus status() const
+    {
+        return model::boardState(model, board, model.instance(board).transform);
+    }
+    Vec3d world(Vec3d local) const { return model.instance(board).transform.applyToPoint(local); }
+};
+
+} // namespace
+
+TEST_CASE("Placa parametrică: creare, decor păstrat, generatorul nu e în listă", "[core][furniture][board]")
+{
+    BoardDoc d;
+    CHECK(model::findGenerator("board") == nullptr);
+    CHECK(std::none_of(model::generators().begin(), model::generators().end(),
+        [](const model::GeneratorInfo& g) { return g.id == "board"; }));
+    CHECK(d.model.mesh(d.def()).faces().size() == 6);
+    CHECK(d.definition().part->nominalThickness == 18.0);
+    CHECK(d.status().state == model::BoardState::Matches);
+
+    const auto walnut = model::libraryMaterialByKey("nuc-decor");
+    d.stack.run("Decor", [&](Model& m) {
+        model::Instance inst = m.instance(d.board);
+        inst.material = m.addMaterial(model::builtinMaterials()[*walnut]);
+        m.setInstance(d.board, inst);
+    });
+    const model::MaterialId decor = d.model.instance(d.board).material;
+    d.stack.run("Lungime", [&](Model& m) { model::setBoardValue(m, d.def(), "length", 800.0); });
+    CHECK(d.param("length") == Approx(800.0));
+    CHECK(d.model.instance(d.board).material == decor);
+    CHECK(d.status().state == model::BoardState::Matches);
+}
+
+TEST_CASE("Placa parametrică: Push/Pull pe capăt actualizează parametrii (finalizatorul)",
+    "[core][furniture][board]")
+{
+    BoardDoc d;
+    const Vec3d farCorner = d.world({ 0, 0, 0 });
+    SECTION("capătul +X")
+    {
+        d.stack.run("Push/Pull", [&](Model& m) {
+            geom::Mesh& mesh = m.mesh(d.def());
+            geom::pushPull(mesh, faceWithNormal(mesh, { 1, 0, 0 }), 200.0);
+        });
+        CHECK(d.param("length") == Approx(800.0));
+        CHECK(d.status().state == model::BoardState::Matches);
+        CHECK(glm::length(d.world({ 0, 0, 0 }) - farCorner) < 1e-6);
+        CHECK(d.stack.undoCount() == 2); // un singur pas pentru Push/Pull + preluarea dimensiunilor
+    }
+    SECTION("capătul −X: originea se mută, placa nu se mișcă în lume")
+    {
+        const Vec3d plusEnd = d.world({ 600, 0, 0 });
+        d.stack.run("Push/Pull", [&](Model& m) {
+            geom::Mesh& mesh = m.mesh(d.def());
+            geom::pushPull(mesh, faceWithNormal(mesh, { -1, 0, 0 }), 200.0);
+        });
+        CHECK(d.param("length") == Approx(800.0));
+        CHECK(d.status().state == model::BoardState::Matches);
+        CHECK(glm::length(d.world({ 800, 0, 0 }) - plusEnd) < 1e-6);
+        REQUIRE(d.stack.undo());
+        CHECK(d.param("length") == Approx(600.0));
+    }
+    SECTION("lățimea")
+    {
+        d.stack.run("Push/Pull", [&](Model& m) {
+            geom::Mesh& mesh = m.mesh(d.def());
+            geom::pushPull(mesh, faceWithNormal(mesh, { 0, 1, 0 }), 100.0);
+        });
+        CHECK(d.param("width") == Approx(500.0));
+    }
+    SECTION("fața de grosime: placa devine „modificată manual”")
+    {
+        d.stack.run("Push/Pull", [&](Model& m) {
+            geom::Mesh& mesh = m.mesh(d.def());
+            geom::pushPull(mesh, faceWithNormal(mesh, { 0, 0, 1 }), 2.0);
+        });
+        CHECK(d.status().state == model::BoardState::Modified);
+        CHECK(d.status().reason == model::BoardReason::Thickness);
+        d.stack.run("Readu", [&](Model& m) { model::restoreBoard(m, d.board); });
+        CHECK(d.status().state == model::BoardState::Matches);
+        REQUIRE(d.stack.undo());
+        CHECK(d.status().reason == model::BoardReason::Thickness);
+    }
+    SECTION("Bevel: formă neregulată, apoi „Readu la parametri”")
+    {
+        d.stack.run("Bevel", [&](Model& m) {
+            geom::Mesh& mesh = m.mesh(d.def());
+            const geom::FaceId top = faceWithNormal(mesh, { 0, 0, 1 });
+            geom::bevelEdges(mesh, { mesh.face(top).outer.uses.front().edge }, 5.0, 1);
+        });
+        CHECK(d.status().reason == model::BoardReason::Geometry);
+        d.stack.run("Readu", [&](Model& m) { model::restoreBoard(m, d.board); });
+        CHECK(model::isSimpleBox(d.model.mesh(d.def())));
+    }
+}
+
+TEST_CASE("Placa parametrică: scara, oglindirea și părintele scalat", "[core][furniture][board]")
+{
+    BoardDoc d;
+    d.stack.run("Scale", [&](Model& m) {
+        model::Instance inst = m.instance(d.board);
+        inst.transform = inst.transform * Transform::scaling({ 0, 0, 0 }, { 1.5, 1, 1 });
+        m.setInstance(d.board, inst);
+    });
+    CHECK(d.status().reason == model::BoardReason::Scaled);
+    d.stack.run("Readu", [&](Model& m) { model::restoreBoard(m, d.board); });
+    CHECK(d.status().state == model::BoardState::Matches);
+
+    d.stack.run("Oglindește", [&](Model& m) {
+        model::Instance inst = m.instance(d.board);
+        inst.transform = Transform::scaling({ 0, 0, 0 }, { -1, 1, 1 }) * inst.transform;
+        m.setInstance(d.board, inst);
+    });
+    CHECK(d.status().state == model::BoardState::Matches);
+    // Readu păstrează oglindirea (semnul scării).
+    d.stack.run("Readu", [&](Model& m) { model::restoreBoard(m, d.board); });
+    CHECK(glm::determinant(glm::dmat3(d.model.instance(d.board).transform.matrix())) < 0.0);
+
+    const auto inScaledParent = model::boardState(d.model, d.board,
+        Transform::scaling({ 0, 0, 0 }, { 1.2, 1.2, 1.2 }) * d.model.instance(d.board).transform);
+    CHECK(inScaledParent.reason == model::BoardReason::ScaledParent);
+}
+
+TEST_CASE("Placa parametrică: pivotul rămâne pe loc la schimbarea dimensiunilor", "[core][furniture][board]")
+{
+    BoardDoc d;
+    SECTION("pivotul implicit (centrul): placa crește simetric")
+    {
+        const Vec3d center = d.world({ 300, 200, 9 });
+        d.stack.run("Lungime", [&](Model& m) { model::setBoardValue(m, d.def(), "length", 800.0); });
+        CHECK(glm::length(d.world({ 400, 200, 9 }) - center) < 1e-6);
+    }
+    SECTION("pivotul explicit la capăt: capătul rămâne pe loc")
+    {
+        d.stack.run("Pivot", [&](Model& m) {
+            model::Instance inst = m.instance(d.board);
+            inst.pivot = Vec3d { 600, 0, 0 };
+            m.setInstance(d.board, inst);
+        });
+        const Vec3d end = d.world({ 600, 0, 0 });
+        d.stack.run("Lungime", [&](Model& m) { model::setBoardValue(m, d.def(), "length", 800.0); });
+        CHECK(glm::length(d.world({ 800, 0, 0 }) - end) < 1e-6);
+        CHECK(d.model.instance(d.board).pivot->x == Approx(800.0));
+    }
+    SECTION("patru instanțe legate: toate compensate, un pas de undo")
+    {
+        std::vector<model::InstanceId> copies { d.board };
+        std::vector<Vec3d> centers { d.world({ 300, 200, 9 }) };
+        d.stack.run("Copii", [&](Model& m) {
+            for (int i = 1; i < 4; ++i) {
+                copies.push_back(model::copyLinked(m, d.board, Transform::translation({ 0, 1000.0 * i, 0 })));
+            }
+        });
+        for (std::size_t i = 1; i < copies.size(); ++i) {
+            centers.push_back(d.model.instance(copies[i]).transform.applyToPoint({ 300, 200, 9 }));
+        }
+        const std::size_t steps = d.stack.undoCount();
+        d.stack.run("Lungime", [&](Model& m) { model::setBoardValue(m, d.def(), "length", 1000.0); });
+        CHECK(d.stack.undoCount() == steps + 1);
+        for (std::size_t i = 0; i < copies.size(); ++i) {
+            CHECK(
+                glm::length(d.model.instance(copies[i]).transform.applyToPoint({ 500, 200, 9 }) - centers[i])
+                < 1e-6);
+        }
+    }
+}
+
+TEST_CASE("Placa parametrică: mutarea originii păstrează animațiile și scenele", "[core][furniture][board]")
+{
+    BoardDoc d;
+    // Placa rotită 90° în jurul lui Y (ca o laterală), cu pivot explicit.
+    const Vec3d pivot { 100, 50, 9 };
+    d.stack.run("Așezare", [&](Model& m) {
+        model::Instance inst = m.instance(d.board);
+        inst.transform = Transform::translation({ 500, 0, 0 })
+            * Transform::rotation({ 0, 0, 0 }, { 0, 1, 0 }, std::numbers::pi / 2);
+        inst.pivot = pivot;
+        m.setInstance(d.board, inst);
+    });
+    const Transform before = d.model.instance(d.board).transform;
+    const model::TransformValues values
+        = model::transformValues(before, pivot); // ce ar fi salvat într-o cheie
+    const Vec3d corner = before.applyToPoint({ 600, 400, 18 });
+    d.stack.run("Push/Pull", [&](Model& m) {
+        geom::Mesh& mesh = m.mesh(d.def());
+        geom::pushPull(mesh, faceWithNormal(mesh, { -1, 0, 0 }), 150.0);
+    });
+    const model::Instance& after = d.model.instance(d.board);
+    // Același colț fizic (acum la x = 750 în coordonatele plăcii) e în același loc.
+    CHECK(glm::length(after.transform.applyToPoint({ 750, 400, 18 }) - corner) < 1e-6);
+    // Cheia de animație (valorile față de pivot) dă aceeași poză cu pivotul nou.
+    const Transform keyed = model::composeTransform(values, *after.pivot);
+    CHECK(glm::length(keyed.applyToPoint({ 750, 400, 18 }) - corner) < 1e-6);
+}
+
+TEST_CASE("Placa parametrică: tipul nou aduce grosimea permisă și scoate canturile incompatibile",
+    "[core][furniture][board]")
+{
+    BoardDoc d;
+    d.stack.run("Cant", [&](Model& m) {
+        model::Definition def = m.definition(d.def());
+        def.part->bands[0] = { "abs.2", "" };
+        m.setDefinition(d.def(), def);
+    });
+    d.stack.run("Tip", [&](Model& m) { model::setBoardType(m, d.def(), "hdf"); });
+    CHECK(d.definition().part->typeKey == "hdf");
+    CHECK(d.definition().part->nominalThickness == 4.0);
+    CHECK(d.definition().part->bands[0].bandKey.empty());
+    CHECK(d.status().state == model::BoardState::Matches);
+}
+
+TEST_CASE(
+    "Finalizatorul: nu atinge geometria obișnuită; o excepție anulează operația", "[core][furniture][board]")
+{
+    const auto cube = [](Model& m) {
+        const model::DefinitionId c = m.addDefinition({ "Cub", false });
+        geom::buildPrimitive(m.mesh(c), geom::Primitive::Box, { 100, 100, 100 }, 4);
+        return c;
+    };
+    Model with;
+    Model without;
+    commands::CommandStack withStack(with);
+    commands::CommandStack withoutStack(without);
+    withStack.setFinalizer(
+        [](Model& m, std::span<const model::DefinitionId> c) { model::finalizeBoards(m, c); });
+    model::DefinitionId a;
+    model::DefinitionId b;
+    withStack.run("Cub", [&](Model& m) { a = cube(m); });
+    withoutStack.run("Cub", [&](Model& m) { b = cube(m); });
+    withStack.run("Push/Pull",
+        [&](Model& m) { geom::pushPull(m.mesh(a), faceWithNormal(m.mesh(a), { 1, 0, 0 }), 50.0); });
+    withoutStack.run("Push/Pull",
+        [&](Model& m) { geom::pushPull(m.mesh(b), faceWithNormal(m.mesh(b), { 1, 0, 0 }), 50.0); });
+    CHECK(with.sameAs(without));
+
+    const Model snapshot = with;
+    withStack.setFinalizer(
+        [](Model&, std::span<const model::DefinitionId>) { throw std::runtime_error("eroare de test"); });
+    const std::size_t steps = withStack.undoCount();
+    CHECK_FALSE(withStack.run("Push/Pull",
+        [&](Model& m) { geom::pushPull(m.mesh(a), faceWithNormal(m.mesh(a), { 0, 1, 0 }), 50.0); }));
+    CHECK(withStack.lastError() == "eroare de test");
+    CHECK(withStack.undoCount() == steps);
+    CHECK(with.sameAs(snapshot));
 }

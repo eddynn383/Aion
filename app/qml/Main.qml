@@ -357,6 +357,7 @@ Window {
         case "view.progressiveAA": preferences.progressiveAA = !preferences.progressiveAA; break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
+        case "debug.board": console.log("board:", JSON.stringify(doc.entityInfo.board ?? null)); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
         case "view.front": viewport.setStandardView(Viewport.Front); break

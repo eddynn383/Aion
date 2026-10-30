@@ -81,8 +81,9 @@ ScriptApi::ScriptApi(Document* document, QObject* parent)
 
 void ScriptApi::log(const QJSValue& value)
 {
-    emit output(value.isObject() && !value.isCallable() ? QString::fromUtf8(QJsonDocument::fromVariant(value.toVariant()).toJson(QJsonDocument::Compact))
-                                                       : value.toString());
+    emit output(value.isObject() && !value.isCallable()
+            ? QString::fromUtf8(QJsonDocument::fromVariant(value.toVariant()).toJson(QJsonDocument::Compact))
+            : value.toString());
 }
 
 void ScriptApi::message(const QString& text)
@@ -90,37 +91,45 @@ void ScriptApi::message(const QString& text)
     emit messageRequested(text);
 }
 
-double ScriptApi::box(double x, double y, double z, double width, double depth, double height, const QString& name)
+double ScriptApi::box(
+    double x, double y, double z, double width, double depth, double height, const QString& name)
 {
-    return m_document ? m_document->createPrimitive(QStringLiteral("box"), QVector3D(float(x), float(y), float(z)),
-                            QVector3D(float(width), float(depth), float(height)), name)
-                      : 0.0;
+    return m_document
+        ? m_document->createPrimitive(QStringLiteral("box"), QVector3D(float(x), float(y), float(z)),
+              QVector3D(float(width), float(depth), float(height)), name)
+        : 0.0;
 }
 
 double ScriptApi::cylinder(double x, double y, double z, double diameter, double height, const QString& name)
 {
-    return m_document ? m_document->createPrimitive(QStringLiteral("cylinder"), QVector3D(float(x), float(y), float(z)),
-                            QVector3D(float(diameter), float(diameter), float(height)), name)
-                      : 0.0;
+    return m_document
+        ? m_document->createPrimitive(QStringLiteral("cylinder"), QVector3D(float(x), float(y), float(z)),
+              QVector3D(float(diameter), float(diameter), float(height)), name)
+        : 0.0;
 }
 
 double ScriptApi::cone(double x, double y, double z, double diameter, double height, const QString& name)
 {
-    return m_document ? m_document->createPrimitive(QStringLiteral("cone"), QVector3D(float(x), float(y), float(z)),
-                            QVector3D(float(diameter), float(diameter), float(height)), name)
-                      : 0.0;
+    return m_document
+        ? m_document->createPrimitive(QStringLiteral("cone"), QVector3D(float(x), float(y), float(z)),
+              QVector3D(float(diameter), float(diameter), float(height)), name)
+        : 0.0;
 }
 
 double ScriptApi::sphere(double x, double y, double z, double diameter, const QString& name)
 {
-    return m_document ? m_document->createPrimitive(QStringLiteral("sphere"), QVector3D(float(x), float(y), float(z)),
-                            QVector3D(float(diameter), float(diameter), float(diameter)), name)
-                      : 0.0;
+    return m_document
+        ? m_document->createPrimitive(QStringLiteral("sphere"), QVector3D(float(x), float(y), float(z)),
+              QVector3D(float(diameter), float(diameter), float(diameter)), name)
+        : 0.0;
 }
 
-double ScriptApi::object(const QString& generator, const QVariantMap& parameters, double x, double y, double z)
+double ScriptApi::object(
+    const QString& generator, const QVariantMap& parameters, double x, double y, double z)
 {
-    return m_document ? m_document->createParametricAtCorner(generator, QVector3D(float(x), float(y), float(z)), parameters) : 0.0;
+    return m_document
+        ? m_document->createParametricAtCorner(generator, QVector3D(float(x), float(y), float(z)), parameters)
+        : 0.0;
 }
 
 bool ScriptApi::place(double id, const QVariantMap& placement)
@@ -171,6 +180,24 @@ bool ScriptApi::line(const QVariantList& from, const QVariantList& to)
 bool ScriptApi::face(const QVariantList& points)
 {
     return m_document && m_document->drawFace(points);
+}
+
+double ScriptApi::board(
+    const QString& type, double thickness, double length, double width, double x, double y, double z)
+{
+    return m_document
+        ? m_document->createBoardAt(type, thickness, length, width, QVector3D(float(x), float(y), float(z)))
+        : 0.0;
+}
+
+bool ScriptApi::setBoardValue(double id, const QString& key, const QVariant& value)
+{
+    if (!m_document) {
+        return false;
+    }
+    m_document->selectInstances({ id });
+    m_document->setBoardValue(key, value);
+    return true;
 }
 
 QVariantMap ScriptApi::cutList(const QVariantMap& options) const
@@ -225,10 +252,14 @@ void ScriptEngine::setDocument(Document* document)
 
 QVariantList ScriptEngine::examples() const
 {
-    return { QVariantMap { { QStringLiteral("name"), QStringLiteral("Scară în spirală") }, { QStringLiteral("code"), QString::fromUtf8(kSpiral) } },
-        QVariantMap { { QStringLiteral("name"), QStringLiteral("Gard") }, { QStringLiteral("code"), QString::fromUtf8(kFence) } },
-        QVariantMap { { QStringLiteral("name"), QStringLiteral("Perete de biblioteci") }, { QStringLiteral("code"), QString::fromUtf8(kShelves) } },
-        QVariantMap { { QStringLiteral("name"), QStringLiteral("Grilă de cuburi colorate") }, { QStringLiteral("code"), QString::fromUtf8(kGrid) } } };
+    return { QVariantMap { { QStringLiteral("name"), QStringLiteral("Scară în spirală") },
+                 { QStringLiteral("code"), QString::fromUtf8(kSpiral) } },
+        QVariantMap { { QStringLiteral("name"), QStringLiteral("Gard") },
+            { QStringLiteral("code"), QString::fromUtf8(kFence) } },
+        QVariantMap { { QStringLiteral("name"), QStringLiteral("Perete de biblioteci") },
+            { QStringLiteral("code"), QString::fromUtf8(kShelves) } },
+        QVariantMap { { QStringLiteral("name"), QStringLiteral("Grilă de cuburi colorate") },
+            { QStringLiteral("code"), QString::fromUtf8(kGrid) } } };
 }
 
 QVariantMap ScriptEngine::run(const QString& code, const QString& name)
@@ -247,12 +278,15 @@ QVariantMap ScriptEngine::run(const QString& code, const QString& name)
     connect(&api, &ScriptApi::messageRequested, this, &ScriptEngine::messageRequested);
     connect(&api, &ScriptApi::commandRequested, this, &ScriptEngine::commandRequested);
     engine.globalObject().setProperty(QStringLiteral("aion"), engine.newQObject(&api));
-    // print(...) = aion.log(...); Qt.hsla și altele din obiectul Qt nu există în QJSEngine: le dăm pe cele utile.
-    engine.evaluate(QStringLiteral("var print = function() { aion.log(Array.prototype.join.call(arguments, ' ')); };"
-                                   "var Qt = { hsla: function(h, s, l, a) { "
-                                   "  const f = function(n) { const k = (n + h * 12) % 12; const v = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));"
-                                   "    return ('0' + Math.round(v * 255).toString(16)).slice(-2); };"
-                                   "  return { toString: function() { return '#' + f(0) + f(8) + f(4); } }; } };"));
+    // print(...) = aion.log(...); Qt.hsla și altele din obiectul Qt nu există în QJSEngine: le dăm pe cele
+    // utile.
+    engine.evaluate(
+        QStringLiteral("var print = function() { aion.log(Array.prototype.join.call(arguments, ' ')); };"
+                       "var Qt = { hsla: function(h, s, l, a) { "
+                       "  const f = function(n) { const k = (n + h * 12) % 12; const v = l - s * Math.min(l, "
+                       "1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));"
+                       "    return ('0' + Math.round(v * 255).toString(16)).slice(-2); };"
+                       "  return { toString: function() { return '#' + f(0) + f(8) + f(4); } }; } };"));
 
     // Limita de timp: un script blocat (buclă infinită) se oprește după 15 s.
     std::mutex mutex;
@@ -277,8 +311,9 @@ QVariantMap ScriptEngine::run(const QString& code, const QString& name)
     const bool ok = !value.isError() && !engine.hasError() && !engine.isInterrupted();
     m_document->endMacro(ok);
     if (!ok) {
-        const QString message = engine.isInterrupted() ? QStringLiteral("Scriptul a fost oprit (a durat peste 15 s).")
-                                                        : value.property(QStringLiteral("message")).toString();
+        const QString message = engine.isInterrupted()
+            ? QStringLiteral("Scriptul a fost oprit (a durat peste 15 s).")
+            : value.property(QStringLiteral("message")).toString();
         result[QStringLiteral("error")] = message.isEmpty() ? value.toString() : message;
         result[QStringLiteral("line")] = value.property(QStringLiteral("lineNumber")).toInt();
     } else if (!value.isUndefined()) {
@@ -291,7 +326,8 @@ QVariantMap ScriptEngine::run(const QString& code, const QString& name)
 
 QString ScriptEngine::pluginFolder() const
 {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/Plugins");
+    const QString dir
+        = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/Plugins");
     QDir().mkpath(dir);
     return dir;
 }
@@ -309,7 +345,9 @@ void ScriptEngine::reloadPlugins()
         QVariantList commands;
         for (const QJsonValue& c : m.value(QStringLiteral("commands")).toArray()) {
             const QJsonObject command = c.toObject();
-            commands.append(QVariantMap { { QStringLiteral("id"), entry + QLatin1Char('/') + command.value(QStringLiteral("function")).toString() },
+            commands.append(QVariantMap {
+                { QStringLiteral("id"),
+                    entry + QLatin1Char('/') + command.value(QStringLiteral("function")).toString() },
                 { QStringLiteral("title"), command.value(QStringLiteral("title")).toString() } });
         }
         m_plugins.append(QVariantMap { { QStringLiteral("id"), entry },
@@ -327,7 +365,8 @@ QVariantMap ScriptEngine::runPluginCommand(const QString& commandId)
     const QString function = commandId.section(QLatin1Char('/'), 1);
     QFile file(QDir(pluginFolder()).filePath(plugin + QStringLiteral("/main.js")));
     if (!file.open(QIODevice::ReadOnly)) {
-        return { { QStringLiteral("ok"), false }, { QStringLiteral("error"), QStringLiteral("Plugin-ul nu are main.js.") } };
+        return { { QStringLiteral("ok"), false },
+            { QStringLiteral("error"), QStringLiteral("Plugin-ul nu are main.js.") } };
     }
     QString title = function;
     for (const QVariant& p : m_plugins) {
@@ -337,7 +376,8 @@ QVariantMap ScriptEngine::runPluginCommand(const QString& commandId)
             }
         }
     }
-    return run(QString::fromUtf8(file.readAll()) + QStringLiteral("\n;") + function + QStringLiteral("();"), title);
+    return run(
+        QString::fromUtf8(file.readAll()) + QStringLiteral("\n;") + function + QStringLiteral("();"), title);
 }
 
 } // namespace aion::render

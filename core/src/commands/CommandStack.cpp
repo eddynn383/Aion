@@ -65,6 +65,19 @@ void CommandStack::beginTransaction(std::string name)
 bool CommandStack::commit()
 {
     assert(inTransaction());
+    m_lastError.clear();
+    if (m_model && m_finalizer) {
+        try {
+            const std::vector<model::DefinitionId> changed = m_model->definitionsWithMeshChanges();
+            if (!changed.empty()) {
+                m_finalizer(*m_model, changed);
+            }
+        } catch (const std::exception& e) {
+            m_lastError = e.what();
+            abort();
+            return false;
+        }
+    }
     std::string name = std::move(*m_transactionName);
     m_transactionName.reset();
     std::unique_ptr<Command> command;

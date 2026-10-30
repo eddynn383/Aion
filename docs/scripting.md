@@ -26,6 +26,8 @@ Aion rulează JavaScript (motorul QJSEngine din Qt, la fel pe macOS, Windows și
 | `face([[x, y, z], …])` | O față plană din puncte (ca un poligon desenat). |
 | `objects()` | Obiectele din context: `{ id, name, x, y, z, width, depth, height }`. |
 | `cutList(options)` | Lista de debitare (doar citire): `{ parts, sheets, bands, hardware, hiddenPieces }`; `options` ca în fereastră (`excluded`, `cutDimensions`, `sheetLength`…). |
+| `board(type, thickness, length, width, x, y, z)` | O placă parametrică (`"pal"`, `"mdf"`, `"hdf"`, `"plywood"`, `"solid"`) cu colțul minim în (x, y, z); întoarce id-ul (0 la un tip necunoscut). |
+| `setBoardValue(id, key, value)` | Schimbă `"length"`, `"width"`, `"thickness"` sau `"type"` pe placa `id`. |
 | `selection()` / `select([id…])` | Obiectele selectate / selectează. |
 | `command(id)` | O comandă din palette (de exemplu `"view.top"`, `"view.extents"`). |
 | `message(text)` | Un mesaj scurt (toast). |

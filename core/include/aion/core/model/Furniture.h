@@ -14,8 +14,9 @@ namespace aion::model {
 
 enum class Unit { SquareMeters, LinearMeters, Piece, Pair };
 
-// Un tip de placă: grosimile permise, formatul plăcii brute (0 = fără, de exemplu lemnul masiv), fibra și dacă merge la
-// firma de debitare. Valori provizorii, de verificat la testare (docs/plans/mobilier-de-verificat.md).
+// Un tip de placă: grosimile permise, formatul plăcii brute (0 = fără, de exemplu lemnul masiv), fibra și
+// dacă merge la firma de debitare. Valori provizorii, de verificat la testare
+// (docs/plans/mobilier-de-verificat.md).
 struct BoardType {
     std::string key;
     std::string label;
@@ -28,7 +29,8 @@ struct BoardType {
     Unit unit = Unit::SquareMeters;
 };
 
-// Un tip de cant: grosimea, tipurile de placă pe care se pune și dacă grosimea lui se scade din dimensiunea de tăiere.
+// Un tip de cant: grosimea, tipurile de placă pe care se pune și dacă grosimea lui se scade din dimensiunea
+// de tăiere.
 struct BandType {
     std::string key;
     std::string label;
@@ -37,8 +39,8 @@ struct BandType {
     bool deduct = true;
 };
 
-// Un tip de feronerie, cu forma simplă (o cutie) folosită în model: lungime (X) × lățime (Y) × înălțime (Z), cu baza
-// centrată în origine.
+// Un tip de feronerie, cu forma simplă (o cutie) folosită în model: lungime (X) × lățime (Y) × înălțime (Z),
+// cu baza centrată în origine.
 struct HardwareType {
     std::string key;
     std::string label;
@@ -55,44 +57,92 @@ struct HardwareType {
 // Cantul se poate pune pe tipul de placă dat.
 [[nodiscard]] bool bandFitsBoard(std::string_view bandKey, std::string_view boardTypeKey);
 
-// Grosimea permisă cea mai apropiată de `value` pentru tipul de placă; la egalitate, cea mai mare. `value` dacă tipul
-// nu există.
+// Grosimea permisă cea mai apropiată de `value` pentru tipul de placă; la egalitate, cea mai mare. `value`
+// dacă tipul nu există.
 [[nodiscard]] double nearestThickness(std::string_view boardTypeKey, double value);
 
-// O bucată de feronerie nouă în `context` (o definiție proprie, cu PartSpec de feronerie și forma tipului). Întoarce
-// instanța (nulă dacă tipul nu există).
-InstanceId createHardware(Model& model, DefinitionId context, std::string_view typeKey, const math::Transform& placement);
+// O bucată de feronerie nouă în `context` (o definiție proprie, cu PartSpec de feronerie și forma tipului).
+// Întoarce instanța (nulă dacă tipul nu există).
+InstanceId createHardware(
+    Model& model, DefinitionId context, std::string_view typeKey, const math::Transform& placement);
 
-// Dimensiunile unei piese (mm), măsurate pe geometria proprie a definiției (fără sub-piese), cu transformarea dată
-// (scările se înmulțesc). O placă (PartSpec de placă): grosimea pe axa grosimii, lungimea pe axa fibrei (chiar dacă e
-// latura mai scurtă). Fără PartSpec: regula din ADR 0017 (fața cea mai mare: grosimea pe normala ei, lungimea =
-// latura mai lungă).
+// Dimensiunile unei piese (mm), măsurate pe geometria proprie a definiției (fără sub-piese), cu transformarea
+// dată (scările se înmulțesc). O placă (PartSpec de placă): grosimea pe axa grosimii, lungimea pe axa fibrei
+// (chiar dacă e latura mai scurtă). Fără PartSpec: regula din ADR 0017 (fața cea mai mare: grosimea pe
+// normala ei, lungimea = latura mai lungă).
 struct PartMeasure {
     double length = 0.0;
     double width = 0.0;
     double thickness = 0.0;
     bool box = false; // o cutie simplă: 6 fețe, 8 vârfuri, toate în colțurile cutiei
     bool extraShells = false; // vârfuri în interiorul cutiei (geometrie desenată în piesă)
-    // Plăcile: axele locale ale lungimii și lățimii (pentru numele laturilor de cant); -1 pentru piesele fără date.
+    // Plăcile: axele locale ale lungimii și lățimii (pentru numele laturilor de cant); -1 pentru piesele fără
+    // date.
     int lengthAxis = -1;
     int widthAxis = -1;
 };
 
-// Indicii din `PartSpec::bands` pentru laturile L1, L2, W1, W2 ale unei plăci măsurate (docs/plans/mobilier-pe-corp.md,
-// §5): U, V = axele locale diferite de axa grosimii, crescător; bands = −V, +V, −U, +U.
+// Indicii din `PartSpec::bands` pentru laturile L1, L2, W1, W2 ale unei plăci măsurate
+// (docs/plans/mobilier-pe-corp.md, §5): U, V = axele locale diferite de axa grosimii, crescător; bands = −V,
+// +V, −U, +U.
 [[nodiscard]] std::array<int, 4> bandSlots(const PartSpec& part, const PartMeasure& measure);
-[[nodiscard]] PartMeasure measurePart(const Model& model, DefinitionId definition, const math::Transform& toWorld);
+[[nodiscard]] PartMeasure measurePart(
+    const Model& model, DefinitionId definition, const math::Transform& toWorld);
 
 // Geometria e o cutie simplă aliniată la axele definiției (6 fețe, 8 vârfuri în colțurile cutiei).
 [[nodiscard]] bool isSimpleBox(const geom::Mesh& mesh);
 
-// „Fă placă”: pune PartSpec de placă pe definiția obiectului (axa grosimii = dimensiunea cea mai mică, fibra = cea mai
-// lungă dintre celelalte două, grosimea nominală = cea permisă cea mai apropiată). Refuză (false) un obiect fără fețe
-// proprii sau cu sub-piese.
+// „Fă placă”: pune PartSpec de placă pe definiția obiectului (axa grosimii = dimensiunea cea mai mică, fibra
+// = cea mai lungă dintre celelalte două, grosimea nominală = cea permisă cea mai apropiată). Refuză (false)
+// un obiect fără fețe proprii sau cu sub-piese.
 bool makeBoard(Model& model, InstanceId instance, std::string_view boardTypeKey = "pal");
 
-// Fișierele dinainte de formatul v6: materialele fără categorie care au numele unui material inclus primesc categoria
-// și cheia lui (ADR 0044).
+// --- Placa parametrică (pasul 5, ADR 0044) ---
+// O placă din bibliotecă: `generator = "board"`, `parameters = {length, width}`, PartSpec cu tipul și
+// grosimea; geometria (o cutie) e în mesh-ul definiției, cu originea în colțul minim, X = lungime, Y =
+// lățime, Z = grosime.
+
+inline constexpr const char* kBoardGenerator = "board";
+
+// O placă nouă în `context`. Întoarce instanța (nulă dacă tipul nu există). Grosimea se aduce la cea permisă.
+InstanceId createBoard(Model& model, DefinitionId context, std::string_view typeKey, double thickness,
+    double length, double width, const math::Transform& placement);
+
+// Reface cutia din parametri și grosimea nominală (decorul e pe instanță, deci rămâne).
+void rebuildBoard(Model& model, DefinitionId definition);
+
+enum class BoardState { Matches, Modified, Detached, NotBoard };
+enum class BoardReason { None, Geometry, Thickness, Scaled, ScaledParent, Children };
+struct BoardStatus {
+    BoardState state = BoardState::NotBoard;
+    BoardReason reason = BoardReason::None;
+};
+// Starea plăcii unei instanțe, cu transformarea ei până la lume (pentru scara părinților). Se calculează, nu
+// se salvează.
+[[nodiscard]] BoardStatus boardState(const Model& model, InstanceId instance, const math::Transform& toWorld);
+
+// Schimbă un parametru al plăcii ("length", "width", "thickness") sau tipul; reface placa și ține pivotul
+// fiecărei instanțe pe loc în lume (DS-1). False dacă definiția nu e o placă parametrică.
+bool setBoardValue(Model& model, DefinitionId definition, std::string_view key, double value);
+bool setBoardType(Model& model, DefinitionId definition, std::string_view typeKey);
+
+// Mută originea definiției cu `d` (în coordonatele ei): vârfurile cu −d, iar instanțele, pivoții explicați,
+// scenele, ancorele căilor, cotele și curbele Pen se compensează, ca nimic să nu se miște în lume.
+void shiftBoardOrigin(Model& model, DefinitionId definition, const math::Vec3d& d);
+
+// După un Push/Pull pe un capăt: dacă placa e încă o cutie cu grosimea nominală, dimensiunile intră în
+// parametri (D20). Nimic dacă e deja în acord. Întoarce true dacă a schimbat ceva.
+bool adoptBoardGeometry(Model& model, DefinitionId definition);
+// Finalizatorul din CommandStack: adoptBoardGeometry pe plăcile atinse.
+void finalizeBoards(Model& model, std::span<const DefinitionId> changed);
+
+// „Readu la parametri”: reface cutia și aduce |scara| instanței la 1 (semnul rămâne), cu pivotul pe loc.
+void restoreBoard(Model& model, InstanceId instance);
+// „Desprinde de parametri”: placa rămâne o cutie cu PartSpec, măsurată din geometrie.
+void detachBoard(Model& model, DefinitionId definition);
+
+// Fișierele dinainte de formatul v6: materialele fără categorie care au numele unui material inclus primesc
+// categoria și cheia lui (ADR 0044).
 void backfillMaterials(Model& model);
 
 } // namespace aion::model

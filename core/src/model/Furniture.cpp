@@ -1,5 +1,7 @@
 #include "aion/core/model/Furniture.h"
 
+#include "aion/core/geom/Bezier.h"
+#include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Primitives.h"
 #include "aion/core/math/Tolerance.h"
 #include "aion/core/model/MaterialLibrary.h"
@@ -10,6 +12,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <set>
 
 namespace aion::model {
 
@@ -20,7 +23,8 @@ std::span<const BoardType> boardTypes()
         { "mdf", "MDF", { 16.0, 18.0, 19.0, 22.0 }, 18.0, 2800.0, 2070.0, false, true, Unit::SquareMeters },
         { "hdf", "HDF", { 3.0, 4.0 }, 3.0, 2800.0, 2070.0, false, true, Unit::SquareMeters },
         { "plywood", "Placaj", { 12.0, 15.0, 18.0 }, 18.0, 2500.0, 1250.0, true, true, Unit::SquareMeters },
-        { "solid", "Lemn masiv", { 18.0, 20.0, 26.0, 40.0 }, 20.0, 0.0, 0.0, true, false, Unit::LinearMeters },
+        { "solid", "Lemn masiv", { 18.0, 20.0, 26.0, 40.0 }, 20.0, 0.0, 0.0, true, false,
+            Unit::LinearMeters },
     } };
     return kTypes;
 }
@@ -48,12 +52,13 @@ std::span<const HardwareType> hardwareTypes()
         for (const auto& [kind, label] : hinges) {
             for (const int angle : { 110, 165 }) {
                 types.push_back({ std::string("hinge.") + kind + "." + std::to_string(angle),
-                    std::string("Balama ") + label + " " + std::to_string(angle) + "°", Unit::Piece, { 50.0, 35.0, 12.0 } });
+                    std::string("Balama ") + label + " " + std::to_string(angle) + "°", Unit::Piece,
+                    { 50.0, 35.0, 12.0 } });
             }
         }
         for (int length = 300; length <= 600; length += 50) {
-            types.push_back({ "slide." + std::to_string(length), "Glisieră " + std::to_string(length) + " mm", Unit::Pair,
-                { static_cast<double>(length), 12.0, 45.0 } });
+            types.push_back({ "slide." + std::to_string(length), "Glisieră " + std::to_string(length) + " mm",
+                Unit::Pair, { static_cast<double>(length), 12.0, 45.0 } });
         }
         types.push_back({ "handle.128", "Mâner 128 mm", Unit::Piece, { 20.0, 30.0, 140.0 } });
         return types;
@@ -63,8 +68,7 @@ std::span<const HardwareType> hardwareTypes()
 
 namespace {
 
-template <class T>
-const T* findByKey(std::span<const T> items, std::string_view key)
+template <class T> const T* findByKey(std::span<const T> items, std::string_view key)
 {
     const auto it = std::find_if(items.begin(), items.end(), [&](const T& t) { return t.key == key; });
     return it == items.end() ? nullptr : &*it;
@@ -91,7 +95,8 @@ bool bandFitsBoard(std::string_view bandKey, std::string_view boardTypeKey)
 {
     const BandType* band = findBandType(bandKey);
     return band != nullptr
-        && std::find(band->boardTypes.begin(), band->boardTypes.end(), boardTypeKey) != band->boardTypes.end();
+        && std::find(band->boardTypes.begin(), band->boardTypes.end(), boardTypeKey)
+        != band->boardTypes.end();
 }
 
 double nearestThickness(std::string_view boardTypeKey, double value)
@@ -111,7 +116,8 @@ double nearestThickness(std::string_view boardTypeKey, double value)
     return best;
 }
 
-InstanceId createHardware(Model& model, DefinitionId context, std::string_view typeKey, const math::Transform& placement)
+InstanceId createHardware(
+    Model& model, DefinitionId context, std::string_view typeKey, const math::Transform& placement)
 {
     const HardwareType* type = findHardwareType(typeKey);
     if (type == nullptr) {
@@ -171,8 +177,8 @@ bool onBoundary(const LocalBox& box, const math::Vec3d& p)
     return false;
 }
 
-// Regula din ADR 0017 pentru piesele fără date: fața cea mai mare dă normala (grosimea), cea mai lungă muchie a ei
-// dă direcția lungimii; lungimea e latura mai lungă.
+// Regula din ADR 0017 pentru piesele fără date: fața cea mai mare dă normala (grosimea), cea mai lungă muchie
+// a ei dă direcția lungimii; lungimea e latura mai lungă.
 PartMeasure measureByLargestFace(const geom::Mesh& mesh, const math::Transform& t)
 {
     PartMeasure m;
@@ -324,10 +330,368 @@ bool makeBoard(Model& model, InstanceId instance, std::string_view boardTypeKey)
     part.typeKey = std::string(boardTypeKey);
     part.nominalThickness = nearestThickness(boardTypeKey, extent[thick]);
     part.thicknessAxis = static_cast<std::uint8_t>(thick);
-    part.grainAxis = findBoardType(boardTypeKey)->grain ? static_cast<std::uint8_t>(grain) : PartSpec::kNoGrain;
+    part.grainAxis
+        = findBoardType(boardTypeKey)->grain ? static_cast<std::uint8_t>(grain) : PartSpec::kNoGrain;
     def.part = part;
     model.setDefinition(d, def);
     return true;
+}
+
+namespace {
+
+void clearMesh(geom::Mesh& mesh)
+{
+    for (geom::FaceId f : std::vector(mesh.faces().keys())) {
+        mesh.removeFace(f);
+    }
+    for (geom::EdgeId e : std::vector(mesh.edges().keys())) {
+        mesh.removeEdge(e);
+    }
+    for (geom::VertexId v : std::vector(mesh.vertices().keys())) {
+        mesh.removeVertex(v);
+    }
+}
+
+// Cutia L × W × T cu colțul minim în origine.
+void buildBox(geom::Mesh& mesh, const math::Vec3d& size)
+{
+    geom::buildPrimitive(mesh, geom::Primitive::Box, size, 4);
+    std::set<geom::VertexId> all(mesh.vertices().keys().begin(), mesh.vertices().keys().end());
+    geom::transformVertices(mesh, all, math::Transform::translation({ size.x / 2, size.y / 2, 0.0 }));
+}
+
+bool isBoard(const Definition& def)
+{
+    return def.generator == kBoardGenerator && def.part && def.part->kind == PartSpec::Kind::Board;
+}
+
+math::Vec3d boardSize(const Definition& def)
+{
+    const auto get = [&](const char* key, double fallback) {
+        const auto it = def.parameters.find(key);
+        return it != def.parameters.end() ? it->second : fallback;
+    };
+    return { get("length", 600.0), get("width", 400.0), def.part ? def.part->nominalThickness : 18.0 };
+}
+
+// Pivotul local al unei instanțe: cel explicit sau centrul cutiei `size`.
+math::Vec3d localPivot(const Instance& inst, const math::Vec3d& size)
+{
+    return inst.pivot ? *inst.pivot : size * 0.5;
+}
+
+math::Vec3d column(const math::Transform& t, int i)
+{
+    return math::Vec3d(t.matrix()[i]);
+}
+
+} // namespace
+
+InstanceId createBoard(Model& model, DefinitionId context, std::string_view typeKey, double thickness,
+    double length, double width, const math::Transform& placement)
+{
+    const BoardType* type = findBoardType(typeKey);
+    if (type == nullptr) {
+        return {};
+    }
+    Definition def { type->label, false };
+    def.shape = "box";
+    def.generator = kBoardGenerator;
+    def.parameters = { { "length", std::max(1.0, length) }, { "width", std::max(1.0, width) } };
+    PartSpec part;
+    part.typeKey = type->key;
+    part.nominalThickness = nearestThickness(type->key, thickness);
+    part.thicknessAxis = 2;
+    part.grainAxis = 0;
+    def.part = part;
+    const DefinitionId d = model.addDefinition(def);
+    rebuildBoard(model, d);
+    Instance inst;
+    inst.parent = context;
+    inst.definition = d;
+    inst.transform = placement;
+    inst.nameKey = "part.board";
+    return model.addInstance(inst);
+}
+
+void rebuildBoard(Model& model, DefinitionId definition)
+{
+    const Definition& def = model.definition(definition);
+    if (!isBoard(def)) {
+        return;
+    }
+    geom::Mesh& mesh = model.mesh(definition);
+    clearMesh(mesh);
+    buildBox(mesh, boardSize(def));
+}
+
+BoardStatus boardState(const Model& model, InstanceId instance, const math::Transform& toWorld)
+{
+    const Definition& def = model.definition(model.instance(instance).definition);
+    BoardStatus status;
+    if (!def.part || def.part->kind != PartSpec::Kind::Board) {
+        return status;
+    }
+    if (def.generator != kBoardGenerator) {
+        status.state = BoardState::Detached;
+        return status;
+    }
+    status.state = BoardState::Modified;
+    const DefinitionId d = model.instance(instance).definition;
+    if (!model.childrenOf(d).empty()) {
+        status.reason = BoardReason::Children;
+        return status;
+    }
+    const geom::Mesh& mesh = model.mesh(d);
+    const math::Vec3d size = boardSize(def);
+    constexpr double kTol = 0.01;
+    if (!isSimpleBox(mesh)) {
+        status.reason = BoardReason::Geometry;
+        return status;
+    }
+    const LocalBox box = localBox(mesh);
+    const math::Vec3d extent = box.hi - box.lo;
+    if (std::abs(extent.z - size.z) > kTol) {
+        status.reason = BoardReason::Thickness;
+        return status;
+    }
+    if (glm::length(box.lo) > kTol || std::abs(extent.x - size.x) > kTol
+        || std::abs(extent.y - size.y) > kTol) {
+        status.reason = BoardReason::Geometry;
+        return status;
+    }
+    const auto orthonormal = [](const math::Transform& t) {
+        for (int i = 0; i < 3; ++i) {
+            if (std::abs(glm::length(column(t, i)) - 1.0) > 1e-6) {
+                return false;
+            }
+            for (int j = i + 1; j < 3; ++j) {
+                if (std::abs(glm::dot(column(t, i), column(t, j))) > 1e-6) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    if (!orthonormal(model.instance(instance).transform)) {
+        status.reason = BoardReason::Scaled;
+        return status;
+    }
+    if (!orthonormal(toWorld)) {
+        status.reason = BoardReason::ScaledParent;
+        return status;
+    }
+    status.state = BoardState::Matches;
+    return status;
+}
+
+void shiftBoardOrigin(Model& model, DefinitionId definition, const math::Vec3d& d)
+{
+    if (glm::length(d) <= tol::kLength) {
+        return;
+    }
+    geom::Mesh& mesh = model.mesh(definition);
+    std::set<geom::VertexId> all(mesh.vertices().keys().begin(), mesh.vertices().keys().end());
+    geom::transformVertices(mesh, all, math::Transform::translation(-d));
+    const math::Transform toOld = math::Transform::translation(d); // coordonatele noi → cele vechi
+    const std::vector<InstanceId> users = model.instancesOf(definition);
+    for (InstanceId id : users) {
+        Instance inst = model.instance(id);
+        inst.transform = inst.transform * toOld;
+        if (inst.pivot) {
+            inst.pivot = *inst.pivot - d; // scris direct: cheile de animație rămân valabile
+        }
+        model.setInstance(id, inst);
+    }
+    const std::set<InstanceId> userSet(users.begin(), users.end());
+    for (std::size_t i = 0; i < model.scenes().size(); ++i) {
+        Scene scene = model.scenes().values()[i];
+        bool changed = false;
+        for (auto& [id, t] : scene.transforms) {
+            if (userSet.contains(id)) {
+                t = t * toOld;
+                changed = true;
+            }
+        }
+        if (changed) {
+            model.setScene(model.scenes().keys()[i], scene);
+        }
+    }
+    for (std::size_t i = 0; i < model.motionPaths().size(); ++i) {
+        MotionPath path = model.motionPaths().values()[i];
+        bool changed = false;
+        for (PathAnchor& a : path.anchors) {
+            if (userSet.contains(a.instance)) {
+                a.before = a.before * toOld;
+                changed = true;
+            }
+        }
+        if (changed) {
+            model.setMotionPath(model.motionPaths().keys()[i], path);
+        }
+    }
+    const math::Transform back = math::Transform::translation(-d);
+    for (std::size_t i = 0; i < model.annotations().size(); ++i) {
+        Annotation a = model.annotations().values()[i];
+        if (a.context == definition) {
+            a.a -= d;
+            a.b -= d;
+            model.setAnnotation(model.annotations().keys()[i], a);
+        }
+    }
+    for (std::size_t i = 0; i < model.penCurves().size(); ++i) {
+        PenCurve c = model.penCurves().values()[i];
+        if (c.definition == definition) {
+            c.path = geom::transformed(c.path, back);
+            model.setPenCurve(model.penCurves().keys()[i], c);
+        }
+    }
+    std::vector<std::pair<GuideId, Guide>> guides;
+    for (std::size_t i = 0; i < model.guides().size(); ++i) {
+        if (model.guides().values()[i].context == definition) {
+            guides.emplace_back(model.guides().keys()[i], model.guides().values()[i]);
+        }
+    }
+    for (auto& [id, g] : guides) {
+        model.removeGuide(id);
+        g.point -= d;
+        model.addGuide(g);
+    }
+}
+
+bool setBoardValue(Model& model, DefinitionId definition, std::string_view key, double value)
+{
+    Definition def = model.definition(definition);
+    if (!isBoard(def)) {
+        return false;
+    }
+    const math::Vec3d before = boardSize(def);
+    if (key == "length" || key == "width") {
+        def.parameters[std::string(key)] = std::max(1.0, value);
+    } else if (key == "thickness") {
+        def.part->nominalThickness = nearestThickness(def.part->typeKey, value);
+    } else {
+        return false;
+    }
+    const math::Vec3d after = boardSize(def);
+    if (glm::length(after - before) <= tol::kLength) {
+        return false;
+    }
+    model.setDefinition(definition, def);
+    rebuildBoard(model, definition);
+    // Pivotul fiecărei instanțe rămâne pe loc în lume; unul explicit își păstrează poziția relativă în cutie.
+    for (InstanceId id : model.instancesOf(definition)) {
+        Instance inst = model.instance(id);
+        const math::Vec3d oldPivot = localPivot(inst, before);
+        const math::Vec3d newPivot = inst.pivot ? oldPivot * (after / before) : after * 0.5;
+        if (inst.pivot) {
+            inst.pivot = newPivot;
+        }
+        const math::Vec3d world = inst.transform.applyToPoint(oldPivot);
+        const math::Vec3d moved = inst.transform.applyToPoint(newPivot);
+        inst.transform = math::Transform::translation(world - moved) * inst.transform;
+        model.setInstance(id, inst);
+    }
+    return true;
+}
+
+bool setBoardType(Model& model, DefinitionId definition, std::string_view typeKey)
+{
+    Definition def = model.definition(definition);
+    const BoardType* type = findBoardType(typeKey);
+    if (!isBoard(def) || type == nullptr || def.part->typeKey == typeKey) {
+        return false;
+    }
+    const double thickness = nearestThickness(typeKey, def.part->nominalThickness);
+    def.part->typeKey = type->key;
+    for (BandSide& side : def.part->bands) {
+        if (!side.bandKey.empty() && !bandFitsBoard(side.bandKey, typeKey)) {
+            side = {};
+        }
+    }
+    def.name = type->label;
+    model.setDefinition(definition, def);
+    if (thickness != def.part->nominalThickness) {
+        setBoardValue(model, definition, "thickness", thickness);
+    }
+    return true;
+}
+
+bool adoptBoardGeometry(Model& model, DefinitionId definition)
+{
+    const Definition& def = model.definition(definition);
+    if (!isBoard(def) || !model.childrenOf(definition).empty()) {
+        return false;
+    }
+    const geom::Mesh& mesh = model.mesh(definition);
+    if (!isSimpleBox(mesh)) {
+        return false;
+    }
+    const LocalBox box = localBox(mesh);
+    const math::Vec3d extent = box.hi - box.lo;
+    const math::Vec3d size = boardSize(def);
+    if (std::abs(extent.z - size.z) > 0.01) {
+        return false; // grosimea nu mai e cea nominală: placa rămâne „modificată manual”
+    }
+    if (std::abs(extent.x - size.x) <= tol::kLength && std::abs(extent.y - size.y) <= tol::kLength
+        && glm::length(box.lo) <= tol::kLength) {
+        return false; // deja în acord
+    }
+    Definition updated = def;
+    updated.parameters["length"] = extent.x;
+    updated.parameters["width"] = extent.y;
+    model.setDefinition(definition, updated);
+    shiftBoardOrigin(model, definition, box.lo);
+    return true;
+}
+
+void finalizeBoards(Model& model, std::span<const DefinitionId> changed)
+{
+    for (DefinitionId d : changed) {
+        if (model.definitions().contains(d) && model.definition(d).generator == kBoardGenerator) {
+            adoptBoardGeometry(model, d);
+        }
+    }
+}
+
+void restoreBoard(Model& model, InstanceId instance)
+{
+    const DefinitionId d = model.instance(instance).definition;
+    const Definition& def = model.definition(d);
+    if (!isBoard(def)) {
+        return;
+    }
+    Instance inst = model.instance(instance);
+    const LocalBox box = localBox(model.mesh(d));
+    const math::Vec3d oldSize = box.empty() ? boardSize(def) : box.hi - box.lo;
+    const math::Vec3d oldPivot
+        = inst.pivot ? *inst.pivot : (box.empty() ? oldSize * 0.5 : (box.lo + box.hi) * 0.5);
+    const math::Vec3d world = inst.transform.applyToPoint(oldPivot);
+    rebuildBoard(model, d);
+    // |scara| → 1, cu semnul păstrat (o oglindire rămâne).
+    math::Mat4d m = inst.transform.matrix();
+    for (int i = 0; i < 3; ++i) {
+        const double len = glm::length(math::Vec3d(m[i]));
+        if (len > 1e-12) {
+            m[i] = math::Mat4d::col_type(math::Vec3d(m[i]) / len, 0.0);
+        }
+    }
+    inst.transform = math::Transform(m);
+    const math::Vec3d newPivot = inst.pivot ? *inst.pivot : boardSize(def) * 0.5;
+    inst.transform
+        = math::Transform::translation(world - inst.transform.applyToPoint(newPivot)) * inst.transform;
+    model.setInstance(instance, inst);
+}
+
+void detachBoard(Model& model, DefinitionId definition)
+{
+    Definition def = model.definition(definition);
+    if (def.generator != kBoardGenerator) {
+        return;
+    }
+    def.generator.clear();
+    def.parameters.clear();
+    model.setDefinition(definition, def);
 }
 
 void backfillMaterials(Model& model)
@@ -338,7 +702,8 @@ void backfillMaterials(Model& model)
         if (!m.category.empty() || !m.libraryKey.empty()) {
             continue;
         }
-        const auto it = std::find_if(library.begin(), library.end(), [&](const Material& l) { return l.name == m.name; });
+        const auto it = std::find_if(
+            library.begin(), library.end(), [&](const Material& l) { return l.name == m.name; });
         if (it != library.end()) {
             m.category = it->category;
             m.libraryKey = it->libraryKey;

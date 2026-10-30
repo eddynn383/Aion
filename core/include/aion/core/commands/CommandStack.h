@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -87,8 +88,7 @@ public:
     void abort();
 
     // Rulează `fn` într-o tranzacție și o încheie.
-    template <class Fn>
-    bool run(std::string name, Fn&& fn)
+    template <class Fn> bool run(std::string name, Fn&& fn)
     {
         beginTransaction(std::move(name));
         if constexpr (std::is_invocable_v<Fn, model::Model&>) {
@@ -112,7 +112,8 @@ public:
     void clear();
     [[nodiscard]] std::size_t undoCount() const { return m_undo.size(); }
 
-    // Starea „salvată”: isClean() e adevărat cât timp istoricul e în punctul marcat (după undo/redo înapoi la el, tot).
+    // Starea „salvată”: isClean() e adevărat cât timp istoricul e în punctul marcat (după undo/redo înapoi la
+    // el, tot).
     void markClean();
     // Documentul are modificări nesalvate chiar fără istoric (de exemplu după o recuperare).
     void markDirty();
@@ -124,6 +125,15 @@ public:
     void setOnInvalid(std::function<void(const geom::ValidationReport&)> handler);
     // Apelat după orice schimbare a istoricului (pentru meniul Edit din UI).
     void setOnChanged(std::function<void()> handler) { m_onChanged = std::move(handler); }
+    // Finalizatorul (ADR 0044): rulat primul în commit(), în aceeași tranzacție, cu definițiile al căror mesh
+    // s-a schimbat (de exemplu ca plăcile să-și preia dimensiunile după Push/Pull). Doar pentru stivele pe
+    // model; nu la push(), undo sau redo. O excepție anulează tranzacția: commit() întoarce false și mesajul
+    // e în lastError().
+    void setFinalizer(std::function<void(model::Model&, std::span<const model::DefinitionId>)> finalizer)
+    {
+        m_finalizer = std::move(finalizer);
+    }
+    [[nodiscard]] const std::string& lastError() const { return m_lastError; }
 
 private:
     void afterChange();
@@ -137,6 +147,8 @@ private:
     std::vector<std::uint64_t> m_undoSerials;
     std::vector<std::uint64_t> m_redoSerials;
     std::uint64_t m_nextSerial = 1;
+    std::function<void(model::Model&, std::span<const model::DefinitionId>)> m_finalizer;
+    std::string m_lastError;
     std::uint64_t m_cleanSerial = 0; // 0 = istoric gol
     std::optional<std::string> m_transactionName;
     bool m_validate;

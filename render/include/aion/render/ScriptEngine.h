@@ -12,9 +12,9 @@ namespace aion::render {
 
 class Document;
 
-// API-ul scripturilor, global `aion` în JavaScript (vezi docs/scripting.md). Coordonatele sunt în mm, în contextul
-// editat; id-urile sunt ale obiectelor (instanțelor). Fiecare funcție modifică documentul prin Document, deci totul
-// intră în pasul de undo al rulării.
+// API-ul scripturilor, global `aion` în JavaScript (vezi docs/scripting.md). Coordonatele sunt în mm, în
+// contextul editat; id-urile sunt ale obiectelor (instanțelor). Fiecare funcție modifică documentul prin
+// Document, deci totul intră în pasul de undo al rulării.
 class ScriptApi : public QObject {
     Q_OBJECT
 public:
@@ -22,23 +22,34 @@ public:
 
     Q_INVOKABLE void log(const QJSValue& value);
     Q_INVOKABLE void message(const QString& text);
-    Q_INVOKABLE double box(double x, double y, double z, double width, double depth, double height, const QString& name = {});
-    Q_INVOKABLE double cylinder(double x, double y, double z, double diameter, double height, const QString& name = {});
-    Q_INVOKABLE double cone(double x, double y, double z, double diameter, double height, const QString& name = {});
+    Q_INVOKABLE double box(
+        double x, double y, double z, double width, double depth, double height, const QString& name = {});
+    Q_INVOKABLE double cylinder(
+        double x, double y, double z, double diameter, double height, const QString& name = {});
+    Q_INVOKABLE double cone(
+        double x, double y, double z, double diameter, double height, const QString& name = {});
     Q_INVOKABLE double sphere(double x, double y, double z, double diameter, const QString& name = {});
-    Q_INVOKABLE double object(const QString& generator, const QVariantMap& parameters, double x, double y, double z);
+    Q_INVOKABLE double object(
+        const QString& generator, const QVariantMap& parameters, double x, double y, double z);
     Q_INVOKABLE bool place(double id, const QVariantMap& placement);
     Q_INVOKABLE bool move(double id, double dx, double dy, double dz);
     // În jurul centrului obiectului sau al punctului `pivot` ([x, y, z]).
-    Q_INVOKABLE bool rotate(double id, double degrees, const QString& axis = QStringLiteral("z"),
-        const QVariantList& pivot = {});
+    Q_INVOKABLE bool rotate(
+        double id, double degrees, const QString& axis = QStringLiteral("z"), const QVariantList& pivot = {});
     Q_INVOKABLE bool remove(double id);
     Q_INVOKABLE bool material(double id, const QString& nameOrColor);
     Q_INVOKABLE bool line(const QVariantList& from, const QVariantList& to);
     Q_INVOKABLE bool face(const QVariantList& points);
     Q_INVOKABLE QVariantList objects() const;
-    // Lista de debitare (ADR 0044), cu aceleași chei ca fereastra: parts, sheets, bands, hardware (doar citire).
+    // Lista de debitare (ADR 0044), cu aceleași chei ca fereastra: parts, sheets, bands, hardware (doar
+    // citire).
     Q_INVOKABLE QVariantMap cutList(const QVariantMap& options = {}) const;
+    // O placă parametrică (ADR 0044): tipul ("pal", "mdf", "hdf", "plywood", "solid"), grosimea, lungimea,
+    // lățimea, colțul minim. Întoarce id-ul obiectului sau 0 la un tip necunoscut.
+    Q_INVOKABLE double board(const QString& type, double thickness, double length, double width,
+        double x = 0.0, double y = 0.0, double z = 0.0);
+    // "length", "width", "thickness" (număr) sau "type" (text) pe placa `id`.
+    Q_INVOKABLE bool setBoardValue(double id, const QString& key, const QVariant& value);
     Q_INVOKABLE QVariantList selection() const;
     Q_INVOKABLE void select(const QVariantList& ids);
     Q_INVOKABLE void command(const QString& id);
