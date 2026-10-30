@@ -108,7 +108,7 @@ struct FaceHit {
 };
 
 // Adâncimea se măsoară pe raza contextului; la egalitate rămâne ctx.mesh (primul strat). `contextPick` primește
-// fața atinsă în ctx.mesh (pentru `Inference::pick`).
+// fața atinsă în ctx.mesh (pentru `Inference::pick`), sau nimic dacă în fața ei e un obiect.
 FaceHit nearestFace(
     const std::vector<detail::Layer>& layers, const math::Ray& ray, Vec2d screen, view::PickResult& contextPick)
 {
@@ -128,6 +128,9 @@ FaceHit nearestFace(
             bestDepth = depth;
             best = { &l, p.face, point, l.normal(l.mesh->face(p.face).plane.normal) };
         }
+    }
+    if (best.hit() && !best.layer->context()) {
+        contextPick = {}; // fața din ctx.mesh (dacă e) e ascunsă de obiect
     }
     return best;
 }
@@ -932,6 +935,12 @@ Inference Engine::inferLocked(const std::vector<detail::Layer>& layers, const vi
         const view::PickResult snap = view::pick(*l.mesh, l.camera, screen, { m_options.pointRadiusPx, -1.0 });
         if (l.context()) {
             out.pick = snap;
+            // În fața unui obiect: rămâne doar un vârf vizibil, fără fața de sub cursor (e a obiectului).
+            if (faceHit.hit() && !faceHit.layer->context()) {
+                const bool shown = snap.kind == view::PickResult::Kind::Vertex && visible(ray, faceHit, snap.point);
+                out.pick = shown ? snap : view::PickResult {};
+                out.pick.face = {};
+            }
         }
         if (snap.kind != view::PickResult::Kind::Vertex) {
             continue;

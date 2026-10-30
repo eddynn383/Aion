@@ -782,3 +782,31 @@ TEST_CASE("Inferență pe obiecte: hover-ul într-o scenă cu 1 000 de obiecte e
     // departe de cursor: ~70 ms în release.
     CHECK(ms < 16.0);
 }
+
+TEST_CASE("Inferență pe obiecte: pick nu numește fața din ctx.mesh ascunsă de un obiect", "[core][inference]")
+{
+    model::Model m;
+    geom::drawPolygon(m.mesh(m.root()), { { 0, -1000, 0 }, { 6000, -1000, 0 }, { 6000, 3000, 0 }, { 0, 3000, 0 } });
+    placeBox(m); // 3000..4000 × 0..1000 × 0..1000, pe sol
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    const auto camera = isoCamera();
+    inference::Engine engine;
+    engine.withScene(&scene);
+
+    // Pe fața de sus a cutiei: solul e în spate, deci pick-ul e gol.
+    auto r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3500, 400, 1000 }), std::nullopt);
+    CHECK(r.kind == Kind::OnFace);
+    CHECK(r.origin == Origin::Object);
+    CHECK_FALSE(r.pick.face);
+    CHECK_FALSE(r.pick.hit());
+    // Pe un colț al cutiei (fără normală), la fel.
+    r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 3000, 0, 1000 }) + Vec2d { 3, 2 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK_FALSE(r.pick.face);
+
+    // Pe sol, lângă cutie: fața din ctx.mesh e cea văzută.
+    r = engine.infer(m.mesh(m.root()), camera, screen(camera, { 1000, 1000, 0 }), std::nullopt);
+    CHECK(r.kind == Kind::OnFace);
+    CHECK(r.pick.face);
+    CHECK(r.face == r.pick.face);
+}

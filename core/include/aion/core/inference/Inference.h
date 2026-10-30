@@ -75,6 +75,7 @@ struct Inference {
     geom::EdgeId edge; // pentru OnEdge, Midpoint, Intersection
     geom::FaceId face; // pentru OnFace
     // ID-urile de mai sus (și `pick`) sunt mereu din mesh-ul contextului; o inferență pe un obiect le are goale.
+    // `pick` e ce se vede din ctx.mesh sub cursor, sau gol: o față din ctx.mesh ascunsă de un obiect nu apare în el.
     Origin origin = Origin::Context;
     model::InstanceId sourceInstance; // pentru Origin::Object: instanța din contextul editat care conține geometria
     std::optional<Vec3d> normal; // normala feței atinse (OnFace sau punct pe o față), în coordonatele contextului

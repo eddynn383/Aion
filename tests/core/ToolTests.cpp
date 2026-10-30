@@ -1789,6 +1789,23 @@ TEST_CASE("Move: vârful capacului unui cilindru, pe care punctele cutiei nu-l o
     CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 })) < 1e-3);
 }
 
+TEST_CASE("Text pe fața unui obiect nu arată aria feței din ctx.mesh de sub el", "[core][tools][snap]")
+{
+    ObjectScene s;
+    s.stack.run("Sol", [](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { -2000, -2000, 0 }, { 4000, -2000, 0 }, { 4000, 4000, 0 }, { -2000, 4000, 0 } });
+    });
+    s.addBox({ 1000, 1000, 0 });
+    s.rebuildScene();
+
+    auto text = tools::makeTool("text");
+    s.click(*text, { 1100, 1150, 1000 }); // fața de sus a cutiei, deasupra solului de 36 m²
+    REQUIRE(s.m.annotations().size() == 1);
+    const model::Annotation& a = s.m.annotations().values().front();
+    CHECK(glm::length(a.a - Vec3d { 1100, 1150, 1000 }) < 1.0);
+    CHECK(a.text == "1100, 1150, 1000");
+}
+
 TEST_CASE("Move fără selecție: obiectul mutat nu se prinde de el însuși", "[core][tools][snap]")
 {
     ObjectScene s;
