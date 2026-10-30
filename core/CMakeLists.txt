@@ -46,6 +46,7 @@ add_library(aion_core STATIC
     src/model/Parametric.cpp
     src/model/Furniture.cpp
     src/model/Carcass.cpp
+    src/model/Stretch.cpp
     src/model/Transfer.cpp
     src/math/Plane.cpp
     src/math/Transform.cpp
@@ -64,6 +65,7 @@ add_library(aion_core STATIC
     src/io/Recovery.cpp
     src/units/Length.cpp
     src/tools/Tools.cpp
+    src/tools/StretchTool.cpp
     src/tools/ToolHelpers.cpp
     src/tools/TransformTools.cpp
     src/tools/ShapeTools.cpp

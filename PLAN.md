@@ -728,7 +728,7 @@ Designul aprobat: [`docs/plans/mobilier-pe-corp.md`](docs/plans/mobilier-pe-corp
 - [x] Pasul 8: legarea componentelor salvate, lista „În model”
 - [x] Pasul 9: feroneria în bibliotecă, variante, deviz
 - [x] Pasul 10: unealta „Placă pe față”
-- [ ] Pasul 11: „Întinde”
+- [x] Pasul 11: „Întinde”
 - [ ] Pasul 12: traducerea (RO, EN complete; DE, PL, IT, FR, ES, PT beta)
 
 **Înghețate în această etapă** (funcționale, reparate, fără funcții noi; primesc doar traducerea): animația,

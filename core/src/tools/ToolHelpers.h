@@ -29,6 +29,7 @@ void updateShiftLock(inference::Engine& engine, bool shift, bool& shiftLock);
 [[nodiscard]] std::unique_ptr<Tool> makePivotTool();
 [[nodiscard]] std::unique_ptr<Tool> makePlaceTool();
 [[nodiscard]] std::unique_ptr<Tool> makeDividerTool();
+[[nodiscard]] std::unique_ptr<Tool> makeStretchTool();
 [[nodiscard]] std::unique_ptr<Tool> makePenTool();
 [[nodiscard]] std::unique_ptr<Tool> makePenEditTool();
 [[nodiscard]] std::unique_ptr<Tool> makeCircleTool();

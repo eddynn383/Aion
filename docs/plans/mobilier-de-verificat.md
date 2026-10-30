@@ -27,3 +27,5 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Mutarea unei piese cu rol în alt părinte (Outliner) | Fără confirmarea „Corpul devine obișnuit” încă (doar Explode și grupările o cer) | Pasul 6 | |
 | „Placă pe față”: ghidul animat | Textul ghidului există; scena animată din ToolDemo lipsește (amânată) | Pasul 10 | |
 | Decorul plăcilor desenate cu „Placă pe față” | Fără decor (Implicit), ca plăcile din scripturi; cele din corpuri primesc „Alb (decor)” | Pasul 10 | |
+| „Întinde”: unde e planul implicit | La mijlocul corpului (un plan) sau la mijlocul a N zone egale („200/2”); planul nu se mută încă cu cursorul | Pasul 11 | |
+| „Întinde”: ghidul animat | Text da, scenă animată nu (amânată) | Pasul 11 | |

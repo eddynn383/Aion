@@ -38,6 +38,13 @@ const guides = {
                 "Tipul și grosimea plăcii noi se aleg în Inspector cât unealta e activă"],
         tip: "Fibra merge pe latura mai lungă; placa apare în lista de debitare"
     },
+    stretch: {
+        title: "Întinde",
+        summary: "Lățește (sau înalță) un corp făcut din plăci: plăcile tăiate de plan se lungesc, cele de dincolo se mută.",
+        steps: ["Click pe o față a corpului: axa e normala ei", "Mișcă mouse-ul pentru distanță și dă click",
+                "Sau tastează 200 (un plan, la mijloc) ori 200/2 (în 2 locuri egale: două uși cresc fiecare cu 100)"],
+        tip: "Un corp din bibliotecă își schimbă doar câmpul; o placă modificată de mână oprește întinderea"
+    },
     circle: {
         title: "Circle",
         summary: "Desenează un cerc (ca poligon cu multe laturi) cu o față în interior.",

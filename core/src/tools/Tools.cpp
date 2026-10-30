@@ -950,6 +950,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "rectangle") {
         return std::make_unique<RectangleTool>();
     }
+    if (id == "stretch") {
+        return makeStretchTool(); // „Întinde” un corp de mobilier
+    }
     if (id == "board") {
         return std::make_unique<RectangleTool>(true); // placă pe față (mobilier)
     }

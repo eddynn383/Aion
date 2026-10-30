@@ -247,7 +247,8 @@ public:
 };
 
 // "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale",
-// "eraser", "board" (placă pe față, mobilier); nullptr pentru o unealtă necunoscută.
+// "eraser", "board" (placă pe față, mobilier), "stretch" (întinde un corp); nullptr pentru o unealtă
+// necunoscută.
 [[nodiscard]] std::unique_ptr<Tool> makeTool(std::string_view id);
 
 // Punctul 3D de sub cursor: pe geometrie dacă există, altfel pe planul solului (Z = 0).
