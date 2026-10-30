@@ -8,15 +8,13 @@
 
 #include <QByteArray>
 #include <QColor>
-#include <QImage>
-
-#include <map>
 #include <QCursor>
 #include <QElapsedTimer>
+#include <QImage>
 #include <QPointF>
 #include <QPointer>
-#include <QRectF>
 #include <QQuickRhiItem>
+#include <QRectF>
 #include <QTimer>
 #include <QVariantList>
 #include <QVector3D>
@@ -26,6 +24,7 @@
 
 #include <atomic>
 #include <deque>
+#include <map>
 #include <memory>
 #include <optional>
 #include <tuple>
@@ -72,6 +71,8 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(bool fog MEMBER m_fog NOTIFY appearanceChanged)
     // Umbrele soarelui, poziționat după oră, lună și latitudine (implicit România, 46° N).
     Q_PROPERTY(bool shadows MEMBER m_shadows NOTIFY appearanceChanged)
+    // Liniile de cant pe laturile plăcilor (mobilier, pasul 7).
+    Q_PROPERTY(bool showBands MEMBER m_showBands NOTIFY appearanceChanged)
     // Mediul de iluminare (lumina ambientală și reflexiile): "simplu", "studio", "exterior", "innorat".
     Q_PROPERTY(QString environment MEMBER m_environment NOTIFY appearanceChanged)
     // Umbrirea ambientală în screen-space (SSAO).
@@ -86,7 +87,8 @@ class Viewport : public QQuickRhiItem {
     // zoom spre suprafața de sub cursor („auto depth”); planurile de tăiere manuale, în mm (0 = automat).
     // Calitatea imaginii (Preferințe → Viewport): eșantioane MSAA (1, 2, 4, 8) și mărimea hărții de umbre.
     // MSAA ales în Preferințe (cât timp camera se mișcă, când antialiasing-ul progresiv e pornit).
-    Q_PROPERTY(int antialiasing READ preferredSamples WRITE setPreferredSamples NOTIFY preferredSamplesChanged)
+    Q_PROPERTY(
+        int antialiasing READ preferredSamples WRITE setPreferredSamples NOTIFY preferredSamplesChanged)
     Q_PROPERTY(int shadowQuality MEMBER m_shadowMapSize NOTIFY appearanceChanged)
     Q_PROPERTY(int orbitPivot READ orbitPivot WRITE setOrbitPivot NOTIFY navigationSettingsChanged)
     Q_PROPERTY(bool zoomToSurface MEMBER m_zoomToSurface NOTIFY navigationSettingsChanged)
@@ -102,7 +104,8 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(bool orthographic READ isOrthographic WRITE setOrthographic NOTIFY projectionChanged)
     Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
     // Unealta de navigare legată de butonul stâng: "" (niciuna), "orbit", "pan" sau "zoom".
-    Q_PROPERTY(QString navigationTool READ navigationTool WRITE setNavigationTool NOTIFY navigationToolChanged)
+    Q_PROPERTY(
+        QString navigationTool READ navigationTool WRITE setNavigationTool NOTIFY navigationToolChanged)
 
     // Baza camerei, pentru gizmo-ul de navigare.
     Q_PROPERTY(QVector3D cameraRight READ cameraRight NOTIFY cameraChanged)
@@ -122,15 +125,17 @@ class Viewport : public QQuickRhiItem {
     Q_PROPERTY(QPointF pointerPosition READ pointerPosition NOTIFY pointerPositionChanged)
     Q_PROPERTY(bool pointerInside READ pointerInside NOTIFY pointerPositionChanged)
 
-    // Vederea prin cameră (plan Animare, secțiunea 9): id-ul camerei-obiect (0 = vederea liberă). Intrarea și ieșirea
-    // sunt un zbor (poza, unghiul, roll-ul, shift-ul); cât timp e activă, vederea urmează camera. Cadrul formatului în
-    // viewport (exteriorul se estompează în QML), opacitatea lui (apare după zbor) și eticheta.
+    // Vederea prin cameră (plan Animare, secțiunea 9): id-ul camerei-obiect (0 = vederea liberă). Intrarea și
+    // ieșirea sunt un zbor (poza, unghiul, roll-ul, shift-ul); cât timp e activă, vederea urmează camera.
+    // Cadrul formatului în viewport (exteriorul se estompează în QML), opacitatea lui (apare după zbor) și
+    // eticheta.
     Q_PROPERTY(double lookThrough READ lookThrough WRITE setLookThrough NOTIFY lookThroughChanged)
     Q_PROPERTY(QRectF lookFrame READ lookFrame NOTIFY lookFrameChanged)
     Q_PROPERTY(double lookFade READ lookFade NOTIFY lookFrameChanged)
     Q_PROPERTY(QString lookLabel READ lookLabel NOTIFY lookFrameChanged)
     // Navigarea (orbit, pan, zoom) mută camera prin care privești; altfel iese din cameră (zbor înapoi).
-    Q_PROPERTY(bool lockCameraToView READ lockCameraToView WRITE setLockCameraToView NOTIFY lookThroughChanged)
+    Q_PROPERTY(
+        bool lockCameraToView READ lockCameraToView WRITE setLockCameraToView NOTIFY lookThroughChanged)
     // Următorul click în viewport alege distanța de focus a camerei selectate (depth of field).
     Q_PROPERTY(bool pickingFocus READ pickingFocus WRITE setPickingFocus NOTIFY pickingFocusChanged)
     // „Adaugă un obiect pe cale”: următorul click pe un obiect îl ancorează pe calea selectată.
@@ -179,7 +184,8 @@ public:
     Q_INVOKABLE bool saveImage(const QString& path);
     // Previzualizarea pentru fișierul .aion: PNG de cel mult 512 px lățime.
     Q_INVOKABLE QByteArray captureThumbnail();
-    // Poziția camerei pentru scene: { tx, ty, tz, yaw, pitch, distance, ortho }; și tranziția animată spre una.
+    // Poziția camerei pentru scene: { tx, ty, tz, yaw, pitch, distance, ortho }; și tranziția animată spre
+    // una.
     Q_INVOKABLE QVariantMap cameraState() const;
     Q_INVOKABLE void animateToCamera(const QVariantMap& state, double seconds = -1.0);
 
@@ -203,7 +209,8 @@ public:
     Q_INVOKABLE void exportScenes(const QVariantList& states, double transition, double delay, bool loop,
         const QString& directory, int fps);
     Q_INVOKABLE void cancelExport();
-    // Randează animația activă din timeline (cu camera ei, dacă are) în PNG-uri; la sfârșit emite animationExported.
+    // Randează animația activă din timeline (cu camera ei, dacă are) în PNG-uri; la sfârșit emite
+    // animationExported.
     Q_INVOKABLE void exportAnimation(const QString& directory, int fps);
     bool scenesPlaying() const { return m_sceneAnimation.has_value() && !m_exporting; }
     int playingScene() const { return m_playingScene; }
@@ -216,13 +223,15 @@ public:
     Q_INVOKABLE void startTurntable(double seconds);
     // Poziția pe ecran (în coordonatele item-ului) a unui punct 3D; pentru scripturile de verificare.
     Q_INVOKABLE QPointF projectToScreen(const QVector3D& world) const;
-    // Punctul din lume (centrul bazei obiectului tras din bibliotecă) sub poziția dată: cel inferat (capăt, mijloc,
-    // muchie, față, ghidaj, grid), altfel suprafața atinsă sau solul (Z = 0), altfel ținta camerei. Ține minte
-    // inferența, ca să se deseneze (marcaj, etichetă, ghidaje) cât durează drop-ul.
+    // Punctul din lume (centrul bazei obiectului tras din bibliotecă) sub poziția dată: cel inferat (capăt,
+    // mijloc, muchie, față, ghidaj, grid), altfel suprafața atinsă sau solul (Z = 0), altfel ținta camerei.
+    // Ține minte inferența, ca să se deseneze (marcaj, etichetă, ghidaje) cât durează drop-ul.
     Q_INVOKABLE QVector3D dropPointAt(const QPointF& position);
-    // Previzualizarea unui obiect tras din bibliotecă: o cutie (centrul bazei și mărimea, în mm) desenată peste model.
+    // Previzualizarea unui obiect tras din bibliotecă: o cutie (centrul bazei și mărimea, în mm) desenată
+    // peste model.
     Q_INVOKABLE void setDropPreview(const QVector3D& baseCenter, const QVector3D& size);
-    // Unealta activă primește un hover / un click în punctul dat (drop-ul unui material = un click cu Paint Bucket).
+    // Unealta activă primește un hover / un click în punctul dat (drop-ul unui material = un click cu Paint
+    // Bucket).
     Q_INVOKABLE void toolHoverAt(const QPointF& position);
     Q_INVOKABLE void toolClickAt(const QPointF& position);
     Q_INVOKABLE void clearDropPreview();
@@ -301,7 +310,8 @@ private:
     // Cât se captează o imagine (PNG, cadrele unui video): fără selecție, hover și marcaje.
     bool m_cleanCapture = false;
     std::optional<std::pair<QVector3D, QVector3D>> m_dropPreview;
-    // Inferența drop-ului: motorul (cu memoria lui) și ce se desenează din ea, în coordonatele contextului editat.
+    // Inferența drop-ului: motorul (cu memoria lui) și ce se desenează din ea, în coordonatele contextului
+    // editat.
     inference::Engine m_dropEngine;
     tools::Overlay m_dropOverlay;
     // Tragerea marcajului unei camere / lumini (cu Select): poziția de start și punctul apucat.
@@ -350,23 +360,30 @@ private:
     double m_clipEnd = 0.0;
 
     void updateCursor();
-    tools::PointerEvent toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount = 1) const;
+    tools::PointerEvent toolEvent(
+        QPointF position, Qt::KeyboardModifiers modifiers, int clickCount = 1) const;
     void afterToolEvent();
     void updateAnnotations();
     void setPointer(QPointF position, bool inside);
     glm::vec4 markerColor(inference::Kind kind, inference::Tint tint) const;
     glm::vec4 tintColor(inference::Tint tint) const;
-    // Ghidajele și marcajul inferenței dintr-un overlay (al uneltei sau al drop-ului), în coordonatele contextului `ctx`.
+    // Ghidajele și marcajul inferenței dintr-un overlay (al uneltei sau al drop-ului), în coordonatele
+    // contextului `ctx`.
     void appendInferenceDrawing(std::vector<LineInstance>& lines, std::vector<LineInstance>& topLines,
-        std::vector<PointInstance>& topPoints, const tools::Overlay& overlay, const math::Transform& ctx) const;
+        std::vector<PointInstance>& topPoints, const tools::Overlay& overlay,
+        const math::Transform& ctx) const;
     // Eticheta marcajului inferenței pentru QML (nullopt dacă nu are etichetă sau e în afara ecranului).
-    std::optional<QVariantMap> inferenceAnnotation(const tools::Overlay& overlay, const math::Transform& ctx) const;
+    std::optional<QVariantMap> inferenceAnnotation(
+        const tools::Overlay& overlay, const math::Transform& ctx) const;
     // Doar modelul (fără selecție, pivot, hover, unealtă): la export și cât rulează animația.
     bool cleanView() const;
-    // Ce desenează documentul (fără ce depinde de cameră), refolosit între cadre cât timp cheia nu se schimbă.
-    std::shared_ptr<const DocumentPass> documentPass(const std::optional<glm::dvec4>& section, std::size_t textures) const;
+    // Ce desenează documentul (fără ce depinde de cameră), refolosit între cadre cât timp cheia nu se
+    // schimbă.
+    std::shared_ptr<const DocumentPass> documentPass(
+        const std::optional<glm::dvec4>& section, std::size_t textures) const;
     void appendDocument(DocumentPass& f) const;
-    // Cum se desenează o definiție: estompată (în afara grupului editat), selectată, sub cursor, marcată de gumă.
+    // Cum se desenează o definiție: estompată (în afara grupului editat), selectată, sub cursor, marcată de
+    // gumă.
     struct DrawStyle {
         bool dim = false;
         bool selected = false;
@@ -389,7 +406,8 @@ private:
     view::Vec2d orbitReleaseVelocity() const;
     void sceneBounds(view::Vec3d& min, view::Vec3d& max) const;
     QImage renderImage();
-    // Transformarea (în model) a unei definiții: prin calea editată, dacă e pe ea, altfel prin prima ei instanță.
+    // Transformarea (în model) a unei definiții: prin calea editată, dacă e pe ea, altfel prin prima ei
+    // instanță.
     math::Transform definitionToWorld(const Document& doc, model::DefinitionId definition) const;
     void appendModelExtras(ViewportFrame& f, const Document& doc) const;
     // Texturile modelului pentru renderer (straturile array-ului) și stratul fiecărei texturi.
@@ -400,7 +418,8 @@ private:
     std::unique_ptr<DocumentPassCache> m_documentPass; // folosit doar din frameForRendering (GUI blocat)
     unsigned m_appearanceGeneration = 0; // crește la orice schimbare de aspect (culori, stil, profile)
     // Cutia scenei, refolosită cât timp modelul nu se schimbă.
-    mutable std::optional<std::tuple<std::uint64_t, const void*, view::Vec3d, view::Vec3d>> m_sceneBoundsCache;
+    mutable std::optional<std::tuple<std::uint64_t, const void*, view::Vec3d, view::Vec3d>>
+        m_sceneBoundsCache;
     // Camera sau lumina al cărei marcaj e sub cursor: ("camera" | "light", id).
     std::optional<std::pair<QString, double>> objectHandleAt(QPointF position) const;
 
@@ -442,7 +461,8 @@ private:
     double m_lookMargin = 0.9;
     double m_previewAspect = 0.0;
     bool m_lockCamera = false;
-    bool m_lockNavigating = false; // un gest de navigare mută camera blocată (vederea nu o urmează până la sfârșit)
+    bool m_lockNavigating
+        = false; // un gest de navigare mută camera blocată (vederea nu o urmează până la sfârșit)
     QTimer m_lockCommitTimer; // rotița: un singur pas de undo pe gest
     bool m_pickingFocus = false;
     bool m_pickingAnchor = false;
@@ -508,6 +528,7 @@ private:
     bool m_profiles = true;
     bool m_fog = false;
     bool m_shadows = false;
+    bool m_showBands = true;
     QString m_environment = QStringLiteral("simplu");
     bool m_ambientOcclusion = false;
     bool m_progressiveAA = false;

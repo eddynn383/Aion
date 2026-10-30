@@ -200,6 +200,16 @@ bool ScriptApi::setBoardValue(double id, const QString& key, const QVariant& val
     return true;
 }
 
+bool ScriptApi::setBand(double id, int side, const QString& bandKey, const QString& decor)
+{
+    if (!m_document) {
+        return false;
+    }
+    m_document->selectInstances({ id });
+    m_document->setBand(side, bandKey, decor);
+    return true;
+}
+
 QVariantMap ScriptApi::cutList(const QVariantMap& options) const
 {
     return m_document ? m_document->cutList(options) : QVariantMap {};

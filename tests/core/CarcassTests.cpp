@@ -329,3 +329,91 @@ TEST_CASE("Corpuri: numele pieselor", "[core][carcass]")
     CHECK(model::partName(b.m, role(b.m, b.def, "door.1.hinge.1")) == "Balama aplicată 110°");
     CHECK(model::partName(b.m, b.placed) == "Corp la sol");
 }
+
+// --- Cantul (pasul 7) ---
+
+TEST_CASE("Cant: ABS 2 pe toate laturile ușilor se scade și se numără în metri", "[core][carcass][bands]")
+{
+    Body b = makeBody("wardrobe");
+    const model::BandPreset& all = model::builtinBandPresets()[1];
+    for (const char* door : { "door.1.panel", "door.2.panel" }) {
+        const model::DefinitionId d = b.m.instance(role(b.m, b.def, door)).definition;
+        CHECK(model::applyBandPreset(b.m, d, all.sides) == 0);
+    }
+    const model::CutList list = model::cutList(b.m);
+    const model::CutPart* doors = row(list, "Ușă");
+    REQUIRE(doors != nullptr);
+    CHECK(doors->count == 2);
+    CHECK(doors->cutLength == Approx(1996.0));
+    CHECK(doors->cutWidth == Approx(494.5));
+    REQUIRE(list.bands.size() == 1);
+    CHECK(list.bands[0].bandKey == "abs.2");
+    CHECK(list.bands[0].length == Approx(4 * 2498.5 + 8 * 50));
+}
+
+TEST_CASE("Cant: ABS 0,4 nu se scade; HDF nu primește cant", "[core][carcass][bands]")
+{
+    Body b = makeBody("wardrobe");
+    const model::DefinitionId d = b.m.instance(role(b.m, b.def, "door.1.panel")).definition;
+    for (int k = 0; k < 4; ++k) {
+        REQUIRE(model::setBand(b.m, d, k, "abs.0.4"));
+    }
+    const model::CutList list = model::cutList(b.m);
+    bool found = false;
+    for (const model::CutPart& p : list.parts) {
+        if (p.bands[0] == "abs.0.4") {
+            found = true;
+            CHECK(p.cutLength == Approx(2000.0));
+            CHECK(p.cutWidth == Approx(498.5));
+        }
+    }
+    CHECK(found);
+    const model::DefinitionId back = b.m.instance(role(b.m, b.def, "back")).definition;
+    CHECK_FALSE(model::setBand(b.m, back, 0, "abs.2"));
+    CHECK(model::applyBandPreset(b.m, back, model::builtinBandPresets()[1].sides) == 4);
+    CHECK(model::boardBands(b.m, back)[0].bandKey.empty());
+}
+
+TEST_CASE("Cant: laturile urmează fibra, nu axele locale", "[core][carcass][bands]")
+{
+    Model m;
+    const model::InstanceId id = model::createBoard(m, m.root(), "pal", 18, 600, 400, Transform {});
+    const model::DefinitionId d = m.instance(id).definition;
+    REQUIRE(model::setBand(m, d, 0, "abs.2")); // L1: o latură lungă (paralelă cu fibra, pe X)
+    CHECK(model::boardBands(m, d)[0].bandKey == "abs.2");
+    CHECK(m.definition(d).part->bands[0].bandKey == "abs.2"); // −V = −Y
+    // Fibra pe Y (placa desprinsă, cu fibra schimbată): L1 e acum latura de la −X.
+    model::detachBoard(m, d);
+    model::Definition def = m.definition(d);
+    def.part->grainAxis = 1;
+    def.part->bands = {};
+    m.setDefinition(d, def);
+    REQUIRE(model::setBand(m, d, 0, "abs.1"));
+    CHECK(m.definition(d).part->bands[2].bandKey == "abs.1"); // −U = −X
+    // Oglindirea instanței nu mută cantul: datele sunt în coordonatele plăcii.
+    model::Instance inst = m.instance(id);
+    inst.transform = Transform::scaling(Vec3d { 0.0 }, { -1, 1, 1 }) * inst.transform;
+    m.setInstance(id, inst);
+    CHECK(model::boardBands(m, d)[0].bandKey == "abs.1");
+}
+
+TEST_CASE("Cant: decorul „ca placa” pe copii legate cu decoruri diferite", "[core][carcass][bands]")
+{
+    Model m;
+    const model::InstanceId a = model::createBoard(m, m.root(), "pal", 18, 600, 400, Transform {});
+    const model::DefinitionId d = m.instance(a).definition;
+    REQUIRE(model::setBand(m, d, 0, "abs.2"));
+    model::Instance second = m.instance(a);
+    second.transform = Transform::translation({ 0, 1000, 0 });
+    model::Material white;
+    white.name = "Alb (decor)";
+    model::Material nut;
+    nut.name = "Nuc (decor)";
+    second.material = m.addMaterial(nut);
+    m.addInstance(second);
+    model::Instance first = m.instance(a);
+    first.material = m.addMaterial(white);
+    m.setInstance(a, first);
+    const model::CutList list = model::cutList(m);
+    CHECK(list.bands.size() == 2);
+}

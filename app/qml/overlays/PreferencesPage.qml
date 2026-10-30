@@ -31,7 +31,8 @@ Item {
         { name: "Viewport", icon: "monitor", description: "Calitatea randării, lumina și informațiile din viewport." },
         { name: "Navigare", icon: "orbit", description: "Orbita, zoom-ul și planurile de tăiere ale camerei." },
         { name: "Grid și snap", icon: "grid-3x3", description: "Grid-ul de pe sol și prinderea punctelor de el." },
-        { name: "Scurtături", icon: "search", description: "Tastele comenzilor și ale uneltelor; click pe una ca s-o schimbi." }
+        { name: "Scurtături", icon: "search", description: "Tastele comenzilor și ale uneltelor; click pe una ca s-o schimbi." },
+        { name: "Mobilier", icon: "box", description: "Cantul: cum se vede în viewport și cât se adaugă la fiecare muchie în lista de debitare." }
     ]
 
     Keys.onEscapePressed: root.closeRequested()
@@ -664,6 +665,61 @@ Item {
                                 model: ["Auto", "1 mm", "5 mm", "1 cm", "5 cm", "10 cm", "50 cm", "1 m"]
                                 currentIndex: root.document ? Math.max(0, steps.indexOf(root.document.gridStep)) : 0
                                 onCurrentIndexChanged: if (root.document) root.document.gridStep = steps[currentIndex]
+                            }
+                        }
+                    }
+                }
+
+                // Mobilier: cantul.
+                Column {
+                    visible: root.category === 8
+                    width: parent.width
+                    spacing: Theme.space6
+                    SettingsGroup {
+                        width: parent.width
+                        title: "Cant"
+                        SettingsRow {
+                            title: "Liniile de cant în viewport"
+                            description: "Laturile plăcilor cu cant au o linie în culoarea decorului cantului."
+                            Toggle {
+                                checked: UserPrefs.showBands
+                                onToggled: UserPrefs.showBands = checked
+                            }
+                        }
+                        SettingsRow {
+                            title: "Adaosul pe muchie"
+                            description: "Cât cant în plus se numără la fiecare muchie (tăiere, prindere în mașină)."
+                            NumberField {
+                                width: 180
+                                unit: "mm"
+                                from: 0
+                                to: 500
+                                value: UserPrefs.bandAllowance
+                                onValueModified: (v) => UserPrefs.bandAllowance = v
+                            }
+                        }
+                        Repeater {
+                            model: root.document ? root.document.allBandTypes() : []
+                            delegate: SettingsRow {
+                                required property var modelData
+                                readonly property var byType: {
+                                    try { return JSON.parse(UserPrefs.bandAllowanceByType) } catch (e) { return ({}) }
+                                }
+                                title: "Adaosul pentru " + modelData.label
+                                description: "Gol sau egal cu cel general = cel general."
+                                NumberField {
+                                    width: 180
+                                    unit: "mm"
+                                    from: 0
+                                    to: 500
+                                    value: parent.byType[modelData.key] ?? UserPrefs.bandAllowance
+                                    onValueModified: (v) => {
+                                        const map = parent.byType
+                                        if (Math.abs(v - UserPrefs.bandAllowance) < 0.001) delete map[modelData.key]
+                                        else map[modelData.key] = v
+                                        UserPrefs.bandAllowanceByType = JSON.stringify(map)
+                                    }
+                                }
                             }
                         }
                     }

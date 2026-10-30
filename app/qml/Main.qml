@@ -1773,6 +1773,7 @@ Window {
         progressiveAntialiasing: preferences.progressiveAA
         antialiasing: preferences.msaa
         shadowQuality: preferences.shadowQuality
+        showBands: UserPrefs.showBands
         onFramesPerSecondChanged: if (AppInfo.startupActions.length > 0) console.info("fps:", framesPerSecond)
         anchors.top: titleBar.bottom
         anchors.bottom: timeline.visible ? timeline.top : statusBar.top

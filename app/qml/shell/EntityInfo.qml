@@ -310,6 +310,19 @@ Column {
         }
     }
 
+    // Cantul plăcii (pasul 7): pe fiecare latură, tipul și decorul; presetări.
+    PropertyGroup {
+        id: bandBox
+        readonly property var board: root.isInstance ? (root.info.board ?? null) : null
+        visible: board !== null && root.modeling
+        title: "Cant"
+        BandPicker {
+            width: bandBox.width
+            document: root.document
+            board: bandBox.board
+        }
+    }
+
     // Sferă / cilindru / con: câte laturi au cercurile (mai multe = mai fină). Doar cât geometria e a primitivei.
     PropertyGroup {
         id: segmentsBox

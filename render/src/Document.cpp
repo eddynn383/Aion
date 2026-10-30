@@ -1178,6 +1178,9 @@ QVariantMap Document::entityInfo() const
                 { QStringLiteral("matches"), status.state == model::BoardState::Matches },
                 { QStringLiteral("reason"), kReasons.at(status.reason) },
                 { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("bands"), boardBandsInfo(inst.definition) },
+                { QStringLiteral("bandTypes"), bandTypesFor(definition.part->typeKey) },
+                { QStringLiteral("bandDecors"), bandDecors() },
             };
         }
         // Sferă / cilindru / con nemodificate: numărul de segmente (0 = nu se poate schimba).
@@ -5563,6 +5566,124 @@ double Document::createBoardAt(
             math::Transform::translation({ corner.x(), corner.y(), corner.z() }));
     });
     return created ? static_cast<double>(created.value) : 0.0;
+}
+
+QVariantList Document::boardBandsInfo(model::DefinitionId definition) const
+{
+    QVariantList out;
+    const std::array<model::BandSide, 4> bands = model::boardBands(m_model, definition);
+    for (int k = 0; k < 4; ++k) {
+        const model::BandSide& b = bands[static_cast<std::size_t>(k)];
+        const model::BandType* type = model::findBandType(b.bandKey);
+        QString decorName;
+        if (const auto i = model::libraryMaterialByKey(b.decor)) {
+            decorName = QString::fromStdString(model::builtinMaterials()[*i].name);
+        }
+        out.append(QVariantMap { { QStringLiteral("side"), k },
+            { QStringLiteral("name"), QString::fromLatin1(model::bandSideName(k).data()) },
+            { QStringLiteral("bandKey"), QString::fromStdString(b.bandKey) },
+            { QStringLiteral("label"), type ? QString::fromStdString(type->label) : QString() },
+            { QStringLiteral("decor"), QString::fromStdString(b.decor) },
+            { QStringLiteral("decorName"), decorName } });
+    }
+    return out;
+}
+
+QVariantList Document::bandTypesFor(const std::string& boardType) const
+{
+    QVariantList out;
+    for (const model::BandType& t : model::bandTypes()) {
+        if (model::bandFitsBoard(t.key, boardType)) {
+            out.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(t.key) },
+                { QStringLiteral("label"), QString::fromStdString(t.label) } });
+        }
+    }
+    return out;
+}
+
+QVariantList Document::bandDecors() const
+{
+    // Decorul cantului: doar materialele incluse de tip decor sau lemn (cheia lor rămâne aceeași în orice
+    // fișier).
+    QVariantList out;
+    for (const model::Material& m : model::builtinMaterials()) {
+        if (m.category == "board-decor" || m.category == "wood") {
+            out.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(m.libraryKey) },
+                { QStringLiteral("name"), QString::fromStdString(m.name) },
+                { QStringLiteral("color"), QColor(m.color.r, m.color.g, m.color.b) } });
+        }
+    }
+    return out;
+}
+
+QVariantList Document::allBandTypes() const
+{
+    QVariantList out;
+    for (const model::BandType& t : model::bandTypes()) {
+        out.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(t.key) },
+            { QStringLiteral("label"), QString::fromStdString(t.label) } });
+    }
+    return out;
+}
+
+QVariantList Document::bandPresets() const
+{
+    QVariantList out;
+    for (const model::BandPreset& p : model::builtinBandPresets()) {
+        QVariantList sides;
+        for (const model::BandSide& s : p.sides) {
+            sides.append(QVariantMap { { QStringLiteral("bandKey"), QString::fromStdString(s.bandKey) },
+                { QStringLiteral("decor"), QString::fromStdString(s.decor) } });
+        }
+        out.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromStdString(p.name) }, { QStringLiteral("sides"), sides } });
+    }
+    return out;
+}
+
+void Document::setBand(int side, const QString& bandKey, const QString& decor)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    bool ok = true;
+    runOnModel("Cant", [&](model::Model& model) {
+        ok = model::setBand(model, def, side, bandKey.toStdString(), decor.toStdString());
+    });
+    if (!ok) {
+        setError(QStringLiteral("Cantul ales nu se pune pe acest tip de placă."));
+    }
+    emit selectionChanged();
+}
+
+void Document::setBands(const QVariantList& sides)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1 || sides.size() != 4) {
+        return;
+    }
+    std::array<model::BandSide, 4> bands {};
+    for (int k = 0; k < 4; ++k) {
+        const QVariantMap s = sides[k].toMap();
+        bands[static_cast<std::size_t>(k)] = { s.value(QStringLiteral("bandKey")).toString().toStdString(),
+            s.value(QStringLiteral("decor")).toString().toStdString() };
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    int skipped = 0;
+    runOnModel("Cant", [&](model::Model& model) { skipped = model::applyBandPreset(model, def, bands); });
+    if (skipped > 0) {
+        setError(QStringLiteral("%1 laturi au rămas fără cant: cantul nu se potrivește tipului plăcii.")
+                .arg(skipped));
+    }
+    emit selectionChanged();
+}
+
+void Document::setHoveredBandSide(int side)
+{
+    if (side != m_hoveredBandSide) {
+        m_hoveredBandSide = side;
+        emit hoveredBandSideChanged();
+    }
 }
 
 void Document::restoreBoard()

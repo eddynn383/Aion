@@ -1,25 +1,25 @@
 #include "aion/render/Viewport.h"
 
-#include "aion/render/Document.h"
-
+#include "ViewportFrame.h"
+#include "ViewportRenderer.h"
 #include "aion/core/geom/Bezier.h"
-#include "aion/core/view/ModelPicking.h"
 #include "aion/core/model/CameraLens.h"
+#include "aion/core/model/Furniture.h"
+#include "aion/core/model/MaterialLibrary.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/units/Length.h"
+#include "aion/core/view/ModelPicking.h"
+#include "aion/render/Document.h"
 
-#include "ViewportFrame.h"
-#include "ViewportRenderer.h"
-
-#include <QNativeGestureEvent>
-#include <QPointingDevice>
 #include <QBuffer>
 #include <QDir>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QKeySequence>
-#include <QGuiApplication>
 #include <QLineF>
+#include <QNativeGestureEvent>
+#include <QPointingDevice>
 #include <QQuickWindow>
 #include <QStyleHints>
 
@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <numbers>
 #include <set>
@@ -64,6 +65,51 @@ constexpr glm::dvec3 kDemoMax { 2000.0, 1500.0, 1000.0 };
 glm::vec4 toVec4(const QColor& c)
 {
     return { c.redF(), c.greenF(), c.blueF(), c.alphaF() };
+}
+
+// O latură de cant a unei plăci (pasul 7): segmentul de pe mijlocul feței înguste, puțin în afara plăcii, în
+// coordonatele definiției.
+struct BandSegment {
+    glm::dvec3 a;
+    glm::dvec3 b;
+    int side = 0; // L1, L2, W1, W2
+    const model::BandSide* band = nullptr;
+};
+
+std::vector<BandSegment> bandSegments(const model::Model& model, model::DefinitionId definition)
+{
+    std::vector<BandSegment> out;
+    const model::Definition& def = model.definition(definition);
+    if (!def.part || def.part->kind != model::PartSpec::Kind::Board) {
+        return out;
+    }
+    const auto [lo, hi] = model::bounds(model, definition);
+    if (lo.x > hi.x) {
+        return out;
+    }
+    constexpr double kOutside = 0.3; // mm, ca linia să nu intre în fața plăcii
+    const int t = std::clamp<int>(def.part->thicknessAxis, 0, 2);
+    const int u = t == 0 ? 1 : 0;
+    const int v = t == 2 ? 1 : 2;
+    const std::array<int, 4> sideSlots
+        = model::bandSlots(*def.part, model::measurePart(model, definition, {}));
+    for (int side = 0; side < 4; ++side) {
+        const int slot = sideSlots[static_cast<std::size_t>(side)];
+        glm::dvec3 a { 0.0 }, b { 0.0 };
+        a[t] = b[t] = (lo[t] + hi[t]) / 2;
+        const int along = slot < 2 ? u : v;
+        const int across = slot < 2 ? v : u;
+        a[along] = lo[along];
+        b[along] = hi[along];
+        a[across] = b[across] = (slot % 2 == 0) ? lo[across] - kOutside : hi[across] + kOutside;
+        out.push_back({ a, b, side, &def.part->bands[static_cast<std::size_t>(slot)] });
+    }
+    return out;
+}
+
+glm::vec4 colorOf(const model::Color& c, float darken = 1.0f)
+{
+    return { c.r / 255.0f * darken, c.g / 255.0f * darken, c.b / 255.0f * darken, 1.0f };
 }
 
 glm::vec4 withAlpha(const QColor& c, float alpha)
@@ -110,7 +156,8 @@ void appendBoxEdges(std::vector<LineInstance>& out, const glm::dvec3& lo, const 
     constexpr std::array<std::pair<int, int>, 12> edges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
         { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
     for (const auto& [i, j] : edges) {
-        out.push_back({ c[static_cast<std::size_t>(i)], c[static_cast<std::size_t>(j)], color, { width, 0.0f } });
+        out.push_back(
+            { c[static_cast<std::size_t>(i)], c[static_cast<std::size_t>(j)], color, { width, 0.0f } });
     }
 }
 
@@ -179,7 +226,8 @@ std::pair<glm::dvec3, double> sunPosition(double hour, int month, double latitud
     const double elevation = std::asin(std::clamp(sinElevation, -1.0, 1.0));
     const double azimuth = std::atan2(-std::sin(hourAngle),
         std::tan(declination) * std::cos(lat) - std::sin(lat) * std::cos(hourAngle)); // de la nord, spre est
-    const double e = std::max(elevation, 3.0 * kDeg); // sub orizont, lumina rămâne joasă (dar fără umbre lungi absurde)
+    const double e
+        = std::max(elevation, 3.0 * kDeg); // sub orizont, lumina rămâne joasă (dar fără umbre lungi absurde)
     const glm::dvec3 dir { std::sin(azimuth) * std::cos(e), std::cos(azimuth) * std::cos(e), std::sin(e) };
     const double intensity = std::clamp((elevation / kDeg + 2.0) / 12.0, 0.0, 1.0);
     return { glm::normalize(dir), intensity };
@@ -187,9 +235,10 @@ std::pair<glm::dvec3, double> sunPosition(double hour, int month, double latitud
 
 } // namespace
 
-// Ce desenează documentul (modelul, selecția, hover-ul, unealta). Nu depinde de cameră, deci se refolosește între
-// cadre: la orbit / pan / zoom nu se mai parcurge tot modelul. Singura excepție sunt profilele (muchia dintre o față
-// văzută din față și una din spate se îngroașă): `profiles` le ține normalele, iar grosimea se alege la fiecare cadru.
+// Ce desenează documentul (modelul, selecția, hover-ul, unealta). Nu depinde de cameră, deci se refolosește
+// între cadre: la orbit / pan / zoom nu se mai parcurge tot modelul. Singura excepție sunt profilele (muchia
+// dintre o față văzută din față și una din spate se îngroașă): `profiles` le ține normalele, iar grosimea se
+// alege la fiecare cadru.
 struct DocumentPass {
     struct ProfileEdge {
         std::size_t line; // indexul în `lines`
@@ -206,7 +255,8 @@ struct DocumentPass {
     std::vector<MeshVertex> transparent;
     std::vector<ProfileEdge> profiles;
     bool hasSelectedFaces = false;
-    unsigned generation = 0; // crește la fiecare reconstruire: renderer-ul reîncarcă triunghiurile doar atunci
+    unsigned generation
+        = 0; // crește la fiecare reconstruire: renderer-ul reîncarcă triunghiurile doar atunci
 };
 
 struct Viewport::DocumentPassCache {
@@ -302,7 +352,8 @@ void Viewport::showTransientCursor(const QCursor& cursor)
 
 void Viewport::updateCursor()
 {
-    if (m_pickingFocus || m_pickingAnchor) { // „Alege punctul de focus” / „obiectul de pus pe cale”: următorul click
+    if (m_pickingFocus
+        || m_pickingAnchor) { // „Alege punctul de focus” / „obiectul de pus pe cale”: următorul click
         setCursor(Qt::CrossCursor);
         return;
     }
@@ -331,9 +382,11 @@ void Viewport::updateCursor()
         setCursor(Qt::PointingHandCursor);
     } else if (m_overPivot || (m_document && m_document->pivotDragging())) {
         setCursor(Qt::SizeAllCursor);
-    } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("paint")) {
+    } else if (m_navigationTool.isEmpty() && m_document
+        && m_document->activeTool() == QLatin1String("paint")) {
         setCursor(m_paintCursor);
-    } else if (m_navigationTool.isEmpty() && m_document && m_document->activeTool() == QLatin1String("eraser")) {
+    } else if (m_navigationTool.isEmpty() && m_document
+        && m_document->activeTool() == QLatin1String("eraser")) {
         setCursor(m_eraserCursor);
     } else {
         unsetCursor();
@@ -355,8 +408,10 @@ void Viewport::setDocument(Document* document)
         // Și schimbările care nu vin din viewport (tastele, Measurements box) mută etichetele.
         connect(m_document, &Document::changed, this, &Viewport::afterToolEvent);
         connect(m_document, &Document::changed, this, &Viewport::updateSceneBounds);
-        connect(m_document, &Document::changed, this, &Viewport::applyLookThrough); // camera privită s-a schimbat
+        connect(
+            m_document, &Document::changed, this, &Viewport::applyLookThrough); // camera privită s-a schimbat
         connect(m_document, &Document::gridSnapChanged, this, [this] { update(); });
+        connect(m_document, &Document::hoveredBandSideChanged, this, [this] { update(); });
         connect(m_document, &Document::activeToolChanged, this, &Viewport::updateCursor);
         connect(m_document, &Document::animationStarted, this, &Viewport::requestAnimationFrame);
         connect(m_document, &Document::timelineTimeChanged, this, &Viewport::applyAnimationCamera);
@@ -365,7 +420,8 @@ void Viewport::setDocument(Document* document)
             updateAnnotations();
             update();
         });
-        connect(m_document, &Document::cameraRequested, this, [this](const QVariantMap& camera) { animateToCamera(camera, 1.0); });
+        connect(m_document, &Document::cameraRequested, this,
+            [this](const QVariantMap& camera) { animateToCamera(camera, 1.0); });
         connect(m_document, &Document::interactionModeChanged, this, [this] {
             if (!m_document->interactionMode()) {
                 updateCursor();
@@ -382,7 +438,8 @@ void Viewport::setDocument(Document* document)
     update();
 }
 
-tools::PointerEvent Viewport::toolEvent(QPointF position, Qt::KeyboardModifiers modifiers, int clickCount) const
+tools::PointerEvent Viewport::toolEvent(
+    QPointF position, Qt::KeyboardModifiers modifiers, int clickCount) const
 {
     tools::PointerEvent e;
     e.screen = toVec2(position);
@@ -428,6 +485,40 @@ void Viewport::appendDocument(DocumentPass& f) const
     const tools::Overlay overlay = doc.tool() && !cleanView() ? doc.tool()->overlay() : tools::Overlay {};
     appendDefinition(f, doc, doc.model().root(), math::Transform {}, 0, {}, hover, overlay);
 
+    // Cantul: linii în culoarea decorului lui pe laturile plăcilor (decorul „ca placa” = al plăcii, mai
+    // închis).
+    if (m_showBands) {
+        const model::Model& model = doc.model();
+        const std::function<void(model::DefinitionId, const math::Transform&, model::MaterialId)> visit
+            = [&](model::DefinitionId parent, const math::Transform& toWorld, model::MaterialId inherited) {
+                  for (model::InstanceId id : model.childrenOf(parent)) {
+                      const model::Instance& inst = model.instance(id);
+                      if (inst.hidden) {
+                          continue;
+                      }
+                      const math::Transform t = toWorld * inst.transform;
+                      const model::MaterialId material = inst.material ? inst.material : inherited;
+                      for (const BandSegment& s : bandSegments(model, inst.definition)) {
+                          if (s.band->bandKey.empty()) {
+                              continue;
+                          }
+                          glm::vec4 color { 0.55f, 0.55f, 0.55f, 1.0f };
+                          if (!s.band->decor.empty()) {
+                              if (const auto i = model::libraryMaterialByKey(s.band->decor)) {
+                                  color = colorOf(model::builtinMaterials()[*i].color);
+                              }
+                          } else if (material && model.materials().contains(material)) {
+                              color = colorOf(model.material(material).color, 0.8f);
+                          }
+                          f.lines.push_back({ glm::vec3(t.applyToPoint(s.a)), glm::vec3(t.applyToPoint(s.b)),
+                              color, { 3.0f, 0.0f } });
+                      }
+                      visit(inst.definition, t, material);
+                  }
+              };
+        visit(model.root(), math::Transform {}, {});
+    }
+
     // Overlay-ul uneltei e în coordonatele contextului editat.
     const math::Transform ctx = doc.contextTransform();
     const auto w = [&](const math::Vec3d& p) { return glm::vec3(ctx.applyToPoint(p)); };
@@ -440,22 +531,24 @@ void Viewport::appendDocument(DocumentPass& f) const
             for (std::size_t k = 0; k < 8; ++k) {
                 c[k] = w({ (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z });
             }
-            constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
-                { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+            constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 },
+                { 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
             for (const auto& [a, b] : kEdges) {
-                f.lines.push_back({ c[std::size_t(a)], c[std::size_t(b)], withAlpha(m_preview, 0.55f), { 1.0f, 4.0f } });
+                f.lines.push_back(
+                    { c[std::size_t(a)], c[std::size_t(b)], withAlpha(m_preview, 0.55f), { 1.0f, 4.0f } });
             }
         }
     }
 
     const glm::vec4 accent = toVec4(m_accent);
-    // Punctele de prindere ale obiectelor (Move): discuri mari cu margine, ca în SketchUp; cel de sub cursor mai mare.
-    // Înaintea marcajului inferenței, care rămâne deasupra lor.
+    // Punctele de prindere ale obiectelor (Move): discuri mari cu margine, ca în SketchUp; cel de sub cursor
+    // mai mare. Înaintea marcajului inferenței, care rămâne deasupra lor.
     for (const tools::Grip& g : overlay.grips) {
         const glm::vec3 p = w(g.point);
         const glm::vec4 color = markerColor(g.kind, inference::Tint::Neutral);
         if (g.hidden && !g.hot) {
-            f.topPoints.push_back({ p, glm::vec4(glm::vec3(color), 0.35f), 6.0f }); // în spate: mic și estompat
+            f.topPoints.push_back(
+                { p, glm::vec4(glm::vec3(color), 0.35f), 6.0f }); // în spate: mic și estompat
             continue;
         }
         f.topPoints.push_back({ p, withAlpha(m_backgroundBottom, 0.95f), g.hot ? 19.0f : 13.0f });
@@ -495,7 +588,8 @@ void Viewport::appendInferenceDrawing(std::vector<LineInstance>& lines, std::vec
     }
 }
 
-std::optional<QVariantMap> Viewport::inferenceAnnotation(const tools::Overlay& overlay, const math::Transform& ctx) const
+std::optional<QVariantMap> Viewport::inferenceAnnotation(
+    const tools::Overlay& overlay, const math::Transform& ctx) const
 {
     if (!overlay.marker || overlay.marker->label.empty()) {
         return std::nullopt;
@@ -531,7 +625,7 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
 
     const auto stateOf = [&](geom::FaceId faceId) {
         if (active) {
-            return selection.contains(faceId) ? 2.0f
+            return selection.contains(faceId)                                          ? 2.0f
                 : (hover.kind == view::PickResult::Kind::Face && hover.face == faceId) ? 1.0f
                                                                                        : 0.0f;
         }
@@ -565,11 +659,14 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
             color = *style.colorOverride;
         }
         glm::vec4 backColor { 0.0f, 0.0f, 0.0f, -1.0f };
-        const model::Material* back = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr;
+        const model::Material* back
+            = face->backMaterial ? model.materials().find(face->backMaterial) : nullptr;
         if (back != nullptr) {
-            backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f, back->color.a / 255.0f };
+            backColor = { back->color.r / 255.0f, back->color.g / 255.0f, back->color.b / 255.0f,
+                back->color.a / 255.0f };
         }
-        // Texturile (față și verso): stratul în array și mărimea reală (UV-ul se calculează în coordonatele definiției).
+        // Texturile (față și verso): stratul în array și mărimea reală (UV-ul se calculează în coordonatele
+        // definiției).
         const auto layerOf = [&](const model::Material* m) {
             if (m != nullptr && m->texture && !style.colorOverride) {
                 if (const auto it = m_textureLayers.find(m->texture.value); it != m_textureLayers.end()) {
@@ -579,7 +676,8 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
             return -1.0f;
         };
         const glm::vec2 layers { layerOf(material), layerOf(back) };
-        const bool transparent = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
+        const bool transparent
+            = displayStyle == 4 || (material != nullptr && displayStyle == 0 && color.a < 0.999f);
         std::vector<MeshVertex>& target = transparent ? f.transparent : f.triangles;
         // Punctele triangulării sunt vârfurile buclelor, în ordine (exterioara, apoi găurile).
         std::vector<geom::VertexId> ids = mesh.loopVertices(face->outer);
@@ -591,20 +689,21 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
             const glm::dvec3 n = i < ids.size() ? smoothNormal(mesh, faceId, ids[i]) : face->plane.normal;
             glm::vec4 uv { 0.0f };
             if (layers.x >= 0.0f) {
-                const math::Vec2d t = model::textureCoordinates(face->plane.normal, tri.points[i], face->texture,
-                    material->textureSize);
+                const math::Vec2d t = model::textureCoordinates(
+                    face->plane.normal, tri.points[i], face->texture, material->textureSize);
                 uv.x = static_cast<float>(t.x);
                 uv.y = static_cast<float>(-t.y);
             }
             if (layers.y >= 0.0f) {
-                // Versoul se vede din partea cealaltă: proiecția după normala inversă (textura nu apare în oglindă).
-                const math::Vec2d t = model::textureCoordinates(-face->plane.normal, tri.points[i], face->texture,
-                    back->textureSize);
+                // Versoul se vede din partea cealaltă: proiecția după normala inversă (textura nu apare în
+                // oglindă).
+                const math::Vec2d t = model::textureCoordinates(
+                    -face->plane.normal, tri.points[i], face->texture, back->textureSize);
                 uv.z = static_cast<float>(t.x);
                 uv.w = static_cast<float>(-t.y);
             }
-            target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])), glm::vec3(toWorldNormal(n)), state, color,
-                surface, backColor, uv, layers });
+            target.push_back({ glm::vec3(toWorld.applyToPoint(tri.points[i])), glm::vec3(toWorldNormal(n)),
+                state, color, surface, backColor, uv, layers });
         }
     }
 
@@ -624,10 +723,11 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
         const bool isHovered
             = active ? (hover.kind == view::PickResult::Kind::Edge && hover.edge == id) : style.hovered;
         if (e.soft && displayStyle != 3 && !(isMarked || (active && (isSelected || isHovered)))) {
-            continue; // muchiile soft (laturile unui cilindru) nu se desenează; în wireframe, da (rețeaua sferei)
+            continue; // muchiile soft (laturile unui cilindru) nu se desenează; în wireframe, da (rețeaua
+                      // sferei)
         }
-        // Profil: muchia de margine a unei suprafețe sau cea dintre o față văzută din față și una din spate (aceasta
-        // depinde de cameră: se alege la fiecare cadru, din `f.profiles`).
+        // Profil: muchia de margine a unei suprafețe sau cea dintre o față văzută din față și una din spate
+        // (aceasta depinde de cameră: se alege la fiecare cadru, din `f.profiles`).
         const bool profiles = m_profiles && displayStyle != 3;
         if (profiles && e.faces.size() == 1) {
             width = kProfileWidth;
@@ -663,9 +763,10 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
         }
         f.lines.push_back({ glm::vec3(p0), glm::vec3(p1), color, { width, 0.0f } });
         if (cameraProfile) {
-            f.profiles.push_back({ f.lines.size() - 1,
-                toWorld.applyToPoint((mesh.position(e.v0) + mesh.position(e.v1)) * 0.5),
-                normalMatrix * mesh.face(e.faces[0]).plane.normal, normalMatrix * mesh.face(e.faces[1]).plane.normal });
+            f.profiles.push_back(
+                { f.lines.size() - 1, toWorld.applyToPoint((mesh.position(e.v0) + mesh.position(e.v1)) * 0.5),
+                    normalMatrix * mesh.face(e.faces[0]).plane.normal,
+                    normalMatrix * mesh.face(e.faces[1]).plane.normal });
         }
     }
 
@@ -689,14 +790,16 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
                     }
                 }
                 if (crossing.size() == 2) {
-                    f.lines.push_back({ glm::vec3(crossing[0]), glm::vec3(crossing[1]), cutColor, { kProfileWidth, 0.0f } });
+                    f.lines.push_back({ glm::vec3(crossing[0]), glm::vec3(crossing[1]), cutColor,
+                        { kProfileWidth, 0.0f } });
                 }
             }
         }
     }
 
     // Instanțele din definiție.
-    const std::set<model::InstanceId> markedInstances(overlay.markedInstances.begin(), overlay.markedInstances.end());
+    const std::set<model::InstanceId> markedInstances(
+        overlay.markedInstances.begin(), overlay.markedInstances.end());
     for (model::InstanceId child : model.childrenOf(definition)) {
         if (!model.isVisible(child)) {
             continue;
@@ -720,8 +823,8 @@ void Viewport::appendDefinition(DocumentPass& f, const Document& doc, model::Def
             childStyle.material = inst.material;
         }
         if (const auto animated = doc.displayColor(child)) {
-            childStyle.colorOverride = glm::vec4(animated->r / 255.0f, animated->g / 255.0f, animated->b / 255.0f,
-                animated->a / 255.0f);
+            childStyle.colorOverride = glm::vec4(
+                animated->r / 255.0f, animated->g / 255.0f, animated->b / 255.0f, animated->a / 255.0f);
         }
         childStyle.dim = dim;
         appendDefinition(f, doc, inst.definition, childToWorld, -1, childStyle, hover, overlay);
@@ -789,7 +892,8 @@ void Viewport::updateAnnotations()
             if (!a || !b || glm::length(*b - *a) < kMinDimensionPx) {
                 continue;
             }
-            // Eticheta stă lângă mijlocul segmentului, deplasată perpendicular (spre partea de sus a ecranului).
+            // Eticheta stă lângă mijlocul segmentului, deplasată perpendicular (spre partea de sus a
+            // ecranului).
             const view::Vec2d dir = glm::normalize(*b - *a);
             view::Vec2d normal { -dir.y, dir.x };
             if (normal.y > 0.0) {
@@ -824,7 +928,8 @@ void Viewport::updateAnnotations()
             if (a.kind == model::Annotation::Kind::Dimension) {
                 anchor = (anchor + t.applyToPoint(a.b + a.offset)) * 0.5;
                 if (text.isEmpty()) {
-                    text = QString::fromStdString(units::formatLength(glm::length(t.applyToPoint(a.b) - t.applyToPoint(a.a))));
+                    text = QString::fromStdString(
+                        units::formatLength(glm::length(t.applyToPoint(a.b) - t.applyToPoint(a.a))));
                 }
             }
             if (const auto p = m_camera.project(anchor)) {
@@ -924,7 +1029,8 @@ math::Transform Viewport::definitionToWorld(const Document& doc, model::Definiti
     // Pe calea editată, transformarea e cea a căii.
     for (std::size_t i = 0; i < doc.path().size(); ++i) {
         if (model.instance(doc.path()[i]).definition == definition) {
-            return model::worldTransform(model, { doc.path().begin(), doc.path().begin() + static_cast<std::ptrdiff_t>(i + 1) });
+            return model::worldTransform(
+                model, { doc.path().begin(), doc.path().begin() + static_cast<std::ptrdiff_t>(i + 1) });
         }
     }
     math::Transform t;
@@ -945,6 +1051,20 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
 {
     const model::Model& model = doc.model();
     const double far = std::max(m_camera.pose().distance * 40.0, 100000.0);
+
+    // Latura de cant de sub cursor în Inspector, pe placa selectată: groasă, deasupra modelului.
+    if (doc.hoveredBandSide() >= 0 && doc.selection().instances.size() == 1 && !cleanView()) {
+        const model::InstanceId id = *doc.selection().instances.begin();
+        if (model.instances().contains(id)) {
+            const math::Transform t = doc.contextTransform() * model.instance(id).transform;
+            for (const BandSegment& s : bandSegments(model, model.instance(id).definition)) {
+                if (s.side == doc.hoveredBandSide()) {
+                    f.topLines.push_back({ glm::vec3(t.applyToPoint(s.a)), glm::vec3(t.applyToPoint(s.b)),
+                        toVec4(m_accent), { 4.0f, 0.0f } });
+                }
+            }
+        }
+    }
 
     // Ghidajele: linii punctate lungi și puncte.
     const glm::vec4 guide = toVec4(m_guide);
@@ -979,8 +1099,10 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         }
     }
 
-    // Pivotul selecției: un punct cu trei axe scurte, deasupra geometriei (se vede și în interiorul obiectului).
-    if (const auto pivot = doc.pivotDragging() ? doc.pivotDragPoint() : doc.selectionPivot(); pivot && !cleanView()) {
+    // Pivotul selecției: un punct cu trei axe scurte, deasupra geometriei (se vede și în interiorul
+    // obiectului).
+    if (const auto pivot = doc.pivotDragging() ? doc.pivotDragPoint() : doc.selectionPivot();
+        pivot && !cleanView()) {
         const glm::dvec3 p = definitionToWorld(doc, doc.activeDefinition()).applyToPoint(*pivot);
         const double len = std::max(glm::length(p - f.eye), 1.0) * 0.035;
         const glm::vec3 pf(p);
@@ -997,7 +1119,8 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
     for (const model::SectionPlane& s : model.sections().values()) {
         const glm::dvec3 n = glm::normalize(s.normal);
         const glm::dvec3 c = center - n * glm::dot(center - s.point, n);
-        const glm::dvec3 u = glm::normalize(glm::cross(std::abs(n.z) < 0.9 ? glm::dvec3(0, 0, 1) : glm::dvec3(1, 0, 0), n));
+        const glm::dvec3 u
+            = glm::normalize(glm::cross(std::abs(n.z) < 0.9 ? glm::dvec3(0, 0, 1) : glm::dvec3(1, 0, 0), n));
         const glm::dvec3 v = glm::cross(n, u);
         const std::array<glm::dvec3, 4> corners { c + (u + v) * size, c + (u - v) * size, c - (u + v) * size,
             c - (u - v) * size };
@@ -1008,34 +1131,40 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         }
     }
 
-    // Camerele și luminile: gizmo-uri (mărime constantă pe ecran; nu și în exporturi) și luminile pentru shader.
+    // Camerele și luminile: gizmo-uri (mărime constantă pe ecran; nu și în exporturi) și luminile pentru
+    // shader.
     const glm::vec4 gizmoColor = withAlpha(m_preview, 0.9f);
     const glm::vec4 selectedColor = toVec4(m_accent);
     const auto screenScale = [&](const glm::dvec3& p) {
         // ~1 px în mm la adâncimea punctului.
-        const double depth = isOrthographic() ? m_camera.pose().distance
-                                              : std::max(glm::dot(p - m_camera.eye(), m_camera.forward()), 1.0);
+        const double depth = isOrthographic()
+            ? m_camera.pose().distance
+            : std::max(glm::dot(p - m_camera.eye(), m_camera.forward()), 1.0);
         return m_camera.worldPerPixelAtTarget() * depth / std::max(m_camera.pose().distance, 1e-6);
     };
     const auto basis = [](const glm::dvec3& dir) {
         const glm::dvec3 f = glm::normalize(dir);
-        const glm::dvec3 r = glm::normalize(glm::cross(f, std::abs(f.z) > 0.99 ? glm::dvec3(1, 0, 0) : glm::dvec3(0, 0, 1)));
+        const glm::dvec3 r
+            = glm::normalize(glm::cross(f, std::abs(f.z) > 0.99 ? glm::dvec3(1, 0, 0) : glm::dvec3(0, 0, 1)));
         return std::array<glm::dvec3, 3> { f, r, glm::cross(r, f) };
     };
-    const auto line = [&](const glm::dvec3& a, const glm::dvec3& b, const glm::vec4& color, float width = 1.25f,
-                          float dash = 0.0f) { f.lines.push_back({ glm::vec3(a), glm::vec3(b), color, { width, dash } }); };
+    const auto line = [&](const glm::dvec3& a, const glm::dvec3& b, const glm::vec4& color,
+                          float width = 1.25f, float dash = 0.0f) {
+        f.lines.push_back({ glm::vec3(a), glm::vec3(b), color, { width, dash } });
+    };
     for (std::size_t i = 0; i < model.cameras().size(); ++i) {
         const model::CameraObject& c = model.cameras().values()[i];
         const bool selected = model.cameras().keys()[i] == doc.selectedCamera();
         // Camera prin care privim nu se desenează (am fi în ea).
-        if ((!c.visible && !selected) || m_cleanCapture || static_cast<double>(model.cameras().keys()[i].value) == m_lookCamera) {
+        if ((!c.visible && !selected) || m_cleanCapture
+            || static_cast<double>(model.cameras().keys()[i].value) == m_lookCamera) {
             continue;
         }
         const glm::vec4 color = selected ? selectedColor : gizmoColor;
         const glm::dvec3 eye = c.position;
         const double k = screenScale(eye) * 36.0 * c.displaySize;
-        // Baza camerei ca în vederea prin ea (cu roll), iar cadrul după lentilă, format și shift: piramida arată exact
-        // ce vede camera.
+        // Baza camerei ca în vederea prin ea (cu roll), iar cadrul după lentilă, format și shift: piramida
+        // arată exact ce vede camera.
         view::Camera lens;
         lens.setPose(view::poseLookingAt(c.position, c.target));
         lens.setRoll(glm::radians(c.roll));
@@ -1051,9 +1180,10 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
             h = w / aspect;
         }
         const double longHalf = std::max(w, h);
-        const glm::dvec3 frameCenter = eye + fw * k + r * (c.shift.x * 2.0 * longHalf) + u * (c.shift.y * 2.0 * longHalf);
-        const std::array<glm::dvec3, 4> q { frameCenter + r * w + u * h, frameCenter - r * w + u * h, frameCenter - r * w - u * h,
-            frameCenter + r * w - u * h };
+        const glm::dvec3 frameCenter
+            = eye + fw * k + r * (c.shift.x * 2.0 * longHalf) + u * (c.shift.y * 2.0 * longHalf);
+        const std::array<glm::dvec3, 4> q { frameCenter + r * w + u * h, frameCenter - r * w + u * h,
+            frameCenter - r * w - u * h, frameCenter + r * w - u * h };
         for (std::size_t j = 0; j < 4; ++j) {
             // Ortografică: muchii paralele (din planul camerei); în perspectivă: din ochi.
             line(c.orthographic ? q[j] - fw * k : eye, q[j], color);
@@ -1079,7 +1209,8 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
             d.position = glm::vec3(l.position);
             d.direction = glm::vec3(glm::normalize(l.direction));
             const auto lin = [](double c) { return static_cast<float>(std::pow(c, 2.2)); };
-            d.color = glm::vec3(lin(qc.redF()), lin(qc.greenF()), lin(qc.blueF())) * static_cast<float>(l.intensity);
+            d.color = glm::vec3(lin(qc.redF()), lin(qc.greenF()), lin(qc.blueF()))
+                * static_cast<float>(l.intensity);
             d.range = static_cast<float>(l.range);
             const double half = glm::radians(l.cone) * 0.5;
             d.cosOuter = static_cast<float>(std::cos(half));
@@ -1143,8 +1274,8 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
         f.topPoints.push_back({ glm::vec3(p), color, selected ? 11.0f : 9.0f });
     }
 
-    // Căile de parcurgere: curba, startul și o săgeată la final; estompate dacă sunt ale altei animații. Nu se văd în
-    // redare și nici în export.
+    // Căile de parcurgere: curba, startul și o săgeată la final; estompate dacă sunt ale altei animații. Nu
+    // se văd în redare și nici în export.
     if (!cleanView()) {
         for (std::size_t i = 0; i < model.motionPaths().size(); ++i) {
             const model::MotionPath& path = model.motionPaths().values()[i];
@@ -1153,8 +1284,11 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
                 continue;
             }
             const bool active = path.animation.value == static_cast<std::uint64_t>(doc.activeAnimation());
-            const glm::vec4 color = selected ? toVec4(m_accent) : active ? withAlpha(m_accent, 0.6f) : withAlpha(m_preview, 0.3f);
-            const std::vector<math::Vec3d> samples = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
+            const glm::vec4 color = selected ? toVec4(m_accent)
+                : active                     ? withAlpha(m_accent, 0.6f)
+                                             : withAlpha(m_preview, 0.3f);
+            const std::vector<math::Vec3d> samples
+                = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
             if (samples.size() < 2) {
                 continue;
             }
@@ -1174,8 +1308,10 @@ void Viewport::appendModelExtras(ViewportFrame& f, const Document& doc) const
                 const glm::dvec3 n = glm::normalize(path.transform.applyToVector(path.normal));
                 const glm::dvec3 side = glm::normalize(glm::cross(n, dir));
                 const double k = screenScale(end) * 12.0;
-                f.topLines.push_back({ glm::vec3(end), glm::vec3(end - dir * k + side * k * 0.6), color, { 2.0f, 0.0f } });
-                f.topLines.push_back({ glm::vec3(end), glm::vec3(end - dir * k - side * k * 0.6), color, { 2.0f, 0.0f } });
+                f.topLines.push_back(
+                    { glm::vec3(end), glm::vec3(end - dir * k + side * k * 0.6), color, { 2.0f, 0.0f } });
+                f.topLines.push_back(
+                    { glm::vec3(end), glm::vec3(end - dir * k - side * k * 0.6), color, { 2.0f, 0.0f } });
             }
         }
     }
@@ -1219,12 +1355,14 @@ std::optional<std::pair<QString, double>> Viewport::objectHandleAt(QPointF posit
             if (!path.visible) {
                 continue;
             }
-            const std::vector<math::Vec3d> samples = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
+            const std::vector<math::Vec3d> samples
+                = geom::sampleBezier(path.curve, geom::defaultTolerance(path.curve));
             // O cale închisă are și segmentul dintre ultimul eșantion și primul.
             const std::size_t count = path.curve.closed ? samples.size() : samples.size() - 1;
             for (std::size_t k = 0; samples.size() > 1 && k < count; ++k) {
                 const auto a = m_camera.project(path.transform.applyToPoint(samples[k]));
-                const auto b = m_camera.project(path.transform.applyToPoint(samples[(k + 1) % samples.size()]));
+                const auto b
+                    = m_camera.project(path.transform.applyToPoint(samples[(k + 1) % samples.size()]));
                 if (!a || !b) {
                     continue;
                 }
@@ -1234,7 +1372,8 @@ std::optional<std::pair<QString, double>> Viewport::objectHandleAt(QPointF posit
                 const double d = glm::length(cursor - (*a + ab * t));
                 if (d < bestPath) {
                     bestPath = d;
-                    best = std::pair { QStringLiteral("path"), static_cast<double>(model.motionPaths().keys()[i].value) };
+                    best = std::pair { QStringLiteral("path"),
+                        static_cast<double>(model.motionPaths().keys()[i].value) };
                 }
             }
         }
@@ -1246,8 +1385,9 @@ QVariantMap Viewport::cameraState() const
 {
     const view::CameraPose& p = m_camera.pose();
     return QVariantMap { { QStringLiteral("tx"), p.target.x }, { QStringLiteral("ty"), p.target.y },
-        { QStringLiteral("tz"), p.target.z }, { QStringLiteral("yaw"), p.yaw }, { QStringLiteral("pitch"), p.pitch },
-        { QStringLiteral("distance"), p.distance }, { QStringLiteral("ortho"), isOrthographic() },
+        { QStringLiteral("tz"), p.target.z }, { QStringLiteral("yaw"), p.yaw },
+        { QStringLiteral("pitch"), p.pitch }, { QStringLiteral("distance"), p.distance },
+        { QStringLiteral("ortho"), isOrthographic() },
         { QStringLiteral("fov"), glm::degrees(m_camera.fovY()) } };
 }
 
@@ -1256,8 +1396,8 @@ namespace {
 view::CameraPose poseFromState(const QVariantMap& state)
 {
     view::CameraPose pose;
-    pose.target = { state.value(QStringLiteral("tx")).toDouble(), state.value(QStringLiteral("ty")).toDouble(),
-        state.value(QStringLiteral("tz")).toDouble() };
+    pose.target = { state.value(QStringLiteral("tx")).toDouble(),
+        state.value(QStringLiteral("ty")).toDouble(), state.value(QStringLiteral("tz")).toDouble() };
     pose.yaw = state.value(QStringLiteral("yaw")).toDouble();
     pose.pitch = state.value(QStringLiteral("pitch")).toDouble();
     pose.distance = state.value(QStringLiteral("distance")).toDouble();
@@ -1289,7 +1429,8 @@ void Viewport::applyLensState(const LensState& state)
     m_camera.setFovY(state.fovY);
     m_camera.setRoll(state.roll);
     m_camera.setShift(state.shift);
-    m_camera.setProjection(state.orthographic ? view::Projection::Orthographic : view::Projection::Perspective);
+    m_camera.setProjection(
+        state.orthographic ? view::Projection::Orthographic : view::Projection::Perspective);
 }
 
 const model::CameraObject* Viewport::lookedCamera() const
@@ -1338,10 +1479,12 @@ void Viewport::applyLookThrough()
     const LensState next { lens->pose(), lens->fovY(), lens->roll(), lens->shift(),
         lens->projection() == view::Projection::Orthographic };
     const model::CameraObject& c = *lookedCamera();
-    m_camera.setClipOverride(c.nearClip > 0.0 ? c.nearClip : m_clipStart, c.farClip > 0.0 ? c.farClip : m_clipEnd);
+    m_camera.setClipOverride(
+        c.nearClip > 0.0 ? c.nearClip : m_clipStart, c.farClip > 0.0 ? c.farClip : m_clipEnd);
     const LensState now = lensState();
-    const bool same = now.pose.target == next.pose.target && now.pose.yaw == next.pose.yaw && now.pose.pitch == next.pose.pitch
-        && now.pose.distance == next.pose.distance && now.fovY == next.fovY && now.roll == next.roll && now.shift == next.shift
+    const bool same = now.pose.target == next.pose.target && now.pose.yaw == next.pose.yaw
+        && now.pose.pitch == next.pose.pitch && now.pose.distance == next.pose.distance
+        && now.fovY == next.fovY && now.roll == next.roll && now.shift == next.shift
         && now.orthographic == next.orthographic;
     if (!same) {
         applyLensState(next);
@@ -1370,12 +1513,14 @@ void Viewport::setLookThrough(double cameraId)
         if (!m_beforeLook) {
             m_beforeLook = from; // vederea la care se întoarce ieșirea
         }
-        m_lensFlight = LensFlight { from, { lens->pose(), lens->fovY(), lens->roll(), lens->shift(),
-            lens->projection() == view::Projection::Orthographic } };
+        m_lensFlight = LensFlight { from,
+            { lens->pose(), lens->fovY(), lens->roll(), lens->shift(),
+                lens->projection() == view::Projection::Orthographic } };
     } else {
         m_lookCamera = 0.0;
         m_lockNavigating = false;
-        const LensState back = m_beforeLook.value_or(LensState { from.pose, view::Camera::kDefaultFovY, 0.0, {}, from.orthographic });
+        const LensState back = m_beforeLook.value_or(
+            LensState { from.pose, view::Camera::kDefaultFovY, 0.0, {}, from.orthographic });
         m_beforeLook.reset();
         m_lensFlight = LensFlight { from, back };
         m_camera.setClipOverride(m_clipStart, m_clipEnd);
@@ -1395,7 +1540,8 @@ void Viewport::leaveLookNow()
         return;
     }
     // Fără zbor: unghiul, roll-ul, shift-ul și proiecția de dinainte, poza rămâne (o animează apelantul).
-    const LensState before = m_beforeLook.value_or(LensState { m_camera.pose(), view::Camera::kDefaultFovY, 0.0, {}, false });
+    const LensState before
+        = m_beforeLook.value_or(LensState { m_camera.pose(), view::Camera::kDefaultFovY, 0.0, {}, false });
     m_lensFlight.reset();
     m_lookCamera = 0.0;
     m_lockNavigating = false;
@@ -1405,7 +1551,8 @@ void Viewport::leaveLookNow()
     m_camera.setFovY(before.fovY);
     m_camera.setRoll(0.0);
     m_camera.setShift({});
-    m_camera.setProjection(before.orthographic ? view::Projection::Orthographic : view::Projection::Perspective);
+    m_camera.setProjection(
+        before.orthographic ? view::Projection::Orthographic : view::Projection::Perspective);
     m_camera.setClipOverride(m_clipStart, m_clipEnd);
     onCameraMoved();
     emit lookThroughChanged();
@@ -1430,7 +1577,9 @@ bool Viewport::advanceLookThrough(double dt)
         LensState s;
         s.pose = view::interpolatePose(f.from.pose, f.to.pose, k);
         // Unghiul se interpolează pe tangentă (zoom-ul optic pare liniar), roll-ul pe drumul scurt.
-        s.fovY = 2.0 * std::atan(std::tan(f.from.fovY * 0.5) + (std::tan(f.to.fovY * 0.5) - std::tan(f.from.fovY * 0.5)) * k);
+        s.fovY = 2.0
+            * std::atan(
+                std::tan(f.from.fovY * 0.5) + (std::tan(f.to.fovY * 0.5) - std::tan(f.from.fovY * 0.5)) * k);
         const double dRoll = std::remainder(f.to.roll - f.from.roll, 2.0 * std::numbers::pi);
         s.roll = f.from.roll + dRoll * k;
         s.shift = f.from.shift + (f.to.shift - f.from.shift) * k;
@@ -1456,7 +1605,8 @@ QRectF Viewport::lookFrame() const
     if (lookedCamera() == nullptr || m_lensFlight) {
         return {};
     }
-    const model::FrameRect f = model::frameInViewport(lookedCameraShown(), { width(), height() }, m_lookMargin);
+    const model::FrameRect f
+        = model::frameInViewport(lookedCameraShown(), { width(), height() }, m_lookMargin);
     return { f.min.x, f.min.y, f.max.x - f.min.x, f.max.y - f.min.y };
 }
 
@@ -1475,8 +1625,9 @@ QString Viewport::lookLabel() const
             break;
         }
     }
-    const QString lens = c->orthographic ? QStringLiteral("paralelă")
-                                         : QStringLiteral("%1 mm").arg(QString::number(c->focalLength, 'f', c->focalLength < 10 ? 1 : 0));
+    const QString lens = c->orthographic
+        ? QStringLiteral("paralelă")
+        : QStringLiteral("%1 mm").arg(QString::number(c->focalLength, 'f', c->focalLength < 10 ? 1 : 0));
     return QString::fromStdString(c->name) + QStringLiteral(" · ") + lens + QStringLiteral(" · ") + format;
 }
 
@@ -1513,8 +1664,8 @@ void Viewport::previewLookAspect(double aspect)
     emit lookFrameChanged();
 }
 
-// Navigarea cu camera blocată pe vedere s-a terminat: camera-obiect primește poziția și ținta vederii (un pas de undo);
-// în Animare, vederea devine o cheie a camerei animației.
+// Navigarea cu camera blocată pe vedere s-a terminat: camera-obiect primește poziția și ținta vederii (un pas
+// de undo); în Animare, vederea devine o cheie a camerei animației.
 void Viewport::commitLockedView()
 {
     m_lockNavigating = false;
@@ -1536,7 +1687,8 @@ void Viewport::commitLockedView()
         { QStringLiteral("target"), QVariantList { target.x, target.y, target.z } } };
     if (c->orthographic) { // zoom-ul ortografic schimbă scara cadrului
         const double before = glm::length(c->target - c->position);
-        changes.insert(QStringLiteral("orthoScale"), c->orthoScale * m_camera.pose().distance / std::max(before, 1e-6));
+        changes.insert(
+            QStringLiteral("orthoScale"), c->orthoScale * m_camera.pose().distance / std::max(before, 1e-6));
     }
     m_document->setCameraProperties(m_lookCamera, changes);
 }
@@ -1549,8 +1701,9 @@ void Viewport::animateToCamera(const QVariantMap& state, double seconds)
     leaveLookNow();
     setOrthographic(state.value(QStringLiteral("ortho")).toBool());
     // Vederea prin cameră folosește unghiul ei; celelalte (scene, vederi standard) pe cel implicit.
-    m_camera.setFovY(state.contains(QStringLiteral("fov")) ? glm::radians(state.value(QStringLiteral("fov")).toDouble())
-                                                           : view::Camera::kDefaultFovY);
+    m_camera.setFovY(state.contains(QStringLiteral("fov"))
+            ? glm::radians(state.value(QStringLiteral("fov")).toDouble())
+            : view::Camera::kDefaultFovY);
     if (seconds >= 0.0) {
         m_motion.animateTo(m_camera, poseFromState(state), seconds);
     } else {
@@ -1608,8 +1761,8 @@ void Viewport::advanceSceneAnimation(double dt)
     }
 }
 
-void Viewport::exportScenes(const QVariantList& states, double transition, double delay, bool loop,
-    const QString& directory, int fps)
+void Viewport::exportScenes(
+    const QVariantList& states, double transition, double delay, bool loop, const QString& directory, int fps)
 {
     if (states.isEmpty() || m_exporting) {
         return;
@@ -1663,7 +1816,8 @@ void Viewport::exportAnimation(const QString& directory, int fps)
     m_exportTimeline = true;
     m_exportFps = std::clamp(fps, 1, 120);
     m_exportFrame = 0;
-    m_exportFrames = std::max(1, static_cast<int>(std::ceil(m_document->animationDuration() * m_exportFps)) + 1);
+    m_exportFrames
+        = std::max(1, static_cast<int>(std::ceil(m_document->animationDuration() * m_exportFps)) + 1);
     m_exportDirectory = directory;
     m_exportProgress = 0.0;
     emit sceneAnimationChanged();
@@ -1694,7 +1848,9 @@ void Viewport::exportNextFrame()
             emit sceneAnimationChanged();
         }
     }
-    const QString file = QStringLiteral("%1/frame_%2.png").arg(m_exportDirectory).arg(m_exportFrame, 5, 10, QLatin1Char('0'));
+    const QString file = QStringLiteral("%1/frame_%2.png")
+                             .arg(m_exportDirectory)
+                             .arg(m_exportFrame, 5, 10, QLatin1Char('0'));
     if (!saveImage(file)) {
         cancelExport();
         return;
@@ -1756,7 +1912,8 @@ QImage Viewport::renderImage()
         captureRect = lookFrame();
         cameraFormat = QSize(lookedCamera()->formatWidth, lookedCamera()->formatHeight);
     }
-    // grabWindow sincronizează doar elementele marcate pentru actualizare: cerem un cadru nou în ambele stări.
+    // grabWindow sincronizează doar elementele marcate pentru actualizare: cerem un cadru nou în ambele
+    // stări.
     m_cleanCapture = true;
     update();
     const QImage frame = window()->grabWindow();
@@ -1769,7 +1926,8 @@ QImage Viewport::renderImage()
     for (QQuickItem* child : hidden) {
         child->setVisible(true);
     }
-    const qreal dpr = frame.devicePixelRatio() > 0 ? frame.devicePixelRatio() : window()->effectiveDevicePixelRatio();
+    const qreal dpr
+        = frame.devicePixelRatio() > 0 ? frame.devicePixelRatio() : window()->effectiveDevicePixelRatio();
     const QRectF scene = mapRectToScene(captureRect);
     const QRect pixels(qRound(scene.x() * dpr), qRound(scene.y() * dpr), qRound(scene.width() * dpr),
         qRound(scene.height() * dpr));
@@ -1921,8 +2079,8 @@ void Viewport::updateSceneBounds()
     view::Vec3d lo;
     view::Vec3d hi;
     sceneBounds(lo, hi);
-    // Marcajele camerelor și ale luminilor nu trebuie tăiate de planul îndepărtat (doar pentru tăiere; umbrele
-    // folosesc cutia geometriei).
+    // Marcajele camerelor și ale luminilor nu trebuie tăiate de planul îndepărtat (doar pentru tăiere;
+    // umbrele folosesc cutia geometriei).
     if (m_document) {
         for (const model::CameraObject& c : m_document->model().cameras().values()) {
             lo = glm::min(lo, c.position);
@@ -1970,11 +2128,12 @@ void Viewport::startTurntable(double seconds)
 
 void Viewport::sceneBounds(view::Vec3d& min, view::Vec3d& max) const
 {
-    // Cutia modelului se recalculează doar când modelul se schimbă (o cer fiecare cadru, fiecare zoom și fiecare
-    // schimbare a documentului, deci și hover-ul).
+    // Cutia modelului se recalculează doar când modelul se schimbă (o cer fiecare cadru, fiecare zoom și
+    // fiecare schimbare a documentului, deci și hover-ul).
     const std::uint64_t revision = m_document ? m_document->modelRevision() : 0U;
     const void* document = m_document;
-    if (!m_sceneBoundsCache || std::get<0>(*m_sceneBoundsCache) != revision || std::get<1>(*m_sceneBoundsCache) != document) {
+    if (!m_sceneBoundsCache || std::get<0>(*m_sceneBoundsCache) != revision
+        || std::get<1>(*m_sceneBoundsCache) != document) {
         const auto b = m_document ? model::bounds(m_document->model(), m_document->model().root())
                                   : std::pair { view::Vec3d { 1.0 }, view::Vec3d { -1.0 } };
         m_sceneBoundsCache = std::tuple { revision, document, b.first, b.second };
@@ -2006,8 +2165,9 @@ void Viewport::collectTextures(ViewportFrame& f, const Document& doc) const
     for (std::size_t i = 0; i < model.textures().size(); ++i) {
         const std::uint64_t id = model.textures().keys()[i].value;
         const model::Texture& t = model.textures().values()[i];
-        const std::size_t key = std::hash<std::string_view> {}(
-            std::string_view(reinterpret_cast<const char*>(t.data.data()), std::min<std::size_t>(t.data.size(), 4096)))
+        const std::size_t key
+            = std::hash<std::string_view> {}(std::string_view(
+                  reinterpret_cast<const char*>(t.data.data()), std::min<std::size_t>(t.data.size(), 4096)))
             ^ t.data.size();
         auto& cached = m_textureCache[id];
         if (cached.first != key || cached.second.isNull()) {
@@ -2020,13 +2180,14 @@ void Viewport::collectTextures(ViewportFrame& f, const Document& doc) const
     f.textureSignature = signature;
 }
 
-std::shared_ptr<const DocumentPass> Viewport::documentPass(const std::optional<glm::dvec4>& section, std::size_t textures) const
+std::shared_ptr<const DocumentPass> Viewport::documentPass(
+    const std::optional<glm::dvec4>& section, std::size_t textures) const
 {
-    // Tot ce schimbă desenul modelului: documentul (modelul, selecția, hover-ul, unealta cresc `revision`), aspectul
-    // (culori, stil, profile), texturile, secțiunea, vederea curată (export, redare) și cutia demo.
+    // Tot ce schimbă desenul modelului: documentul (modelul, selecția, hover-ul, unealta cresc `revision`),
+    // aspectul (culori, stil, profile), texturile, secțiunea, vederea curată (export, redare) și cutia demo.
     DocumentPassCache::Key key { m_document, m_document ? m_document->revision() : 0U,
-        m_document ? m_document->interactionRevision() : 0U, cleanView(), m_demoVisible, m_appearanceGeneration,
-        m_displayStyle, textures, section };
+        m_document ? m_document->interactionRevision() : 0U, cleanView(), m_demoVisible,
+        m_appearanceGeneration, m_displayStyle, textures, section };
     if (m_documentPass->pass && m_documentPass->key == key) {
         return m_documentPass->pass;
     }
@@ -2108,19 +2269,23 @@ ViewportFrame Viewport::frameForRendering() const
         f.envReflection = 0.0f;
     }
     f.ambientOcclusion = m_ambientOcclusion;
-    // Depth of field: doar prin cameră (și deci la exportul prin ea), după zbor; o cameră ortografică n-are focus.
-    if (const model::CameraObject* c = lookedCamera(); c != nullptr && !m_lensFlight && c->dof.enabled && !c->orthographic) {
+    // Depth of field: doar prin cameră (și deci la exportul prin ea), după zbor; o cameră ortografică n-are
+    // focus.
+    if (const model::CameraObject* c = lookedCamera();
+        c != nullptr && !m_lensFlight && c->dof.enabled && !c->orthographic) {
         const QRectF frame = lookFrame();
         const double dpr = window() != nullptr ? window()->effectiveDevicePixelRatio() : 1.0;
         f.dof.enabled = true;
         f.dof.focus = static_cast<float>(c->dof.focusDistance);
         f.dof.focal = static_cast<float>(c->focalLength);
         f.dof.fStop = static_cast<float>(c->dof.fStop);
-        f.dof.pixelsPerMm = static_cast<float>(std::max(frame.width(), frame.height()) * dpr / std::max(c->sensorWidth, 1.0));
+        f.dof.pixelsPerMm = static_cast<float>(
+            std::max(frame.width(), frame.height()) * dpr / std::max(c->sensorWidth, 1.0));
     }
     const auto [sunDir, sunIntensity] = sunPosition(m_sunHour, m_sunMonth, m_latitude);
     f.sunDirection = m_shadows ? sunDir : glm::normalize(glm::dvec3(-0.4, -0.6, 0.7));
-    f.sunIntensity = (m_shadows ? sunIntensity : 1.0) * (m_environment == QLatin1String("innorat") ? 0.35 : 1.0);
+    f.sunIntensity
+        = (m_shadows ? sunIntensity : 1.0) * (m_environment == QLatin1String("innorat") ? 0.35 : 1.0);
     f.shadows = m_shadows && sunIntensity > 0.0 && f.style != 3;
     sceneBounds(f.sceneMin, f.sceneMax);
     if (m_document) {
@@ -2158,7 +2323,8 @@ ViewportFrame Viewport::frameForRendering() const
     // Obiectul tras din bibliotecă: cutia lui, cu accent, peste tot restul.
     if (m_dropPreview && !cleanView()) {
         const glm::vec3 size(m_dropPreview->second.x(), m_dropPreview->second.y(), m_dropPreview->second.z());
-        const glm::vec3 lo = glm::vec3(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z())
+        const glm::vec3 lo
+            = glm::vec3(m_dropPreview->first.x(), m_dropPreview->first.y(), m_dropPreview->first.z())
             - glm::vec3(size.x * 0.5f, size.y * 0.5f, 0.0f);
         const glm::vec3 hi = lo + size;
         const glm::vec4 color = toVec4(m_accent);
@@ -2166,15 +2332,16 @@ ViewportFrame Viewport::frameForRendering() const
         for (std::size_t k = 0; k < 8; ++k) {
             c[k] = { (k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z };
         }
-        constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 },
-            { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+        constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 },
+            { 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
         for (const auto& [a, b] : kEdges) {
             f.topLines.push_back({ c[std::size_t(a)], c[std::size_t(b)], color, { 1.5f, 0.0f } });
         }
         f.topPoints.push_back({ lo + glm::vec3(size.x * 0.5f, size.y * 0.5f, 0.0f), color, 7.0f });
         // Inferența punctului de plasare: ghidajele și marcajul, ca la unelte.
         if (m_document) {
-            appendInferenceDrawing(f.lines, f.topLines, f.topPoints, m_dropOverlay, m_document->contextTransform());
+            appendInferenceDrawing(
+                f.lines, f.topLines, f.topPoints, m_dropOverlay, m_document->contextTransform());
         }
     }
     f.points.push_back({ { 0, 0, 0 }, toVec4(m_axisZ.lighter(130)), 5.0f });
@@ -2211,8 +2378,8 @@ void Viewport::onCameraMoved()
 {
     markMotion();
     updateAnnotations();
-    // QML (gizmo-ul, bara de stare...) află de cameră o dată pe cadru: mouse-ul trimite până la 120 de mișcări pe
-    // secundă, iar legăturile reevaluate la fiecare umpleau firul principal și opreau cadrele.
+    // QML (gizmo-ul, bara de stare...) află de cameră o dată pe cadru: mouse-ul trimite până la 120 de
+    // mișcări pe secundă, iar legăturile reevaluate la fiecare umpleau firul principal și opreau cadrele.
     m_cameraNotifyPending = true;
     polish();
     if (isOrthographic() != m_notifiedOrthographic) {
@@ -2257,8 +2424,11 @@ void Viewport::onAfterAnimating()
         advanceSceneAnimation(dt);
     }
     const bool interacting = m_document && m_document->advanceInteractions(dt);
-    // Camera animației: la redarea timeline-ului sau cât rulează, în Modul interacțiune, o animație cu chei de cameră.
-    if (interacting && (m_document->playing() || (m_document->interactionMode() && m_document->animationCameraActive()))) {
+    // Camera animației: la redarea timeline-ului sau cât rulează, în Modul interacțiune, o animație cu chei
+    // de cameră.
+    if (interacting
+        && (m_document->playing()
+            || (m_document->interactionMode() && m_document->animationCameraActive()))) {
         applyAnimationCamera();
     }
     if (m_turntableSecondsLeft > 0.0) {
@@ -2267,7 +2437,8 @@ void Viewport::onAfterAnimating()
         m_turntableSecondsLeft -= dt;
         onCameraMoved();
     }
-    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting) || interacting || looking) {
+    if (m_motion.isActive() || m_turntableSecondsLeft > 0.0 || (m_sceneAnimation && !m_exporting)
+        || interacting || looking) {
         update();
     } else {
         m_ticking = false;
@@ -2278,7 +2449,8 @@ void Viewport::itemChange(ItemChange change, const ItemChangeData& data)
 {
     if (change == ItemSceneChange && data.window != nullptr) {
         connect(data.window, &QQuickWindow::afterAnimating, this, &Viewport::onAfterAnimating);
-        connect(data.window, &QQuickWindow::frameSwapped, this,
+        connect(
+            data.window, &QQuickWindow::frameSwapped, this,
             [this] { m_framesThisSecond.fetch_add(1, std::memory_order_relaxed); }, Qt::DirectConnection);
     }
     QQuickRhiItem::itemChange(change, data);
@@ -2345,8 +2517,8 @@ void Viewport::beginDrag(Drag drag, QPointF position)
 void Viewport::updateInteractionCursor(QPointF position)
 {
     const QString kind = m_document->interactionHover(m_camera, toVec2(position));
-    setCursor(kind == QLatin1String("drag") ? Qt::OpenHandCursor
-            : kind == QLatin1String("click") ? Qt::PointingHandCursor
+    setCursor(kind == QLatin1String("drag")    ? Qt::OpenHandCursor
+            : kind == QLatin1String("click")   ? Qt::PointingHandCursor
             : kind == QLatin1String("context") ? Qt::WhatsThisCursor
                                                : Qt::ArrowCursor);
 }
@@ -2368,7 +2540,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         && m_navigationTool.isEmpty()) {
         forceActiveFocus(Qt::MouseFocusReason);
         if (event->button() == Qt::RightButton) {
-            if (m_document->interactionEvent(m_camera, toVec2(event->position()), QStringLiteral("rightClick"))) {
+            if (m_document->interactionEvent(
+                    m_camera, toVec2(event->position()), QStringLiteral("rightClick"))) {
                 requestAnimationFrame();
             }
         } else if (event->button() == Qt::LeftButton) {
@@ -2384,7 +2557,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
                 disconnect(&m_longPressTimer, nullptr, this, nullptr);
                 connect(&m_longPressTimer, &QTimer::timeout, this, [this] {
                     if (m_interactionPressed && m_document
-                        && m_document->interactionEvent(m_camera, toVec2(m_interactionPress), QStringLiteral("longPress"))) {
+                        && m_document->interactionEvent(
+                            m_camera, toVec2(m_interactionPress), QStringLiteral("longPress"))) {
                         m_longPressFired = true;
                         requestAnimationFrame();
                     }
@@ -2400,22 +2574,26 @@ void Viewport::mousePressEvent(QMouseEvent* event)
     if (m_pickingAnchor && event->button() == Qt::LeftButton && m_document) {
         const model::Model& model = m_document->model();
         if (const auto hit = view::pickInstance(model, model.root(), m_camera, toVec2(event->position()))) {
-            m_document->anchorToPath(static_cast<double>(m_document->selectedPath().value), static_cast<double>(hit->instance.value));
+            m_document->anchorToPath(static_cast<double>(m_document->selectedPath().value),
+                static_cast<double>(hit->instance.value));
         }
         setPickingAnchor(false);
         event->accept();
         return;
     }
-    // „Alege punctul de focus” (depth of field): distanța de la cameră la punctul de sub cursor, pe direcția privirii.
+    // „Alege punctul de focus” (depth of field): distanța de la cameră la punctul de sub cursor, pe direcția
+    // privirii.
     if (m_pickingFocus && event->button() == Qt::LeftButton && m_document) {
-        const model::CameraId id = m_lookCamera > 0.0 ? model::CameraId { static_cast<std::uint64_t>(m_lookCamera) }
-                                                      : m_document->selectedCamera();
+        const model::CameraId id = m_lookCamera > 0.0
+            ? model::CameraId { static_cast<std::uint64_t>(m_lookCamera) }
+            : m_document->selectedCamera();
         const model::CameraObject* c = m_document->model().cameras().find(id);
         const auto point = m_document->surfacePoint(m_camera, toVec2(event->position()));
         if (c != nullptr && point) {
             const math::Vec3d axis = glm::normalize(c->target - c->position);
             const double distance = std::max(glm::dot(*point - c->position, axis), 1.0);
-            m_document->setCameraProperties(static_cast<double>(id.value), { { QStringLiteral("focusDistance"), distance } });
+            m_document->setCameraProperties(
+                static_cast<double>(id.value), { { QStringLiteral("focusDistance"), distance } });
         }
         setPickingFocus(false);
         event->accept();
@@ -2452,8 +2630,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             return;
         }
     }
-    // Marcajul pivotului (cu unealta Select) se trage: până la eliberare lucrează unealta „pivot” (mai jos, ca orice
-    // unealtă), care se prinde ca Move; un singur pas de undo.
+    // Marcajul pivotului (cu unealta Select) se trage: până la eliberare lucrează unealta „pivot” (mai jos,
+    // ca orice unealtă), care se prinde ca Move; un singur pas de undo.
     const bool pivotPress = drag == Drag::None && event->button() == Qt::LeftButton && m_document
         && m_document->activeTool() == QLatin1String("select") && !m_document->curveEditing()
         && pivotUnder(event->position());
@@ -2467,7 +2645,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             // Dublu click pe o cale: editarea curbei ei.
             if (handle->first == QLatin1String("path")) {
                 const qint64 now = m_frameClock.nsecsElapsed();
-                const qint64 interval = qint64(QGuiApplication::styleHints()->mouseDoubleClickInterval()) * 1'000'000;
+                const qint64 interval
+                    = qint64(QGuiApplication::styleHints()->mouseDoubleClickInterval()) * 1'000'000;
                 const bool twice = now - m_lastPathClickNs <= interval
                     && QLineF(event->position(), m_lastPathClickPosition).length() <= kMultiClickDistancePx;
                 m_lastPathClickNs = twice ? 0 : now;
@@ -2482,7 +2661,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
             // Se poate și trage: mutarea întreagă e un singur pas de undo.
             if (const auto start = m_document->selectedObjectPosition()) {
                 m_objectDrag = ObjectDrag { *start, *start, event->position(), false };
-                if (const auto grab = objectDragPoint(event->position(), event->modifiers().testFlag(Qt::ShiftModifier))) {
+                if (const auto grab
+                    = objectDragPoint(event->position(), event->modifiers().testFlag(Qt::ShiftModifier))) {
                     m_objectDrag->grab = *grab;
                 }
                 m_document->beginMacro("Mută");
@@ -2513,7 +2693,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
         event->ignore();
         return;
     }
-    // Prin cameră: navigarea iese din ea (zbor înapoi), sau, blocată pe vedere, mută camera. În timpul zborului nu.
+    // Prin cameră: navigarea iese din ea (zbor înapoi), sau, blocată pe vedere, mută camera. În timpul
+    // zborului nu.
     if (m_lensFlight) {
         event->accept();
         return;
@@ -2560,7 +2741,8 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
         onCameraMoved();
     } else if (m_objectDrag && m_document) {
         const bool vertical = event->modifiers().testFlag(Qt::ShiftModifier);
-        if (!m_objectDrag->moved && QLineF(event->position(), m_objectDrag->press).length() <= kMultiClickDistancePx) {
+        if (!m_objectDrag->moved
+            && QLineF(event->position(), m_objectDrag->press).length() <= kMultiClickDistancePx) {
             return;
         }
         if (!m_objectDrag->moved || vertical != m_objectDrag->vertical) {
@@ -2612,7 +2794,8 @@ std::optional<math::Vec3d> Viewport::objectDragPoint(QPointF position, bool vert
     math::Vec3d normal { 0, 0, 1 };
     if (vertical) {
         const math::Vec3d f = m_camera.forward();
-        normal = glm::length(math::Vec2d(f.x, f.y)) > 1e-6 ? glm::normalize(math::Vec3d(f.x, f.y, 0.0)) : math::Vec3d { 0, 1, 0 };
+        normal = glm::length(math::Vec2d(f.x, f.y)) > 1e-6 ? glm::normalize(math::Vec3d(f.x, f.y, 0.0))
+                                                           : math::Vec3d { 0, 1, 0 };
     }
     const double denom = glm::dot(normal, ray.direction);
     if (std::abs(denom) < 1e-9) {
@@ -2627,7 +2810,8 @@ std::optional<math::Vec3d> Viewport::objectDragPoint(QPointF position, bool vert
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_interactionPressed && m_document && m_document->interactionMode() && event->button() == Qt::LeftButton) {
+    if (m_interactionPressed && m_document && m_document->interactionMode()
+        && event->button() == Qt::LeftButton) {
         m_interactionPressed = false;
         m_longPressTimer.stop();
         if (m_interactionDragging) {
@@ -2647,7 +2831,8 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
         return;
     }
     if (event->button() == Qt::RightButton) {
-        if (m_rightPress && QLineF(*m_rightPress, event->position()).length() <= kMultiClickDistancePx && m_document) {
+        if (m_rightPress && QLineF(*m_rightPress, event->position()).length() <= kMultiClickDistancePx
+            && m_document) {
             m_document->selectForContextMenu(m_camera, toVec2(event->position()));
             afterToolEvent();
             emit contextMenuRequested(event->position());
@@ -2687,7 +2872,8 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
 void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
 {
     if (m_document && m_document->interactionMode() && event->button() == Qt::LeftButton) {
-        if (m_document->interactionEvent(m_camera, toVec2(event->position()), QStringLiteral("doubleClick"))) {
+        if (m_document->interactionEvent(
+                m_camera, toVec2(event->position()), QStringLiteral("doubleClick"))) {
             requestAnimationFrame();
         }
         event->accept();
@@ -2697,7 +2883,8 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* event)
     if (event->button() == Qt::MiddleButton && !(m_lookCamera > 0.0 && m_lockCamera)) {
         leaveLookNow();
         auto pose = m_camera.pose();
-        const auto surface = m_document ? m_document->surfacePoint(m_camera, toVec2(event->position())) : std::nullopt;
+        const auto surface
+            = m_document ? m_document->surfacePoint(m_camera, toVec2(event->position())) : std::nullopt;
         pose.target = surface ? *surface : m_camera.zoomAnchorAt(toVec2(event->position()));
         m_motion.animateTo(m_camera, pose);
         requestAnimationFrame();
@@ -2761,8 +2948,10 @@ void Viewport::wheelEvent(QWheelEvent* event)
             m_camera.pan(toVec2(d));
             showTransientCursor(Qt::ClosedHandCursor);
         } else {
-            // Pivotul se alege la începutul gestului (sau la fiecare eveniment, dacă dispozitivul nu are faze).
-            if (event->phase() == Qt::ScrollBegin || event->phase() == Qt::NoScrollPhase || !m_trackpadOrbiting) {
+            // Pivotul se alege la începutul gestului (sau la fiecare eveniment, dacă dispozitivul nu are
+            // faze).
+            if (event->phase() == Qt::ScrollBegin || event->phase() == Qt::NoScrollPhase
+                || !m_trackpadOrbiting) {
                 beginOrbitAt(pos);
                 m_trackpadOrbiting = true;
             }
@@ -2786,7 +2975,8 @@ void Viewport::wheelEvent(QWheelEvent* event)
         return;
     }
     const double factor = std::pow(kWheelZoomStep, steps);
-    if (m_lockNavigating) { // camera blocată: pasul se aplică imediat, ca scrierea de la sfârșit să-l prindă întreg
+    if (m_lockNavigating) { // camera blocată: pasul se aplică imediat, ca scrierea de la sfârșit să-l prindă
+                            // întreg
         m_motion.stop();
         m_camera.zoomAbout(factor, zoomAnchor(pos));
         onCameraMoved();

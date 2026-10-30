@@ -50,6 +50,9 @@ public:
         double x = 0.0, double y = 0.0, double z = 0.0);
     // "length", "width", "thickness" (număr) sau "type" (text) pe placa `id`.
     Q_INVOKABLE bool setBoardValue(double id, const QString& key, const QVariant& value);
+    // Cantul pe latura `side` (0–3 = L1, L2, W1, W2) a plăcii `id`: `bandKey` "" = fără, `decor` = cheia unui
+    // material inclus ("" = ca placa).
+    Q_INVOKABLE bool setBand(double id, int side, const QString& bandKey, const QString& decor = QString());
     Q_INVOKABLE QVariantList selection() const;
     Q_INVOKABLE void select(const QVariantList& ids);
     Q_INVOKABLE void command(const QString& id);

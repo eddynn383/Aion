@@ -306,6 +306,92 @@ std::array<int, 4> bandSlots(const PartSpec& part, const PartMeasure& measure)
     return { 2, 3, 0, 1 };
 }
 
+std::string_view bandSideName(int side)
+{
+    static constexpr std::array<std::string_view, 4> kNames { "L1", "L2", "W1", "W2" };
+    return side >= 0 && side < 4 ? kNames[static_cast<std::size_t>(side)] : std::string_view {};
+}
+
+namespace {
+
+// Indicele din `PartSpec::bands` al laturii L1…W2 a plăcii (măsurată pe geometria ei, fără transformare).
+int bandSlot(const Model& model, DefinitionId definition, int side)
+{
+    const PartSpec& part = *model.definition(definition).part;
+    return bandSlots(
+        part, measurePart(model, definition, math::Transform {}))[static_cast<std::size_t>(side)];
+}
+
+bool isBoardPart(const Model& model, DefinitionId definition)
+{
+    const Definition& def = model.definition(definition);
+    return def.part && def.part->kind == PartSpec::Kind::Board;
+}
+
+} // namespace
+
+bool setBand(
+    Model& model, DefinitionId definition, int side, std::string_view bandKey, std::string_view decor)
+{
+    if (side < 0 || side > 3 || !isBoardPart(model, definition)) {
+        return false;
+    }
+    Definition def = model.definition(definition);
+    if (!bandKey.empty() && !bandFitsBoard(bandKey, def.part->typeKey)) {
+        return false;
+    }
+    const int slot = bandSlot(model, definition, side);
+    BandSide& target = def.part->bands[static_cast<std::size_t>(slot)];
+    const BandSide next { std::string(bandKey), bandKey.empty() ? std::string() : std::string(decor) };
+    if (target == next) {
+        return true;
+    }
+    target = next;
+    model.setDefinition(definition, def);
+    return true;
+}
+
+std::array<BandSide, 4> boardBands(const Model& model, DefinitionId definition)
+{
+    std::array<BandSide, 4> out {};
+    if (!isBoardPart(model, definition)) {
+        return out;
+    }
+    const PartSpec& part = *model.definition(definition).part;
+    for (int k = 0; k < 4; ++k) {
+        out[static_cast<std::size_t>(k)]
+            = part.bands[static_cast<std::size_t>(bandSlot(model, definition, k))];
+    }
+    return out;
+}
+
+std::span<const BandPreset> builtinBandPresets()
+{
+    static const std::array<BandPreset, 3> kPresets { {
+        { "Fără", {} },
+        { "Toate 2 mm", { { { "abs.2", "" }, { "abs.2", "" }, { "abs.2", "" }, { "abs.2", "" } } } },
+        { "L1 2 mm, restul 0,4 mm",
+            { { { "abs.2", "" }, { "abs.0.4", "" }, { "abs.0.4", "" }, { "abs.0.4", "" } } } },
+    } };
+    return kPresets;
+}
+
+int applyBandPreset(Model& model, DefinitionId definition, const std::array<BandSide, 4>& sides)
+{
+    if (!isBoardPart(model, definition)) {
+        return 0;
+    }
+    int skipped = 0;
+    for (int k = 0; k < 4; ++k) {
+        const BandSide& side = sides[static_cast<std::size_t>(k)];
+        if (!setBand(model, definition, k, side.bandKey, side.decor)) {
+            setBand(model, definition, k, {}, {});
+            ++skipped;
+        }
+    }
+    return skipped;
+}
+
 bool makeBoard(Model& model, InstanceId instance, std::string_view boardTypeKey)
 {
     const DefinitionId d = model.instance(instance).definition;

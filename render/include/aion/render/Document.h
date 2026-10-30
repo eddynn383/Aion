@@ -46,6 +46,9 @@ class Document : public QObject, private model::ModelObserver {
     // activă.
     Q_PROPERTY(QString activeTool READ activeTool WRITE setActiveTool NOTIFY activeToolChanged)
     Q_PROPERTY(QString toolStatus READ toolStatus NOTIFY toolStatusChanged)
+    // Latura de cant (0–3 = L1…W2) de sub cursor în Inspector, evidențiată pe placa selectată; −1 = niciuna.
+    Q_PROPERTY(
+        int hoveredBandSide READ hoveredBandSide WRITE setHoveredBandSide NOTIFY hoveredBandSideChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     // ⌘C a pus ceva în clipboard-ul documentului (⌘V îl poate lipi).
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
@@ -428,6 +431,16 @@ public:
     // Placa parametrică selectată (ADR 0044): "length", "width", "thickness" (număr) sau "type" (cheia
     // tipului).
     Q_INVOKABLE void setBoardValue(const QString& key, const QVariant& value);
+    // Cantul plăcii selectate (pasul 7): o latură (`bandKey` "" = fără, `decor` = cheia unui material inclus,
+    // "" = ca placa) sau toate patru (o presetare: listă de { bandKey, decor } pe L1, L2, W1, W2).
+    Q_INVOKABLE void setBand(int side, const QString& bandKey, const QString& decor);
+    Q_INVOKABLE void setBands(const QVariantList& sides);
+    // Presetările de cant incluse: { name, sides }.
+    Q_INVOKABLE QVariantList bandPresets() const;
+    // Toate tipurile de cant: { key, label }.
+    Q_INVOKABLE QVariantList allBandTypes() const;
+    [[nodiscard]] int hoveredBandSide() const { return m_hoveredBandSide; }
+    void setHoveredBandSide(int side);
     Q_INVOKABLE void restoreBoard();
     // O placă nouă cu colțul minim în `corner` (coordonatele contextului); întoarce id-ul obiectului.
     double createBoardAt(
@@ -676,6 +689,7 @@ public:
 
 signals:
     void activeToolChanged();
+    void hoveredBandSideChanged();
     void toolStatusChanged();
     void clipboardChanged();
     void historyChanged();
@@ -849,13 +863,17 @@ private:
     void finishDivider(const std::optional<math::Vec3d>& at, bool atClick);
     // Corpul ales pentru „Adaugă separator” și trecerea din coordonatele contextului în ale lui.
     model::DefinitionId carcassTarget(math::Transform* bodyFromContext) const;
+    [[nodiscard]] QVariantList boardBandsInfo(model::DefinitionId definition) const;
+    [[nodiscard]] QVariantList bandTypesFor(const std::string& boardType) const;
+    [[nodiscard]] QVariantList bandDecors() const;
     struct Clipboard {
         std::shared_ptr<const model::Model> model; // modelul de la ⌘C
         std::vector<model::InstanceId> instances;
     };
     std::optional<Clipboard> m_clipboard;
     std::optional<tools::PlaceSource> m_place; // lipirea în curs (unealta „place”)
-    bool m_dividerActive = false; // „Adaugă separator” în curs (unealta „divider”)
+    bool m_dividerActive = false;
+    int m_hoveredBandSide = -1; // „Adaugă separator” în curs (unealta „divider”)
     model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
     model::MotionPathId m_editPath; // sau calea editată
     model::MotionPathId m_selectedPath;

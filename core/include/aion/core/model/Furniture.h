@@ -89,6 +89,26 @@ struct PartMeasure {
 [[nodiscard]] PartMeasure measurePart(
     const Model& model, DefinitionId definition, const math::Transform& toWorld);
 
+// --- Cantul (pasul 7) ---
+// Laturile unei plăci, cum le vede utilizatorul: 0 = L1, 1 = L2 (laturile paralele cu fibra), 2 = W1, 3 = W2.
+[[nodiscard]] std::string_view bandSideName(int side);
+// Cantul pe latura `side` (L1…W2) a plăcii `definition`: `bandKey` gol = fără; `decor` = cheia unui material
+// inclus, gol = „ca placa”. False dacă definiția nu e o placă sau cantul nu se potrivește tipului plăcii.
+bool setBand(
+    Model& model, DefinitionId definition, int side, std::string_view bandKey, std::string_view decor = {});
+// Cantul plăcii, în ordinea L1, L2, W1, W2.
+[[nodiscard]] std::array<BandSide, 4> boardBands(const Model& model, DefinitionId definition);
+
+struct BandPreset {
+    std::string name;
+    std::array<BandSide, 4> sides {}; // L1, L2, W1, W2
+};
+// „Fără”, „Toate 2 mm”, „L1 2 mm, restul 0,4 mm”.
+[[nodiscard]] std::span<const BandPreset> builtinBandPresets();
+// O presetare pe placă: laturile cu un cant care nu se potrivește tipului rămân fără cant. Întoarce câte
+// laturi au rămas fără cant din cauza tipului.
+int applyBandPreset(Model& model, DefinitionId definition, const std::array<BandSide, 4>& sides);
+
 // Geometria e o cutie simplă aliniată la axele definiției (6 fețe, 8 vârfuri în colțurile cutiei).
 [[nodiscard]] bool isSimpleBox(const geom::Mesh& mesh);
 

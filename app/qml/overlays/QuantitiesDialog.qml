@@ -23,7 +23,12 @@ Popover {
 
     readonly property var cutOptions: ({ sheetLength: sheetLength, sheetWidth: sheetWidth, waste: waste / 100,
                                          maxThickness: maxThickness, excluded: excludedKeys,
-                                         cutDimensions: cutDimensions })
+                                         cutDimensions: cutDimensions, bandAllowance: UserPrefs.bandAllowance,
+                                         bandAllowanceByType: root.parseJson(UserPrefs.bandAllowanceByType) })
+
+    function parseJson(text) {
+        try { return JSON.parse(text) } catch (e) { return ({}) }
+    }
     readonly property var checkedKeys: {
         const out = {}
         for (const p of (root.cuts.parts ?? []))
