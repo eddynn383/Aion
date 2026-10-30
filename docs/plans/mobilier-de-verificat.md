@@ -25,3 +25,5 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Decorul cantului | Doar materialele incluse de tip decor sau lemn | Pasul 7 | |
 | Lista „În model” | Dalele au iconița și „×N”, fără miniatură randată (amânată); doar componentele (Creează componentă sau copiile ⌥D), nu obiectele simple ⌘G | Pasul 8 | |
 | Mutarea unei piese cu rol în alt părinte (Outliner) | Fără confirmarea „Corpul devine obișnuit” încă (doar Explode și grupările o cer) | Pasul 6 | |
+| „Placă pe față”: ghidul animat | Textul ghidului există; scena animată din ToolDemo lipsește (amânată) | Pasul 10 | |
+| Decorul plăcilor desenate cu „Placă pe față” | Fără decor (Implicit), ca plăcile din scripturi; cele din corpuri primesc „Alb (decor)” | Pasul 10 | |

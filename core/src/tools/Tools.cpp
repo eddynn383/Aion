@@ -2,6 +2,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
+#include "aion/core/model/Furniture.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/PenCurves.h"
 #include "aion/core/tools/Tool.h"
@@ -398,9 +399,16 @@ private:
 
 // --- Rectangle ------------------------------------------------------------------------------
 
+// Rectangle; cu `board`, „Placă pe față” (mobilier, pasul 10): dreptunghiul devine o placă parametrică cu
+// grosimea pe normala planului (spre exteriorul feței) și fibra pe latura mai lungă.
 class RectangleTool final : public Tool {
 public:
-    std::string_view id() const override { return "rectangle"; }
+    explicit RectangleTool(bool board = false)
+        : m_board(board)
+    {
+    }
+
+    std::string_view id() const override { return m_board ? "board" : "rectangle"; }
 
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
@@ -455,6 +463,11 @@ public:
 
     std::string status() const override
     {
+        if (m_board) {
+            return m_origin
+                ? "Alege colțul opus al plăcii sau tastează dimensiunile (600,400) · Esc anulează"
+                : "Placă pe față: alege primul colț pe o față (placa iese spre exterior) sau pe sol";
+        }
         return m_origin ? "Alege colțul opus sau tastează dimensiunile (3000,2000) · Esc anulează"
                         : "Alege primul colț (pe sol sau pe o față)";
     }
@@ -545,11 +558,47 @@ private:
         if (!corners) {
             return;
         }
-        const std::vector<Vec3d> pts(corners->begin(), corners->end());
-        ctx.stack.run("Rectangle", [&](geom::Mesh& mesh) { geom::drawPolygon(mesh, pts); });
+        if (m_board && ctx.model != nullptr) {
+            createBoardFrom(ctx, *corners);
+        } else {
+            const std::vector<Vec3d> pts(corners->begin(), corners->end());
+            ctx.stack.run("Rectangle", [&](geom::Mesh& mesh) { geom::drawPolygon(mesh, pts); });
+        }
         m_origin.reset();
         m_engine.resetLock();
         m_shiftLock = false;
+    }
+
+    void createBoardFrom(ToolContext& ctx, const std::array<Vec3d, 4>& c)
+    {
+        // Fibra pe latura mai lungă; rotația proprie (grosimea pe +normală) cu originea mutată dacă trebuie.
+        Vec3d side1 = c[1] - c[0];
+        Vec3d side2 = c[3] - c[0];
+        if (glm::length(side2) > glm::length(side1)) {
+            std::swap(side1, side2);
+        }
+        Vec3d origin = c[0];
+        const Vec3d ex = glm::normalize(side1);
+        Vec3d ey = glm::normalize(side2);
+        if (glm::dot(glm::cross(ex, ey), m_plane.normal) < 0.0) {
+            origin += side2;
+            ey = -ey;
+        }
+        const Vec3d ez = glm::cross(ex, ey);
+        math::Mat4d m { 1.0 };
+        m[0] = glm::dvec4(ex, 0.0);
+        m[1] = glm::dvec4(ey, 0.0);
+        m[2] = glm::dvec4(ez, 0.0);
+        m[3] = glm::dvec4(origin, 1.0);
+        const BoardDefaults defaults = ctx.boardDefaults != nullptr ? *ctx.boardDefaults : BoardDefaults {};
+        ctx.stack.run("Placă pe față", [&](model::Model& model) {
+            const model::InstanceId id = model::createBoard(model, ctx.context, defaults.type,
+                defaults.thickness, glm::length(side1), glm::length(side2), math::Transform(m));
+            if (id) {
+                ctx.selection.clear();
+                ctx.selection.instances.insert(id);
+            }
+        });
     }
 
     std::optional<std::array<Vec3d, 4>> currentCorners() const
@@ -575,6 +624,7 @@ private:
     inference::Engine m_engine;
     inference::Inference m_inference;
     bool m_shiftLock = false;
+    bool m_board = false;
 };
 
 // --- Push/Pull ------------------------------------------------------------------------------
@@ -899,6 +949,9 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     }
     if (id == "rectangle") {
         return std::make_unique<RectangleTool>();
+    }
+    if (id == "board") {
+        return std::make_unique<RectangleTool>(true); // placă pe față (mobilier)
     }
     if (id == "pushpull") {
         return std::make_unique<PushPullTool>();

@@ -155,6 +155,12 @@ struct ToolRequests {
     bool dividerCancel = false;
 };
 
+// Tipul și grosimea plăcii noi pentru unealta „Placă pe față” (`board`), alese în Inspector.
+struct BoardDefaults {
+    std::string type = "pal";
+    double thickness = 18.0;
+};
+
 struct ToolContext {
     ToolContext(geom::Mesh& mesh, commands::CommandStack& stack, geom::Selection& selection,
         const view::Camera& camera)
@@ -177,6 +183,8 @@ struct ToolContext {
     // folosire.
     model::MaterialId paintMaterial;
     const model::Material* libraryMaterial = nullptr;
+    // „Placă pe față”: tipul și grosimea plăcii noi; nul = PAL 18.
+    const BoardDefaults* boardDefaults = nullptr;
     // Ghidajele contextului, pentru inferență.
     std::span<const inference::GuideRef> guides;
     // Snap la grid: pasul în mm (0 = oprit).
@@ -239,7 +247,7 @@ public:
 };
 
 // "select", "line", "arc", "rectangle", "circle", "polygon", "pushpull", "offset", "move", "rotate", "scale",
-// "eraser"; nullptr pentru o unealtă necunoscută.
+// "eraser", "board" (placă pe față, mobilier); nullptr pentru o unealtă necunoscută.
 [[nodiscard]] std::unique_ptr<Tool> makeTool(std::string_view id);
 
 // Punctul 3D de sub cursor: pe geometrie dacă există, altfel pe planul solului (Z = 0).

@@ -437,6 +437,10 @@ public:
     Q_INVOKABLE void setBands(const QVariantList& sides);
     // Altă variantă a feroneriei selectate (toate aparițiile ei legate).
     Q_INVOKABLE void setHardwareVariant(const QString& typeKey);
+    // „Placă pe față”: tipul și grosimea plăcii noi (Inspector-ul cât unealta e activă).
+    Q_PROPERTY(QVariantMap boardDefaults READ boardDefaults NOTIFY boardDefaultsChanged)
+    QVariantMap boardDefaults() const;
+    Q_INVOKABLE void setBoardDefaults(const QString& type, double thickness);
     // Presetările de cant incluse: { name, sides }.
     Q_INVOKABLE QVariantList bandPresets() const;
     // Toate tipurile de cant: { key, label }.
@@ -695,6 +699,7 @@ public:
 
 signals:
     void activeToolChanged();
+    void boardDefaultsChanged();
     void hoveredBandSideChanged();
     void toolStatusChanged();
     void clipboardChanged();
@@ -881,7 +886,8 @@ private:
     std::optional<Clipboard> m_clipboard;
     std::optional<tools::PlaceSource> m_place; // lipirea în curs (unealta „place”)
     bool m_dividerActive = false;
-    int m_hoveredBandSide = -1; // „Adaugă separator” în curs (unealta „divider”)
+    int m_hoveredBandSide = -1;
+    tools::BoardDefaults m_boardDefaults; // „Adaugă separator” în curs (unealta „divider”)
     model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
     model::MotionPathId m_editPath; // sau calea editată
     model::MotionPathId m_selectedPath;

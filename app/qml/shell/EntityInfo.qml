@@ -123,6 +123,43 @@ Column {
         }
     }
 
+    // „Placă pe față” activă: tipul și grosimea plăcii noi.
+    PropertyGroup {
+        id: newBoardBox
+        readonly property var defaults: root.document ? root.document.boardDefaults : null
+        readonly property var currentType: defaults ? defaults.types.find(t => t.key === defaults.type) : null
+        visible: root.document !== null && root.document.activeTool === "board" && root.modeling
+        title: "Placă nouă"
+        Flow {
+            width: newBoardBox.width
+            spacing: 4
+            Repeater {
+                model: newBoardBox.defaults ? newBoardBox.defaults.types : []
+                delegate: Button {
+                    required property var modelData
+                    text: modelData.label
+                    small: true
+                    variant: newBoardBox.defaults && newBoardBox.defaults.type === modelData.key ? "primary" : "secondary"
+                    onClicked: root.document.setBoardDefaults(modelData.key, newBoardBox.defaults.thickness)
+                }
+            }
+        }
+        Flow {
+            width: newBoardBox.width
+            spacing: 4
+            Repeater {
+                model: newBoardBox.currentType ? newBoardBox.currentType.thicknesses : []
+                delegate: Button {
+                    required property var modelData
+                    text: modelData + " mm"
+                    small: true
+                    variant: newBoardBox.defaults && Math.abs(newBoardBox.defaults.thickness - modelData) < 0.01 ? "primary" : "secondary"
+                    onClicked: root.document.setBoardDefaults(newBoardBox.defaults.type, modelData)
+                }
+            }
+        }
+    }
+
     // Obiect dinamic: parametrii generatorului (lățime, înălțime, număr de polițe…). Copiile legate se schimbă împreună.
     PropertyGroup {
         id: parametersBox

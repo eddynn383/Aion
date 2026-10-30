@@ -52,6 +52,9 @@ Item {
             { id: "dimension", icon: "dimension", name: "Dimension", key: "", phase: 9 },
             { id: "text", icon: "type", name: "Text", key: "", phase: 9 },
             { id: "section", icon: "section", name: "Section Plane", key: "", phase: 9 } ] },
+        // Mobilier: plăci desenate direct pe fețe.
+        { id: "furniture", modes: [0], tools: [
+            { id: "board", icon: "board", name: "Placă pe față", key: "", phase: 35 } ] },
         { id: "erase", modes: [0], tools: [
             { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 } ] }
     ]

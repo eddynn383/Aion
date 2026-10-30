@@ -31,6 +31,13 @@ const guides = {
                 "Sau tastează lățimea și lungimea: 3000,2000"],
         tip: "Pe o față existentă, dreptunghiul o împarte"
     },
+    board: {
+        title: "Placă pe față",
+        summary: "Desenează o placă de mobilier (PAL 18 implicit) direct pe o față: grosimea iese spre exterior.",
+        steps: ["Click pe primul colț, pe o față sau pe sol", "Click pe colțul opus sau tastează 600,400",
+                "Tipul și grosimea plăcii noi se aleg în Inspector cât unealta e activă"],
+        tip: "Fibra merge pe latura mai lungă; placa apare în lista de debitare"
+    },
     circle: {
         title: "Circle",
         summary: "Desenează un cerc (ca poligon cu multe laturi) cu o față în interior.",

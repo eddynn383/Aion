@@ -1399,6 +1399,7 @@ template <class Fn> void Document::withTool(const view::Camera& camera, Fn&& fn)
     }
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
+    ctx.boardDefaults = &m_boardDefaults;
     ctx.toWorld = contextTransform();
     ctx.drawsPaths = m_workMode == Animation; // Pen-ul desenează căi în Animare
     if (const model::PenCurve* c = m_editCurve ? m_model.penCurves().find(m_editCurve) : nullptr) {
@@ -5793,6 +5794,32 @@ void Document::setHardwareVariant(const QString& typeKey)
     runOnModel("Variantă de feronerie",
         [&](model::Model& model) { model::replaceHardwareVariant(model, def, typeKey.toStdString()); });
     emit selectionChanged();
+}
+
+QVariantMap Document::boardDefaults() const
+{
+    QVariantList types;
+    for (const model::BoardType& t : model::boardTypes()) {
+        QVariantList thicknesses;
+        for (const double v : t.thicknesses) {
+            thicknesses.append(v);
+        }
+        types.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(t.key) },
+            { QStringLiteral("label"), QString::fromStdString(t.label) },
+            { QStringLiteral("thicknesses"), thicknesses } });
+    }
+    return { { QStringLiteral("type"), QString::fromStdString(m_boardDefaults.type) },
+        { QStringLiteral("thickness"), m_boardDefaults.thickness }, { QStringLiteral("types"), types } };
+}
+
+void Document::setBoardDefaults(const QString& type, double thickness)
+{
+    if (model::findBoardType(type.toStdString()) == nullptr) {
+        return;
+    }
+    m_boardDefaults.type = type.toStdString();
+    m_boardDefaults.thickness = model::nearestThickness(m_boardDefaults.type, thickness);
+    emit boardDefaultsChanged();
 }
 
 void Document::setHoveredBandSide(int side)
