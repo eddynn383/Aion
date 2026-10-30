@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <numbers>
 #include <set>
 #include <cmath>
 
@@ -1749,7 +1750,7 @@ TEST_CASE("Move: un colț real bate punctul cutiei la aceeași distanță", "[co
     s.selection.instances.insert(a);
 
     const Vec3d airCorner { 3500, 500, 1000 };                          // colțul cutiei cilindrului (în aer)
-    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(M_PI / 4), 500 * std::sin(M_PI / 4), 0 };
+    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
     const Vec2d mid = (s.screen(airCorner) + s.screen(capVertex)) * 0.5; // egal departe de amândouă
 
     auto move = tools::makeTool("move");
@@ -1769,7 +1770,7 @@ TEST_CASE("Move: vârful capacului unui cilindru, pe care punctele cutiei nu-l o
     s.rebuildScene({ a });
     s.selection.instances.insert(a);
 
-    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(M_PI / 4), 500 * std::sin(M_PI / 4), 0 };
+    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
     auto move = tools::makeTool("move");
     s.click(*move, { 500, 500, 1000 });
     s.click(*move, capVertex);
