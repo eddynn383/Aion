@@ -244,34 +244,27 @@ std::shared_ptr<const MeshIndex> indexFor(const geom::Mesh& mesh)
     return index;
 }
 
-// Marginea (în unități de lume) în jurul razei care acoperă `radiusPx` pixeli la adâncimea cutiei: între razele
-// pixelilor vecini, distanța crește liniar cu adâncimea (perspectivă) sau e constantă (ortografic).
-struct NearRay {
-    math::Ray ray;
-    double perPixelAtOrigin = 0.0;
-    double perPixelPerDistance = 0.0;
-    double radiusPx = 0.0;
-
-    NearRay(const Camera& camera, Vec2d screen, double radius)
-        : ray(camera.rayAt(screen))
-        , radiusPx(radius)
-    {
-        const math::Ray dx = camera.rayAt(screen + Vec2d { 1.0, 0.0 });
-        const math::Ray dy = camera.rayAt(screen + Vec2d { 0.0, 1.0 });
-        perPixelAtOrigin = std::max(glm::length(dx.origin - ray.origin), glm::length(dy.origin - ray.origin));
-        perPixelPerDistance = std::max(glm::length(dx.direction - ray.direction), glm::length(dy.direction - ray.direction));
-    }
-
-    [[nodiscard]] bool touches(const Box& b) const
-    {
-        const Vec3d center = (b.lo + b.hi) * 0.5;
-        const double far = glm::length(center - ray.origin) + glm::length(b.hi - b.lo) * 0.5;
-        const double margin = (radiusPx + 1.0) * (perPixelAtOrigin + perPixelPerDistance * far) + 1e-6;
-        return rayHitsBox(ray, b.lo, b.hi, margin);
-    }
-};
-
 } // namespace
+
+NearCursor::NearCursor(const Camera& camera, Vec2d screen, double radiusPx)
+    : m_ray(camera.rayAt(screen))
+    , m_radiusPx(radiusPx)
+{
+    // Între razele pixelilor vecini, distanța crește liniar cu adâncimea (perspectivă) sau e constantă (ortografic).
+    const math::Ray dx = camera.rayAt(screen + Vec2d { 1.0, 0.0 });
+    const math::Ray dy = camera.rayAt(screen + Vec2d { 0.0, 1.0 });
+    m_perPixelAtOrigin = std::max(glm::length(dx.origin - m_ray.origin), glm::length(dy.origin - m_ray.origin));
+    m_perPixelPerDistance
+        = std::max(glm::length(dx.direction - m_ray.direction), glm::length(dy.direction - m_ray.direction));
+}
+
+bool NearCursor::touches(const Vec3d& lo, const Vec3d& hi) const
+{
+    const Vec3d center = (lo + hi) * 0.5;
+    const double far = glm::length(center - m_ray.origin) + glm::length(hi - lo) * 0.5;
+    const double margin = (m_radiusPx + 1.0) * (m_perPixelAtOrigin + m_perPixelPerDistance * far) + 1e-6;
+    return rayHitsBox(m_ray, lo, hi, margin);
+}
 
 void setPickIndexThreshold(std::size_t entities)
 {
@@ -303,8 +296,8 @@ void forEachVertexNear(const geom::Mesh& mesh, const Camera& camera, Vec2d scree
     // Un vârf aproape de cursor e capătul unei muchii aproape de cursor (sau un vârf izolat). Un vârf poate fi
     // vizitat de mai multe ori; apelantul compară distanțele, deci nu contează.
     const auto index = indexFor(mesh);
-    const NearRay near(camera, screen, radiusPx);
-    index->edgeTree.query([&](const Box& b) { return near.touches(b); }, [&](std::uint32_t i) {
+    const NearCursor near(camera, screen, radiusPx);
+    index->edgeTree.query([&](const Box& b) { return near.touches(b.lo, b.hi); }, [&](std::uint32_t i) {
         const geom::Edge& e = mesh.edge(index->edges[i]);
         visit(e.v0);
         visit(e.v1);
@@ -324,8 +317,8 @@ void forEachEdgeNear(const geom::Mesh& mesh, const Camera& camera, Vec2d screen,
         return;
     }
     const auto index = indexFor(mesh);
-    const NearRay near(camera, screen, radiusPx);
-    index->edgeTree.query([&](const Box& b) { return near.touches(b); }, [&](std::uint32_t i) { visit(index->edges[i]); });
+    const NearCursor near(camera, screen, radiusPx);
+    index->edgeTree.query([&](const Box& b) { return near.touches(b.lo, b.hi); }, [&](std::uint32_t i) { visit(index->edges[i]); });
 }
 
 } // namespace aion::view

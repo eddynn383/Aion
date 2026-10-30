@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <glm/geometric.hpp>
+#include <glm/trigonometric.hpp>
 
 using namespace aion;
 using Catch::Approx;
@@ -118,4 +119,39 @@ TEST_CASE("snapScene: ascunse și excluse", "[core][inference][snapscene]")
     const inference::SnapScene scene = model::snapScene(m, {}, { excl });
     REQUIRE(scene.sources.size() == 1);
     CHECK(scene.sources[0].instance == visible);
+}
+
+TEST_CASE("snapScene: cutia fiecărei surse e în coordonatele contextului", "[core][inference][snapscene]")
+{
+    Model m;
+    const model::DefinitionId box = boxDefinition(m, { 400, 200, 300 });
+    const model::DefinitionId grp = groupDefinition(m);
+    // Rotită cu 90° în jurul lui Z și mutată: X și Y își schimbă întinderea.
+    const Transform t
+        = Transform::translation({ 1000, 0, 0 }) * Transform::rotation({ 0, 0, 0 }, { 0, 0, 1 }, glm::radians(90.0));
+    const model::InstanceId rotated = place(m, m.root(), box, t);
+    const model::InstanceId g = place(m, m.root(), grp, Transform::translation({ 0, 5000, 0 }));
+    place(m, grp, box, Transform());
+
+    const inference::SnapScene root = model::snapScene(m, {}, {});
+    REQUIRE(root.sources.size() == 2);
+    for (const inference::SnapSource& s : root.sources) {
+        const Vec3d lo = s.instance == g ? Vec3d { -200, 4900, 0 } : Vec3d { 900, -200, 0 };
+        const Vec3d hi = s.instance == g ? Vec3d { 200, 5100, 300 } : Vec3d { 1100, 200, 300 };
+        CHECK(glm::length(s.lo - lo) < 1e-6);
+        CHECK(glm::length(s.hi - hi) < 1e-6);
+    }
+
+    // Editând grupul, cutia cutiei rotite trece în coordonatele lui.
+    const inference::SnapScene inGroup = model::snapScene(m, { g }, {});
+    REQUIRE(inGroup.sources.size() == 2); // geometria liberă a rădăcinii e goală; cutia rotită și cea din grup
+    bool found = false;
+    for (const inference::SnapSource& s : inGroup.sources) {
+        if (s.instance == rotated) {
+            CHECK(glm::length(s.lo - Vec3d { 900, -5200, 0 }) < 1e-6);
+            CHECK(glm::length(s.hi - Vec3d { 1100, -4800, 300 }) < 1e-6);
+            found = true;
+        }
+    }
+    CHECK(found);
 }

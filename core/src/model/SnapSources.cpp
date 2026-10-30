@@ -2,9 +2,44 @@
 
 #include "aion/core/model/Operations.h"
 
+#include <glm/common.hpp>
+
+#include <limits>
+#include <unordered_map>
+#include <utility>
+
 namespace aion::model {
 
 namespace {
+
+// Cutia vârfurilor unui mesh, în coordonatele lui.
+std::pair<math::Vec3d, math::Vec3d> meshBox(const geom::Mesh& mesh)
+{
+    math::Vec3d lo { std::numeric_limits<double>::infinity() };
+    math::Vec3d hi { -std::numeric_limits<double>::infinity() };
+    for (const geom::Vertex& v : mesh.vertices().values()) {
+        lo = glm::min(lo, v.position);
+        hi = glm::max(hi, v.position);
+    }
+    return { lo, hi };
+}
+
+// Cutia aliniată cu axele care cuprinde cutia `box` după transformarea `t` (cele 8 colțuri).
+void transformBox(const std::pair<math::Vec3d, math::Vec3d>& box, const math::Transform& t, inference::SnapSource& s)
+{
+    const auto& [lo, hi] = box;
+    if (lo.x > hi.x) {
+        return;
+    }
+    s.lo = math::Vec3d { std::numeric_limits<double>::infinity() };
+    s.hi = math::Vec3d { -std::numeric_limits<double>::infinity() };
+    for (int i = 0; i < 8; ++i) {
+        const math::Vec3d corner { (i & 1) ? hi.x : lo.x, (i & 2) ? hi.y : lo.y, (i & 4) ? hi.z : lo.z };
+        const math::Vec3d p = t.applyToPoint(corner);
+        s.lo = glm::min(s.lo, p);
+        s.hi = glm::max(s.hi, p);
+    }
+}
 
 struct Walker {
     const Model& model;
@@ -64,6 +99,15 @@ inference::SnapScene snapScene(const Model& model, const std::vector<InstanceId>
     const math::Transform toLocal = worldTransform(model, path).inverse();
     for (inference::SnapSource& s : w.scene.sources) {
         s.toContext = toLocal * s.toContext;
+    }
+    // Cutiile, o dată pe definiție (multe instanțe pot folosi aceeași).
+    std::unordered_map<const geom::Mesh*, std::pair<math::Vec3d, math::Vec3d>> boxes;
+    for (inference::SnapSource& s : w.scene.sources) {
+        auto it = boxes.find(s.mesh);
+        if (it == boxes.end()) {
+            it = boxes.emplace(s.mesh, meshBox(*s.mesh)).first;
+        }
+        transformBox(it->second, s.toContext, s);
     }
     return std::move(w.scene);
 }

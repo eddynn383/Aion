@@ -11,6 +11,10 @@
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
 
+#include <chrono>
+#include <cstdio>
+#include <set>
+
 using namespace aion;
 using Catch::Approx;
 using geom::Mesh;
@@ -684,4 +688,97 @@ TEST_CASE("Inferență: aliniere dublă", "[core][inference]")
     const auto single = engine.infer(mesh, camera, screen(camera, { 1500, 2000, 0 }) + Vec2d { 0, 4 }, std::nullopt);
     CHECK(single.kind == Kind::FromPoint);
     CHECK(single.guides.size() == 1);
+}
+
+TEST_CASE("Inferență pe obiecte: sursele departe de cursor se sar, fără să schimbe rezultatul", "[core][inference]")
+{
+    model::Model m;
+    const model::InstanceId id = placeBox(m);
+    const inference::SnapScene alone = model::snapScene(m, {}, {});
+    // Multe cutii departe de cutia de lângă cursor.
+    std::set<model::InstanceId> far;
+    for (int k = 0; k < 40; ++k) {
+        far.insert(placeBox(m, Transform::translation({ -6000.0 + (k % 10) * 1500.0, -6000.0 - (k / 10) * 1500.0, 0 })));
+    }
+    const inference::SnapScene all = model::snapScene(m, {}, {});
+    REQUIRE(all.sources.size() == 41);
+    const auto camera = isoCamera();
+
+    // Același șir de mișcări (capete, mijloace, muchii, fețe, sol) dă aceleași rezultate cu și fără cutiile depărtate.
+    inference::Engine one;
+    one.withScene(&alone);
+    inference::Engine many;
+    many.withScene(&all);
+    const Vec2d c = screen(camera, { 4000, 1000, 1000 });
+    int onObject = 0;
+    for (int i = -6; i <= 6; ++i) {
+        for (int j = -6; j <= 6; ++j) {
+            const Vec2d at = c + Vec2d { i * 9.0, j * 7.0 };
+            const auto a = one.infer(m.mesh(m.root()), camera, at, std::nullopt);
+            const auto b = many.infer(m.mesh(m.root()), camera, at, std::nullopt);
+            CHECK(a.kind == b.kind);
+            CHECK(near(a.point, b.point, 1e-9));
+            CHECK(a.sourceInstance == b.sourceInstance);
+            onObject += b.sourceInstance == id ? 1 : 0;
+        }
+    }
+    CHECK(onObject > 20);
+
+    // Cutia hotărăște: aceeași geometrie, cu o cutie mutată departe, nu se mai vede; o cutie necunoscută nu se sare.
+    const Vec3d corner { 4000, 1000, 1000 };
+    inference::SnapScene moved = alone;
+    moved.sources[0].lo = Vec3d { 50000, 50000, 0 };
+    moved.sources[0].hi = Vec3d { 51000, 51000, 1000 };
+    inference::Engine culled;
+    culled.withScene(&moved);
+    auto r = culled.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.origin == Origin::Context);
+    CHECK_FALSE(r.sourceInstance);
+
+    moved.sources[0].lo = Vec3d { 1.0 };
+    moved.sources[0].hi = Vec3d { -1.0 };
+    inference::Engine unknown;
+    unknown.withScene(&moved);
+    r = unknown.infer(m.mesh(m.root()), camera, screen(camera, corner) + Vec2d { 4, 0 }, std::nullopt);
+    CHECK(r.kind == Kind::Endpoint);
+    CHECK(r.sourceInstance == id);
+}
+
+TEST_CASE("Inferență pe obiecte: hover-ul într-o scenă cu 1 000 de obiecte e rapid", "[.perf][core][inference]")
+{
+    model::Model m;
+    for (int i = 0; i < 1000; ++i) {
+        model::Definition def { "Sferă", true };
+        def.shape = "sphere";
+        const model::DefinitionId d = m.addDefinition(def);
+        geom::buildPrimitive(m.mesh(d), geom::Primitive::Sphere, { 400, 400, 400 }, 24);
+        model::Instance inst;
+        inst.parent = m.root();
+        inst.definition = d;
+        inst.transform = Transform::translation({ (i % 20) * 600.0, (i / 20) * 600.0, 0 });
+        m.addInstance(inst);
+    }
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    view::Camera camera;
+    camera.setViewportSize(1600, 1000);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 5700, 14700, 200 }, 0, 0, 40000 }));
+    inference::Engine engine;
+    engine.withScene(&scene);
+    const auto hover = [&](int k) {
+        return engine.infer(m.mesh(m.root()), camera, { 300.0 + (k * 37) % 1000, 200.0 + (k * 53) % 600 }, std::nullopt);
+    };
+    for (int k = 0; k < 20; ++k) {
+        (void)hover(k); // încălzire: indexurile și cache-urile
+    }
+    int onObject = 0;
+    const auto start = std::chrono::steady_clock::now();
+    for (int k = 0; k < 200; ++k) {
+        onObject += hover(k).origin == Origin::Object ? 1 : 0;
+    }
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / 200.0;
+    std::printf("inferență cu SnapScene, 1 000 de obiecte: %.3f ms / hover\n", ms);
+    CHECK(onObject > 0);
+    // Sub un cadru și în build-ul de debug (UBSan, fără optimizări); în release e ~0,15 ms. Fără tăierea surselor
+    // departe de cursor: ~70 ms în release.
+    CHECK(ms < 16.0);
 }

@@ -428,8 +428,13 @@ Inference Engine::infer(const geom::Mesh& mesh, const view::Camera& camera, Vec2
     m_hitCenter.reset();
     std::vector<detail::Layer> layers { { &mesh, camera, nullptr, {} } };
     if (m_scene) {
+        // Doar sursele a căror cutie e lângă cursor: toate căutările (fața de sub cursor, capete, mijloace, muchii, și
+        // în lock) cer un punct la cel mult raza cea mai mare de cursor, deci o sursă departe nu poate da nimic.
+        const view::NearCursor near(
+            camera, screen, std::max(m_options.pointRadiusPx * m_options.hysteresis, m_options.edgeRadiusPx));
         for (const SnapSource& source : m_scene->sources) {
-            if (source.mesh) {
+            const bool bounded = source.lo.x <= source.hi.x;
+            if (source.mesh && (!bounded || near.touches(source.lo, source.hi))) {
                 layers.push_back({ source.mesh, camera.inContext(source.toContext), &source.toContext, source.instance });
             }
         }

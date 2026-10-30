@@ -46,6 +46,22 @@ void setHiddenTags(std::set<model::TagId> tags);
 // Raza atinge cutia aliniată cu axele (cu o margine)? Testul rapid de dinaintea triangulării unei fețe.
 [[nodiscard]] bool rayHitsBox(const math::Ray& ray, const math::Vec3d& lo, const math::Vec3d& hi, double margin = 0.0);
 
+// Vecinătatea cursorului: raza lui, cu o margine care acoperă `radiusPx` pixeli la adâncimea cutiei testate (crește
+// liniar cu adâncimea în perspectivă, constantă în ortografic). Se construiește o dată pe mișcare de mouse.
+class NearCursor {
+public:
+    NearCursor(const Camera& camera, Vec2d screen, double radiusPx);
+    // Cutia (aliniată cu axele, în coordonatele camerei) poate avea un punct la cel mult `radiusPx` pixeli de cursor
+    // sau atins de rază? Un superset: răspunsul „nu” e sigur.
+    [[nodiscard]] bool touches(const math::Vec3d& lo, const math::Vec3d& hi) const;
+
+private:
+    math::Ray m_ray;
+    double m_perPixelAtOrigin = 0.0;
+    double m_perPixelPerDistance = 0.0;
+    double m_radiusPx = 0.0;
+};
+
 // Căutările pe geometrie trec printr-un index (BVH pe fețe, muchii și vârfuri, refăcut doar când se schimbă
 // `Mesh::revision`) de la acest număr de entități în sus; sub el, buclele simple sunt la fel de rapide. Testele îl
 // pot coborî la 0, ca să verifice indexul pe modele mici.
