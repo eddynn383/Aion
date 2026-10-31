@@ -69,9 +69,14 @@ glm::vec4 toVec4(const QColor& c)
 
 // O latură de cant a unei plăci (pasul 7): segmentul de pe mijlocul feței înguste, puțin în afara plăcii, în
 // coordonatele definiției.
+// `a`, `b`: segmentul de pe mijlocul feței înguste (evidențierea din Inspector); `lo`, `hi`: fâșia cantului,
+// cât toată fața îngustă și cu grosimea cantului spre interior, puțin peste fețele plăcii ca să nu se
+// amestece cu ele.
 struct BandSegment {
     glm::dvec3 a;
     glm::dvec3 b;
+    glm::dvec3 lo;
+    glm::dvec3 hi;
     int side = 0; // L1, L2, W1, W2
     const model::BandSide* band = nullptr;
 };
@@ -102,7 +107,17 @@ std::vector<BandSegment> bandSegments(const model::Model& model, model::Definiti
         a[along] = lo[along];
         b[along] = hi[along];
         a[across] = b[across] = (slot % 2 == 0) ? lo[across] - kOutside : hi[across] + kOutside;
-        out.push_back({ a, b, side, &def.part->bands[static_cast<std::size_t>(slot)] });
+        const model::BandSide& band = def.part->bands[static_cast<std::size_t>(slot)];
+        const model::BandType* type = model::findBandType(band.bandKey);
+        const double thick = std::max(type != nullptr ? type->thickness : 0.0, 0.4);
+        glm::dvec3 slabLo = lo - glm::dvec3(kOutside);
+        glm::dvec3 slabHi = hi + glm::dvec3(kOutside);
+        if (slot % 2 == 0) {
+            slabHi[across] = lo[across] + thick;
+        } else {
+            slabLo[across] = hi[across] - thick;
+        }
+        out.push_back({ a, b, slabLo, slabHi, side, &band });
     }
     return out;
 }
@@ -110,6 +125,41 @@ std::vector<BandSegment> bandSegments(const model::Model& model, model::Definiti
 glm::vec4 colorOf(const model::Color& c, float darken = 1.0f)
 {
     return { c.r / 255.0f * darken, c.g / 255.0f * darken, c.b / 255.0f * darken, 1.0f };
+}
+
+// Fâșia unui cant ca o cutie subțire (6 fețe) în culoarea decorului, cu muchiile ei.
+template <class Pass>
+void appendBandSlab(
+    Pass& f, const BandSegment& s, const math::Transform& t, const glm::vec4& color, const glm::vec4& edge)
+{
+    std::array<glm::vec3, 8> c {};
+    for (std::size_t k = 0; k < 8; ++k) {
+        c[k] = glm::vec3(t.applyToPoint(
+            { (k & 1) ? s.hi.x : s.lo.x, (k & 2) ? s.hi.y : s.lo.y, (k & 4) ? s.hi.z : s.lo.z }));
+    }
+    // Fețele cutiei (colțurile în ordine, normala locală).
+    static constexpr std::array<std::array<int, 4>, 6> kFaces { { { 0, 2, 6, 4 }, { 1, 5, 7, 3 },
+        { 0, 4, 5, 1 }, { 2, 3, 7, 6 }, { 0, 1, 3, 2 }, { 4, 6, 7, 5 } } };
+    static constexpr std::array<glm::dvec3, 6> kNormals { { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 },
+        { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } } };
+    for (std::size_t i = 0; i < 6; ++i) {
+        const glm::vec3 n = glm::vec3(glm::normalize(t.applyToNormal(kNormals[i])));
+        const auto& q = kFaces[i];
+        for (const int k : { q[0], q[1], q[2], q[0], q[2], q[3] }) {
+            MeshVertex v;
+            v.position = c[static_cast<std::size_t>(k)];
+            v.normal = n;
+            v.color = color;
+            v.material = { 0.6f, 0.0f };
+            f.triangles.push_back(v);
+        }
+    }
+    static constexpr std::array<std::pair<int, int>, 12> kEdges { { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 },
+        { 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } } };
+    for (const auto& [a, b] : kEdges) {
+        f.lines.push_back(
+            { c[static_cast<std::size_t>(a)], c[static_cast<std::size_t>(b)], edge, { 1.0f, 0.0f } });
+    }
 }
 
 glm::vec4 withAlpha(const QColor& c, float alpha)
@@ -485,8 +535,8 @@ void Viewport::appendDocument(DocumentPass& f) const
     const tools::Overlay overlay = doc.tool() && !cleanView() ? doc.tool()->overlay() : tools::Overlay {};
     appendDefinition(f, doc, doc.model().root(), math::Transform {}, 0, {}, hover, overlay);
 
-    // Cantul: linii în culoarea decorului lui pe laturile plăcilor (decorul „ca placa” = al plăcii, mai
-    // închis).
+    // Cantul: o fâșie pe toată fața îngustă a plăcii, în culoarea decorului lui (decorul „ca placa” = al
+    // plăcii, mai închis).
     if (m_showBands) {
         const model::Model& model = doc.model();
         const std::function<void(model::DefinitionId, const math::Transform&, model::MaterialId)> visit
@@ -510,8 +560,7 @@ void Viewport::appendDocument(DocumentPass& f) const
                           } else if (material && model.materials().contains(material)) {
                               color = colorOf(model.material(material).color, 0.8f);
                           }
-                          f.lines.push_back({ glm::vec3(t.applyToPoint(s.a)), glm::vec3(t.applyToPoint(s.b)),
-                              color, { 3.0f, 0.0f } });
+                          appendBandSlab(f, s, t, color, toVec4(m_edge));
                       }
                       visit(inst.definition, t, material);
                   }

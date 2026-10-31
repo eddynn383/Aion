@@ -21,7 +21,7 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Baza și capacul: pe toată adâncimea sau cât polițele? | Pe toată adâncimea (964 × 600 la dulapul de referință); polițele și separatoarele = adâncimea − spatele | §4 (tabelul de orientare spune altceva; s-a ales dulapul de referință) | |
 | Polițele corpului pentru electrocasnice | În spațiul de sub nișă; ușa de jos acoperă și polița de sub nișă | §4, pasul 6 | |
 | Balamaua și mânerul pe ușă | Balamaua la 5 mm de latura ei, pe spatele ușii; mânerul vertical, la 40 mm de marginea liberă, centrat | §4, pasul 6 | |
-| Liniile de cant în viewport | Pe mijlocul feței înguste, 0,3 mm în afara plăcii, cu adâncime (nu se văd prin alte piese); comutatorul e în Preferințe → Mobilier (nu în bara viewport-ului) | §7 al planului, pasul 7 | |
+| Cantul în viewport | O fâșie pe toată fața îngustă, cu grosimea cantului spre interiorul plăcii (desen, nu geometrie: dimensiunile și lista nu se schimbă); comutatorul e în Preferințe → Mobilier | §7 al planului, pasul 7 (cerut de autor după testare) | |
 | Decorul cantului | Doar materialele incluse de tip decor sau lemn | Pasul 7 | |
 | Lista „În model” | Dalele au iconița și „×N”, fără miniatură randată (amânată); doar componentele (Creează componentă sau copiile ⌥D), nu obiectele simple ⌘G | Pasul 8 | |
 | Mutarea unei piese cu rol în alt părinte (Outliner) | Fără confirmarea „Corpul devine obișnuit” încă (doar Explode și grupările o cer) | Pasul 6 | |
@@ -31,3 +31,4 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | „Întinde”: ghidul animat | Text da, scenă animată nu (amânată) | Pasul 11 | |
 | Limba implicită | Româna (nu limba sistemului) cât traducerea acoperă doar lista de debitare și Inspector-ul | Pasul 12a | |
 | Propozițiile cu numere în traducere | Lipite din bucăți („Afectează ” + N + „ apariții legate.”), fără plural `%n` încă | Pasul 12a | |
+| Ușile corpurilor | Fiecare ușă are o animație de deschidere (0,8 s, 105° spre față) și interacțiunea „Clic → pornește animația (comută)”; copiile legate ale corpului se deschid împreună | Pasul 6 (cerut de autor după testare) | |

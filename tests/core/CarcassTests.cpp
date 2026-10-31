@@ -1,3 +1,4 @@
+#include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/Carcass.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Furniture.h"
@@ -142,10 +143,9 @@ TEST_CASE("Corpuri: balamalele după înălțimea ușii", "[core][carcass]")
     Body tall = makeBody("wardrobe");
     CHECK(countRoles(tall.m, tall.m.instance(role(tall.m, tall.def, "door.2")).definition, "door.2.hinge.")
         == 4);
-    // Ușa 1 din 2 are balamalele pe stânga, ușa 2 pe dreapta.
-    CHECK(tall.m.instance(role(tall.m, tall.def, "door.1")).behavior.anchor == model::Behavior::Anchor::Left);
-    CHECK(
-        tall.m.instance(role(tall.m, tall.def, "door.2")).behavior.anchor == model::Behavior::Anchor::Right);
+    // Ușa 1 din 2 are balamalele (și pivotul) pe stânga, ușa 2 pe dreapta.
+    CHECK(tall.m.instance(role(tall.m, tall.def, "door.1")).pivot->x == Approx(0.0));
+    CHECK(tall.m.instance(role(tall.m, tall.def, "door.2")).pivot->x == Approx(498.5));
 }
 
 TEST_CASE("Corpuri: refacerea păstrează decorul, cantul și separatorul", "[core][carcass]")
@@ -219,19 +219,45 @@ TEST_CASE("Corpuri: un separator mutat de mână rămâne unde e", "[core][carca
     CHECK(center(b.m, divider).x == Approx(400.0));
 }
 
-TEST_CASE("Corpuri: o ușă deschisă se închide la refacere", "[core][carcass]")
+TEST_CASE("Corpuri: fiecare ușă are o animație de deschidere și o interacțiune", "[core][carcass]")
 {
-    Body b = makeBody("base");
-    const model::InstanceId door = role(b.m, b.def, "door.1");
-    model::Instance inst = b.m.instance(door);
-    const Transform closed = inst.transform;
-    inst.behavior.open = true;
-    inst.transform = Transform::rotation({ 0, -18, 0 }, { 0, 0, 1 }, 1.5) * closed;
-    b.m.setInstance(door, inst);
-    CHECK_FALSE(model::rolePiecesDiffer(b.m, b.def)); // deschiderea nu e o modificare de mână
-    REQUIRE(model::setParameter(b.m, b.def, "depth", 500));
-    CHECK_FALSE(b.m.instance(door).behavior.open);
-    CHECK(b.m.instance(door).transform == closed);
+    Body b = makeBody("wardrobe");
+    const auto check = [&](const char* roleKey, double angle) {
+        const model::InstanceId door = role(b.m, b.def, roleKey);
+        REQUIRE(door);
+        const model::Instance& inst = b.m.instance(door);
+        CHECK(inst.behavior.kind == model::Behavior::Kind::None);
+        REQUIRE(inst.rules.size() == 1);
+        const model::Action& play = inst.rules[0].actions.at(0);
+        CHECK(inst.rules[0].trigger == model::Trigger::Click);
+        CHECK(play.kind == model::ActionKind::PlayAnimation);
+        CHECK(play.direction == model::PlayDirection::Toggle);
+        const model::Animation* animation = b.m.animations().find(play.animation);
+        REQUIRE(animation != nullptr);
+        const model::ObjectTrack* track = model::findTrack(*animation, door);
+        REQUIRE(track != nullptr);
+        const model::Channel* rz = model::findChannel(*track, model::Property::RotationZ);
+        REQUIRE(rz != nullptr);
+        CHECK(rz->keys.back().value == Approx(angle));
+        // Deschisă, ușa iese în față (−Y), în jurul laturii balamalelor.
+        const auto open = model::evaluateInstance(*track, animation->duration, inst.transform, *inst.pivot);
+        REQUIRE(open);
+        const Vec3d edge = open->applyToPoint({ angle < 0 ? 300.0 : 200.0, 0.0, 0.0 });
+        CHECK(edge.y < -100.0);
+        return play.animation;
+    };
+    check("door.1", -105.0); // balamalele pe stânga
+    const model::AnimationId second = check("door.2", 105.0);
+    CHECK(b.m.animations().size() == 2);
+
+    // Refacerea păstrează animația; o ușă în minus o șterge.
+    REQUIRE(model::setParameter(b.m, b.def, "width", 1200));
+    CHECK(b.m.animations().size() == 2);
+    CHECK(b.m.instance(role(b.m, b.def, "door.2")).rules[0].actions[0].animation == second);
+    CHECK(b.m.instance(role(b.m, b.def, "door.2")).pivot->x == Approx(598.5));
+    REQUIRE(model::setParameter(b.m, b.def, "doors", 1));
+    CHECK(b.m.animations().size() == 1);
+    CHECK_FALSE(b.m.animations().contains(second));
 }
 
 TEST_CASE("Corpuri: piesele utilizatorului și copiile nu se dublează", "[core][carcass]")

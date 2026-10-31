@@ -101,9 +101,9 @@ void door(std::vector<DesiredPiece>& out, const std::string& role, double x0, do
     group.kind = DesiredPiece::Kind::Group;
     group.transform = math::Transform::translation({ x0, -thickness, z0 });
     group.nameKey = "part.door";
-    group.behavior.kind = Behavior::Kind::Rotate;
+    // Latura balamalelor și lățimea: pentru pivotul și animația de deschidere (ensureDoorMotion).
     group.behavior.anchor = hingesLeft ? Behavior::Anchor::Left : Behavior::Anchor::Right;
-    group.behavior.amount = kDoorAngle;
+    group.length = w;
     out.push_back(group);
 
     DesiredPiece panel
@@ -265,6 +265,79 @@ MaterialId decor(Model& model)
     return index ? model.addMaterial(builtinMaterials()[*index]) : MaterialId {};
 }
 
+constexpr double kDoorSeconds = 0.8;
+
+// Interacțiunea „clic → deschide / închide” a unei uși: o regulă care pornește animația ei în sensul
+// „Comută”.
+bool isDoorRule(const Rule& r)
+{
+    return r.trigger == Trigger::Click && r.actions.size() == 1
+        && r.actions[0].kind == ActionKind::PlayAnimation && r.actions[0].direction == PlayDirection::Toggle;
+}
+
+AnimationId doorAnimation(const Model& model, const Instance& door)
+{
+    for (const Rule& r : door.rules) {
+        if (isDoorRule(r) && model.animations().contains(r.actions[0].animation)) {
+            return r.actions[0].animation;
+        }
+    }
+    return {};
+}
+
+std::string doorLabel(std::string_view role)
+{
+    if (role == "door.lower") {
+        return "ușa de jos";
+    }
+    if (role == "door.upper") {
+        return "ușa de sus";
+    }
+    return "ușa " + std::string(role.substr(role.find('.') + 1));
+}
+
+// Ușa se deschide cu o animație proprie (rotire în jurul laturii balamalelor, spre față), pornită de un clic
+// în Modul interacțiune; în Animare, animația ei arată ușa deschisă. Pivotul ușii e pe latura balamalelor.
+void ensureDoorMotion(Model& model, DefinitionId body, InstanceId door, const DesiredPiece& p)
+{
+    Instance inst = model.instance(door);
+    const bool left = p.behavior.anchor == Behavior::Anchor::Left;
+    inst.behavior = {};
+    inst.pivot = math::Vec3d { left ? 0.0 : p.length, 0.0, 0.0 };
+    const AnimationId existing = doorAnimation(model, inst);
+    Animation animation = existing ? *model.animations().find(existing) : Animation {};
+    animation.name = model.definition(body).name + " · " + doorLabel(p.role);
+    animation.duration = kDoorSeconds;
+    animation.loop = false;
+    std::erase_if(animation.tracks, [&](const ObjectTrack& t) { return t.instance == door; });
+    setChannelKey(animation, door, Property::RotationZ, 0.0, 0.0);
+    setChannelKey(animation, door, Property::RotationZ, kDoorSeconds, left ? -kDoorAngle : kDoorAngle);
+    AnimationId id = existing;
+    if (id) {
+        model.setAnimation(id, animation);
+    } else {
+        id = model.addAnimation(animation);
+        Action play;
+        play.kind = ActionKind::PlayAnimation;
+        play.animation = id;
+        play.direction = PlayDirection::Toggle;
+        Rule rule;
+        rule.trigger = Trigger::Click;
+        rule.actions.push_back(play);
+        inst.rules.push_back(rule);
+    }
+    model.setInstance(door, inst);
+}
+
+// Șterge o piesă; animația unei uși pleacă odată cu ea.
+void removePiece(Model& model, InstanceId id)
+{
+    if (const AnimationId animation = doorAnimation(model, model.instance(id))) {
+        model.removeAnimation(animation);
+    }
+    removeSubtree(model, id);
+}
+
 // Transformarea de bază nouă; cheile de animație ale piesei se mută cu diferența (ca Auto-key oprit).
 void setBase(Model& model, InstanceId id, Instance& inst, const math::Transform& target)
 {
@@ -337,7 +410,7 @@ InstanceId create(Model& model, DefinitionId parent, const DesiredPiece& p)
     inst.nameKey = p.nameKey;
     inst.relativePosition = p.relativePosition;
     if (p.kind == DesiredPiece::Kind::Group) {
-        inst.behavior = p.behavior;
+        // Deschiderea e animația ușii (ensureDoorMotion), nu un comportament.
     } else if (p.kind == DesiredPiece::Kind::Board) {
         inst.material = decor(model);
     }
@@ -477,27 +550,23 @@ void reconcileCarcass(Model& model, DefinitionId body)
             if (p.kind == DesiredPiece::Kind::Board) {
                 updateBoard(model, inst, p);
             }
-            if (p.kind == DesiredPiece::Kind::Group) {
-                // Poza închisă; durata aleasă de utilizator rămâne.
-                inst.behavior.kind = p.behavior.kind;
-                inst.behavior.anchor = p.behavior.anchor;
-                inst.behavior.amount = p.behavior.amount;
-                inst.behavior.open = false;
-            }
             inst.relativePosition = p.relativePosition;
             setBase(model, id, inst, p.transform);
             model.setInstance(id, inst);
             placed[p.role] = id;
         } else {
             if (found) {
-                removeSubtree(model, it->second);
+                removePiece(model, it->second);
             }
             placed[p.role] = create(model, parent, p);
+        }
+        if (p.kind == DesiredPiece::Kind::Group && placed[p.role]) {
+            ensureDoorMotion(model, body, placed[p.role], p);
         }
     }
     for (const auto& [role, id] : existing) {
         if (!wanted.contains(role) && alive(id)) {
-            removeSubtree(model, id);
+            removePiece(model, id);
         }
     }
 }
