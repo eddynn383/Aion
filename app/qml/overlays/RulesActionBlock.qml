@@ -161,7 +161,7 @@ Item {
 
             // „Alternează”: două liste.
             Repeater {
-                model: root.container ? [{ key: "first", label: "întâi:" }, { key: "second", label: "apoi:" }] : []
+                model: root.container ? [{ key: "first", label: qsTrId("RulesActionBlock.intai") }, { key: "second", label: "apoi:" }] : []
                 delegate: Column {
                     required property var modelData
                     width: content.width

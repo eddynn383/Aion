@@ -30,6 +30,9 @@ InstanceId makeGroup(Model& model, DefinitionId context, const geom::Selection& 
 // Explode: geometria definiției (transformată) se lipește de geometria părintelui, instanțele din ea devin
 // copii ai părintelui; definiția dispare dacă nu mai are instanțe. Întoarce entitățile apărute în părinte.
 geom::Selection explode(Model& model, InstanceId instance);
+// Explode ar pierde date de mobilier (date de piesă, cheia unei componente salvate sau parametrii unei plăci); interfața
+// cere confirmare înainte (ADR 0044).
+[[nodiscard]] bool explodeLosesPartData(const Model& model, InstanceId instance);
 
 // Copierea (unică, legată) și „Fă unic”: model/Copying.h.
 

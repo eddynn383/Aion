@@ -33,35 +33,35 @@ Popover {
 
     // --- Blocurile ---
     readonly property var categories: [
-        { name: "Evenimente", color: "#D97706", blocks: [
-            { trigger: "click", label: "Când dau click" }, { trigger: "doubleClick", label: "Când dau dublu-click" },
-            { trigger: "rightClick", label: "Când dau click dreapta" }, { trigger: "longPress", label: "Când țin apăsat" },
-            { trigger: "hoverEnter", label: "Când cursorul intră" }, { trigger: "hoverLeave", label: "Când cursorul iese" },
-            { trigger: "drag", label: "Când trag obiectul" }, { trigger: "key", label: "Când apăs tasta" } ] },
-        { name: "Mișcare", color: "#2563EB", blocks: [ { kind: "moveBy", label: "Mută cu" }, { kind: "moveTo", label: "Mută la" }, { kind: "rotateBy" }, { kind: "scaleTo" } ] },
-        { name: "Aspect", color: "#7C3AED", blocks: [ { kind: "show" }, { kind: "hide" }, { kind: "toggleVisible" }, { kind: "setMaterial" } ] },
-        { name: "Animație și scene", color: "#DB2777", blocks: [ { kind: "playAnimation" }, { kind: "goToScene" } ] },
-        { name: "Control", color: "#EA580C", blocks: [ { kind: "wait" }, { kind: "alternate" } ] }
+        { name: qsTrId("RulesEditor.evenimente"), color: "#D97706", blocks: [
+            { trigger: "click", label: qsTrId("RulesEditor.cand_dau_click") }, { trigger: "doubleClick", label: qsTrId("RulesEditor.cand_dau_dublu_click") },
+            { trigger: "rightClick", label: qsTrId("RulesEditor.cand_dau_click_dreapta") }, { trigger: "longPress", label: qsTrId("RulesEditor.cand_tin_apasat") },
+            { trigger: "hoverEnter", label: qsTrId("RulesEditor.cand_cursorul_intra") }, { trigger: "hoverLeave", label: qsTrId("RulesEditor.cand_cursorul_iese") },
+            { trigger: "drag", label: qsTrId("RulesEditor.cand_trag_obiectul") }, { trigger: "key", label: qsTrId("RulesEditor.cand_apas_tasta") } ] },
+        { name: qsTrId("RulesEditor.miscare"), color: "#2563EB", blocks: [ { kind: "moveBy", label: qsTrId("RulesEditor.muta_cu") }, { kind: "moveTo", label: qsTrId("RulesEditor.muta_la") }, { kind: "rotateBy" }, { kind: "scaleTo" } ] },
+        { name: qsTrId("RulesEditor.aspect"), color: "#7C3AED", blocks: [ { kind: "show" }, { kind: "hide" }, { kind: "toggleVisible" }, { kind: "setMaterial" } ] },
+        { name: qsTrId("RulesEditor.animatie_si_scene"), color: "#DB2777", blocks: [ { kind: "playAnimation" }, { kind: "goToScene" } ] },
+        { name: qsTrId("RulesEditor.control"), color: "#EA580C", blocks: [ { kind: "wait" }, { kind: "alternate" } ] }
     ]
     readonly property var triggerOptions: categories[0].blocks.map(b => ({ value: b.trigger, label: b.label }))
 
     function blockInfo(kind) {
-        const mm = { field: "duration", label: "în", unit: "s" }
+        const mm = { field: "duration", label: qsTrId("RulesEditor.in"), unit: "s" }
         switch (kind) {
-        case "moveBy": return { label: "Mută", color: "#2563EB", target: true,
-            fields: [{ field: "x", label: "cu X" }, { field: "y", label: "Y" }, { field: "z", label: "Z", unit: "mm" }, mm] }
-        case "moveTo": return { label: "Mută", color: "#2563EB", target: true,
-            fields: [{ field: "x", label: "la X" }, { field: "y", label: "Y" }, { field: "z", label: "Z", unit: "mm" }, mm] }
-        case "rotateBy": return { label: "Rotește", color: "#2563EB", target: true, fields: [{ field: "z", label: "cu", unit: "°" }, mm] }
-        case "scaleTo": return { label: "Scalează", color: "#2563EB", target: true, fields: [{ field: "x", label: "la", unit: "×" }, mm] }
-        case "show": return { label: "Arată", color: "#7C3AED", target: true }
-        case "hide": return { label: "Ascunde", color: "#7C3AED", target: true }
-        case "toggleVisible": return { label: "Comută vizibilitatea", color: "#7C3AED", target: true }
-        case "setMaterial": return { label: "Schimbă materialul", color: "#7C3AED", target: true, pick: "material" }
-        case "playAnimation": return { label: "Pornește animația", color: "#DB2777", pick: "animation" }
-        case "goToScene": return { label: "Mergi la scena", color: "#DB2777", pick: "scene" }
-        case "wait": return { label: "Așteaptă", color: "#EA580C", fields: [{ field: "duration", label: "", unit: "s" }] }
-        case "alternate": return { label: "Alternează", color: "#EA580C" }
+        case "moveBy": return { label: qsTrId("RulesEditor.muta"), color: "#2563EB", target: true,
+            fields: [{ field: "x", label: qsTrId("RulesEditor.cu_x") }, { field: "y", label: qsTrId("RulesEditor.y") }, { field: "z", label: qsTrId("RulesEditor.z"), unit: "mm" }, mm] }
+        case "moveTo": return { label: qsTrId("RulesEditor.muta"), color: "#2563EB", target: true,
+            fields: [{ field: "x", label: qsTrId("RulesEditor.la_x") }, { field: "y", label: qsTrId("RulesEditor.y") }, { field: "z", label: qsTrId("RulesEditor.z"), unit: "mm" }, mm] }
+        case "rotateBy": return { label: qsTrId("RulesEditor.roteste"), color: "#2563EB", target: true, fields: [{ field: "z", label: "cu", unit: "°" }, mm] }
+        case "scaleTo": return { label: qsTrId("RulesEditor.scaleaza"), color: "#2563EB", target: true, fields: [{ field: "x", label: "la", unit: "×" }, mm] }
+        case "show": return { label: qsTrId("RulesEditor.arata"), color: "#7C3AED", target: true }
+        case "hide": return { label: qsTrId("RulesEditor.ascunde"), color: "#7C3AED", target: true }
+        case "toggleVisible": return { label: qsTrId("RulesEditor.comuta_vizibilitatea"), color: "#7C3AED", target: true }
+        case "setMaterial": return { label: qsTrId("RulesEditor.schimba_materialul"), color: "#7C3AED", target: true, pick: "material" }
+        case "playAnimation": return { label: qsTrId("RulesEditor.porneste_animatia"), color: "#DB2777", pick: "animation" }
+        case "goToScene": return { label: qsTrId("RulesEditor.mergi_la_scena"), color: "#DB2777", pick: "scene" }
+        case "wait": return { label: qsTrId("RulesEditor.asteapta"), color: "#EA580C", fields: [{ field: "duration", label: "", unit: "s" }] }
+        case "alternate": return { label: qsTrId("RulesEditor.alterneaza"), color: "#EA580C" }
         }
         return { label: kind, color: "gray" }
     }
@@ -81,21 +81,21 @@ Popover {
     }
 
     // „Pornește animația”: sensul și repetarea (0 = la infinit).
-    readonly property var directionOptions: [{ value: "forward", label: "înainte" }, { value: "reverse", label: "înapoi" },
-        { value: "toggle", label: "comută" }]
-    readonly property var repeatOptions: [{ value: "once", label: "o dată" }, { value: "times", label: "de mai multe ori" },
-        { value: "loop", label: "la infinit" }]
+    readonly property var directionOptions: [{ value: "forward", label: qsTrId("RulesEditor.inainte") }, { value: "reverse", label: qsTrId("RulesEditor.inapoi") },
+        { value: "toggle", label: qsTrId("RulesEditor.comuta") }]
+    readonly property var repeatOptions: [{ value: "once", label: qsTrId("RulesEditor.o_data") }, { value: "times", label: qsTrId("RulesEditor.de_mai_multe_ori") },
+        { value: "loop", label: qsTrId("RulesEditor.la_infinit") }]
     function repeatMode(repeat) { return repeat === 0 ? "loop" : repeat === 1 ? "once" : "times" }
     function setRepeatMode(path, mode) { root.setField(path, "repeat", mode === "loop" ? 0 : mode === "once" ? 1 : 2) }
 
-    readonly property var targetOptions: [{ value: 0, label: "acest obiect" }].concat(
+    readonly property var targetOptions: [{ value: 0, label: qsTrId("RulesEditor.acest_obiect") }].concat(
         (root.document ? root.document.outline : []).map(o => ({ value: o.id, label: o.name })))
     function optionsFor(field) {
         const list = field === "material" ? root.document.modelMaterials
                    : field === "animation" ? root.document.animations : root.document.scenes
         const options = list.map(o => ({ value: o.id, label: o.name }))
-        return options.length > 0 ? options : [{ value: 0, label: field === "material" ? "(niciun material în model)"
-                                                       : field === "animation" ? "(nicio animație)" : "(nicio scenă)" }]
+        return options.length > 0 ? options : [{ value: 0, label: field === "material" ? qsTrId("RulesEditor.niciun_material_in_model")
+                                                       : field === "animation" ? qsTrId("RulesEditor.nicio_animatie") : qsTrId("RulesEditor.nicio_scena") }]
     }
 
     // --- Editarea (căi: [regulă, index, "first"|"second", index, …]) ---
@@ -258,7 +258,7 @@ Popover {
             Text {
                 width: parent.width - closeButton.width
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Interacțiuni · " + root.instanceName
+                text: qsTrId("RulesEditor.interactiuni") + root.instanceName
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.DemiBold
@@ -266,7 +266,7 @@ Popover {
             IconButton {
                 id: closeButton
                 iconName: "x"
-                tooltip: "Închide"
+                tooltip: qsTrId("RulesEditor.inchide")
                 onClicked: root.close()
             }
         }
@@ -276,8 +276,7 @@ Popover {
             anchors.topMargin: Theme.space1
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Trage un eveniment în dreapta ca să începi o regulă, apoi trage acțiunile sub el. Rulează în Modul "
-                  + "interacțiune (F5). Pentru a șterge un bloc, trage-l înapoi pe paletă."
+            text: qsTrId("RulesEditor.trage_un_eveniment_in_dreapta_ca_sa_incepi_o_reg")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -443,7 +442,7 @@ Popover {
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: 26; height: 26; iconSize: 13
                                     iconName: "trash-2"
-                                    tooltip: "Șterge regula"
+                                    tooltip: qsTrId("RulesEditor.sterge_regula")
                                     onClicked: root.removeRule(ruleColumn.index)
                                 }
                             }
@@ -461,7 +460,7 @@ Popover {
                         topPadding: Theme.space8
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.Wrap
-                        text: "Nicio regulă. Trage un eveniment galben (de exemplu „Când dau click”) aici."
+                        text: qsTrId("RulesEditor.nicio_regula_trage_un_eveniment_galben_de_exempl")
                         color: Theme.textTertiary
                         font.pixelSize: Theme.fontSizeSm
                     }

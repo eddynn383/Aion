@@ -12,9 +12,9 @@ Rectangle {
     signal modeSelected(int mode)
 
     readonly property var modes: [
-        { id: "mode.model", icon: "box", name: "Modelare" },
-        { id: "mode.animate", icon: "film", name: "Animare" },
-        { id: "mode.interact", icon: "hand-pointer", name: "Interacțiune" }
+        { id: "mode.model", icon: "box", name: qsTrId("ModeSwitch.modelare") },
+        { id: "mode.animate", icon: "film", name: qsTrId("ModeSwitch.animare") },
+        { id: "mode.interact", icon: "hand-pointer", name: qsTrId("ModeSwitch.interactiune") }
     ]
 
     implicitWidth: modeRow.implicitWidth + 4
@@ -35,7 +35,7 @@ Rectangle {
                 implicitHeight: Theme.controlHeight
                 iconName: modelData.icon
                 iconSize: Theme.iconSizeMd
-                tooltip: "Modul " + modelData.name
+                tooltip: qsTrId("ModeSwitch.modul") + modelData.name
                 shortcut: root.shortcutFor(modelData.id)
                 checked: root.mode === index
                 onClicked: root.modeSelected(index)

@@ -35,7 +35,8 @@ void appendInference(Overlay& o, const inference::Inference& inf)
     }
     if (inf.valid()) {
         const inference::Tint tint = inf.guides.empty() ? inference::Tint::Neutral : inf.guides.front().tint;
-        o.marker = InferenceMarker { inf.point, inf.kind, tint, std::string(inference::label(inf)), inf.locked };
+        o.marker
+            = InferenceMarker { inf.point, inf.kind, tint, std::string(inference::label(inf)), inf.locked };
     }
 }
 
@@ -100,7 +101,8 @@ view::PickResult pickWithInstances(const ToolContext& ctx, Vec2d screen, view::P
     if (ctx.model == nullptr) {
         return geometry;
     }
-    const auto hit = view::pickInstance(*ctx.model, ctx.context, ctx.camera, screen);
+    const auto hit = view::pickInstance(
+        ctx.pickModel != nullptr ? *ctx.pickModel : *ctx.model, ctx.context, ctx.camera, screen);
     if (!hit) {
         return geometry;
     }

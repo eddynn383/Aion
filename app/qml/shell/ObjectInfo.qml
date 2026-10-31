@@ -39,7 +39,7 @@ Column {
         width: root.width
         spacing: Theme.space1
         Repeater {
-            model: ["X", "Y", "Z"]
+            model: [qsTrId("ObjectInfo.x"), qsTrId("ObjectInfo.y"), qsTrId("ObjectInfo.z")]
             delegate: NumberField {
                 required property string modelData
                 required property int index
@@ -71,7 +71,7 @@ Column {
         }
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.isCamera ? "Cameră" : root.isPath ? "Cale" : "Lumină"
+            text: root.isCamera ? qsTrId("ObjectInfo.camera") : root.isPath ? qsTrId("ObjectInfo.cale") : qsTrId("ObjectInfo.lumina")
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
@@ -80,7 +80,7 @@ Column {
 
     Input {
         width: parent.width
-        placeholderText: "Nume"
+        placeholderText: qsTrId("ObjectInfo.nume")
         text: root.info.name ?? ""
         onEditingFinished: if (text !== root.info.name) root.set({ name: text })
     }
@@ -89,19 +89,19 @@ Column {
     Tabs {
         visible: root.isLight
         width: parent.width
-        model: ["Bec", "Spot", "Soare", "Panou"]
+        model: [qsTrId("ObjectInfo.bec"), qsTrId("ObjectInfo.spot"), qsTrId("ObjectInfo.soare"), qsTrId("ObjectInfo.panou")]
         readonly property var kinds: ["point", "spot", "directional", "area"]
         currentIndex: Math.max(0, kinds.indexOf(root.lightKind))
         onCurrentIndexChanged: if (root.isLight && kinds[currentIndex] !== root.lightKind) root.set({ lightKind: kinds[currentIndex] })
     }
 
-    Caption { text: "Poziție (mm)"; visible: !(root.isLight && root.lightKind === "directional") }
+    Caption { text: qsTrId("ObjectInfo.pozitie_mm"); visible: !(root.isLight && root.lightKind === "directional") }
     VectorFields { key: "position"; visible: !(root.isLight && root.lightKind === "directional") }
 
-    Caption { text: "Ținta, spre ce privește (mm)"; visible: root.isCamera }
+    Caption { text: qsTrId("ObjectInfo.tinta_spre_ce_priveste_mm"); visible: root.isCamera }
     VectorFields { key: "target"; visible: root.isCamera }
 
-    Caption { text: "Direcția luminii"; visible: root.isLight && root.lightKind !== "point" }
+    Caption { text: qsTrId("ObjectInfo.directia_luminii"); visible: root.isLight && root.lightKind !== "point" }
     VectorFields {
         key: "direction"
         visible: root.isLight && root.lightKind !== "point"
@@ -115,32 +115,32 @@ Column {
         visible: root.isPath && !(root.info.active ?? true)
         width: parent.width
         wrapMode: Text.Wrap
-        text: "Calea animației „" + (root.info.animationName ?? "") + "”: obiectele ei se mișcă doar când e animația activă."
+        text: qsTrId("ObjectInfo.calea_animatiei") + (root.info.animationName ?? "") + qsTrId("ObjectInfo.obiectele_ei_se_misca_doar_cand_e_animatia_activa")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeXs
     }
     PropertyGroup {
         visible: root.isPath
         width: parent.width
-        title: "Rotație (°)"
+        title: qsTrId("ObjectInfo.rotatie")
         VectorFields { key: "rotation"; decimals: 1; step: 15 }
     }
     PropertyGroup {
         visible: root.isPath
         width: parent.width
-        title: "Dimensiuni (mm)"
+        title: qsTrId("ObjectInfo.dimensiuni_mm")
         VectorFields { key: "size" }
     }
     PropertyGroup {
         visible: root.isPath
         width: parent.width
-        title: "Parcurgere"
+        title: qsTrId("ObjectInfo.parcurgere")
         Row {
             width: parent.width
             spacing: Theme.space1
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Start"
+                label: qsTrId("ObjectInfo.start")
                 unit: "s"
                 decimals: 2
                 step: 0.1
@@ -150,7 +150,7 @@ Column {
             }
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Durată"
+                label: qsTrId("ObjectInfo.durata")
                 unit: "s"
                 decimals: 2
                 step: 0.5
@@ -181,7 +181,7 @@ Column {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
-                text: "Curbă: " + EasingMath.title(root.info.easing)
+                text: qsTrId("ObjectInfo.curba") + EasingMath.title(root.info.easing)
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeSm
             }
@@ -196,11 +196,11 @@ Column {
     PropertyGroup {
         visible: root.isPath
         width: parent.width
-        title: "Obiecte ancorate"
+        title: qsTrId("ObjectInfo.obiecte_ancorate")
         actions: IconButton {
             width: 20; height: 20; iconSize: 13
             iconName: "plus"
-            tooltip: "Adaugă: click pe un obiect în viewport"
+            tooltip: qsTrId("ObjectInfo.adauga_click_pe_un_obiect_in_viewport")
             checked: root.viewport && root.viewport.pickingAnchor
             solidChecked: false
             onClicked: if (root.viewport) root.viewport.pickingAnchor = !root.viewport.pickingAnchor
@@ -241,13 +241,13 @@ Column {
                     RowAction {
                         shown: anchorHover.hovered
                         iconName: "x"
-                        tooltip: "Scoate de pe cale (revine unde era)"
+                        tooltip: qsTrId("ObjectInfo.scoate_de_pe_cale_revine_unde_era")
                         onClicked: root.document.detachFromPath(root.info.id, anchorRow.modelData.instance)
                     }
                     RowAction {
                         shown: anchorHover.hovered
                         iconName: "rotate-cw"
-                        tooltip: "Rotește fața cu 90°"
+                        tooltip: qsTrId("ObjectInfo.roteste_fata_cu_90")
                         onClicked: root.document.rotateAnchor(root.info.id, anchorRow.modelData.instance)
                     }
                 }
@@ -257,7 +257,7 @@ Column {
             visible: root.isPath && (root.info.anchors ?? []).length === 0
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Niciun obiect. Apasă + și dă click pe un obiect. Mai multe obiecte merg în coloană; mută-le ca să stea altfel."
+            text: qsTrId("ObjectInfo.niciun_obiect_apasa_si_da_click_pe_un_obiect_mai_")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -266,14 +266,14 @@ Column {
     Button {
         visible: !root.isPath
         width: parent.width
-        text: root.isCamera ? "Pune camera în vederea curentă" : "Pune lumina în vederea curentă"
+        text: root.isCamera ? qsTrId("ObjectInfo.pune_camera_in_vederea_curenta") : qsTrId("ObjectInfo.pune_lumina_in_vederea_curenta")
         onClicked: root.document.placeSelectedObjectAtView(root.viewport.cameraState())
     }
 
     // --- Camera (plan Animare, secțiunea 9): formatul, lentila, depth of field, planurile de tăiere ---
     PropertyGroup {
         visible: root.isCamera
-        title: "Format"
+        title: qsTrId("ObjectInfo.format")
         Rectangle {
             id: formatButton
             width: parent.width
@@ -286,7 +286,7 @@ Column {
                 anchors.left: parent.left
                 anchors.leftMargin: Theme.space2
                 anchors.verticalCenter: parent.verticalCenter
-                text: formatButton.preset ? formatButton.preset.name : "Personalizat"
+                text: formatButton.preset ? formatButton.preset.name : qsTrId("ObjectInfo.personalizat")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeSm
             }
@@ -319,7 +319,7 @@ Column {
             spacing: Theme.space1
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "L"
+                label: qsTrId("ObjectInfo.l")
                 unit: "px"
                 from: 16
                 to: 16384
@@ -328,7 +328,7 @@ Column {
             }
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "H"
+                label: qsTrId("ObjectInfo.h")
                 unit: "px"
                 from: 16
                 to: 16384
@@ -340,14 +340,14 @@ Column {
 
     PropertyGroup {
         visible: root.isCamera
-        title: (root.info.orthographic ?? false) ? "Lentilă · paralelă"
-              : "Lentilă · " + Math.round(root.info.fovH ?? 0) + "° × " + Math.round(root.info.fovV ?? 0) + "°"
+        title: (root.info.orthographic ?? false) ? qsTrId("ObjectInfo.lentila_paralela")
+              : qsTrId("ObjectInfo.lentila") + Math.round(root.info.fovH ?? 0) + "° × " + Math.round(root.info.fovV ?? 0) + "°"
         Row {
             width: parent.width
             spacing: Theme.space1
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Focală"
+                label: qsTrId("ObjectInfo.focala")
                 unit: "mm"
                 from: 1
                 to: 2000
@@ -358,7 +358,7 @@ Column {
             }
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Scară"
+                label: qsTrId("ObjectInfo.scara")
                 unit: "mm"
                 from: 1
                 visible: root.info.orthographic ?? false
@@ -367,7 +367,7 @@ Column {
             }
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Roll"
+                label: qsTrId("ObjectInfo.roll")
                 unit: "°"
                 decimals: 1
                 value: root.info.roll ?? 0
@@ -402,7 +402,7 @@ Column {
                 anchors.left: parent.left
                 anchors.leftMargin: Theme.space2
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Senzor: " + (sensorButton.preset ? sensorButton.preset.name : (root.info.sensorWidth ?? 36) + " mm")
+                text: qsTrId("ObjectInfo.senzor") + (sensorButton.preset ? sensorButton.preset.name : (root.info.sensorWidth ?? 36) + qsTrId("ObjectInfo.mm"))
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeSm
             }
@@ -431,7 +431,7 @@ Column {
             spacing: Theme.space1
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Shift X"
+                label: qsTrId("ObjectInfo.shift_x")
                 decimals: 2
                 step: 0.01
                 from: -2
@@ -441,7 +441,7 @@ Column {
             }
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Shift Y"
+                label: qsTrId("ObjectInfo.shift_y")
                 decimals: 2
                 step: 0.01
                 from: -2
@@ -452,7 +452,7 @@ Column {
         }
         Toggle {
             width: parent.width
-            text: "Proiecție paralelă"
+            text: qsTrId("ObjectInfo.proiectie_paralela")
             checked: root.info.orthographic ?? false
             onToggled: root.set({ orthographic: checked })
         }
@@ -460,10 +460,10 @@ Column {
 
     PropertyGroup {
         visible: root.isCamera
-        title: "Depth of field"
+        title: qsTrId("ObjectInfo.depth_of_field")
         Toggle {
             width: parent.width
-            text: "Claritate doar la distanța de focus"
+            text: qsTrId("ObjectInfo.claritate_doar_la_distanta_de_focus")
             checked: root.info.dofEnabled ?? false
             onToggled: root.set({ dofEnabled: checked })
         }
@@ -473,7 +473,7 @@ Column {
             spacing: Theme.space1
             NumberField {
                 width: (parent.width - Theme.space1) * 0.62
-                label: "Focus"
+                label: qsTrId("ObjectInfo.focus")
                 unit: "mm"
                 from: 1
                 step: 100
@@ -495,20 +495,20 @@ Column {
             visible: root.info.dofEnabled ?? false
             width: parent.width
             iconName: "focus"
-            text: root.viewport && root.viewport.pickingFocus ? "Click în viewport pe punctul clar…" : "Alege punctul de focus"
+            text: root.viewport && root.viewport.pickingFocus ? qsTrId("ObjectInfo.click_in_viewport_pe_punctul_clar") : qsTrId("ObjectInfo.alege_punctul_de_focus")
             onClicked: if (root.viewport) root.viewport.pickingFocus = !root.viewport.pickingFocus
         }
     }
 
     PropertyGroup {
         visible: root.isCamera
-        title: "Planuri de tăiere"
+        title: qsTrId("ObjectInfo.planuri_de_taiere")
         Row {
             width: parent.width
             spacing: Theme.space1
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Clip ↑"
+                label: qsTrId("ObjectInfo.clip")
                 unit: "mm"
                 from: 0
                 value: root.info.nearClip ?? 0
@@ -516,7 +516,7 @@ Column {
             }
             NumberField {
                 width: (parent.width - Theme.space1) / 2
-                label: "Clip ↓"
+                label: qsTrId("ObjectInfo.clip_2")
                 unit: "mm"
                 from: 0
                 value: root.info.farClip ?? 0
@@ -528,7 +528,7 @@ Column {
         visible: root.isCamera
         width: parent.width
         variant: "primary"
-        text: root.viewport && root.viewport.lookThrough === root.info.id ? "Ieși din cameră (Esc)" : "Privește prin cameră"
+        text: root.viewport && root.viewport.lookThrough === root.info.id ? qsTrId("ObjectInfo.iesi_din_camera_esc") : qsTrId("ObjectInfo.priveste_prin_camera")
         onClicked: root.viewport.lookThrough = root.viewport.lookThrough === root.info.id ? 0 : root.info.id
     }
 
@@ -536,11 +536,11 @@ Column {
     Toggle {
         visible: root.isLight
         width: parent.width
-        text: "Aprinsă"
+        text: qsTrId("ObjectInfo.aprinsa")
         checked: root.info.enabled ?? true
         onToggled: root.set({ enabled: checked })
     }
-    Caption { text: "Culoare"; visible: root.isLight }
+    Caption { text: qsTrId("ObjectInfo.culoare"); visible: root.isLight }
     Flow {
         visible: root.isLight
         width: parent.width
@@ -572,7 +572,7 @@ Column {
     Slider {
         visible: root.isLight
         width: parent.width
-        label: "Intensitate"
+        label: qsTrId("ObjectInfo.intensitate")
         from: 0
         to: 10
         stepSize: 0.1
@@ -583,7 +583,7 @@ Column {
     NumberField {
         visible: root.isLight && root.lightKind !== "directional"
         width: parent.width
-        label: "Rază"
+        label: qsTrId("ObjectInfo.raza")
         unit: "mm"
         from: 1
         step: 100
@@ -593,7 +593,7 @@ Column {
     Slider {
         visible: root.isLight && root.lightKind === "spot"
         width: parent.width
-        label: "Con"
+        label: qsTrId("ObjectInfo.con")
         from: 5
         to: 170
         stepSize: 1
@@ -604,7 +604,7 @@ Column {
     Slider {
         visible: root.isLight && root.lightKind === "spot"
         width: parent.width
-        label: "Margine estompată"
+        label: qsTrId("ObjectInfo.margine_estompata")
         from: 0
         to: 1
         stepSize: 0.05
@@ -618,7 +618,7 @@ Column {
         spacing: Theme.space1
         NumberField {
             width: (parent.width - Theme.space1) / 2
-            label: "L"
+            label: qsTrId("ObjectInfo.l")
             unit: "mm"
             from: 1
             step: 50
@@ -627,7 +627,7 @@ Column {
         }
         NumberField {
             width: (parent.width - Theme.space1) / 2
-            label: "H"
+            label: qsTrId("ObjectInfo.h")
             unit: "mm"
             from: 1
             step: 50
@@ -638,7 +638,7 @@ Column {
     Toggle {
         visible: root.isLight && root.lightKind === "spot"
         width: parent.width
-        text: "Aruncă umbre"
+        text: qsTrId("ObjectInfo.arunca_umbre")
         checked: root.info.castShadows ?? false
         onToggled: root.set({ castShadows: checked })
     }
@@ -646,20 +646,20 @@ Column {
         visible: root.isLight && root.lightKind === "spot" && (root.info.castShadows ?? false)
         width: parent.width
         wrapMode: Text.Wrap
-        text: "Un singur spot cu umbre la un moment dat (primul din listă). Marcajul se trage în viewport (Shift = pe verticală)."
+        text: qsTrId("ObjectInfo.un_singur_spot_cu_umbre_la_un_moment_dat_primul_d")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeXs
     }
     Toggle {
         width: parent.width
-        text: root.isPath ? "Calea în viewport" : "Marcaj în viewport"
+        text: root.isPath ? qsTrId("ObjectInfo.calea_in_viewport") : qsTrId("ObjectInfo.marcaj_in_viewport")
         checked: root.info.visible ?? true
         onToggled: root.set({ visible: checked })
     }
     Button {
         width: parent.width
         variant: "secondary"
-        text: root.isCamera ? "Șterge camera" : root.isPath ? "Șterge calea" : "Șterge lumina"
+        text: root.isCamera ? qsTrId("ObjectInfo.sterge_camera") : root.isPath ? qsTrId("ObjectInfo.sterge_calea") : qsTrId("ObjectInfo.sterge_lumina")
         onClicked: root.document.deleteSelectedObject()
     }
 }

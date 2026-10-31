@@ -544,3 +544,49 @@ TEST_CASE("canMakeUnique cu folosirile numărate o dată dă același rezultat",
     (void)model::makeUniqueDeep(s.m, s.corpB);
     check();
 }
+
+// --- Cheile de mobilier pe copii (ADR 0043, 0044) ---
+
+TEST_CASE("Copiile golesc cheia componentei salvate și rolul piesei copiate", "[core][copying][furniture]")
+{
+    Mobila f;
+    model::Definition corp = f.m.definition(f.corp);
+    corp.sourceKey = "cheie-corp";
+    f.m.setDefinition(f.corp, corp);
+    model::Instance board = f.m.instance(f.boardIn);
+    board.roleKey = "space.1.shelf.1";
+    board.relativePosition = 0.5;
+    f.m.setInstance(f.boardIn, board);
+
+    SECTION("copyDeep: definițiile copiate nu au cheie; originalul o păstrează")
+    {
+        const auto copy = model::copyDeep(f.m, f.m.root(), f.m, { f.corpA }, Transform::translation({ 0, 3000, 0 }));
+        std::set<InstanceId> instances;
+        std::set<DefinitionId> definitions;
+        collect(f.m, copy.roots.front(), instances, definitions);
+        for (DefinitionId d : definitions) {
+            CHECK(f.m.definition(d).sourceKey.empty());
+        }
+        CHECK(f.m.definition(f.corp).sourceKey == "cheie-corp");
+    }
+    SECTION("copyDeep pe o singură piesă: copia pierde rolul")
+    {
+        const auto copy = model::copyDeep(f.m, f.corp, f.m, { f.boardIn }, Transform::translation({ 0, 0, 300 }));
+        const model::Instance& c = f.m.instance(copy.roots.front());
+        CHECK(c.roleKey.empty());
+        CHECK_FALSE(c.relativePosition);
+        CHECK(f.m.instance(f.boardIn).roleKey == "space.1.shelf.1");
+    }
+    SECTION("copyLinked (⌥D, Array): copia pierde rolul, definiția rămâne aceeași")
+    {
+        const InstanceId c = model::copyLinked(f.m, f.boardIn, Transform::translation({ 0, 0, 300 }));
+        CHECK(f.m.instance(c).roleKey.empty());
+        CHECK(f.m.instance(c).definition == f.board);
+    }
+    SECTION("makeUniqueDeep: copia unică nu mai e legată de componenta salvată")
+    {
+        model::makeUniqueDeep(f.m, f.corpInB);
+        CHECK(f.m.definition(f.m.instance(f.corpInB).definition).sourceKey.empty());
+        CHECK(f.m.definition(f.m.instance(f.corpInA).definition).sourceKey == "cheie-corp");
+    }
+}

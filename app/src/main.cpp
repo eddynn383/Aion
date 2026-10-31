@@ -10,6 +10,8 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QSettings>
+#include <QTranslator>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlExtensionPlugin>
@@ -73,6 +75,35 @@ protected:
     }
 };
 
+// Limba interfeței (ADR 0043, pasul 12): `AION_LANG`, apoi Preferințe → Limbă (`ui/language`). Implicit româna cât
+// traducerea acoperă doar o parte din interfață (docs/plans/mobilier-de-verificat.md). O cheie fără traducere în limba
+// aleasă cade pe engleză, apoi pe română: traducătorul instalat ultimul e întrebat primul.
+void installTranslations(QGuiApplication& app)
+{
+    static const QStringList kLanguages { QStringLiteral("ro"), QStringLiteral("en"), QStringLiteral("de"),
+        QStringLiteral("pl"), QStringLiteral("it"), QStringLiteral("fr"), QStringLiteral("es"), QStringLiteral("pt") };
+    QString language = qEnvironmentVariable("AION_LANG");
+    if (language.isEmpty()) {
+        language = QSettings().value(QStringLiteral("ui/language"), QStringLiteral("ro")).toString();
+    }
+    if (!kLanguages.contains(language)) {
+        language = QStringLiteral("ro");
+    }
+    QStringList chain { QStringLiteral("ro") };
+    if (language != QLatin1String("ro")) {
+        chain.append(QStringLiteral("en"));
+    }
+    if (language != QLatin1String("ro") && language != QLatin1String("en")) {
+        chain.append(language);
+    }
+    for (const QString& lang : chain) {
+        auto* translator = new QTranslator(&app);
+        if (translator->load(QStringLiteral(":/i18n/aion_%1.qm").arg(lang))) {
+            QCoreApplication::installTranslator(translator);
+        }
+    }
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -91,6 +122,7 @@ int main(int argc, char* argv[])
 #endif
 
     loadFonts();
+    installTranslations(app);
 
     FileOpenFilter fileOpenFilter;
     app.installEventFilter(&fileOpenFilter);

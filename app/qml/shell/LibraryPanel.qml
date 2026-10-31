@@ -20,13 +20,15 @@ Item {
                                     "gen:shelf": "library", "gen:cabinet": "archive", "gen:stairs": "stairs",
                                     "gen:tree": "tree-deciduous", "gen:conifer": "tree-pine", "gen:bush": "shrub",
                                     "gen:person": "person-standing" })
-    readonly property var items: (root.document ? root.document.libraryItems : [])
+    // „În model”: componentele din document (plasarea face o copie legată).
+    readonly property var allItems: (root.document ? root.document.libraryItems.concat(root.document.modelComponents) : [])
+    readonly property var items: root.allItems
         .filter(i => (root.category.length === 0 || i.category === root.category)
                      && (root.query.length === 0 || i.name.toLowerCase().indexOf(root.query) >= 0
                          || i.category.toLowerCase().indexOf(root.query) >= 0))
     readonly property var categories: {
         const names = []
-        for (const i of (root.document ? root.document.libraryItems : []))
+        for (const i of root.allItems)
             if (!names.includes(i.category))
                 names.push(i.category)
         return names
@@ -50,7 +52,7 @@ Item {
                 id: search
                 width: parent.width
                 iconName: "search"
-                placeholderText: "Caută (ușă, masă, raft…)"
+                placeholderText: qsTrId("LibraryPanel.cauta_usa_masa_raft")
             }
 
             // Filtrul pe categorii.
@@ -71,7 +73,7 @@ Item {
                         Text {
                             id: chipText
                             anchors.centerIn: parent
-                            text: chip.modelData.length > 0 ? chip.modelData : "Toate"
+                            text: chip.modelData.length > 0 ? chip.modelData : qsTrId("LibraryPanel.toate")
                             color: chip.current ? Theme.textPrimary : Theme.textSecondary
                             font.pixelSize: Theme.fontSizeXs
                         }
@@ -117,6 +119,15 @@ Item {
                                         name: root.icons[tile.modelData.id] ?? "box"
                                         size: Math.min(26, parent.height * 0.6)
                                         color: Theme.textSecondary
+                                    }
+                                    // „În model”: câte apariții are componenta.
+                                    Text {
+                                        visible: (tile.modelData.count ?? 0) > 0
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        text: "×" + (tile.modelData.count ?? 0)
+                                        color: Theme.accent
+                                        font.pixelSize: Theme.fontSizeXs
                                     }
                                     // Obiectele dinamice au parametri (lățime, înălțime…) în Inspector.
                                     Icon {
@@ -167,14 +178,14 @@ Item {
                 visible: root.items.length === 0
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Nimic găsit."
+                text: qsTrId("LibraryPanel.nimic_gasit")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeSm
             }
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Obiectele tale: selectează un obiect și apasă + din antet („Salvează în bibliotecă”)."
+                text: qsTrId("LibraryPanel.obiectele_tale_selecteaza_un_obiect_si_apasa_di")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }

@@ -1,12 +1,13 @@
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Transfer.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-
 #include <glm/geometric.hpp>
 
 #include <cmath>
@@ -54,7 +55,8 @@ Model sampleModel()
     geom::transformVertices(root,
         { root.findVertexNear({ 0, 2000, 2700 }, 1e-6), root.findVertexNear({ 6000, 2000, 2700 }, 1e-6) },
         Transform::translation({ 0, 0, 1500 }));
-    geom::drawPolygon(root, { { 6000, 1400, 1000 }, { 6000, 2600, 1000 }, { 6000, 2600, 2000 }, { 6000, 1400, 2000 } });
+    geom::drawPolygon(
+        root, { { 6000, 1400, 1000 }, { 6000, 2600, 1000 }, { 6000, 2600, 2000 }, { 6000, 1400, 2000 } });
     geom::pushPull(root, faceAt(root, { 6000, 2000, 1500 }), -6000);
 
     // Un cilindru ca obiect cu două copii, pe un tag.
@@ -86,7 +88,8 @@ Model sampleModel()
     const model::MaterialId glass = m.addMaterial({ "Sticlă", { 170, 205, 225, 90 }, 0.05f, 0.0f });
     root.setFaceMaterial(faceAt(root, { 0, 1000, 1000 }), brick);
     // O textură (octeții unei imagini) pe cărămidă, cu poziționarea ei pe față.
-    const model::TextureId texture = m.addTexture({ "Cărămidă", "procedural:brick", { 0x89, 'P', 'N', 'G', 9, 8, 7 } });
+    const model::TextureId texture
+        = m.addTexture({ "Cărămidă", "procedural:brick", { 0x89, 'P', 'N', 'G', 9, 8, 7 } });
     model::Material textured = m.material(brick);
     textured.texture = texture;
     textured.textureSize = { 600, 300 };
@@ -102,8 +105,10 @@ Model sampleModel()
     // Ghidaje, adnotări, o secțiune și o scenă.
     m.addGuide({ m.root(), { 0, 0, 0 }, { 1, 0, 0 } });
     m.addGuide({ m.root(), { 1000, 1000, 0 }, { 0, 0, 0 } });
-    m.addAnnotation({ model::Annotation::Kind::Dimension, m.root(), { 0, 0, 0 }, { 6000, 0, 0 }, { 0, -500, 0 }, "" });
-    m.addAnnotation({ model::Annotation::Kind::Text, m.root(), { 3000, 0, 1000 }, {}, { 0, -800, 600 }, "Ușa" });
+    m.addAnnotation(
+        { model::Annotation::Kind::Dimension, m.root(), { 0, 0, 0 }, { 6000, 0, 0 }, { 0, -500, 0 }, "" });
+    m.addAnnotation(
+        { model::Annotation::Kind::Text, m.root(), { 3000, 0, 1000 }, {}, { 0, -800, 600 }, "Ușa" });
     m.addSection({ "Secțiune 1", { 3000, 2000, 1200 }, { 0, 0, 1 }, false });
     m.addScene({ "Fațada", { 3000, 2000, 1000 }, 0.4, 0.2, 15000, false, "clay", false, {}, {}, {} });
     // O cameră și două lumini.
@@ -214,8 +219,8 @@ TEST_CASE("OBJ: export și import înapoi păstrează forma (fețele coplanare s
 TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân legate", "[core][io]")
 {
     Model original = sampleModel();
-    // Copiile unui obiect rămân un singur mesh doar dacă au același material (materialul obiectului se exportă
-    // în mesh): le dăm taburetelor același material.
+    // Copiile unui obiect rămân un singur mesh doar dacă au același material (materialul obiectului se
+    // exportă în mesh): le dăm taburetelor același material.
     model::MaterialId glass;
     for (const model::Instance& inst : original.instances().values()) {
         glass = inst.material ? inst.material : glass;
@@ -315,9 +320,9 @@ TEST_CASE("Fișiere .aion: acțiunile își păstrează sensul și repetarea", "
 
 TEST_CASE("Fișiere .aion: un fișier v4 dă Înainte / O dată", "[core][io]")
 {
-    CHECK(io::kFormatVersion == 5);
+    CHECK(io::kFormatVersion == 6);
     std::string text = io::toJson(playingModel());
-    const std::string current = "\"formatVersion\": 5";
+    const std::string current = "\"formatVersion\": 6";
     REQUIRE(text.find(current) != std::string::npos);
     text.replace(text.find(current), current.size(), "\"formatVersion\": 4");
     text = std::regex_replace(text, std::regex(R"("direction": \d+,)"), "");
@@ -331,4 +336,136 @@ TEST_CASE("Fișiere .aion: un fișier v4 dă Înainte / O dată", "[core][io]")
         CHECK(a.direction == model::PlayDirection::Forward);
         CHECK(a.repeat == 1);
     }
+}
+
+// --- Datele de mobilier (ADR 0044) ---
+
+namespace {
+
+// O placă etichetată, un decor cu categorie, un corp salvat (cheie) și o piesă cu rol.
+Model furnitureModel()
+{
+    Model m;
+    model::Material decor { "Nuc (decor)", { 104, 70, 46, 255 } };
+    decor.category = "board-decor";
+    decor.libraryKey = "nuc-decor";
+    const model::MaterialId decorId = m.addMaterial(decor);
+
+    model::Definition board { "Placă", false };
+    board.generator = "board";
+    board.parameters = { { "length", 600.0 }, { "width", 400.0 } };
+    model::PartSpec spec;
+    spec.typeKey = "pal";
+    spec.nominalThickness = 18.0;
+    spec.grainAxis = 0;
+    spec.bands[0] = { "abs.2", "", true };
+    spec.bands[3] = { "abs.0.4", "alb-decor", false };
+    board.part = spec;
+    const model::DefinitionId boardId = m.addDefinition(board);
+    geom::buildPrimitive(m.mesh(boardId), geom::Primitive::Box, { 600, 400, 18 }, 4);
+
+    model::Definition body { "Corp", false };
+    body.sourceKey = "4f6c2a1e-0000-4000-8000-000000000001";
+    const model::DefinitionId bodyId = m.addDefinition(body);
+
+    model::Instance shelf;
+    shelf.parent = bodyId;
+    shelf.definition = boardId;
+    shelf.material = decorId;
+    shelf.roleKey = "space.1.shelf.1";
+    shelf.nameKey = "part.shelf";
+    shelf.relativePosition = 0.25;
+    m.addInstance(shelf);
+
+    model::Instance placed;
+    placed.parent = m.root();
+    placed.definition = bodyId;
+    m.addInstance(placed);
+
+    model::Definition hinge { "Balama", false };
+    model::PartSpec hw;
+    hw.kind = model::PartSpec::Kind::Hardware;
+    hw.typeKey = "hinge.overlay.110";
+    hinge.part = hw;
+    m.addDefinition(hinge);
+    return m;
+}
+
+} // namespace
+
+TEST_CASE("Fișiere .aion v6: datele de piesă, cheile și categoriile se păstrează", "[core][io][furniture]")
+{
+    const Model original = furnitureModel();
+    const io::LoadResult loaded = io::readArchive(io::writeArchive(original));
+    INFO(loaded.error);
+    REQUIRE(loaded.model);
+    CHECK(loaded.model->sameAs(original));
+    CHECK(io::toJson(original).find("\"formatVersion\": 6") != std::string::npos);
+}
+
+TEST_CASE("Fișiere .aion v6: un fișier v5 se deschide fără date de piesă", "[core][io][furniture]")
+{
+    std::string text = io::toJson(sampleModel());
+    const std::string current = "\"formatVersion\": 6";
+    REQUIRE(text.find(current) != std::string::npos);
+    text.replace(text.find(current), current.size(), "\"formatVersion\": 5");
+    const io::LoadResult loaded = io::fromJson(text);
+    INFO(loaded.error);
+    REQUIRE(loaded.model);
+    for (const model::Definition& d : loaded.model->definitions().values()) {
+        CHECK_FALSE(d.part);
+        CHECK(d.sourceKey.empty());
+    }
+    for (const model::Instance& i : loaded.model->instances().values()) {
+        CHECK(i.roleKey.empty());
+        CHECK_FALSE(i.relativePosition);
+    }
+
+    // Un fișier dintr-o versiune viitoare e refuzat cu mesajul clar.
+    const io::LoadResult newer = io::fromJson(R"({"format":"aion","formatVersion":7})");
+    CHECK_FALSE(newer.model);
+    CHECK(newer.error.find("mai nouă") != std::string::npos);
+}
+
+TEST_CASE("Fișiere .aion v6: un tip de piesă necunoscut se scrie înapoi neschimbat", "[core][io][furniture]")
+{
+    std::string text = io::toJson(furnitureModel());
+    const std::string kind = "\"kind\": \"hardware\"";
+    REQUIRE(text.find(kind) != std::string::npos);
+    text.replace(text.find(kind), kind.size(), "\"kind\": \"accessory\"");
+    const std::string type = "\"type\": \"pal\"";
+    REQUIRE(text.find(type) != std::string::npos);
+    text.replace(text.find(type), type.size(), "\"type\": \"compact-hpl\"");
+    const io::LoadResult loaded = io::fromJson(text);
+    INFO(loaded.error);
+    REQUIRE(loaded.model);
+    const std::string again = io::toJson(*loaded.model);
+    CHECK(again.find("\"kind\": \"accessory\"") != std::string::npos);
+    CHECK(again.find("\"type\": \"compact-hpl\"") != std::string::npos);
+}
+
+TEST_CASE("Datele de piesă: Salvează în bibliotecă și inserarea le păstrează", "[core][io][furniture]")
+{
+    Model m = furnitureModel();
+    model::InstanceId placed;
+    for (model::InstanceId id : m.childrenOf(m.root())) {
+        placed = id;
+    }
+    REQUIRE(placed);
+    const Model extracted = model::extractInstance(m, placed);
+    CHECK(extracted.definition(extracted.root()).sourceKey == "4f6c2a1e-0000-4000-8000-000000000001");
+    Model target;
+    const model::InstanceId inserted
+        = model::insertModel(target, target.root(), extracted, "Corp", Transform::translation({ 0, 0, 0 }));
+    const model::Definition& def = target.definition(target.instance(inserted).definition);
+    CHECK(def.sourceKey == "4f6c2a1e-0000-4000-8000-000000000001");
+    const std::vector<model::InstanceId> pieces = target.childrenOf(target.instance(inserted).definition);
+    REQUIRE(pieces.size() == 1);
+    const model::Instance& shelf = target.instance(pieces.front());
+    CHECK(shelf.roleKey == "space.1.shelf.1");
+    const model::Definition& boardDef = target.definition(shelf.definition);
+    REQUIRE(boardDef.part);
+    CHECK(boardDef.part->typeKey == "pal");
+    CHECK(boardDef.part->bands[3].bandKey == "abs.0.4");
+    CHECK(boardDef.generator == "board");
 }

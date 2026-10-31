@@ -36,6 +36,9 @@ add_executable(aion_tests
     core/AnimationPlayerTests.cpp
     core/TexturingTests.cpp
     core/ParametricTests.cpp
+    core/FurnitureTests.cpp
+    core/CarcassTests.cpp
+    core/StretchTests.cpp
     core/IoTests.cpp
     core/RecoveryTests.cpp
     core/QuantitiesTests.cpp

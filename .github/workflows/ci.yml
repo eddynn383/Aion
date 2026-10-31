@@ -14,6 +14,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Traducerile sunt complete (RO, EN) și fișierele .ts la zi
+        run: python3 tools/check_translations.py
 
       - name: Instalează Ninja
         run: brew install ninja

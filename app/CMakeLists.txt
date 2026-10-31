@@ -36,6 +36,16 @@ set_target_properties(aion_app PROPERTIES
     WIN32_EXECUTABLE ON
 )
 
+# Traducerile (ADR 0043, pasul 12): fișierele .ts sunt scrise de tools/extract_strings.py; la compilare devin .qm, în
+# resursele aplicației sub /i18n. main.cpp le încarcă după limba aleasă (cu engleza și româna ca rezervă).
+set(AION_LANGUAGES ro en de pl it fr es pt)
+set(AION_TS_FILES)
+foreach(lang IN LISTS AION_LANGUAGES)
+    list(APPEND AION_TS_FILES "${PROJECT_SOURCE_DIR}/translations/aion_${lang}.ts")
+endforeach()
+qt_add_translations(aion_app TS_FILES ${AION_TS_FILES} RESOURCE_PREFIX "/i18n" LUPDATE_TARGET aion_lupdate
+    LUPDATE_OPTIONS -tr-function-alias QT_TRID_NOOP+=AION_TR)
+
 # Header-ele cu QML_ELEMENT trebuie găsite prin include path de fișierul de înregistrare generat.
 target_include_directories(aion_app PRIVATE src src/bridge)
 
@@ -107,6 +117,8 @@ qt_add_qml_module(aion_app
         qml/overlays/RulesActionBlock.qml
         qml/overlays/RulesActionList.qml
         qml/components/DataTable.qml
+        qml/components/CheckBox.qml
+        qml/components/BandPicker.qml
         qml/components/MaterialSwatch.qml
         qml/components/AccordionSection.qml
         qml/components/RowAction.qml

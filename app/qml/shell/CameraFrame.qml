@@ -75,7 +75,7 @@ Item {
                 Icon { anchors.verticalCenter: parent.verticalCenter; name: lockButton.on ? "lock" : "lock-open"; size: 12; color: "white" }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Blochează camera pe vedere"
+                    text: qsTrId("CameraFrame.blocheaza_camera_pe_vedere")
                     color: "white"
                     font.pixelSize: Theme.fontSizeXs
                 }
@@ -88,8 +88,8 @@ Item {
             }
             Tooltip {
                 visible: lockArea.containsMouse
-                text: lockButton.on ? "Orbit / pan / zoom mută camera (un pas de undo pe gest)"
-                                    : "Navigarea iese din cameră (zbor înapoi)"
+                text: lockButton.on ? qsTrId("CameraFrame.orbit_pan_zoom_muta_camera_un_pas_de_undo_pe_ges")
+                                    : qsTrId("CameraFrame.navigarea_iese_din_camera_zbor_inapoi")
             }
         }
         Rectangle {
@@ -104,7 +104,7 @@ Item {
                 hoverEnabled: true
                 onClicked: root.viewport.lookThrough = 0
             }
-            Tooltip { visible: exitArea.containsMouse; text: "Ieși din cameră (Esc)" }
+            Tooltip { visible: exitArea.containsMouse; text: qsTrId("CameraFrame.iesi_din_camera_esc") }
         }
     }
 

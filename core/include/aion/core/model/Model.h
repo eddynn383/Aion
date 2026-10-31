@@ -8,6 +8,7 @@
 #include "aion/core/math/Transform.h"
 #include "aion/core/model/Ids.h"
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -17,8 +18,9 @@
 #include <unordered_map>
 #include <vector>
 
-// Modelul: definiții (fiecare cu geometria ei), instanțe plasate cu o transformare și tag-uri (vezi ADR 0008).
-// Rădăcina e și ea o definiție; un grup e o definiție cu o singură instanță, o componentă poate avea oricâte.
+// Modelul: definiții (fiecare cu geometria ei), instanțe plasate cu o transformare și tag-uri (vezi ADR
+// 0008). Rădăcina e și ea o definiție; un grup e o definiție cu o singură instanță, o componentă poate avea
+// oricâte.
 namespace aion::model {
 
 struct Color {
@@ -40,7 +42,8 @@ struct Tag {
 };
 
 // O imagine folosită ca textură (PNG sau JPG, octeții fișierului), salvată în arhiva `.aion`.
-// `source`: de unde vine („procedural:brick” pentru texturile generate, numele fișierului pentru cele importate).
+// `source`: de unde vine („procedural:brick” pentru texturile generate, numele fișierului pentru cele
+// importate).
 struct Texture {
     std::string name;
     std::string source;
@@ -49,8 +52,8 @@ struct Texture {
     bool operator==(const Texture&) const = default;
 };
 
-// Un material: culoare (cu opacitate), rugozitate și caracter metalic (PBR simplificat), opțional cu o textură
-// care se repetă la fiecare `textureSize` mm (culoarea o nuanțează: alb = textura neschimbată).
+// Un material: culoare (cu opacitate), rugozitate și caracter metalic (PBR simplificat), opțional cu o
+// textură care se repetă la fiecare `textureSize` mm (culoarea o nuanțează: alb = textura neschimbată).
 struct Material {
     std::string name;
     Color color { 200, 200, 200, 255 };
@@ -58,6 +61,11 @@ struct Material {
     float metallic = 0.0f;
     TextureId texture {};
     math::Vec2d textureSize { 1000.0 };
+    // Categoria (ADR 0044): "wood", "metal", "glass", "plastic", "stone", "board-decor" sau "" (necunoscută).
+    // Decide clasa obiectelor fără date de piesă în lista de debitare.
+    std::string category {};
+    // Cheia materialului inclus din care vine ("otel-periat"); "" = creat de utilizator.
+    std::string libraryKey {};
 
     bool operator==(const Material&) const = default;
 };
@@ -116,9 +124,10 @@ struct Scene {
     bool operator==(const Scene&) const = default;
 };
 
-// O cameră ca obiect: se vede în viewport (gizmo), se poate „privi prin ea” și folosi în scene și pe timeline.
-// Camera ca obiect (ca în Blender): poziția, ținta, lentila (focala pe un senzor; unghiul de vedere se calculează
-// pe latura lungă a cadrului, vezi model/CameraLens.h), formatul cadrului, shift-ul și înclinarea, depth of field.
+// O cameră ca obiect: se vede în viewport (gizmo), se poate „privi prin ea” și folosi în scene și pe
+// timeline. Camera ca obiect (ca în Blender): poziția, ținta, lentila (focala pe un senzor; unghiul de vedere
+// se calculează pe latura lungă a cadrului, vezi model/CameraLens.h), formatul cadrului, shift-ul și
+// înclinarea, depth of field.
 struct CameraObject {
     struct DepthOfField {
         bool enabled = false;
@@ -158,9 +167,9 @@ struct Light {
     Color color { 255, 244, 229, 255 };
     double intensity = 1.0;
     double range = 6000.0; // mm: dincolo de rază lumina nu mai ajunge (punctuală, spot, suprafață)
-    double cone = 45.0;    // spot: unghiul conului (grade, întreg)
+    double cone = 45.0; // spot: unghiul conului (grade, întreg)
     double softness = 0.25; // spot: cât din con e marginea estompată
-    double width = 1000.0;  // suprafață
+    double width = 1000.0; // suprafață
     double height = 1000.0;
     bool castShadows = false;
     bool enabled = true;
@@ -169,12 +178,13 @@ struct Light {
     bool operator==(const Light&) const = default;
 };
 
-// Animațiile (timeline-ul): keyframe-uri cu valori absolute, pe canale (o proprietate a unui obiect) și pe cameră
-// (ADR 0034).
+// Animațiile (timeline-ul): keyframe-uri cu valori absolute, pe canale (o proprietate a unui obiect) și pe
+// cameră (ADR 0034).
 
-// Easing-ul dintre o cheie și următoarea: o curbă Bézier cubică, ca `cubic-bezier` din CSS (capetele (0, 0) și (1, 1),
-// mânerele (x1, y1) și (x2, y2)), sau un salt la final (`step`). `name` = presetarea („easeInOut”) sau numele dat de
-// utilizator; cheia ține curba însăși, deci un fișier trimis altcuiva arată la fel. Implicit: ease-in-out.
+// Easing-ul dintre o cheie și următoarea: o curbă Bézier cubică, ca `cubic-bezier` din CSS (capetele (0, 0)
+// și (1, 1), mânerele (x1, y1) și (x2, y2)), sau un salt la final (`step`). `name` = presetarea („easeInOut”)
+// sau numele dat de utilizator; cheia ține curba însăși, deci un fișier trimis altcuiva arată la fel.
+// Implicit: ease-in-out.
 struct Easing {
     std::string name = "easeInOut";
     double x1 = 0.42;
@@ -185,9 +195,21 @@ struct Easing {
     bool operator==(const Easing&) const = default;
 };
 
-// Proprietățile animabile ale unui obiect, în ordinea din timeline. Valorile sunt ca în Inspector: poziția pivotului
-// (mm, în coordonatele părintelui), rotația (grade, Euler XYZ), scara pe axele proprii; culoarea (RGBA).
-enum class Property { PositionX, PositionY, PositionZ, RotationX, RotationY, RotationZ, ScaleX, ScaleY, ScaleZ, Color };
+// Proprietățile animabile ale unui obiect, în ordinea din timeline. Valorile sunt ca în Inspector: poziția
+// pivotului (mm, în coordonatele părintelui), rotația (grade, Euler XYZ), scara pe axele proprii; culoarea
+// (RGBA).
+enum class Property {
+    PositionX,
+    PositionY,
+    PositionZ,
+    RotationX,
+    RotationY,
+    RotationZ,
+    ScaleX,
+    ScaleY,
+    ScaleZ,
+    Color
+};
 inline constexpr int kPropertyCount = 10;
 
 struct Key {
@@ -215,7 +237,8 @@ struct CameraKey {
     bool operator==(const CameraKey&) const = default;
 };
 
-// Pista unui obiect: canalele lui, în ordinea proprietăților. Proprietățile fără canal rămân cum sunt în model.
+// Pista unui obiect: canalele lui, în ordinea proprietăților. Proprietățile fără canal rămân cum sunt în
+// model.
 struct ObjectTrack {
     InstanceId instance;
     std::vector<Channel> channels;
@@ -233,8 +256,8 @@ struct Animation {
     bool operator==(const Animation&) const = default;
 };
 
-// Un obiect ancorat pe o cale de parcurgere (ADR 0036): decalajul lui față de cale (pe axele ei, la locul obiectului)
-// și transformarea de dinainte de ancorare, pusă la loc când e scos.
+// Un obiect ancorat pe o cale de parcurgere (ADR 0036): decalajul lui față de cale (pe axele ei, la locul
+// obiectului) și transformarea de dinainte de ancorare, pusă la loc când e scos.
 struct PathAnchor {
     InstanceId instance;
     double along = 0.0; // mm, de-a lungul căii (negativ = în urmă)
@@ -246,8 +269,9 @@ struct PathAnchor {
     bool operator==(const PathAnchor&) const = default;
 };
 
-// O cale de parcurgere, desenată cu Pen-ul în Animare: un obiect de scenă (ca o cameră) al unei animații. Obiectele
-// ancorate o parcurg de la primul la ultimul punct în `duration` secunde, de la `start`, cu easing-ul ei.
+// O cale de parcurgere, desenată cu Pen-ul în Animare: un obiect de scenă (ca o cameră) al unei animații.
+// Obiectele ancorate o parcurg de la primul la ultimul punct în `duration` secunde, de la `start`, cu
+// easing-ul ei.
 struct MotionPath {
     std::string name;
     math::Transform transform; // poziția / rotația / scara căii
@@ -262,18 +286,50 @@ struct MotionPath {
     bool operator==(const MotionPath&) const = default;
 };
 
+// O latură cu cant a unei plăci (ADR 0044): cheia tipului de cant ("" = fără) și decorul ("" = ca placa,
+// altfel libraryKey-ul unui material inclus).
+struct BandSide {
+    std::string bandKey;
+    std::string decor;
+    bool rounded = false; // muchiile cantului rotunjite (raza ≈ grosimea lui), pentru mașina de cantuit
+
+    bool operator==(const BandSide&) const = default;
+};
+
+// Datele de piesă ale unei definiții de mobilier (ADR 0044): o placă (tip, grosime, axe, cant) sau o bucată
+// de feronerie (tipul în `typeKey`). Ordinea laturilor din `bands` e în docs/plans/mobilier-pe-corp.md, §5.
+struct PartSpec {
+    enum class Kind { Board, Hardware };
+    static constexpr std::uint8_t kNoGrain = 255;
+
+    Kind kind = Kind::Board;
+    std::string typeKey; // placă: "pal", "mdf", "hdf", "plywood", "solid"; feronerie: "hinge.overlay.110"…
+    double nominalThickness = 0.0; // mm (doar plăci)
+    std::uint8_t thicknessAxis = 2; // axa locală a grosimii
+    std::uint8_t grainAxis = 0; // axa locală a fibrei; kNoGrain = fără fibră
+    std::array<BandSide, 4> bands {};
+    std::string rawKind; // un `kind` necunoscut din fișier, păstrat și scris înapoi; "" altfel
+
+    bool operator==(const PartSpec&) const = default;
+};
+
 // Proprietățile unei definiții; geometria stă separat (Model::mesh).
 struct Definition {
     std::string name;
     bool group = false; // fără copii legate (o singură instanță); altfel, un obiect cu copii
     // Un grup în sensul Outliner-ului: colecție de obiecte și alte grupuri (folder), fără geometrie proprie.
     bool collection = false;
-    // Forma unei primitive („box”, „cylinder”, „cone”, „sphere”), pentru iconița din listă; gol = formă liberă.
+    // Forma unei primitive („box”, „cylinder”, „cone”, „sphere”), pentru iconița din listă; gol = formă
+    // liberă.
     std::string shape {};
     // Obiect dinamic (parametric): generatorul („door”, „table”…) și parametrii lui; geometria (părțile, ca
     // subgrupuri) se reface din ei. Gol = obiect obișnuit. Vezi model/Parametric.h.
     std::string generator {};
     std::map<std::string, double> parameters {};
+    // Datele de piesă de mobilier (placă sau feronerie); nul = obiect obișnuit (ADR 0044).
+    std::optional<PartSpec> part {};
+    // UUID-ul unei componente salvate în bibliotecă; legătura dintre plasările ei (ADR 0044). "" = fără.
+    std::string sourceKey {};
 
     bool operator==(const Definition&) const = default;
 };
@@ -282,8 +338,8 @@ struct Definition {
 // un sertar care glisează. Axele și punctele se calculează din cutia definiției, în coordonatele ei.
 struct Behavior {
     enum class Kind { None, Rotate, Slide };
-    // Rotate: latura balamalei (Left, Right = verticală; Top, Bottom = orizontală), deschidere spre față (−Y).
-    // Slide: direcția (Front = −Y, Back = +Y, Left = −X, Right = +X, Top = +Z, Bottom = −Z).
+    // Rotate: latura balamalei (Left, Right = verticală; Top, Bottom = orizontală), deschidere spre față
+    // (−Y). Slide: direcția (Front = −Y, Back = +Y, Left = −X, Right = +X, Top = +Z, Bottom = −Z).
     enum class Anchor { Left, Right, Front, Back, Top, Bottom };
 
     Kind kind = Kind::None;
@@ -295,7 +351,8 @@ struct Behavior {
     bool operator==(const Behavior&) const = default;
 };
 
-// Interacțiunile cu blocuri (ca Scratch / Sketchware): „Când [eveniment] → acțiuni”, rulate în Modul interacțiune.
+// Interacțiunile cu blocuri (ca Scratch / Sketchware): „Când [eveniment] → acțiuni”, rulate în Modul
+// interacțiune.
 enum class Trigger { Click, RightClick, DoubleClick, HoverEnter, HoverLeave, LongPress, Drag, Key };
 enum class ActionKind {
     MoveBy, // vector (mm), în `duration` secunde
@@ -311,7 +368,8 @@ enum class ActionKind {
     Wait, // duration
     Alternate, // prima dată `first`, a doua oară `second`, apoi iar `first`…
 };
-// Sensul unei animații pornite dintr-o interacțiune: Comută deschide ce e la început și închide ce e la sfârșit.
+// Sensul unei animații pornite dintr-o interacțiune: Comută deschide ce e la început și închide ce e la
+// sfârșit.
 enum class PlayDirection { Forward, Reverse, Toggle };
 
 struct Action {
@@ -351,17 +409,26 @@ struct Instance {
     MaterialId material;
     Behavior behavior;
     std::vector<Rule> rules; // interacțiunile obiectului
-    // Valorile de plasare blocate (lacătele din Inspector), câte un bit: poziția X/Y/Z (0–2), dimensiunile (3–5),
-    // rotația (6–8), scara (9–11). Uneltele de transformare nu le schimbă.
+    // Valorile de plasare blocate (lacătele din Inspector), câte un bit: poziția X/Y/Z (0–2), dimensiunile
+    // (3–5), rotația (6–8), scara (9–11). Uneltele de transformare nu le schimbă.
     std::uint16_t placementLocks = 0;
-    // Pivotul (punctul fix la rotire și scalare din Inspector), în coordonatele definiției. Gol = centrul cutiei.
+    // Pivotul (punctul fix la rotire și scalare din Inspector), în coordonatele definiției. Gol = centrul
+    // cutiei.
     std::optional<math::Vec3d> pivot {};
+    // Rolul piesei într-un corp din bibliotecă ("side.left", "door.1.hinge.2"), după care corpul își
+    // recunoaște piesele la refacere; "" = pusă de utilizator (ADR 0043).
+    std::string roleKey {};
+    // Cheia numelui dat de program; afișat (tradus) când `name` e gol.
+    std::string nameKey {};
+    // Separator pus cu clic: poziția centrului, ca fracție din lățimea interioară a corpului.
+    std::optional<double> relativePosition {};
 
     bool operator==(const Instance&) const = default;
 };
 
-// O curbă desenată cu Pen-ul în Modelare: muchiile ei sunt geometrie obișnuită (cu `curve` id-ul ei), iar punctele și
-// mânerele rămân aici, ca să se poată edita cât timp muchiile sunt neschimbate (vezi model/PenCurves.h).
+// O curbă desenată cu Pen-ul în Modelare: muchiile ei sunt geometrie obișnuită (cu `curve` id-ul ei), iar
+// punctele și mânerele rămân aici, ca să se poată edita cât timp muchiile sunt neschimbate (vezi
+// model/PenCurves.h).
 struct PenCurve {
     DefinitionId definition; // definiția în care s-a desenat (editabilă doar acolo)
     std::uint32_t curve = 0; // id-ul de pe muchiile ei (Edge::curve)
@@ -397,7 +464,9 @@ class Model;
 class ModelObserver {
 public:
     virtual ~ModelObserver() = default;
-    virtual void meshChanged(DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary) = 0;
+    virtual void meshChanged(
+        DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary)
+        = 0;
     // Definiții, instanțe sau tag-uri adăugate, schimbate sau șterse.
     virtual void structureChanged(const Model& model) = 0;
 };
@@ -488,14 +557,19 @@ public:
     void beginRecording();
     [[nodiscard]] bool isRecording() const { return m_recording.has_value(); }
     ChangeSet endRecording();
+    // În timpul înregistrării: definițiile încă existente al căror mesh are schimbări, plus cele schimbate
+    // sau create structural, sortate (pentru finalizatorul din CommandStack).
+    [[nodiscard]] std::vector<DefinitionId> definitionsWithMeshChanges() const;
     void apply(const ChangeSet& changes, geom::ChangeDirection direction);
 
     void addObserver(ModelObserver* observer);
     void removeObserver(ModelObserver* observer);
 
     // --- Verificări ---
-    // Geometria fiecărei definiții și structura: referințe valide, fără cicluri (o definiție nu se conține pe sine).
-    [[nodiscard]] geom::ValidationReport validate(geom::ValidationLevel level = geom::ValidationLevel::Full) const;
+    // Geometria fiecărei definiții și structura: referințe valide, fără cicluri (o definiție nu se conține pe
+    // sine).
+    [[nodiscard]] geom::ValidationReport validate(
+        geom::ValidationLevel level = geom::ValidationLevel::Full) const;
     [[nodiscard]] bool sameAs(const Model& other) const;
 
 private:
@@ -507,20 +581,23 @@ private:
     void touch(TagId id);
     void touch(MaterialId id);
     template <class IdT, class T>
-    IdT addEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, T value);
+    IdT addEntity(
+        geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::* changes, T value);
     template <class IdT, class T>
-    void removeEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id);
+    void removeEntity(
+        geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::* changes, IdT id);
     template <class IdT, class T>
-    void setEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::*changes, IdT id, T value);
+    void setEntity(geom::SlotMap<IdT, T>& map, std::map<IdT, geom::EntityChange<T>> ChangeSet::* changes,
+        IdT id, T value);
     void notifyStructure();
     void instancesChanged() { m_children.reset(); }
 
     DefinitionId m_root;
     geom::SlotMap<DefinitionId, Definition> m_definitions;
     geom::SlotMap<InstanceId, Instance> m_instances;
-    // Copiii fiecărei definiții (după `parent`), construit la nevoie și golit la orice schimbare a instanțelor:
-    // `childrenOf` e chemat recursiv la desen, la alegere și la cutii, iar o trecere prin toate instanțele la fiecare
-    // apel făcea costul pătratic în numărul de obiecte.
+    // Copiii fiecărei definiții (după `parent`), construit la nevoie și golit la orice schimbare a
+    // instanțelor: `childrenOf` e chemat recursiv la desen, la alegere și la cutii, iar o trecere prin toate
+    // instanțele la fiecare apel făcea costul pătratic în numărul de obiecte.
     mutable std::optional<std::unordered_map<std::uint64_t, std::vector<InstanceId>>> m_children;
     geom::SlotMap<TagId, Tag> m_tags;
     geom::SlotMap<MaterialId, Material> m_materials;

@@ -1,6 +1,9 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Primitives.h"
+#include "aion/core/model/Carcass.h"
+#include "aion/core/model/Furniture.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Parametric.h"
 #include "aion/core/model/SnapSources.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/tools/Tool.h"
@@ -9,14 +12,13 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-
 #include <glm/trigonometric.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <numbers>
 #include <set>
-#include <cmath>
 
 using namespace aion;
 using Catch::Approx;
@@ -115,7 +117,8 @@ TEST_CASE("Unelte: dreptunghi, linie, selecție, ștergere, undo (scenariul din 
     CHECK(s.stack.undoName() == "Line");
 }
 
-TEST_CASE("Select: hover-ul în aceeași față nu schimbă overlay-ul (viewport-ul nu se reface)", "[core][tools]")
+TEST_CASE(
+    "Select: hover-ul în aceeași față nu schimbă overlay-ul (viewport-ul nu se reface)", "[core][tools]")
 {
     Scene s;
     s.stack.run("Rect", [&](Mesh& m) {
@@ -209,7 +212,8 @@ TEST_CASE("Unelte: selecție prin dreptunghi, window și crossing", "[core][tool
     geom::drawPolygon(s.mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
     auto select = tools::makeTool("select");
 
-    // Stânga → dreapta, acoperă doar jumătate din pătrat: nimic complet în interior, deci doar muchia din stânga.
+    // Stânga → dreapta, acoperă doar jumătate din pătrat: nimic complet în interior, deci doar muchia din
+    // stânga.
     s.drag(*select, s.screen({ -200, -200, 0 }), s.screen({ 500, 1200, 0 }));
     CHECK(s.selection.faces.empty());
     CHECK(s.selection.edges.size() == 1);
@@ -261,8 +265,8 @@ TEST_CASE("Picking: vârful are prioritate, iar muchiile ascunse nu se aleg", "[
     CHECK_FALSE(empty.hit());
 }
 
-
-TEST_CASE("Unelte: o cameră de 4 × 3 m numai din inferențe și Measurements box (Faza 4)", "[core][tools][inference]")
+TEST_CASE("Unelte: o cameră de 4 × 3 m numai din inferențe și Measurements box (Faza 4)",
+    "[core][tools][inference]")
 {
     Scene s;
     auto line = tools::makeTool("line");
@@ -290,7 +294,8 @@ TEST_CASE("Unelte: o cameră de 4 × 3 m numai din inferențe și Measurements b
     const geom::Face& face = s.mesh.face(s.mesh.faces().keys().front());
     const auto pts = s.mesh.loopPoints(face.outer);
     REQUIRE(pts.size() == 4);
-    for (const Vec3d& p : { Vec3d { 0, 0, 0 }, Vec3d { 4000, 0, 0 }, Vec3d { 4000, 3000, 0 }, Vec3d { 0, 3000, 0 } }) {
+    for (const Vec3d& p :
+        { Vec3d { 0, 0, 0 }, Vec3d { 4000, 0, 0 }, Vec3d { 4000, 3000, 0 }, Vec3d { 0, 3000, 0 } }) {
         CHECK(std::any_of(pts.begin(), pts.end(), [&](const Vec3d& q) { return glm::length(q - p) < 1e-6; }));
     }
 }
@@ -562,7 +567,8 @@ TEST_CASE("Unelte: cerc, cilindru neted, selecția și ștergerea curbei", "[cor
         [&](const geom::Edge& e) { return e.curve == curve; }));
 }
 
-TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin capete și săgeată", "[core][tools][curves]")
+TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin capete și săgeată",
+    "[core][tools][curves]")
 {
     Scene s;
     auto polygon = tools::makeTool("polygon");
@@ -589,7 +595,8 @@ TEST_CASE("Unelte: poligonul extrudat are laturi vizibile; arcul trece prin cape
     CHECK(a.mesh.findVertexNear({ 1000, 500, 0 }, 1e-6)); // vârful din mijloc, pe săgeată
 }
 
-TEST_CASE("Unelte pe model: selectarea unei componente, copii unice cu Move+Option, dublu-click intră", "[core][tools][model]")
+TEST_CASE("Unelte pe model: selectarea unei componente, copii unice cu Move+Option, dublu-click intră",
+    "[core][tools][model]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -618,7 +625,8 @@ TEST_CASE("Unelte pe model: selectarea unei componente, copii unice cu Move+Opti
     geom::Selection everything;
     everything.faces.insert(m.mesh(m.root()).faces().keys().begin(), m.mesh(m.root()).faces().keys().end());
     model::InstanceId box;
-    stack.run("Make Component", [&](model::Model& model) { box = model::makeGroup(model, model.root(), everything, true); });
+    stack.run("Make Component",
+        [&](model::Model& model) { box = model::makeGroup(model, model.root(), everything, true); });
     REQUIRE(box);
 
     // Click pe ea: se selectează instanța întreagă.
@@ -630,7 +638,8 @@ TEST_CASE("Unelte pe model: selectarea unei componente, copii unice cu Move+Opti
     REQUIRE(selection.instances.size() == 1);
     CHECK(*selection.instances.begin() == box);
 
-    // Move + Option, 1000 pe axa roșie: o copie unică (definiție proprie, aceeași geometrie; doar ⌥D și Array leagă).
+    // Move + Option, 1000 pe axa roșie: o copie unică (definiție proprie, aceeași geometrie; doar ⌥D și Array
+    // leagă).
     auto move = tools::makeTool("move");
     tools::Modifiers option;
     option.alt = true;
@@ -661,7 +670,8 @@ TEST_CASE("Unelte pe model: selectarea unei componente, copii unice cu Move+Opti
     CHECK(requests.enter);
 }
 
-TEST_CASE("Unelte: Paint Bucket vopsește, cu Cmd tot ce e conectat, cu Option ia materialul", "[core][tools][paint]")
+TEST_CASE("Unelte: Paint Bucket vopsește, cu Cmd tot ce e conectat, cu Option ia materialul",
+    "[core][tools][paint]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -715,7 +725,8 @@ TEST_CASE("Unelte: Paint Bucket vopsește, cu Cmd tot ce e conectat, cu Option i
     CHECK(*requests.sampledMaterial == ctx.paintMaterial);
 }
 
-TEST_CASE("Unelte: Tape Measure lasă ghidaje (de care se prinde inferența), cote, text, secțiune", "[core][tools][measure]")
+TEST_CASE("Unelte: Tape Measure lasă ghidaje (de care se prinde inferența), cote, text, secțiune",
+    "[core][tools][measure]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -802,7 +813,8 @@ TEST_CASE("Unelte: Section Plane pe fața laterală a unei cutii e vertical", "[
     });
     auto section = tools::makeTool("section");
     // Fețele vizibile din vederea izometrică: cea de sus și două laterale.
-    for (Vec3d p : { Vec3d { 2000, 800, 600 }, Vec3d { 1000, 0, 600 }, Vec3d { 1000, 1500, 600 }, Vec3d { 0, 800, 600 } }) {
+    for (Vec3d p : { Vec3d { 2000, 800, 600 }, Vec3d { 1000, 0, 600 }, Vec3d { 1000, 1500, 600 },
+             Vec3d { 0, 800, 600 } }) {
         const auto s = camera.project(p);
         INFO(p.x << "," << p.y << "," << p.z);
         section->pointerMove(ctx, { *s, {}, 1 });
@@ -813,7 +825,8 @@ TEST_CASE("Unelte: Section Plane pe fața laterală a unei cutii e vertical", "[
     section->pointerDown(ctx, { *s, {}, 1 });
     REQUIRE(m.sections().size() == 1);
     const auto& sec = m.sections().values().front();
-    INFO("n = " << sec.normal.x << "," << sec.normal.y << "," << sec.normal.z << " p = " << sec.point.x << "," << sec.point.y << "," << sec.point.z);
+    INFO("n = " << sec.normal.x << "," << sec.normal.y << "," << sec.normal.z << " p = " << sec.point.x << ","
+                << sec.point.y << "," << sec.point.z);
     CHECK(std::abs(sec.normal.z) < 1e-6);
 }
 
@@ -868,7 +881,9 @@ TEST_CASE("Tag-uri pe forme: o față cu tag ascuns nu se mai alege", "[core][vi
     CHECK(view::pick(mesh, camera, *center).hit());
 }
 
-TEST_CASE("Poziționează textura: tragerea mută textura cu cursorul, Shift o rotește în jurul punctului apăsat", "[core][tools][textures]")
+TEST_CASE(
+    "Poziționează textura: tragerea mută textura cu cursorul, Shift o rotește în jurul punctului apăsat",
+    "[core][tools][textures]")
 {
     model::Model m;
     commands::CommandStack stack(m);
@@ -877,7 +892,8 @@ TEST_CASE("Poziționează textura: tragerea mută textura cu cursorul, Shift o r
     camera.setViewportSize(1000, 800);
     camera.setPose(view::standardViewPose(view::StandardView::Top, { { 0, 0, 0 }, 0, 0, 6000 }));
     geom::Mesh& mesh = m.mesh(m.root());
-    geom::drawPolygon(mesh, { { -2000, -2000, 0 }, { 2000, -2000, 0 }, { 2000, 2000, 0 }, { -2000, 2000, 0 } });
+    geom::drawPolygon(
+        mesh, { { -2000, -2000, 0 }, { 2000, -2000, 0 }, { 2000, 2000, 0 }, { -2000, 2000, 0 } });
     REQUIRE(mesh.faces().size() == 1);
     const geom::FaceId face = mesh.faces().keys().front();
     tools::ToolContext ctx { mesh, stack, selection, camera };
@@ -901,13 +917,15 @@ TEST_CASE("Poziționează textura: tragerea mută textura cu cursorul, Shift o r
 
     // Rotire în jurul punctului apăsat: punctul de textură de acolo nu se mută.
     const Vec3d pivot { 500, 500, 0 };
-    const math::Vec2d before = model::textureCoordinates(mesh.face(face).plane.normal, pivot, mesh.face(face).texture, { 1000, 1000 });
+    const math::Vec2d before = model::textureCoordinates(
+        mesh.face(face).plane.normal, pivot, mesh.face(face).texture, { 1000, 1000 });
     tool->pointerMove(ctx, event(pivot, true));
     tool->pointerDown(ctx, event(pivot, true));
     tool->pointerMove(ctx, event({ 800, 500, 0 }, true));
     tool->pointerUp(ctx, event({ 800, 500, 0 }, true));
     CHECK(mesh.face(face).texture.rotation != Approx(0.0));
-    const math::Vec2d after = model::textureCoordinates(mesh.face(face).plane.normal, pivot, mesh.face(face).texture, { 1000, 1000 });
+    const math::Vec2d after = model::textureCoordinates(
+        mesh.face(face).plane.normal, pivot, mesh.face(face).texture, { 1000, 1000 });
     CHECK(after.x == Approx(before.x).margin(1e-3));
     CHECK(after.y == Approx(before.y).margin(1e-3));
 
@@ -920,7 +938,9 @@ TEST_CASE("Poziționează textura: tragerea mută textura cu cursorul, Shift o r
 TEST_CASE("Unelte: o muchie redesenată reface fața ștearsă", "[core][tools]")
 {
     Scene s;
-    s.stack.run("Pătrat", [](Mesh& mesh) { geom::drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } }); });
+    s.stack.run("Pătrat", [](Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 1000, 0, 0 }, { 1000, 1000, 0 }, { 0, 1000, 0 } });
+    });
     REQUIRE(s.mesh.faces().size() == 1);
     s.stack.run("Șterge fața", [](Mesh& mesh) { geom::eraseFace(mesh, mesh.faces().keys().front()); });
     REQUIRE(s.mesh.faces().empty());
@@ -931,7 +951,8 @@ TEST_CASE("Unelte: o muchie redesenată reface fața ștearsă", "[core][tools]"
     CHECK(s.mesh.edges().size() == 4);
 }
 
-TEST_CASE("Unelte: Move pornește dintr-un colț sau mijloc al obiectului și se prinde de colțul altuia", "[core][tools][model]")
+TEST_CASE("Unelte: Move pornește dintr-un colț sau mijloc al obiectului și se prinde de colțul altuia",
+    "[core][tools][model]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -950,7 +971,8 @@ TEST_CASE("Unelte: Move pornește dintr-un colț sau mijloc al obiectului și se
     // Două cutii-obiect: A (0..600) și B (2000..2600).
     const auto makeBox = [&](double x0) {
         stack.run("Box", [&](geom::Mesh& mesh) {
-            geom::drawPolygon(mesh, { { x0, 0, 0 }, { x0 + 600, 0, 0 }, { x0 + 600, 600, 0 }, { x0, 600, 0 } });
+            geom::drawPolygon(
+                mesh, { { x0, 0, 0 }, { x0 + 600, 0, 0 }, { x0 + 600, 600, 0 }, { x0, 600, 0 } });
         });
         geom::Selection faces;
         for (geom::FaceId f : m.mesh(m.root()).faces().keys()) {
@@ -960,7 +982,8 @@ TEST_CASE("Unelte: Move pornește dintr-un colț sau mijloc al obiectului și se
         geom::Selection all;
         all.faces.insert(m.mesh(m.root()).faces().keys().begin(), m.mesh(m.root()).faces().keys().end());
         model::InstanceId id;
-        stack.run("Group", [&](model::Model& model) { id = model::makeGroup(model, model.root(), all, false); });
+        stack.run(
+            "Group", [&](model::Model& model) { id = model::makeGroup(model, model.root(), all, false); });
         return id;
     };
     const model::InstanceId a = makeBox(0);
@@ -1033,7 +1056,8 @@ model::InstanceId boxObject(model::Model& m, commands::CommandStack& stack, doub
 
 } // namespace
 
-TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în colț ține muchia pe loc)", "[core][tools][transform]")
+TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în colț ține muchia pe loc)",
+    "[core][tools][transform]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -1065,7 +1089,9 @@ TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în 
     ctx.pivot = model::pivotPoint(m, box);
     REQUIRE(glm::length(*ctx.pivot - Vec3d { 1000, 0, 0 }) < 1e-9);
     const math::Transform before = m.instance(box).transform;
-    const auto world = [&](Vec3d local) { return m.instance(box).transform.applyToPoint(before.inverse().applyToPoint(local)); };
+    const auto world = [&](Vec3d local) {
+        return m.instance(box).transform.applyToPoint(before.inverse().applyToPoint(local));
+    };
 
     SECTION("Rotate pe Y: centrul e deja pivotul, primul click alege referința")
     {
@@ -1074,7 +1100,8 @@ TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în 
         REQUIRE(rotate->key(ctx, { tools::Key::Left, {} })); // axa verde
         // Raportorul stă pe pivot înainte de orice click.
         const std::vector<Vec3d> points = rotate->overlay().points;
-        CHECK(std::any_of(points.begin(), points.end(), [](const Vec3d& p) { return glm::length(p - Vec3d { 1000, 0, 0 }) < 1e-9; }));
+        CHECK(std::any_of(points.begin(), points.end(),
+            [](const Vec3d& p) { return glm::length(p - Vec3d { 1000, 0, 0 }) < 1e-9; }));
         click(*rotate, { 1600, 0, 0 }); // referința: colțul de pe axa roșie
         rotate->pointerMove(ctx, at({ 1500, 0, 400 }));
         REQUIRE(rotate->applyMeasurement(ctx, "30"));
@@ -1094,7 +1121,8 @@ TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în 
         auto rotate = tools::makeTool("rotate");
         rotate->pointerMove(ctx, at({ 1600, 600, 600 }));
         REQUIRE(rotate->key(ctx, { tools::Key::Up, {} })); // axa albastră
-        const tools::PointerEvent near { at({ 1600, 600, 600 }).screen + Vec2d { 4, -3 }, { false, false, true }, 1 };
+        const tools::PointerEvent near { at({ 1600, 600, 600 }).screen + Vec2d { 4, -3 },
+            { false, false, true }, 1 };
         rotate->pointerMove(ctx, near);
         rotate->pointerDown(ctx, near);
         rotate->pointerUp(ctx, near);
@@ -1120,7 +1148,8 @@ TEST_CASE("Unelte: Rotate și Scale pornesc din pivotul selecției (pivotul în 
     }
 }
 
-TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca obiectele (cu prindere)", "[core][tools][transform]")
+TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca obiectele (cu prindere)",
+    "[core][tools][transform]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -1196,7 +1225,8 @@ TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca
     {
         model::SceneObjectRef ref { cam, {} };
         stack.run("Roll", [&](model::Model& model) {
-            model::transformSceneObject(model, ref, math::Transform::rotation(c.position, { 0, 1, 0 }, glm::radians(30.0)));
+            model::transformSceneObject(
+                model, ref, math::Transform::rotation(c.position, { 0, 1, 0 }, glm::radians(30.0)));
         });
         CHECK(std::abs(m.cameras().at(cam).roll) == Approx(30.0));
         CHECK(glm::length(m.cameras().at(cam).target - c.target) < 1e-6);
@@ -1212,10 +1242,12 @@ TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca
         stack.run("Lumină", [&](model::Model& model) { light = model.addLight(l); });
         const model::SceneObjectRef ref { {}, light };
         stack.run("Rotate", [&](model::Model& model) {
-            model::transformSceneObject(model, ref, math::Transform::rotation(l.position, { 1, 0, 0 }, glm::radians(90.0)));
+            model::transformSceneObject(
+                model, ref, math::Transform::rotation(l.position, { 1, 0, 0 }, glm::radians(90.0)));
         });
         CHECK(glm::length(m.lights().at(light).direction - Vec3d { 0, 1, 0 }) < 1e-9);
-        stack.run("Scale", [&](model::Model& model) { model::scaleSceneObject(model, ref, Vec3d { 2.0, 0.5, 1.0 }); });
+        stack.run("Scale",
+            [&](model::Model& model) { model::scaleSceneObject(model, ref, Vec3d { 2.0, 0.5, 1.0 }); });
         CHECK(m.lights().at(light).width == Approx(2000.0));
         CHECK(m.lights().at(light).height == Approx(500.0));
         stack.run("Spot", [&](model::Model& model) {
@@ -1228,7 +1260,8 @@ TEST_CASE("Unelte: camerele și luminile se mută, se rotesc și se scalează ca
     }
 }
 
-TEST_CASE("Unelte: Rotate — referința și unghiul se prind exact de axa inferată (linia nu iese înclinată)", "[core][tools][transform]")
+TEST_CASE("Unelte: Rotate — referința și unghiul se prind exact de axa inferată (linia nu iese înclinată)",
+    "[core][tools][transform]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -1267,14 +1300,16 @@ TEST_CASE("Unelte: Rotate — referința și unghiul se prind exact de axa infer
     REQUIRE(ref);
     CHECK(std::abs(ref->b.y) < 1e-6); // exact pe axa X
     // Unghiul: cursorul lângă axa verde → exact 90°, cu linia de final pe axă.
-    rotate->pointerMove(ctx, at({ 1000, 500, 0 }) );
+    rotate->pointerMove(ctx, at({ 1000, 500, 0 }));
     const tools::PointerEvent green = at({ 1009, 500, 0 });
     rotate->pointerMove(ctx, green);
     REQUIRE(rotate->measurement());
     CHECK(rotate->measurement()->value == "90°");
 }
 
-TEST_CASE("Unelte: tragerea pivotului se prinde ca la Move (colțul altui obiect, originea, centrul unei fețe)", "[core][tools][transform]")
+TEST_CASE(
+    "Unelte: tragerea pivotului se prinde ca la Move (colțul altui obiect, originea, centrul unei fețe)",
+    "[core][tools][transform]")
 {
     model::Model m;
     commands::CommandStack stack { m };
@@ -1326,7 +1361,8 @@ TEST_CASE("Unelte: tragerea pivotului se prinde ca la Move (colțul altui obiect
     }
     SECTION("centrul feței de sus a propriului obiect")
     {
-        // De sus: centrul feței văzute e un punct obișnuit (centrul cutiei și fața de jos, sub el, sunt estompate).
+        // De sus: centrul feței văzute e un punct obișnuit (centrul cutiei și fața de jos, sub el, sunt
+        // estompate).
         camera.setPose(view::standardViewPose(view::StandardView::Top, { { 1800, 300, 300 }, 0, 0, 9000 }));
         const Vec3d top { 1300, 300, 600 };
         ctx.pivot = Vec3d { 1000, 0, 0 };
@@ -1351,10 +1387,13 @@ TEST_CASE("Unelte: tragerea pivotului se prinde ca la Move (colțul altui obiect
     }
 }
 
-TEST_CASE("Unelte: guma pe o linie care împarte o față o lasă întreagă; deleteSelection cu fețe o ia", "[core][tools][erase]")
+TEST_CASE("Unelte: guma pe o linie care împarte o față o lasă întreagă; deleteSelection cu fețe o ia",
+    "[core][tools][erase]")
 {
     Scene s;
-    s.stack.run("Rect", [&](Mesh& mesh) { geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } }); });
+    s.stack.run("Rect", [&](Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 2000, 0, 0 }, { 2000, 2000, 0 }, { 0, 2000, 0 } });
+    });
     s.stack.run("Line", [&](Mesh& mesh) { geom::drawLine(mesh, { 1000, 0, 0 }, { 1000, 2000, 0 }); });
     REQUIRE(s.mesh.faces().size() == 2);
     SECTION("guma")
@@ -1418,7 +1457,8 @@ TEST_CASE("Place: urmează cursorul și desenează copia", "[core][tools]")
     s.place->pointerMove(s.ctx, { s.screen({ 1000, 500, 0 }), {}, 1 });
     const tools::Overlay o = s.place->overlay();
     const bool drawn = std::any_of(o.lines.begin(), o.lines.end(), [](const tools::OverlayLine& l) {
-        return glm::length(l.a - Vec3d { 1000, 500, 0 }) < 1.0 && glm::length(l.b - Vec3d { 1100, 500, 0 }) < 1.0;
+        return glm::length(l.a - Vec3d { 1000, 500, 0 }) < 1.0
+            && glm::length(l.b - Vec3d { 1100, 500, 0 }) < 1.0;
     });
     CHECK(drawn);
 }
@@ -1516,7 +1556,10 @@ struct ObjectScene {
         return m.addInstance(inst);
     }
 
-    void rebuildScene(const std::set<model::InstanceId>& exclude = {}) { scene = model::snapScene(m, {}, exclude); }
+    void rebuildScene(const std::set<model::InstanceId>& exclude = {})
+    {
+        scene = model::snapScene(m, {}, exclude);
+    }
 
     std::unique_ptr<tools::Tool> make(std::string_view id)
     {
@@ -1661,7 +1704,8 @@ TEST_CASE("Primitive: sub bază, înălțimea rămâne 0 și click-ul nu face ni
     cube->pointerMove(s.ctx, tools::PointerEvent { s.screen(below), {}, 1 });
     CHECK(cube->measurement()->value == units::formatLength(0.0));
     const tools::Overlay o = cube->overlay();
-    CHECK(std::ranges::none_of(o.lines, [](const tools::OverlayLine& l) { return l.a.z < -1e-6 || l.b.z < -1e-6; }));
+    CHECK(std::ranges::none_of(
+        o.lines, [](const tools::OverlayLine& l) { return l.a.z < -1e-6 || l.b.z < -1e-6; }));
     s.click(*cube, below);
     CHECK(s.m.instances().empty());
     CHECK(cube->measurement()->label == "Înălțime"); // tot la pasul înălțimii
@@ -1734,7 +1778,8 @@ TEST_CASE("Primitive: previzualizarea sferei are meridiane și paralele", "[core
     const double r = 600.0; // raza bazei = raza sferei; centrul la înălțimea razei
     const tools::Overlay o = sphere->overlay();
     std::vector<tools::OverlayLine> body;
-    std::ranges::copy_if(o.lines, std::back_inserter(body), [](const tools::OverlayLine& l) { return !l.dashed && !l.onTop; });
+    std::ranges::copy_if(
+        o.lines, std::back_inserter(body), [](const tools::OverlayLine& l) { return !l.dashed && !l.onTop; });
     CHECK(body.size() >= 8 * 16);
     const Vec3d center { 0, 0, r };
     for (const tools::OverlayLine& l : body) {
@@ -1770,8 +1815,8 @@ TEST_CASE("Move: colțul obiectului mutat pe colțul altui obiect", "[core][tool
     s.selection.instances.insert(a);
 
     auto move = tools::makeTool("move");
-    s.click(*move, { 500, 500, 1000 });                  // colțul lui A
-    s.click(*move, { 2500, 500, 1000 });                 // colțul lui B (cel din stânga)
+    s.click(*move, { 500, 500, 1000 }); // colțul lui A
+    s.click(*move, { 2500, 500, 1000 }); // colțul lui B (cel din stânga)
     CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - Vec3d { 2000, 0, 0 }) < 1e-6);
 }
 
@@ -1783,8 +1828,9 @@ TEST_CASE("Move: un colț real bate punctul cutiei la aceeași distanță", "[co
     s.rebuildScene({ a });
     s.selection.instances.insert(a);
 
-    const Vec3d airCorner { 3500, 500, 1000 };                          // colțul cutiei cilindrului (în aer)
-    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
+    const Vec3d airCorner { 3500, 500, 1000 }; // colțul cutiei cilindrului (în aer)
+    const Vec3d capVertex = Vec3d { 3000, 0, 1000 }
+        + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
     const Vec2d mid = (s.screen(airCorner) + s.screen(capVertex)) * 0.5; // egal departe de amândouă
 
     auto move = tools::makeTool("move");
@@ -1793,7 +1839,9 @@ TEST_CASE("Move: un colț real bate punctul cutiei la aceeași distanță", "[co
     move->pointerMove(s.ctx, e);
     move->pointerDown(s.ctx, e);
     move->pointerUp(s.ctx, e);
-    CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 })) < 1e-3);
+    CHECK(glm::length(
+              s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 }))
+        < 1e-3);
 }
 
 TEST_CASE("Move: vârful capacului unui cilindru, pe care punctele cutiei nu-l oferă", "[core][tools][snap]")
@@ -1804,18 +1852,22 @@ TEST_CASE("Move: vârful capacului unui cilindru, pe care punctele cutiei nu-l o
     s.rebuildScene({ a });
     s.selection.instances.insert(a);
 
-    const Vec3d capVertex = Vec3d { 3000, 0, 1000 } + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
+    const Vec3d capVertex = Vec3d { 3000, 0, 1000 }
+        + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
     auto move = tools::makeTool("move");
     s.click(*move, { 500, 500, 1000 });
     s.click(*move, capVertex);
-    CHECK(glm::length(s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 })) < 1e-3);
+    CHECK(glm::length(
+              s.m.instance(a).transform.applyToPoint({ 0, 0, 0 }) - (capVertex - Vec3d { 500, 500, 1000 }))
+        < 1e-3);
 }
 
 TEST_CASE("Text pe fața unui obiect nu arată aria feței din ctx.mesh de sub el", "[core][tools][snap]")
 {
     ObjectScene s;
     s.stack.run("Sol", [](geom::Mesh& mesh) {
-        geom::drawPolygon(mesh, { { -2000, -2000, 0 }, { 4000, -2000, 0 }, { 4000, 4000, 0 }, { -2000, 4000, 0 } });
+        geom::drawPolygon(
+            mesh, { { -2000, -2000, 0 }, { 4000, -2000, 0 }, { 4000, 4000, 0 }, { -2000, 4000, 0 } });
     });
     s.addBox({ 1000, 1000, 0 });
     s.rebuildScene();
@@ -1828,7 +1880,8 @@ TEST_CASE("Text pe fața unui obiect nu arată aria feței din ctx.mesh de sub e
     CHECK(a.text == "1100, 1150, 1000");
 }
 
-TEST_CASE("Move: colțul real pe un punct al cutiei ține punctul aprins, cu marcajul inferenței", "[core][tools][snap]")
+TEST_CASE("Move: colțul real pe un punct al cutiei ține punctul aprins, cu marcajul inferenței",
+    "[core][tools][snap]")
 {
     ObjectScene s;
     const model::InstanceId a = s.addBox({ 0, 0, 0 });
@@ -1856,7 +1909,8 @@ TEST_CASE("Move fără selecție: obiectul mutat nu se prinde de el însuși", "
     auto move = tools::makeTool("move");
     CHECK(move->snapExclude().empty());
 
-    // Baza pe colțul de sus al lui A (obiectul de sub cursor, fără selecție), apoi cursorul pe colțul lui de jos.
+    // Baza pe colțul de sus al lui A (obiectul de sub cursor, fără selecție), apoi cursorul pe colțul lui de
+    // jos.
     s.clickLive(*move, { 500, 500, 1000 });
     CHECK(move->snapExclude() == std::set<model::InstanceId> { a });
     CHECK(s.selection.instances.empty());
@@ -1877,8 +1931,8 @@ TEST_CASE("Move cu selecție: înainte de bază, vârfurile obiectului selectat 
     CHECK(move->snapExclude().empty());
 
     // Vârful capacului nu e un punct al cutiei: baza vine doar din geometria lui C, deci C e încă în scenă.
-    const Vec3d capVertex
-        = Vec3d { 0, 0, 1000 } + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
+    const Vec3d capVertex = Vec3d { 0, 0, 1000 }
+        + Vec3d { 500 * std::cos(std::numbers::pi / 4), 500 * std::sin(std::numbers::pi / 4), 0 };
     s.clickLive(*move, capVertex);
     CHECK(move->snapExclude() == std::set<model::InstanceId> { c });
     const Vec3d target { 2500, -500, 1000 }; // colțul lui B
@@ -1886,7 +1940,8 @@ TEST_CASE("Move cu selecție: înainte de bază, vârfurile obiectului selectat 
     CHECK(glm::length(s.m.instance(c).transform.applyToPoint({ 0, 0, 0 }) - (target - capVertex)) < 1e-3);
 }
 
-TEST_CASE("Rotate fără selecție: obiectul rotit iese din scenă după alegerea centrului", "[core][tools][snap]")
+TEST_CASE(
+    "Rotate fără selecție: obiectul rotit iese din scenă după alegerea centrului", "[core][tools][snap]")
 {
     ObjectScene s;
     const model::InstanceId a = s.addBox({ 0, 0, 0 });
@@ -1896,4 +1951,102 @@ TEST_CASE("Rotate fără selecție: obiectul rotit iese din scenă după alegere
     CHECK(rotate->snapExclude() == std::set<model::InstanceId> { a });
     rotate->cancel(s.ctx);
     CHECK(rotate->snapExclude().empty());
+}
+
+TEST_CASE(
+    "Placă pe față: dreptunghiul de pe o față devine placă spre exterior", "[core][tools][model][furniture]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Front, { { 300, 0, 360 }, 0, 0, 4000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    // O cutie 600 × 560 × 720; fața din față e la y = 0, cu normala −Y.
+    stack.run("Box", [&](geom::Mesh& mesh) {
+        geom::drawPolygon(mesh, { { 0, 0, 0 }, { 600, 0, 0 }, { 600, 560, 0 }, { 0, 560, 0 } });
+        geom::pushPull(mesh, mesh.faces().keys().front(), -720);
+    });
+    const auto at = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return *s;
+    };
+    auto tool = tools::makeTool("board");
+    REQUIRE(tool);
+    for (const Vec3d p : { Vec3d { 0, 0, 0 }, Vec3d { 600, 0, 720 } }) {
+        const tools::PointerEvent e { at(p), {}, 1 };
+        tool->pointerMove(ctx, e);
+        tool->pointerDown(ctx, e);
+        tool->pointerUp(ctx, e);
+    }
+    REQUIRE(selection.instances.size() == 1);
+    const model::InstanceId board = *selection.instances.begin();
+    const model::Definition& def = m.definition(m.instance(board).definition);
+    REQUIRE(def.part);
+    CHECK(def.part->typeKey == "pal");
+    CHECK(def.part->nominalThickness == Approx(18.0));
+    CHECK(def.parameters.at("length") == Approx(720.0)); // fibra pe latura lungă
+    CHECK(def.parameters.at("width") == Approx(600.0));
+    const math::Transform& t = m.instance(board).transform;
+    CHECK(t.applyToVector({ 0, 0, 1 }).y == Approx(-1.0)); // grosimea spre exterior (−Y)
+    CHECK(model::boardState(m, board, t).state == model::BoardState::Matches);
+}
+
+TEST_CASE("Întinde: planul urmează cursorul, apoi distanța din VCB", "[core][tools][model][furniture]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 300, 280, 360 }, 0, 0, 4000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    const model::InstanceId body = model::createParametric(
+        m, m.root(), "base", { { "doors", 2 }, { "shelves", 0 } }, math::Transform {});
+    model::makePlainBody(m, m.instance(body).definition);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    ctx.snap = &scene;
+    const auto at = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return *s;
+    };
+    auto tool = tools::makeTool("stretch");
+    REQUIRE(tool);
+    const auto click = [&](Vec3d p) {
+        const tools::PointerEvent e { at(p), {}, 1 };
+        tool->pointerMove(ctx, e);
+        tool->pointerDown(ctx, e);
+        tool->pointerUp(ctx, e);
+    };
+    // Fața de sus (normala Z) ar alege înălțimea; pentru lățime, fața din dreapta sau din stânga.
+    const Vec3d side = camera.forward().x < 0.0 ? Vec3d { 600, 280, 360 } : Vec3d { 0, 280, 360 };
+    click(side);
+    // Planul, mutat cu cursorul pe capac la x = 150, apoi fixat.
+    const Vec3d onTop { 150, 280, 720 };
+    tool->pointerMove(ctx, { at(onTop), {}, 1 });
+    click(onTop);
+    REQUIRE(tool->applyMeasurement(ctx, "200"));
+    const model::DefinitionId def = m.instance(body).definition;
+    double bottom = 0.0;
+    double door1 = 0.0;
+    for (model::InstanceId id : m.childrenOf(def)) {
+        const model::Instance& inst = m.instance(id);
+        if (inst.roleKey == "bottom") {
+            bottom = m.definition(inst.definition).parameters.at("length");
+        }
+        for (model::InstanceId inner : m.childrenOf(inst.definition)) {
+            if (m.instance(inner).roleKey == "door.1.panel") {
+                door1 = m.definition(m.instance(inner).definition).parameters.at("width");
+            }
+        }
+    }
+    CHECK(bottom == Approx(764.0));
+    CHECK(door1 == Approx(298.5 + 200.0)); // planul trece prin ușa 1
 }

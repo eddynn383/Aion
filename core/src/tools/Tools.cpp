@@ -1,13 +1,14 @@
+#include "ToolHelpers.h"
 #include "aion/core/geom/Operations.h"
-#include "aion/core/model/Operations.h"
-#include "aion/core/model/PenCurves.h"
-#include "aion/core/view/ModelPicking.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
+#include "aion/core/model/Carcass.h"
+#include "aion/core/model/Furniture.h"
+#include "aion/core/model/Operations.h"
+#include "aion/core/model/PenCurves.h"
 #include "aion/core/tools/Tool.h"
 #include "aion/core/units/Length.h"
-
-#include "ToolHelpers.h"
+#include "aion/core/view/ModelPicking.h"
 
 #include <glm/geometric.hpp>
 
@@ -32,9 +33,7 @@ bool Tool::key(ToolContext& ctx, const KeyEvent& e)
     return false;
 }
 
-void Tool::cancel(ToolContext& /*ctx*/)
-{
-}
+void Tool::cancel(ToolContext& /*ctx*/) { }
 
 std::optional<SurfacePoint> surfacePoint(const ToolContext& ctx, Vec2d screen)
 {
@@ -105,6 +104,7 @@ bool deleteSelection(ToolContext& ctx, bool keepFaces)
                 model::eraseInstance(model, i);
             }
         }
+        model::pruneDoorAnimations(model); // ușile corpurilor șterse nu-și lasă animațiile în listă
     });
 }
 
@@ -143,8 +143,9 @@ public:
             const bool crossing = e.screen.x < m_press->x;
             picked = view::pickInRectangle(ctx.mesh, ctx.camera, *m_press, e.screen, crossing);
             if (ctx.model != nullptr) {
-                picked.instances = view::pickInstancesInRectangle(
-                    *ctx.model, ctx.context, ctx.camera, *m_press, e.screen, crossing);
+                picked.instances
+                    = view::pickInstancesInRectangle(ctx.pickModel != nullptr ? *ctx.pickModel : *ctx.model,
+                        ctx.context, ctx.camera, *m_press, e.screen, crossing);
             }
         } else {
             picked = clickSelection(ctx, e);
@@ -205,7 +206,8 @@ private:
             s.instances.insert(hit.instance);
             return s;
         }
-        // Dublu click pe o curbă Pen încă editabilă (muchia ei sau fața închisă de ea): editarea punctelor și mânerelor.
+        // Dublu click pe o curbă Pen încă editabilă (muchia ei sau fața închisă de ea): editarea punctelor și
+        // mânerelor.
         if (e.clickCount == 2 && ctx.requests != nullptr && ctx.model != nullptr
             && (hit.kind == view::PickResult::Kind::Edge || hit.kind == view::PickResult::Kind::Face)) {
             geom::EdgeId edge = hit.edge;
@@ -213,7 +215,8 @@ private:
                 const geom::Loop& outer = ctx.mesh.face(hit.face).outer;
                 edge = outer.uses.empty() ? geom::EdgeId {} : outer.uses.front().edge;
             }
-            const model::PenCurveId curve = edge ? model::penCurveForEdge(*ctx.model, ctx.context, edge) : model::PenCurveId {};
+            const model::PenCurveId curve
+                = edge ? model::penCurveForEdge(*ctx.model, ctx.context, edge) : model::PenCurveId {};
             if (curve && model::penCurveEditable(*ctx.model, curve)) {
                 ctx.requests->editPenCurve = curve;
                 for (geom::EdgeId e2 : geom::curveEdges(ctx.mesh, edge)) {
@@ -225,10 +228,12 @@ private:
         if (hit.kind == view::PickResult::Kind::Edge) {
             // O muchie a unei curbe (cerc, arc) selectează toată curba.
             for (geom::EdgeId edge : geom::curveEdges(ctx.mesh, hit.edge)) {
-                s.add(e.clickCount >= 2 ? geom::edgeWithFaces(ctx.mesh, edge) : geom::Selection { { edge }, {}, {} });
+                s.add(e.clickCount >= 2 ? geom::edgeWithFaces(ctx.mesh, edge)
+                                        : geom::Selection { { edge }, {}, {} });
             }
         } else if (hit.kind == view::PickResult::Kind::Face) {
-            s = e.clickCount >= 2 ? geom::faceWithEdges(ctx.mesh, hit.face) : geom::Selection { {}, { hit.face }, {} };
+            s = e.clickCount >= 2 ? geom::faceWithEdges(ctx.mesh, hit.face)
+                                  : geom::Selection { {}, { hit.face }, {} };
         }
         if (e.clickCount >= 3 && !s.empty()) {
             s = geom::connectedTo(ctx.mesh, s);
@@ -319,13 +324,15 @@ public:
 
     std::string status() const override
     {
-        return m_start ? "Alege următorul punct sau tastează lungimea · săgeți/Shift: blochează direcția · Esc termină"
-                       : "Alege punctul de început al liniei";
+        return m_start
+            ? "Alege următorul punct sau tastează lungimea · săgeți/Shift: blochează direcția · Esc termină"
+            : "Alege punctul de început al liniei";
     }
 
     std::optional<Measurement> measurement() const override
     {
-        return Measurement { "Lungime", m_start ? units::formatLength(glm::length(m_current - *m_start)) : "" };
+        return Measurement { "Lungime",
+            m_start ? units::formatLength(glm::length(m_current - *m_start)) : "" };
     }
 
     bool applyMeasurement(ToolContext& ctx, std::string_view text) override
@@ -395,9 +402,16 @@ private:
 
 // --- Rectangle ------------------------------------------------------------------------------
 
+// Rectangle; cu `board`, „Placă pe față” (mobilier, pasul 10): dreptunghiul devine o placă parametrică cu
+// grosimea pe normala planului (spre exteriorul feței) și fibra pe latura mai lungă.
 class RectangleTool final : public Tool {
 public:
-    std::string_view id() const override { return "rectangle"; }
+    explicit RectangleTool(bool board = false)
+        : m_board(board)
+    {
+    }
+
+    std::string_view id() const override { return m_board ? "board" : "rectangle"; }
 
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
@@ -452,6 +466,11 @@ public:
 
     std::string status() const override
     {
+        if (m_board) {
+            return m_origin
+                ? "Alege colțul opus al plăcii sau tastează dimensiunile (600,400) · Esc anulează"
+                : "Placă pe față: alege primul colț pe o față (placa iese spre exterior) sau pe sol";
+        }
         return m_origin ? "Alege colțul opus sau tastează dimensiunile (3000,2000) · Esc anulează"
                         : "Alege primul colț (pe sol sau pe o față)";
     }
@@ -463,7 +482,8 @@ public:
         }
         const Vec3d d = m_current - *m_origin;
         return Measurement { "Dimensiuni",
-            units::formatLength(std::abs(glm::dot(d, m_u))) + ", " + units::formatLength(std::abs(glm::dot(d, m_v))) };
+            units::formatLength(std::abs(glm::dot(d, m_u))) + ", "
+                + units::formatLength(std::abs(glm::dot(d, m_v))) };
     }
 
     bool applyMeasurement(ToolContext& ctx, std::string_view text) override
@@ -475,7 +495,8 @@ public:
         const Vec3d d = m_current - *m_origin;
         double du = glm::dot(d, m_u);
         double dv = glm::dot(d, m_v);
-        // Valoarea tastată dă mărimea; sensul vine din poziția cursorului (sau e pozitiv, dacă nu există încă).
+        // Valoarea tastată dă mărimea; sensul vine din poziția cursorului (sau e pozitiv, dacă nu există
+        // încă).
         const auto apply = [](double current, const std::optional<double>& typed) {
             if (!typed) {
                 return current;
@@ -500,8 +521,8 @@ private:
         updateShiftLock(m_engine, e.modifiers.shift, m_shiftLock);
         // Colțul opus nu folosește direcții din primul colț (ar da un dreptunghi degenerat),
         // dar folosește capetele, muchiile și alinierea cu punctele de referință, proiectate pe plan.
-        m_inference = inferAt(m_engine, ctx, e.screen, std::nullopt,
-            m_origin ? std::optional(m_plane) : std::nullopt);
+        m_inference = inferAt(
+            m_engine, ctx, e.screen, std::nullopt, m_origin ? std::optional(m_plane) : std::nullopt);
         if (m_inference.valid()) {
             m_current = m_origin ? m_plane.project(m_inference.point) : m_inference.point;
         }
@@ -540,11 +561,47 @@ private:
         if (!corners) {
             return;
         }
-        const std::vector<Vec3d> pts(corners->begin(), corners->end());
-        ctx.stack.run("Rectangle", [&](geom::Mesh& mesh) { geom::drawPolygon(mesh, pts); });
+        if (m_board && ctx.model != nullptr) {
+            createBoardFrom(ctx, *corners);
+        } else {
+            const std::vector<Vec3d> pts(corners->begin(), corners->end());
+            ctx.stack.run("Rectangle", [&](geom::Mesh& mesh) { geom::drawPolygon(mesh, pts); });
+        }
         m_origin.reset();
         m_engine.resetLock();
         m_shiftLock = false;
+    }
+
+    void createBoardFrom(ToolContext& ctx, const std::array<Vec3d, 4>& c)
+    {
+        // Fibra pe latura mai lungă; rotația proprie (grosimea pe +normală) cu originea mutată dacă trebuie.
+        Vec3d side1 = c[1] - c[0];
+        Vec3d side2 = c[3] - c[0];
+        if (glm::length(side2) > glm::length(side1)) {
+            std::swap(side1, side2);
+        }
+        Vec3d origin = c[0];
+        const Vec3d ex = glm::normalize(side1);
+        Vec3d ey = glm::normalize(side2);
+        if (glm::dot(glm::cross(ex, ey), m_plane.normal) < 0.0) {
+            origin += side2;
+            ey = -ey;
+        }
+        const Vec3d ez = glm::cross(ex, ey);
+        math::Mat4d m { 1.0 };
+        m[0] = glm::dvec4(ex, 0.0);
+        m[1] = glm::dvec4(ey, 0.0);
+        m[2] = glm::dvec4(ez, 0.0);
+        m[3] = glm::dvec4(origin, 1.0);
+        const BoardDefaults defaults = ctx.boardDefaults != nullptr ? *ctx.boardDefaults : BoardDefaults {};
+        ctx.stack.run("Placă pe față", [&](model::Model& model) {
+            const model::InstanceId id = model::createBoard(model, ctx.context, defaults.type,
+                defaults.thickness, glm::length(side1), glm::length(side2), math::Transform(m));
+            if (id) {
+                ctx.selection.clear();
+                ctx.selection.instances.insert(id);
+            }
+        });
     }
 
     std::optional<std::array<Vec3d, 4>> currentCorners() const
@@ -570,6 +627,7 @@ private:
     inference::Engine m_engine;
     inference::Inference m_inference;
     bool m_shiftLock = false;
+    bool m_board = false;
 };
 
 // --- Push/Pull ------------------------------------------------------------------------------
@@ -662,12 +720,14 @@ public:
                     o.lines.push_back({ a, a + offset, false });
                 }
             }
-            o.dimensions.push_back({ m_origin, m_origin + offset, units::formatLength(std::abs(m_distance)) });
+            o.dimensions.push_back(
+                { m_origin, m_origin + offset, units::formatLength(std::abs(m_distance)) });
         }
         o.lines.push_back({ m_origin, m_origin + offset, true });
         appendInference(o, m_inference);
         if (!o.marker) {
-            o.marker = InferenceMarker { m_origin + offset, inference::Kind::Ground, inference::Tint::Neutral, "", false };
+            o.marker = InferenceMarker { m_origin + offset, inference::Kind::Ground, inference::Tint::Neutral,
+                "", false };
         }
         return o;
     }
@@ -722,8 +782,9 @@ private:
         // paralelă; altfel e punctul de pe normală cel mai apropiat de cursor.
         inference::Inference inf = inferAt(m_engine, ctx, screen, std::nullopt);
         const double depth = glm::dot(inf.point - m_origin, m_normal);
-        const bool fromPoint = (inf.kind == inference::Kind::Endpoint || inf.kind == inference::Kind::Midpoint
-                                   || inf.kind == inference::Kind::Center || inf.kind == inference::Kind::OnEdge)
+        const bool fromPoint
+            = (inf.kind == inference::Kind::Endpoint || inf.kind == inference::Kind::Midpoint
+                  || inf.kind == inference::Kind::Center || inf.kind == inference::Kind::OnEdge)
             && std::abs(depth) > tol::kLength; // punctele din planul feței nu dau o adâncime
 
         const bool fromFace = inf.kind == inference::Kind::OnFace && inf.face != m_face
@@ -848,7 +909,8 @@ public:
 
     view::PickResult hover() const override
     {
-        return m_hover.kind == view::PickResult::Kind::Edge || m_hover.kind == view::PickResult::Kind::Instance
+        return m_hover.kind == view::PickResult::Kind::Edge
+                || m_hover.kind == view::PickResult::Kind::Instance
             ? m_hover
             : view::PickResult {};
     }
@@ -891,6 +953,12 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
     if (id == "rectangle") {
         return std::make_unique<RectangleTool>();
     }
+    if (id == "stretch") {
+        return makeStretchTool(); // „Întinde” un corp de mobilier
+    }
+    if (id == "board") {
+        return std::make_unique<RectangleTool>(true); // placă pe față (mobilier)
+    }
     if (id == "pushpull") {
         return std::make_unique<PushPullTool>();
     }
@@ -907,13 +975,17 @@ std::unique_ptr<Tool> makeTool(std::string_view id)
         return makePenTool();
     }
     if (id == "penedit") {
-        return makePenEditTool(); // editarea unei curbe Pen sau a unei căi (pusă de Document, nu e în toolbar)
+        return makePenEditTool(); // editarea unei curbe Pen sau a unei căi (pusă de Document, nu e în
+                                  // toolbar)
     }
     if (id == "pivot") {
         return makePivotTool(); // doar pentru tragerea marcajului pivotului (nu e în toolbar)
     }
     if (id == "place") {
         return makePlaceTool(); // lipirea unei copii (⌘V), pusă de Document
+    }
+    if (id == "divider") {
+        return makeDividerTool(); // „Adaugă separator” într-un corp de mobilier, pusă de Document
     }
     if (id == "circle") {
         return makeCircleTool();

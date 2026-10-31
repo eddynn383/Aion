@@ -594,6 +594,22 @@ void Model::beginRecording()
     }
 }
 
+std::vector<DefinitionId> Model::definitionsWithMeshChanges() const
+{
+    std::vector<DefinitionId> out;
+    if (!m_recording) {
+        return out;
+    }
+    for (const auto& [id, mesh] : m_meshes) {
+        if (m_definitions.contains(id) && (mesh->hasRecordedChanges() || m_recording->definitions.contains(id)
+                || m_createdWhileRecording.contains(id))) {
+            out.push_back(id);
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
 ChangeSet Model::endRecording()
 {
     assert(m_recording);

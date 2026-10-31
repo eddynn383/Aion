@@ -18,7 +18,7 @@ include(AionOptions)
 add_subdirectory(core)
 
 if(AION_BUILD_APP)
-    find_package(Qt6 6.9 REQUIRED COMPONENTS Gui GuiPrivate Quick QuickControls2 ShaderTools Svg)
+    find_package(Qt6 6.9 REQUIRED COMPONENTS Gui GuiPrivate Quick QuickControls2 ShaderTools Svg LinguistTools)
     qt_standard_project_setup(REQUIRES 6.9)
     add_subdirectory(render)
     add_subdirectory(app)

@@ -32,7 +32,7 @@ Popover {
             Text {
                 width: parent.width - closeButton.width
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Turul uneltelor · " + (root.index + 1) + " din " + root.order.length
+                text: qsTrId("ToolTour.turul_uneltelor") + (root.index + 1) + qsTrId("ToolTour.din") + root.order.length
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.Medium
@@ -40,7 +40,7 @@ Popover {
             IconButton {
                 id: closeButton
                 iconName: "x"
-                tooltip: "Închide"
+                tooltip: qsTrId("ToolTour.inchide")
                 onClicked: root.close()
             }
         }
@@ -79,7 +79,7 @@ Popover {
             height: Theme.controlHeight
             Button {
                 anchors.left: parent.left
-                text: "Încearcă"
+                text: qsTrId("ToolTour.incearca")
                 iconName: "mouse-pointer-2"
                 onClicked: { root.tryTool(root.toolId); root.close() }
             }
@@ -87,13 +87,13 @@ Popover {
                 anchors.right: parent.right
                 spacing: Theme.space2
                 Button {
-                    text: "Înapoi"
+                    text: qsTrId("ToolTour.inapoi")
                     enabled: root.index > 0
                     onClicked: root.index -= 1
                 }
                 Button {
                     variant: "primary"
-                    text: root.index === root.order.length - 1 ? "Gata" : "Următorul"
+                    text: root.index === root.order.length - 1 ? qsTrId("ToolTour.gata") : qsTrId("ToolTour.urmatorul")
                     onClicked: root.index === root.order.length - 1 ? root.close() : root.index += 1
                 }
             }

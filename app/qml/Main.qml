@@ -13,7 +13,7 @@ Window {
     minimumWidth: 960
     minimumHeight: 600
     visible: true
-    title: doc.fileName + (doc.modified ? " — modificat" : "") + " · Aion"
+    title: doc.fileName + (doc.modified ? qsTrId("Main.modificat") : "") + qsTrId("Main.aion")
     color: Theme.bgApp
     // Conținutul continuă sub bara de titlu (macOS: butoanele native rămân, fără fundal propriu).
     // Pe Windows și Linux rămâne bara de titlu a sistemului (TitleBar-ul nostru stă sub ea).
@@ -31,125 +31,130 @@ Window {
     // Toate comenzile aplicației; apar în command palette și au scurtături.
     readonly property var commands: {
         const list = [
-            { id: "file.new", title: "Document nou", category: "Fișier", shortcut: "Ctrl+N", icon: "plus" },
-            { id: "file.open", title: "Deschide…", category: "Fișier", shortcut: "Ctrl+O", icon: "search" },
-            { id: "file.save", title: "Salvează", category: "Fișier", shortcut: "Ctrl+S", icon: "check" },
-            { id: "file.saveAs", title: "Salvează ca…", category: "Fișier", shortcut: "Ctrl+Shift+S", icon: "check" },
-            { id: "file.import", title: "Importă (OBJ, glTF, GLB)…", category: "Fișier", shortcut: "", icon: "arrow-down" },
-            { id: "file.exportObj", title: "Exportă OBJ…", category: "Fișier", shortcut: "", icon: "arrow-up" },
-            { id: "file.exportGlb", title: "Exportă glTF binar (GLB)…", category: "Fișier", shortcut: "", icon: "arrow-up" },
-            { id: "file.exportGltf", title: "Exportă glTF…", category: "Fișier", shortcut: "", icon: "arrow-up" },
-            { id: "scene.add", title: "Adaugă scena curentă", category: "Vedere", shortcut: "", icon: "plus" },
-            { id: "file.exportVideo", title: "Exportă animația (video MP4)…", category: "Fișier", shortcut: "", icon: "film" },
-            { id: "object.camera", title: "Adaugă o cameră (din vederea curentă)", category: "Obiecte", shortcut: "", icon: "camera" },
-            { id: "object.light.point", title: "Adaugă o lumină punctuală (bec)", category: "Obiecte", shortcut: "", icon: "lightbulb" },
-            { id: "object.light.spot", title: "Adaugă un spot", category: "Obiecte", shortcut: "", icon: "light-spot" },
-            { id: "object.light.directional", title: "Adaugă o lumină direcțională", category: "Obiecte", shortcut: "", icon: "sun" },
-            { id: "object.light.area", title: "Adaugă un panou luminos", category: "Obiecte", shortcut: "", icon: "light-area" },
-            { id: "camera.look", title: "Privește prin camera selectată", category: "Vizualizare", shortcut: "", icon: "video" },
-            { id: "edit.mirrorX", title: "Oglindește pe X (roșu)", category: "Modelare", shortcut: "", icon: "flip-horizontal" },
-            { id: "edit.mirrorY", title: "Oglindește pe Y (verde)", category: "Modelare", shortcut: "", icon: "flip-horizontal" },
-            { id: "edit.mirrorZ", title: "Oglindește pe Z (albastru)", category: "Modelare", shortcut: "", icon: "flip-vertical" },
-            { id: "edit.array", title: "Array: copii în linie sau în cerc…", category: "Modelare", shortcut: "", icon: "copy" },
-            { id: "edit.chamfer", title: "Chamfer (teșește plat muchiile sau fața)…", category: "Modelare", shortcut: "", icon: "square" },
-            { id: "edit.bevel", title: "Bevel (rotunjește muchiile sau fața)…", category: "Modelare", shortcut: "", icon: "circle" },
-            { id: "edit.subdivide", title: "Subdivide (împarte fețele și rotunjește obiectul)…", category: "Modelare", shortcut: "", icon: "prim-sphere" },
-            { id: "edit.soften", title: "Muchii netede (Soften: ascunde muchiile sub un unghi)…", category: "Modelare", shortcut: "", icon: "circle" },
-            { id: "library.save", title: "Salvează obiectul selectat în bibliotecă", category: "Obiecte", shortcut: "", icon: "book-open" },
-            { id: "view.environment:simplu", title: "Mediu: simplu", category: "Vizualizare", shortcut: "", icon: "sun" },
-            { id: "view.environment:studio", title: "Mediu: studio", category: "Vizualizare", shortcut: "", icon: "sun" },
-            { id: "view.environment:exterior", title: "Mediu: exterior", category: "Vizualizare", shortcut: "", icon: "sun" },
-            { id: "view.environment:innorat", title: "Mediu: înnorat", category: "Vizualizare", shortcut: "", icon: "sun" },
-            { id: "view.ambientOcclusion", title: "Umbrire ambientală (SSAO)", category: "Vizualizare", shortcut: "", icon: "circle" },
-            { id: "view.progressiveAA", title: "Antialiasing progresiv (cât camera stă pe loc)", category: "Vizualizare", shortcut: "", icon: "circle" },
-            { id: "material.new", title: "Material nou (personalizat)…", category: "Materiale", shortcut: "", icon: "palette" },
-            { id: "mode.model", title: "Modul Modelare", category: "Moduri", shortcut: "Alt+1", icon: "box" },
-            { id: "mode.animate", title: "Modul Animare", category: "Moduri", shortcut: "Alt+2", icon: "film" },
-            { id: "mode.interact", title: "Modul Interacțiune", category: "Moduri", shortcut: "Alt+3", icon: "hand-pointer" },
-            { id: "mode.interaction", title: "Interact: folosește interacțiunile (comută cu Select)", category: "Vizualizare", shortcut: "F5", icon: "play" },
+            { id: "file.new", title: qsTrId("Main.document_nou"), category: "Fișier", shortcut: "Ctrl+N", icon: "plus" },
+            { id: "file.open", title: qsTrId("Main.deschide"), category: "Fișier", shortcut: "Ctrl+O", icon: "search" },
+            { id: "file.save", title: qsTrId("Main.salveaza"), category: "Fișier", shortcut: "Ctrl+S", icon: "check" },
+            { id: "file.saveAs", title: qsTrId("Main.salveaza_ca"), category: "Fișier", shortcut: "Ctrl+Shift+S", icon: "check" },
+            { id: "file.import", title: qsTrId("Main.importa_obj_gltf_glb"), category: "Fișier", shortcut: "", icon: "arrow-down" },
+            { id: "file.exportObj", title: qsTrId("Main.exporta_obj"), category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.exportGlb", title: qsTrId("Main.exporta_gltf_binar_glb"), category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "file.exportGltf", title: qsTrId("Main.exporta_gltf"), category: "Fișier", shortcut: "", icon: "arrow-up" },
+            { id: "scene.add", title: qsTrId("Main.adauga_scena_curenta"), category: "Vedere", shortcut: "", icon: "plus" },
+            { id: "file.exportVideo", title: qsTrId("Main.exporta_animatia_video_mp4"), category: "Fișier", shortcut: "", icon: "film" },
+            { id: "object.camera", title: qsTrId("Main.adauga_o_camera_din_vederea_curenta"), category: "Obiecte", shortcut: "", icon: "camera" },
+            { id: "object.light.point", title: qsTrId("Main.adauga_o_lumina_punctuala_bec"), category: "Obiecte", shortcut: "", icon: "lightbulb" },
+            { id: "object.light.spot", title: qsTrId("Main.adauga_un_spot"), category: "Obiecte", shortcut: "", icon: "light-spot" },
+            { id: "object.light.directional", title: qsTrId("Main.adauga_o_lumina_directionala"), category: "Obiecte", shortcut: "", icon: "sun" },
+            { id: "object.light.area", title: qsTrId("Main.adauga_un_panou_luminos"), category: "Obiecte", shortcut: "", icon: "light-area" },
+            { id: "camera.look", title: qsTrId("Main.priveste_prin_camera_selectata"), category: "Vizualizare", shortcut: "", icon: "video" },
+            { id: "edit.mirrorX", title: qsTrId("Main.oglindeste_pe_x_rosu"), category: "Modelare", shortcut: "", icon: "flip-horizontal" },
+            { id: "edit.mirrorY", title: qsTrId("Main.oglindeste_pe_y_verde"), category: "Modelare", shortcut: "", icon: "flip-horizontal" },
+            { id: "edit.mirrorZ", title: qsTrId("Main.oglindeste_pe_z_albastru"), category: "Modelare", shortcut: "", icon: "flip-vertical" },
+            { id: "edit.array", title: qsTrId("Main.array_copii_in_linie_sau_in_cerc"), category: "Modelare", shortcut: "", icon: "copy" },
+            { id: "edit.chamfer", title: qsTrId("Main.chamfer_teseste_plat_muchiile_sau_fata"), category: "Modelare", shortcut: "", icon: "square" },
+            { id: "edit.bevel", title: qsTrId("Main.bevel_rotunjeste_muchiile_sau_fata"), category: "Modelare", shortcut: "", icon: "circle" },
+            { id: "edit.subdivide", title: qsTrId("Main.subdivide_imparte_fetele_si_rotunjeste_obiectul"), category: "Modelare", shortcut: "", icon: "prim-sphere" },
+            { id: "edit.soften", title: qsTrId("Main.muchii_netede_soften_ascunde_muchiile_sub_un_unghi"), category: "Modelare", shortcut: "", icon: "circle" },
+            { id: "library.save", title: qsTrId("Main.salveaza_obiectul_selectat_in_biblioteca"), category: "Obiecte", shortcut: "", icon: "book-open" },
+            { id: "view.environment:simplu", title: qsTrId("Main.mediu_simplu"), category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:studio", title: qsTrId("Main.mediu_studio"), category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:exterior", title: qsTrId("Main.mediu_exterior"), category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.environment:innorat", title: qsTrId("Main.mediu_innorat"), category: "Vizualizare", shortcut: "", icon: "sun" },
+            { id: "view.ambientOcclusion", title: qsTrId("Main.umbrire_ambientala_ssao"), category: "Vizualizare", shortcut: "", icon: "circle" },
+            { id: "view.progressiveAA", title: qsTrId("Main.antialiasing_progresiv_cat_camera_sta_pe_loc"), category: "Vizualizare", shortcut: "", icon: "circle" },
+            { id: "material.new", title: qsTrId("Main.material_nou_personalizat"), category: "Materiale", shortcut: "", icon: "palette" },
+            { id: "mode.model", title: qsTrId("Main.modul_modelare"), category: "Moduri", shortcut: "Alt+1", icon: "box" },
+            { id: "mode.animate", title: qsTrId("Main.modul_animare"), category: "Moduri", shortcut: "Alt+2", icon: "film" },
+            { id: "mode.interact", title: qsTrId("Main.modul_interactiune"), category: "Moduri", shortcut: "Alt+3", icon: "hand-pointer" },
+            { id: "mode.interaction", title: qsTrId("Main.interact_foloseste_interactiunile_comuta_cu_select"), category: "Vizualizare", shortcut: "F5", icon: "play" },
             // Animare: tastatura timeline-ului (doar în modul Animare; Space nu mai alege Select acolo).
-            { id: "anim.play", title: "Redă / pauză", category: "Animare", shortcut: "Space", icon: "play" },
-            { id: "anim.prevFrame", title: "Cadrul anterior", category: "Animare", shortcut: "Left", icon: "arrow-left" },
-            { id: "anim.nextFrame", title: "Cadrul următor", category: "Animare", shortcut: "Right", icon: "arrow-right" },
-            { id: "anim.back10", title: "10 cadre înapoi", category: "Animare", shortcut: "Shift+Left", icon: "arrow-left" },
-            { id: "anim.forward10", title: "10 cadre înainte", category: "Animare", shortcut: "Shift+Right", icon: "arrow-right" },
-            { id: "anim.prevKey", title: "Cheia anterioară", category: "Animare", shortcut: "Alt+Left", icon: "diamond" },
-            { id: "anim.nextKey", title: "Cheia următoare", category: "Animare", shortcut: "Alt+Right", icon: "diamond" },
-            { id: "anim.start", title: "La începutul animației", category: "Animare", shortcut: "Home", icon: "skip-back" },
-            { id: "anim.end", title: "La sfârșitul animației", category: "Animare", shortcut: "End", icon: "skip-back" },
-            { id: "anim.key", title: "Keyframe pe selecție (toate canalele)", category: "Animare", shortcut: "K", icon: "diamond" },
-            { id: "anim.deleteKeys", title: "Șterge keyframe-urile selectate", category: "Animare", shortcut: "Delete", icon: "trash-2" },
-            { id: "anim.copyKeys", title: "Copiază keyframe-urile selectate", category: "Animare", shortcut: "Ctrl+C", icon: "copy" },
-            { id: "anim.pasteKeys", title: "Lipește keyframe-urile la playhead", category: "Animare", shortcut: "Ctrl+V", icon: "copy" },
-            { id: "anim.autoKey", title: doc.autoKey ? "Oprește Auto-key" : "Pornește Auto-key", category: "Animare", shortcut: "", icon: "circle" },
-            { id: "anim.fit", title: "Încadrează toată animația în timeline", category: "Animare", shortcut: "", icon: "scan" },
-            { id: "rules.edit", title: "Interacțiuni cu blocuri pentru obiectul selectat…", category: "Organizare", shortcut: "", icon: "hand-pointer" },
-            { id: "file.quantities", title: "Raport de cantități (arii, volume, debitare mobilier)…", category: "Fișier", shortcut: "", icon: "ruler" },
-            { id: "file.exportPng", title: "Exportă imaginea (PNG)…", category: "Fișier", shortcut: "", icon: "monitor" },
-            { id: "view.iso",    title: "Vedere izometrică", category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
-            { id: "view.top",    title: "Vedere de sus",     category: "Vedere", shortcut: "Ctrl+1", icon: "arrow-down" },
-            { id: "view.front",  title: "Vedere din față",   category: "Vedere", shortcut: "Ctrl+2", icon: "arrow-up" },
-            { id: "view.right",  title: "Vedere din dreapta", category: "Vedere", shortcut: "Ctrl+3", icon: "arrow-left" },
-            { id: "view.back",   title: "Vedere din spate",  category: "Vedere", shortcut: "Ctrl+4", icon: "arrow-down" },
-            { id: "view.left",   title: "Vedere din stânga", category: "Vedere", shortcut: "Ctrl+5", icon: "arrow-right" },
-            { id: "view.bottom", title: "Vedere de jos",     category: "Vedere", shortcut: "Ctrl+6", icon: "arrow-up" },
-            { id: "view.extents", title: "Zoom Extents",     category: "Vedere", shortcut: "Shift+Z", icon: "scan" },
-            { id: "view.projection", title: viewport.orthographic ? "Proiecție în perspectivă" : "Proiecție paralelă (ortografică)",
+            { id: "anim.play", title: qsTrId("Main.reda_pauza"), category: "Animare", shortcut: "Space", icon: "play" },
+            { id: "anim.prevFrame", title: qsTrId("Main.cadrul_anterior"), category: "Animare", shortcut: "Left", icon: "arrow-left" },
+            { id: "anim.nextFrame", title: qsTrId("Main.cadrul_urmator"), category: "Animare", shortcut: "Right", icon: "arrow-right" },
+            { id: "anim.back10", title: qsTrId("Main.10_cadre_inapoi"), category: "Animare", shortcut: "Shift+Left", icon: "arrow-left" },
+            { id: "anim.forward10", title: qsTrId("Main.10_cadre_inainte"), category: "Animare", shortcut: "Shift+Right", icon: "arrow-right" },
+            { id: "anim.prevKey", title: qsTrId("Main.cheia_anterioara"), category: "Animare", shortcut: "Alt+Left", icon: "diamond" },
+            { id: "anim.nextKey", title: qsTrId("Main.cheia_urmatoare"), category: "Animare", shortcut: "Alt+Right", icon: "diamond" },
+            { id: "anim.start", title: qsTrId("Main.la_inceputul_animatiei"), category: "Animare", shortcut: "Home", icon: "skip-back" },
+            { id: "anim.end", title: qsTrId("Main.la_sfarsitul_animatiei"), category: "Animare", shortcut: "End", icon: "skip-back" },
+            { id: "anim.key", title: qsTrId("Main.keyframe_pe_selectie_toate_canalele"), category: "Animare", shortcut: "K", icon: "diamond" },
+            { id: "anim.deleteKeys", title: qsTrId("Main.sterge_keyframe_urile_selectate"), category: "Animare", shortcut: "Delete", icon: "trash-2" },
+            { id: "anim.copyKeys", title: qsTrId("Main.copiaza_keyframe_urile_selectate"), category: "Animare", shortcut: "Ctrl+C", icon: "copy" },
+            { id: "anim.pasteKeys", title: qsTrId("Main.lipeste_keyframe_urile_la_playhead"), category: "Animare", shortcut: "Ctrl+V", icon: "copy" },
+            { id: "anim.autoKey", title: doc.autoKey ? qsTrId("Main.opreste_auto_key") : qsTrId("Main.porneste_auto_key"), category: "Animare", shortcut: "", icon: "circle" },
+            { id: "anim.fit", title: qsTrId("Main.incadreaza_toata_animatia_in_timeline"), category: "Animare", shortcut: "", icon: "scan" },
+            { id: "rules.edit", title: qsTrId("Main.interactiuni_cu_blocuri_pentru_obiectul_selectat"), category: "Organizare", shortcut: "", icon: "hand-pointer" },
+            { id: "file.quantities", title: qsTrId("Main.raport_de_cantitati_arii_volume_debitare_mobilier"), category: "Fișier", shortcut: "", icon: "ruler" },
+            { id: "file.exportPng", title: qsTrId("Main.exporta_imaginea_png"), category: "Fișier", shortcut: "", icon: "monitor" },
+            { id: "view.iso",    title: qsTrId("Main.vedere_izometrica"), category: "Vedere", shortcut: "Ctrl+0", icon: "box" },
+            { id: "view.top",    title: qsTrId("Main.vedere_de_sus"),     category: "Vedere", shortcut: "Ctrl+1", icon: "arrow-down" },
+            { id: "view.front",  title: qsTrId("Main.vedere_din_fata"),   category: "Vedere", shortcut: "Ctrl+2", icon: "arrow-up" },
+            { id: "view.right",  title: qsTrId("Main.vedere_din_dreapta"), category: "Vedere", shortcut: "Ctrl+3", icon: "arrow-left" },
+            { id: "view.back",   title: qsTrId("Main.vedere_din_spate"),  category: "Vedere", shortcut: "Ctrl+4", icon: "arrow-down" },
+            { id: "view.left",   title: qsTrId("Main.vedere_din_stanga"), category: "Vedere", shortcut: "Ctrl+5", icon: "arrow-right" },
+            { id: "view.bottom", title: qsTrId("Main.vedere_de_jos"),     category: "Vedere", shortcut: "Ctrl+6", icon: "arrow-up" },
+            { id: "view.extents", title: qsTrId("Main.zoom_extents"),     category: "Vedere", shortcut: "Shift+Z", icon: "scan" },
+            { id: "view.projection", title: viewport.orthographic ? qsTrId("Main.proiectie_in_perspectiva") : qsTrId("Main.proiectie_paralela_ortografica"),
               category: "Vedere", shortcut: "", icon: "focus" },
-            { id: "view.grid",   title: viewport.gridVisible ? "Ascunde grid-ul" : "Arată grid-ul", category: "Vedere", shortcut: "", icon: "grid-3x3" },
-            { id: "view.demo",   title: viewport.demoVisible ? "Ascunde cutia demo" : "Arată cutia demo", category: "Vedere", shortcut: "", icon: "box" },
-            { id: "edit.undo", title: doc.canUndo ? "Undo " + doc.undoName : "Undo", category: "Editare",
+            { id: "view.grid",   title: viewport.gridVisible ? qsTrId("Main.ascunde_grid_ul") : qsTrId("Main.arata_grid_ul"), category: "Vedere", shortcut: "", icon: "grid-3x3" },
+            { id: "view.demo",   title: viewport.demoVisible ? qsTrId("Main.ascunde_cutia_demo") : qsTrId("Main.arata_cutia_demo"), category: "Vedere", shortcut: "", icon: "box" },
+            { id: "edit.undo", title: doc.canUndo ? qsTrId("Main.undo") + doc.undoName : qsTrId("Main.undo_2"), category: "Editare",
               shortcut: "Ctrl+Z", icon: "undo-2" },
-            { id: "edit.redo", title: doc.canRedo ? "Redo " + doc.redoName : "Redo", category: "Editare",
+            { id: "edit.redo", title: doc.canRedo ? qsTrId("Main.redo") + doc.redoName : qsTrId("Main.redo_2"), category: "Editare",
               shortcut: "Ctrl+Shift+Z", icon: "redo-2" },
-            { id: "edit.delete", title: "Șterge selecția", category: "Editare", shortcut: "Delete", icon: "trash-2" },
-            { id: "edit.copy", title: "Copiază obiectele selectate", category: "Editare", shortcut: "Ctrl+C", icon: "copy" },
-            { id: "edit.paste", title: "Lipește (click pentru loc, Esc renunță)", category: "Editare", shortcut: "Ctrl+V",
+            { id: "edit.delete", title: qsTrId("Main.sterge_selectia"), category: "Editare", shortcut: "Delete", icon: "trash-2" },
+            { id: "edit.copy", title: qsTrId("Main.copiaza_obiectele_selectate"), category: "Editare", shortcut: "Ctrl+C", icon: "copy" },
+            { id: "edit.paste", title: qsTrId("Main.lipeste_click_pentru_loc_esc_renunta"), category: "Editare", shortcut: "Ctrl+V",
               icon: "clipboard-paste" },
-            { id: "edit.selectAll", title: "Selectează tot", category: "Editare", shortcut: "Ctrl+A",
+            { id: "edit.selectAll", title: qsTrId("Main.selecteaza_tot"), category: "Editare", shortcut: "Ctrl+A",
               icon: "square-dashed-mouse-pointer" },
-            { id: "edit.selectNone", title: "Deselectează tot", category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
-            { id: "org.makeGroup", title: "Creează obiect (din formele selectate)", category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
-            { id: "org.group", title: "Grupează obiectele", category: "Organizare", shortcut: "Ctrl+Alt+G", icon: "folder" },
-            { id: "org.duplicateLinked", title: "Duplicare legată (copie editată împreună)", category: "Organizare", shortcut: "Alt+D", icon: "component" },
-            { id: "org.explode", title: "Desface (grup sau obiect)", category: "Organizare", shortcut: "", icon: "box" },
-            { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
-            { id: "org.enter", title: "Editează grupul sau obiectul selectat", category: "Organizare", shortcut: "", icon: "box" },
-            { id: "org.exit", title: "Ieși din grupul sau obiectul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
-            { id: "org.hide", title: "Ascunde selecția", category: "Organizare", shortcut: "", icon: "eye-off" },
-            { id: "org.unhideAll", title: "Arată tot", category: "Organizare", shortcut: "", icon: "eye" },
-            { id: "org.lock", title: "Blochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
-            { id: "org.unlock", title: "Deblochează selecția", category: "Organizare", shortcut: "", icon: "lock" },
-            { id: "edit.createFaces", title: "Creează fețe din muchiile selectate", category: "Modelare", shortcut: "", icon: "square" },
-            { id: "edit.selectConnected", title: "Selectează ce e conectat", category: "Editare", shortcut: "", icon: "square-dashed-mouse-pointer" },
-            { id: "edit.reverseFaces", title: "Inversează fețele selectate", category: "Editare", shortcut: "", icon: "rotate-ccw" },
-            { id: "view.zoomSelection", title: "Zoom la selecție", category: "Vedere", shortcut: "", icon: "scan" },
-            { id: "edit.intersectModel", title: "Intersectează fețele selectate cu modelul", category: "Editare", shortcut: "", icon: "scan" },
-            { id: "edit.intersectSelection", title: "Intersectează fețele selectate între ele", category: "Editare", shortcut: "", icon: "scan" },
-            { id: "solid.union", title: "Solide: reuniune", category: "Solide", shortcut: "", icon: "box" },
-            { id: "solid.subtract", title: "Solide: scade al doilea din primul", category: "Solide", shortcut: "", icon: "box" },
-            { id: "solid.intersect", title: "Solide: intersecție", category: "Solide", shortcut: "", icon: "box" },
-            { id: "guides.clear", title: "Șterge ghidajele (" + doc.guideCount + ")", category: "Editare", shortcut: "", icon: "trash-2" },
-            { id: "style.shaded", title: "Stil: materiale", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "style.clay", title: "Stil: clay (alb mat)", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "style.hiddenline", title: "Stil: linii ascunse", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "style.wireframe", title: "Stil: wireframe", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "style.xray", title: "Stil: X-Ray", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "style.shadows", title: viewport.shadows ? "Ascunde umbrele" : "Arată umbrele", category: "Stil", shortcut: "", icon: "sun-medium" },
-            { id: "style.profiles", title: viewport.profiles ? "Fără profile" : "Profile (contururi)", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "style.fog", title: viewport.fog ? "Fără ceață" : "Ceață", category: "Stil", shortcut: "", icon: "palette" },
-            { id: "ui.leftPanel",  title: "Comută panoul din stânga", category: "Interfață", shortcut: "", icon: "panel-left" },
-            { id: "ui.rightPanel", title: "Comută panoul din dreapta", category: "Interfață", shortcut: "", icon: "panel-right" },
-            { id: "ui.panels",   title: "Mod focus (ascunde panourile)", category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
-            { id: "ui.theme",    title: "Comută tema (Sistem / Light / Dark)", category: "Interfață", shortcut: "", icon: "sun" },
-            { id: "view.snapGrid", title: doc.snapToGrid ? "Oprește snap la grid" : "Snap la grid", category: "Vedere", shortcut: "Alt+G", icon: "grid-3x3" },
-            { id: "nav.pivotView", title: "Orbitează în jurul centrului vederii", category: "Vedere", shortcut: "", icon: "orbit" },
-            { id: "nav.pivotSelection", title: "Orbitează în jurul selecției", category: "Vedere", shortcut: "", icon: "orbit" },
-            { id: "nav.pivotCursor", title: "Orbitează în jurul punctului de sub cursor", category: "Vedere", shortcut: "", icon: "orbit" },
-            { id: "app.preferences", title: "Preferințe…", category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
-            { id: "app.about", title: "Despre Aion", category: "Interfață", shortcut: "", icon: "info" },
-            { id: "app.tour", title: "Turul uneltelor (cum se folosește fiecare)", category: "Ajutor", shortcut: "", icon: "info" },
-            { id: "app.start", title: "Ecranul de start (document nou, deschide, recente)", category: "Fișier", shortcut: "", icon: "app-window" }
+            { id: "edit.selectNone", title: qsTrId("Main.deselecteaza_tot"), category: "Editare", shortcut: "Ctrl+Shift+A", icon: "x" },
+            { id: "org.makeGroup", title: qsTrId("Main.creeaza_obiect_din_formele_selectate"), category: "Organizare", shortcut: "Ctrl+G", icon: "box" },
+            { id: "org.group", title: qsTrId("Main.grupeaza_obiectele"), category: "Organizare", shortcut: "Ctrl+Alt+G", icon: "folder" },
+            { id: "org.makeComponent", title: qsTrId("Main.creeaza_componenta_copiile_raman_legate_apare_in_biblio"), category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.duplicateLinked", title: qsTrId("Main.duplicare_legata_copie_editata_impreuna"), category: "Organizare", shortcut: "Alt+D", icon: "component" },
+            { id: "org.explode", title: qsTrId("Main.desface_grup_sau_obiect"), category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.makeUnique", title: qsTrId("Main.fa_unic_separa_de_copii"), category: "Organizare", shortcut: "", icon: "component" },
+            { id: "furniture.makeBoard", title: qsTrId("Main.fa_placa_pal_pentru_lista_de_debitare"), category: "Mobilier", shortcut: "", icon: "box" },
+            { id: "furniture.addDivider", title: qsTrId("Main.adauga_separator_clic_in_corp"), category: "Mobilier", shortcut: "", icon: "box" },
+            { id: "view.doorsOpen", title: qsTrId("Main.usile_corpurilor_deschise_inchise_afisare"), category: "Mobilier", shortcut: "", icon: "door-open" },
+            { id: "furniture.makePlain", title: qsTrId("Main.transforma_in_corp_obisnuit"), category: "Mobilier", shortcut: "", icon: "box" },
+            { id: "org.enter", title: qsTrId("Main.editeaza_grupul_sau_obiectul_selectat"), category: "Organizare", shortcut: "", icon: "box" },
+            { id: "org.exit", title: qsTrId("Main.iesi_din_grupul_sau_obiectul_editat"), category: "Organizare", shortcut: "", icon: "arrow-left" },
+            { id: "org.hide", title: qsTrId("Main.ascunde_selectia"), category: "Organizare", shortcut: "", icon: "eye-off" },
+            { id: "org.unhideAll", title: qsTrId("Main.arata_tot"), category: "Organizare", shortcut: "", icon: "eye" },
+            { id: "org.lock", title: qsTrId("Main.blocheaza_selectia"), category: "Organizare", shortcut: "", icon: "lock" },
+            { id: "org.unlock", title: qsTrId("Main.deblocheaza_selectia"), category: "Organizare", shortcut: "", icon: "lock" },
+            { id: "edit.createFaces", title: qsTrId("Main.creeaza_fete_din_muchiile_selectate"), category: "Modelare", shortcut: "", icon: "square" },
+            { id: "edit.selectConnected", title: qsTrId("Main.selecteaza_ce_e_conectat"), category: "Editare", shortcut: "", icon: "square-dashed-mouse-pointer" },
+            { id: "edit.reverseFaces", title: qsTrId("Main.inverseaza_fetele_selectate"), category: "Editare", shortcut: "", icon: "rotate-ccw" },
+            { id: "view.zoomSelection", title: qsTrId("Main.zoom_la_selectie"), category: "Vedere", shortcut: "", icon: "scan" },
+            { id: "edit.intersectModel", title: qsTrId("Main.intersecteaza_fetele_selectate_cu_modelul"), category: "Editare", shortcut: "", icon: "scan" },
+            { id: "edit.intersectSelection", title: qsTrId("Main.intersecteaza_fetele_selectate_intre_ele"), category: "Editare", shortcut: "", icon: "scan" },
+            { id: "solid.union", title: qsTrId("Main.solide_reuniune"), category: "Solide", shortcut: "", icon: "box" },
+            { id: "solid.subtract", title: qsTrId("Main.solide_scade_al_doilea_din_primul"), category: "Solide", shortcut: "", icon: "box" },
+            { id: "solid.intersect", title: qsTrId("Main.solide_intersectie"), category: "Solide", shortcut: "", icon: "box" },
+            { id: "guides.clear", title: qsTrId("Main.sterge_ghidajele") + doc.guideCount + ")", category: "Editare", shortcut: "", icon: "trash-2" },
+            { id: "style.shaded", title: qsTrId("Main.stil_materiale"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.clay", title: qsTrId("Main.stil_clay_alb_mat"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.hiddenline", title: qsTrId("Main.stil_linii_ascunse"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.wireframe", title: qsTrId("Main.stil_wireframe"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.xray", title: qsTrId("Main.stil_x_ray"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.shadows", title: viewport.shadows ? qsTrId("Main.ascunde_umbrele") : qsTrId("Main.arata_umbrele"), category: "Stil", shortcut: "", icon: "sun-medium" },
+            { id: "style.profiles", title: viewport.profiles ? qsTrId("Main.fara_profile") : qsTrId("Main.profile_contururi"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "style.fog", title: viewport.fog ? qsTrId("Main.fara_ceata") : qsTrId("Main.ceata"), category: "Stil", shortcut: "", icon: "palette" },
+            { id: "ui.leftPanel",  title: qsTrId("Main.comuta_panoul_din_stanga"), category: "Interfață", shortcut: "", icon: "panel-left" },
+            { id: "ui.rightPanel", title: qsTrId("Main.comuta_panoul_din_dreapta"), category: "Interfață", shortcut: "", icon: "panel-right" },
+            { id: "ui.panels",   title: qsTrId("Main.mod_focus_ascunde_panourile"), category: "Interfață", shortcut: "Ctrl+\\", icon: "focus" },
+            { id: "ui.theme",    title: qsTrId("Main.comuta_tema_sistem_light_dark"), category: "Interfață", shortcut: "", icon: "sun" },
+            { id: "view.snapGrid", title: doc.snapToGrid ? qsTrId("Main.opreste_snap_la_grid") : qsTrId("Main.snap_la_grid"), category: "Vedere", shortcut: "Alt+G", icon: "grid-3x3" },
+            { id: "nav.pivotView", title: qsTrId("Main.orbiteaza_in_jurul_centrului_vederii"), category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "nav.pivotSelection", title: qsTrId("Main.orbiteaza_in_jurul_selectiei"), category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "nav.pivotCursor", title: qsTrId("Main.orbiteaza_in_jurul_punctului_de_sub_cursor"), category: "Vedere", shortcut: "", icon: "orbit" },
+            { id: "app.preferences", title: qsTrId("Main.preferinte"), category: "Interfață", shortcut: "Ctrl+,", icon: "settings" },
+            { id: "app.about", title: qsTrId("Main.despre_aion"), category: "Interfață", shortcut: "", icon: "info" },
+            { id: "app.tour", title: qsTrId("Main.turul_uneltelor_cum_se_foloseste_fiecare"), category: "Ajutor", shortcut: "", icon: "info" },
+            { id: "app.start", title: qsTrId("Main.ecranul_de_start_document_nou_deschide_recente"), category: "Fișier", shortcut: "", icon: "app-window" }
         ]
         // Toate uneltele din toolbar, cu scurtăturile lor.
         for (const t of toolbar.allTools)
@@ -157,19 +162,19 @@ Window {
         // Documentele recente.
         for (let i = 0; i < doc.recentFiles.length; ++i) {
             const path = doc.recentFiles[i]
-            list.push({ id: "file.recent:" + i, title: "Deschide recent: " + path.split("/").pop(),
+            list.push({ id: "file.recent:" + i, title: qsTrId("Main.deschide_recent") + path.split("/").pop(),
                         category: "Fișier", shortcut: "", icon: "layers" })
         }
         if (AppInfo.debugBuild)
-            list.push({ id: "debug.storybook", title: "Storybook: toate componentele", category: "Dezvoltare", shortcut: "", icon: "palette" },
-                      { id: "debug.demos", title: "Galeria animațiilor din ghiduri", category: "Dezvoltare", shortcut: "", icon: "palette" },
-                      { id: "debug.benchmark", title: "Măsoară fps (rotește camera 4 s)", category: "Dezvoltare", shortcut: "", icon: "orbit" })
-        list.push({ id: "script.console", title: "Consola de scripturi (JavaScript)…", category: "Scripturi", shortcut: "Ctrl+Alt+J", icon: "code" })
+            list.push({ id: "debug.storybook", title: qsTrId("Main.storybook_toate_componentele"), category: "Dezvoltare", shortcut: "", icon: "palette" },
+                      { id: "debug.demos", title: qsTrId("Main.galeria_animatiilor_din_ghiduri"), category: "Dezvoltare", shortcut: "", icon: "palette" },
+                      { id: "debug.benchmark", title: qsTrId("Main.masoara_fps_roteste_camera_4_s"), category: "Dezvoltare", shortcut: "", icon: "orbit" })
+        list.push({ id: "script.console", title: qsTrId("Main.consola_de_scripturi_javascript"), category: "Scripturi", shortcut: "Ctrl+Alt+J", icon: "code" })
         for (const p of scripts.plugins)
             for (const c of p.commands)
                 list.push({ id: "plugin:" + c.id, title: p.name + ": " + c.title, category: "Plugin-uri", shortcut: "", icon: "code" })
         for (const g of doc.generators)
-            list.push({ id: "object.parametric:" + g.id, title: "Obiect dinamic: " + g.name, category: "Obiecte", shortcut: "", icon: "sliders-horizontal" })
+            list.push({ id: "object.parametric:" + g.id, title: qsTrId("Main.obiect_dinamic") + g.name, category: "Obiecte", shortcut: "", icon: "sliders-horizontal" })
         // Scurtăturile alese în Preferințe înlocuiesc pe cele implicite ("" = fără scurtătură).
         const custom = window.shortcutOverrides
         return list.map(c => Object.assign({}, c, {
@@ -236,10 +241,50 @@ Window {
         preferences.customShortcuts = "{}"
     }
 
+    // Explode cu confirmare când s-ar pierde date de mobilier (ADR 0044).
+    function explodeChecked() {
+        const breaks = doc.selectionBreaksCarcass()
+        const loses = doc.explodeLosesPartData()
+        if (!breaks && !loses) {
+            doc.explodeSelection()
+            return
+        }
+        const messages = []
+        if (loses) messages.push(qsTrId("Main.datele_de_piesa_tip_grosime_cant_sau_legatura_cu_biblio"))
+        if (breaks) messages.push(qsTrId("Main.corpul_devine_obisnuit_nu_se_mai_reface_din_campurile_l"))
+        confirmDialog.ask(qsTrId("Main.desfaci_obiectul"), messages.join(" ") + qsTrId("Main.poti_anula_cu_z"), qsTrId("Main.desface"), () => {
+            if (breaks) doc.makeContextPlain()
+            doc.explodeSelection()
+        })
+    }
+
+    // Make Group / Grupează pe piese dintr-un corp: corpul devine obișnuit (după confirmare).
+    function groupChecked(action) {
+        if (!doc.selectionBreaksCarcass()) {
+            action()
+            return
+        }
+        confirmDialog.ask(qsTrId("Main.grupezi_piese_din_corp"),
+            qsTrId("Main.corpul_devine_obisnuit_nu_se_mai_reface_din_campuril_2"), qsTrId("Main.grupeaza"), () => {
+                doc.makeContextPlain()
+                action()
+            })
+    }
+
+    // Un câmp al unui obiect dinamic: refacerea unui corp pierde modificările de mână din piesele lui.
+    function setParameterChecked(key, value) {
+        if (!doc.rolePiecesDiffer()) {
+            doc.setParameter(key, value)
+            return
+        }
+        confirmDialog.ask(qsTrId("Main.refaci_corpul"),
+            qsTrId("Main.unele_piese_au_fost_modificate_de_mana_forma_dimensiuni"), qsTrId("Main.continua"), () => doc.setParameter(key, value))
+    }
+
     function runCommand(id) {
         if (id.startsWith("plugin:")) {
             const r = scripts.runPluginCommand(id.slice(7))
-            if (!r.ok) toast.show("Plugin: " + r.error)
+            if (!r.ok) toast.show(qsTrId("Main.plugin") + r.error)
             return
         }
         if (id.startsWith("view.environment:")) {
@@ -282,7 +327,7 @@ Window {
         }
         case "camera.look":
             if (doc.selectedObject.kind === "camera") viewport.lookThrough = doc.selectedObject.id
-            else toast.show("Selectează o cameră (în Outliner, la Camere și lumini).")
+            else toast.show(qsTrId("Main.selecteaza_o_camera_in_outliner_la_camere_si_lumini"))
             break
         case "mode.interaction":
             // F5: Select ↔ Interact; din alt mod, trece în Interacțiune cu Interact activ.
@@ -314,7 +359,7 @@ Window {
         case "rules.edit": window.openRulesEditor(); break
         case "file.exportVideo":
             if (doc.activeAnimation > 0) fileDialog.ask("exportVideo")
-            else toast.show("Creează întâi o animație în timeline.")
+            else toast.show(qsTrId("Main.creeaza_intai_o_animatie_in_timeline"))
             break
         case "scene.add": doc.addScene(viewport.cameraState(), viewport.displayStyle); break
         case "debug.materials": preferences.leftMaterials = true; break
@@ -345,6 +390,8 @@ Window {
         case "view.progressiveAA": preferences.progressiveAA = !preferences.progressiveAA; break
         case "material.new": preferences.leftMaterials = true; materialsPanel.newMaterial(); break
         case "debug.cutlist": quantitiesDialog.tab = 1; quantitiesDialog.open(); break
+        case "debug.board": console.log("board:", JSON.stringify(doc.entityInfo.board ?? null)); break
+        case "debug.components": console.log("components:", JSON.stringify(doc.modelComponents)); break
         case "view.iso": viewport.setStandardView(Viewport.Iso); break
         case "view.top": viewport.setStandardView(Viewport.Top); break
         case "view.front": viewport.setStandardView(Viewport.Front); break
@@ -363,11 +410,16 @@ Window {
         case "edit.paste": doc.pasteClipboard(); break
         case "edit.selectAll": doc.selectAll(); break
         case "edit.selectNone": doc.clearSelection(); break
-        case "org.makeGroup": doc.makeGroup(); break
-        case "org.group": doc.groupSelection(); break
+        case "org.makeGroup": window.groupChecked(() => doc.makeGroup()); break
+        case "org.group": window.groupChecked(() => doc.groupSelection()); break
+        case "org.makeComponent": window.groupChecked(() => doc.makeComponent()); break
         case "org.duplicateLinked": doc.duplicateLinked(); break
-        case "org.explode": doc.explodeSelection(); break
+        case "org.explode": window.explodeChecked(); break
         case "org.makeUnique": doc.makeUniqueSelection(); break
+        case "furniture.makeBoard": doc.makeBoardSelection(); break
+        case "furniture.addDivider": doc.beginAddDivider(); break
+        case "furniture.upgrade": doc.upgradeGenerator(); break
+        case "furniture.makePlain": doc.makePlainBody(); break
         case "org.enter": doc.enterInstance(0); break
         case "org.exit": doc.exitContext(); break
         case "org.hide": doc.hideSelection(); break
@@ -378,6 +430,7 @@ Window {
         case "edit.createFaces": doc.createFacesFromSelection(); break
         case "edit.reverseFaces": doc.reverseSelectedFaces(); break
         case "view.zoomSelection": viewport.zoomToSelection(); break
+        case "view.doorsOpen": doc.doorsOpen = !doc.doorsOpen; break
         case "edit.intersectModel": doc.intersectSelection(true); break
         case "edit.intersectSelection": doc.intersectSelection(false); break
         case "solid.union": doc.booleanSelection("union"); break
@@ -403,11 +456,11 @@ Window {
         case "ui.theme": Theme.cycleMode(); break
         case "view.snapGrid":
             doc.snapToGrid = !doc.snapToGrid
-            toast.show(doc.snapToGrid ? "Snap la grid: pornit (" + (doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : "pas automat") + ")" : "Snap la grid: oprit")
+            toast.show(doc.snapToGrid ? qsTrId("Main.snap_la_grid_pornit") + (doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : qsTrId("Main.pas_automat")) + ")" : qsTrId("Main.snap_la_grid_oprit"))
             break
-        case "nav.pivotView": viewport.orbitPivot = 0; toast.show("Orbita: în jurul centrului vederii"); break
-        case "nav.pivotSelection": viewport.orbitPivot = 1; toast.show("Orbita: în jurul selecției"); break
-        case "nav.pivotCursor": viewport.orbitPivot = 2; toast.show("Orbita: în jurul punctului de sub cursor"); break
+        case "nav.pivotView": viewport.orbitPivot = 0; toast.show(qsTrId("Main.orbita_in_jurul_centrului_vederii")); break
+        case "nav.pivotSelection": viewport.orbitPivot = 1; toast.show(qsTrId("Main.orbita_in_jurul_selectiei")); break
+        case "nav.pivotCursor": viewport.orbitPivot = 2; toast.show(qsTrId("Main.orbita_in_jurul_punctului_de_sub_cursor")); break
         case "app.preferences": preferencesPage.active = true; break
         case "app.about": aboutDialog.open(); break
         case "app.tour": toolTour.open(); break
@@ -659,11 +712,11 @@ Window {
                     console.info("subdivide:", subdividePanel.levels, JSON.stringify(subdividePanel.result), "undo:", doc.undoName)
                 } else if (action.startsWith("scriptjs:")) {
                     // Cod JavaScript direct (pentru teste): „scriptjs:aion.box(0,0,0,100,100,100)”.
-                    const r = scripts.run(action.slice(9), "Script")
+                    const r = scripts.run(action.slice(9), qsTrId("Main.script"))
                     console.info("scriptjs:", r.ok, r.output, r.error)
                 } else if (action.startsWith("script:")) {
                     // „script:0” rulează exemplul 0 din consolă.
-                    const r = scripts.run(scripts.examples[parseInt(action.slice(7))].code, "Script")
+                    const r = scripts.run(scripts.examples[parseInt(action.slice(7))].code, qsTrId("Main.script"))
                     console.info("script:", r.ok, r.output, r.error)
                 } else if (action.startsWith("fpslog:")) {
                     // „fpslog:secunde”: doar fps-ul în fiecare secundă (de exemplu în repaus).
@@ -705,7 +758,7 @@ Window {
     // Uneltele de modelare implementate până acum (celelalte apar în toolbar, dar vin în fazele următoare).
     readonly property var modelingTools: ["select", "interact", "line", "arc", "pen", "rectangle", "circle", "polygon", "pushpull", "offset",
                                          "followme", "move", "rotate", "scale", "eraser", "paint", "texture",
-                                         "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder"]
+                                         "tape", "protractor", "dimension", "text", "section", "cube", "sphere", "cone", "cylinder", "board", "stretch"]
     property string pendingToolMessage: ""
 
     // Modul de lucru (0 Modelare, 1 Animare, 2 Interacțiune): Document oprește ce era în curs, unealta revine la
@@ -721,7 +774,7 @@ Window {
     function selectTool(id) {
         // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare).
         if (!doc.commandAllowed("tool." + id)) {
-            toast.show("Unealta nu e disponibilă în modul " + ["Modelare", "Animare", "Interacțiune"][doc.workMode] + ".")
+            toast.show(qsTrId("Main.unealta_nu_e_disponibila_in_modul") + [qsTrId("Main.modelare"), qsTrId("Main.animare"), qsTrId("Main.interactiune")][doc.workMode] + ".")
             id = "select"
         }
         window.activeTool = id
@@ -730,7 +783,7 @@ Window {
         doc.interactionMode = id === "interact"
         const tool = toolbar.toolInfo(id)
         const ready = modelingTools.includes(id) || navigationTools.includes(id)
-        pendingToolMessage = tool && !ready ? "Unealta „" + tool.name + "” vine în Faza " + tool.phase : ""
+        pendingToolMessage = tool && !ready ? qsTrId("Main.unealta") + tool.name + qsTrId("Main.vine_in_faza") + tool.phase : ""
     }
 
     Document {
@@ -782,11 +835,11 @@ Window {
     function saveToLibrary() {
         const info = doc.entityInfo
         if (info.kind !== "instance") {
-            toast.show("Selectează un obiect ca să-l salvezi în bibliotecă.")
+            toast.show(qsTrId("Main.selecteaza_un_obiect_ca_sa_l_salvezi_in_biblioteca"))
             return
         }
         if (doc.saveSelectionToLibrary(info.name, viewport.captureThumbnail()))
-            toast.show("„" + info.name + "” e acum în bibliotecă.")
+            toast.show("„" + info.name + qsTrId("Main.e_acum_in_biblioteca"))
     }
 
     // Fantoma unui element tras din bibliotecă; lăsată peste viewport, pune obiectul acolo.
@@ -832,7 +885,7 @@ Window {
     function openRulesEditor() {
         const info = doc.entityInfo
         if (info.kind !== "instance") {
-            toast.show("Selectează un grup sau o componentă ca să-i adaugi interacțiuni.")
+            toast.show(qsTrId("Main.selecteaza_un_grup_sau_o_componenta_ca_sa_i_adaugi_inte"))
             return
         }
         rulesEditor.openFor(info.instanceId, info.name)
@@ -1053,7 +1106,7 @@ Window {
             commands: window.commands
             onShortcutChanged: (id, sequence) => {
                 const taken = window.setShortcut(id, sequence)
-                shortcutNotice = taken ? "Combinația era folosită de „" + taken + "”, care a rămas fără scurtătură." : ""
+                shortcutNotice = taken ? qsTrId("Main.combinatia_era_folosita_de") + taken + qsTrId("Main.care_a_ramas_fara_scurtatura") : ""
             }
             onShortcutsReset: window.resetShortcuts()
             onCloseRequested: preferencesPage.active = false
@@ -1226,8 +1279,8 @@ Window {
             // În browser: selectorul de fișiere al browserului și download-uri.
             if (WebFiles.available) {
                 switch (what) {
-                case "open": WebFiles.pick("open", "Modele Aion (*.aion)"); break
-                case "import": WebFiles.pick("import", "Modele 3D (*.obj *.gltf *.glb)"); break
+                case "open": WebFiles.pick("open", qsTrId("Main.modele_aion_aion")); break
+                case "import": WebFiles.pick("import", qsTrId("Main.modele_3d_obj_gltf_glb")); break
                 case "saveAs":
                     if (window.webSave("aion") && afterSave) afterSave()
                     afterSave = null
@@ -1237,13 +1290,13 @@ Window {
                 case "exportGltf": window.webSave("gltf"); break
                 case "exportPng": window.webSave("png"); break
                 case "exportReport": {
-                    const name = doc.fileName + (reportKind === "cutlist" ? " - debitare" : " - cantitati") + ".csv"
+                    const name = doc.fileName + (reportKind === "cutlist" ? qsTrId("Main.debitare") : qsTrId("Main.cantitati")) + ".csv"
                     const path = WebFiles.temporaryPath(name)
                     if (doc.exportReport(path, reportKind, reportOptions)) WebFiles.download(path, name)
                     break
                 }
-                case "exportVideo": toast.show("Exportul video nu e disponibil în browser (folosește aplicația desktop)."); break
-                case "textureImage": WebFiles.pick("texture", "Imagini (*.png *.jpg *.jpeg)"); break
+                case "exportVideo": toast.show(qsTrId("Main.exportul_video_nu_e_disponibil_in_browser_foloseste_apl")); break
+                case "textureImage": WebFiles.pick("texture", qsTrId("Main.imagini_png_jpg_jpeg")); break
                 }
                 return
             }
@@ -1251,20 +1304,20 @@ Window {
             const save = ["saveAs", "exportObj", "exportGlb", "exportGltf", "exportPng", "exportReport", "exportVideo"].includes(what)
             fileMode = save ? FileDialog.SaveFile : FileDialog.OpenFile
             switch (what) {
-            case "open": title = "Deschide"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
-            case "saveAs": title = "Salvează"; nameFilters = ["Modele Aion (*.aion)"]; defaultSuffix = "aion"; break
-            case "import": title = "Importă"; nameFilters = ["Modele 3D (*.obj *.gltf *.glb)"]; defaultSuffix = ""; break
-            case "textureImage": title = "Alege imaginea texturii"; nameFilters = ["Imagini (*.png *.jpg *.jpeg)"]; defaultSuffix = ""; break
-            case "exportObj": title = "Exportă OBJ"; nameFilters = ["OBJ (*.obj)"]; defaultSuffix = "obj"; break
-            case "exportGlb": title = "Exportă GLB"; nameFilters = ["glTF binar (*.glb)"]; defaultSuffix = "glb"; break
-            case "exportGltf": title = "Exportă glTF"; nameFilters = ["glTF (*.gltf)"]; defaultSuffix = "gltf"; break
-            case "exportPng": title = "Exportă imaginea"; nameFilters = ["PNG (*.png)"]; defaultSuffix = "png"; break
-            case "exportReport": title = "Exportă raportul"; nameFilters = ["CSV (*.csv)"]; defaultSuffix = "csv"; break
-            case "exportVideo": title = "Exportă animația"; nameFilters = ["Video MP4 (*.mp4)"]; defaultSuffix = "mp4"; break
+            case "open": title = qsTrId("Main.deschide_2"); nameFilters = [qsTrId("Main.modele_aion_aion")]; defaultSuffix = "aion"; break
+            case "saveAs": title = qsTrId("Main.salveaza"); nameFilters = [qsTrId("Main.modele_aion_aion")]; defaultSuffix = "aion"; break
+            case "import": title = qsTrId("Main.importa"); nameFilters = [qsTrId("Main.modele_3d_obj_gltf_glb")]; defaultSuffix = ""; break
+            case "textureImage": title = qsTrId("Main.alege_imaginea_texturii"); nameFilters = [qsTrId("Main.imagini_png_jpg_jpeg")]; defaultSuffix = ""; break
+            case "exportObj": title = qsTrId("Main.exporta_obj_2"); nameFilters = [qsTrId("Main.obj_obj")]; defaultSuffix = "obj"; break
+            case "exportGlb": title = qsTrId("Main.exporta_glb"); nameFilters = [qsTrId("Main.gltf_binar_glb")]; defaultSuffix = "glb"; break
+            case "exportGltf": title = qsTrId("Main.exporta_gltf_2"); nameFilters = [qsTrId("Main.gltf_gltf")]; defaultSuffix = "gltf"; break
+            case "exportPng": title = qsTrId("Main.exporta_imaginea"); nameFilters = [qsTrId("Main.png_png")]; defaultSuffix = "png"; break
+            case "exportReport": title = qsTrId("Main.exporta_raportul"); nameFilters = [qsTrId("Main.csv_csv")]; defaultSuffix = "csv"; break
+            case "exportVideo": title = qsTrId("Main.exporta_animatia"); nameFilters = [qsTrId("Main.video_mp4_mp4")]; defaultSuffix = "mp4"; break
             }
             if (save)
                 selectedFile = "file:///" + doc.fileName
-                    + (what === "exportReport" ? (reportKind === "cutlist" ? " - debitare" : " - cantitati") : "")
+                    + (what === "exportReport" ? (reportKind === "cutlist" ? qsTrId("Main.debitare") : qsTrId("Main.cantitati")) : "")
                     + "." + defaultSuffix
             open()
         }
@@ -1281,14 +1334,14 @@ Window {
             case "exportObj":
             case "exportGlb":
             case "exportGltf":
-                if (doc.exportFile(path)) toast.show("Exportat: " + path.split("/").pop())
+                if (doc.exportFile(path)) toast.show(qsTrId("Main.exportat") + path.split("/").pop())
                 break
             case "exportPng":
-                if (viewport.saveImage(path)) toast.show("Imagine salvată: " + path.split("/").pop())
-                else toast.show("Imaginea nu a putut fi salvată.")
+                if (viewport.saveImage(path)) toast.show(qsTrId("Main.imagine_salvata") + path.split("/").pop())
+                else toast.show(qsTrId("Main.imaginea_nu_a_putut_fi_salvata"))
                 break
             case "exportReport":
-                if (doc.exportReport(path, reportKind, reportOptions)) toast.show("Raport salvat: " + path.split("/").pop())
+                if (doc.exportReport(path, reportKind, reportOptions)) toast.show(qsTrId("Main.raport_salvat") + path.split("/").pop())
                 break
             case "exportVideo": window.exportVideo(path); break
             case "textureImage": if (textureCallback) textureCallback(path); break
@@ -1337,19 +1390,19 @@ Window {
     property string videoOutput: ""
     function exportVideo(path) {
         window.videoOutput = path
-        const frames = path.replace(/\.mp4$/i, "") + " - cadre"
+        const frames = path.replace(/\.mp4$/i, "") + qsTrId("Main.cadre")
         viewport.exportAnimation(frames, doc.timeline.fps ?? 30)
-        toast.show("Se exportă animația… (progresul e în timeline)")
+        toast.show(qsTrId("Main.se_exporta_animatia_progresul_e_in_timeline"))
     }
     Connections {
         target: viewport
         function onAnimationExported(directory, frames, fps) {
             if (frames === 0) {
-                toast.show("Exportul animației a fost anulat.")
+                toast.show(qsTrId("Main.exportul_animatiei_a_fost_anulat"))
                 return
             }
             const error = AppInfo.encodeVideo(directory, fps, window.videoOutput)
-            toast.show(error.length === 0 ? "Video salvat: " + window.videoOutput.split("/").pop() : error)
+            toast.show(error.length === 0 ? qsTrId("Main.video_salvat") + window.videoOutput.split("/").pop() : error)
         }
     }
 
@@ -1421,7 +1474,7 @@ Window {
                     id: objectsSection
                     width: parent.width
                     separator: false
-                    title: "Obiecte"
+                    title: qsTrId("Main.obiecte")
                     iconName: "layers"
                     count: doc.outline.length + doc.cameras.length + doc.lights.length
                     expanded: preferences.leftOutliner
@@ -1432,7 +1485,7 @@ Window {
                     actions: HeaderButton {
                         id: addObjectButton
                         iconName: "plus"
-                        tooltip: "Adaugă o formă, o cameră sau o lumină"
+                        tooltip: qsTrId("Main.adauga_o_forma_o_camera_sau_o_lumina")
                         checked: addObjectMenu.opened
                         onClicked: addObjectMenu.opened ? addObjectMenu.close() : addObjectMenu.open()
                         Popover {
@@ -1445,16 +1498,16 @@ Window {
                                 Repeater {
                                     // Formele doar în Modelare (ca uneltele 3D din toolbar); camerele și luminile mereu.
                                     model: (doc.workMode === 0 ? [
-                                        { id: "box", icon: "prim-cube", label: "Cub" },
-                                        { id: "sphere", icon: "prim-sphere", label: "Sferă" },
-                                        { id: "cone", icon: "prim-cone", label: "Con" },
-                                        { id: "cylinder", icon: "prim-cylinder", label: "Cilindru", separatorAfter: true }
+                                        { id: "box", icon: "prim-cube", label: qsTrId("Main.cub") },
+                                        { id: "sphere", icon: "prim-sphere", label: qsTrId("Main.sfera") },
+                                        { id: "cone", icon: "prim-cone", label: qsTrId("Main.con") },
+                                        { id: "cylinder", icon: "prim-cylinder", label: qsTrId("Main.cilindru"), separatorAfter: true }
                                     ] : []).concat([
-                                        { id: "camera", icon: "camera", label: "Cameră (din vederea curentă)" },
-                                        { id: "point", icon: "lightbulb", label: "Lumină punctuală (bec)" },
-                                        { id: "spot", icon: "light-spot", label: "Spot" },
-                                        { id: "directional", icon: "sun", label: "Lumină direcțională" },
-                                        { id: "area", icon: "light-area", label: "Panou luminos" }
+                                        { id: "camera", icon: "camera", label: qsTrId("Main.camera_din_vederea_curenta") },
+                                        { id: "point", icon: "lightbulb", label: qsTrId("Main.lumina_punctuala_bec") },
+                                        { id: "spot", icon: "light-spot", label: qsTrId("Main.spot") },
+                                        { id: "directional", icon: "sun", label: qsTrId("Main.lumina_directionala") },
+                                        { id: "area", icon: "light-area", label: qsTrId("Main.panou_luminos") }
                                     ])
                                     delegate: Item {
                                         id: addItem
@@ -1510,13 +1563,22 @@ Window {
                         anchors.fill: parent
                         document: doc
                         viewport: viewport
+                        onMoveRequested: (instance, target) => {
+                            if (!doc.moveBreaksCarcass(instance, target)) {
+                                doc.moveInstanceTo(instance, target)
+                                return
+                            }
+                            confirmDialog.ask(qsTrId("Main.scoti_piesa_din_corp"),
+                                qsTrId("Main.corpul_devine_obisnuit_nu_se_mai_reface_din_campuril_2"),
+                                qsTrId("Main.muta"), () => doc.moveInstanceTo(instance, target))
+                        }
                     }
                 }
                 AccordionSection {
                     id: librarySection
                     visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
-                    title: "Bibliotecă"
+                    title: qsTrId("Main.biblioteca")
                     iconName: "book-open"
                     expanded: preferences.leftLibrary
                     bodyHeight: accordion.heightOf("library", 260)
@@ -1525,7 +1587,7 @@ Window {
                     onToggled: preferences.leftLibrary = !preferences.leftLibrary
                     actions: HeaderButton {
                         iconName: "plus"
-                        tooltip: "Salvează obiectul selectat în bibliotecă"
+                        tooltip: qsTrId("Main.salveaza_obiectul_selectat_in_biblioteca")
                         onClicked: window.saveToLibrary()
                     }
                     LibraryPanel {
@@ -1548,7 +1610,7 @@ Window {
                     id: tagsSection
                     visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
-                    title: "Tag-uri"
+                    title: qsTrId("Main.tag_uri")
                     iconName: "tag"
                     count: doc.tags.length
                     expanded: preferences.leftTags
@@ -1558,9 +1620,9 @@ Window {
                     onToggled: preferences.leftTags = !preferences.leftTags
                     actions: HeaderButton {
                         iconName: "plus"
-                        tooltip: "Tag nou"
+                        tooltip: qsTrId("Main.tag_nou")
                         onClicked: {
-                            doc.addTag("Tag " + (doc.tags.length + 1))
+                            doc.addTag(qsTrId("Main.tag") + (doc.tags.length + 1))
                             preferences.leftTags = true
                         }
                     }
@@ -1573,7 +1635,7 @@ Window {
                     id: materialsSection
                     visible: doc.workMode === 0 // după modul de lucru
                     width: parent.width
-                    title: "Materiale"
+                    title: qsTrId("Main.materiale")
                     iconName: "palette"
                     count: doc.modelMaterials.length
                     expanded: preferences.leftMaterials
@@ -1583,7 +1645,7 @@ Window {
                     onToggled: preferences.leftMaterials = !preferences.leftMaterials
                     actions: HeaderButton {
                         iconName: "plus"
-                        tooltip: "Material nou (personalizat)"
+                        tooltip: qsTrId("Main.material_nou_personalizat_2")
                         onClicked: {
                             preferences.leftMaterials = true
                             materialsPanel.newMaterial()
@@ -1611,7 +1673,7 @@ Window {
                     id: scenesSection
                     visible: doc.workMode !== 2 // după modul de lucru
                     width: parent.width
-                    title: "Scene"
+                    title: qsTrId("Main.scene")
                     iconName: "monitor"
                     count: doc.scenes.length
                     expanded: preferences.leftScenes
@@ -1623,12 +1685,12 @@ Window {
                         HeaderButton {
                             id: sceneSettingsButton
                             iconName: "settings"
-                            tooltip: "Setările scenelor (tranziția)"
+                            tooltip: qsTrId("Main.setarile_scenelor_tranzitia")
                             onClicked: scenesPanel.openSettings(sceneSettingsButton)
                         },
                         HeaderButton {
                             iconName: "plus"
-                            tooltip: "Scenă nouă din vederea curentă"
+                            tooltip: qsTrId("Main.scena_noua_din_vederea_curenta")
                             onClicked: {
                                 doc.addScene(viewport.cameraState(), viewport.displayStyle)
                                 preferences.leftScenes = true
@@ -1648,7 +1710,7 @@ Window {
                     id: interactionsSection
                     visible: doc.workMode === 2 // după modul de lucru
                     width: parent.width
-                    title: "Interacțiuni"
+                    title: qsTrId("Main.interactiuni")
                     iconName: "hand-pointer"
                     count: doc.interactions.length
                     expanded: preferences.leftInteractions
@@ -1659,13 +1721,13 @@ Window {
                     actions: [
                         HeaderButton {
                             iconName: "play"
-                            tooltip: "Folosește interacțiunile (Interact, F5)"
+                            tooltip: qsTrId("Main.foloseste_interactiunile_interact_f5")
                             checked: window.activeTool === "interact"
                             onClicked: window.runCommand("mode.interaction")
                         },
                         HeaderButton {
                             iconName: "plus"
-                            tooltip: "Interacțiune nouă pentru obiectul selectat"
+                            tooltip: qsTrId("Main.interactiune_noua_pentru_obiectul_selectat")
                             onClicked: window.openRulesEditor()
                         }
                     ]
@@ -1724,6 +1786,7 @@ Window {
         progressiveAntialiasing: preferences.progressiveAA
         antialiasing: preferences.msaa
         shadowQuality: preferences.shadowQuality
+        showBands: UserPrefs.showBands
         onFramesPerSecondChanged: if (AppInfo.startupActions.length > 0) console.info("fps:", framesPerSecond)
         anchors.top: titleBar.bottom
         anchors.bottom: timeline.visible ? timeline.top : statusBar.top
@@ -1821,7 +1884,7 @@ Window {
                 spacing: Theme.space1
 
                 Repeater {
-                    model: ["Model"].concat(doc.contextPath)
+                    model: [qsTrId("Main.model")].concat(doc.contextPath)
                     delegate: Row {
                         required property string modelData
                         required property int index
@@ -1848,7 +1911,7 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                     iconName: "x"
                     iconSize: 12
-                    tooltip: "Ieși din grup (Esc)"
+                    tooltip: qsTrId("Main.iesi_din_grup_esc")
                     onClicked: doc.exitContext()
                 }
             }
@@ -1878,19 +1941,19 @@ Window {
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Copie de recuperare: " + doc.recoveryInfo
+                    text: qsTrId("Main.copie_de_recuperare") + doc.recoveryInfo
                     color: Theme.textPrimary
                     font.pixelSize: Theme.fontSizeSm
                 }
                 Button {
                     small: true
                     variant: "primary"
-                    text: "Recuperează"
+                    text: qsTrId("Main.recupereaza")
                     onClicked: window.confirmDiscard(() => doc.recoverSession(""))
                 }
                 Button {
                     small: true
-                    text: "Renunță"
+                    text: qsTrId("Main.renunta")
                     onClicked: doc.discardRecovery("")
                 }
             }
@@ -1931,7 +1994,7 @@ Window {
                     height: 26
                     iconSize: Theme.iconSizeSm
                     iconName: "x"
-                    tooltip: "Oprește animația (sau click în viewport)"
+                    tooltip: qsTrId("Main.opreste_animatia_sau_click_in_viewport")
                     onClicked: viewport.stopScenes()
                 }
             }
@@ -1988,7 +2051,7 @@ Window {
                 id: noInteractionTip
                 delay: 0
                 timeout: 2600
-                text: "Obiectul nu are interacțiuni. Alege Select și adaugă una din Inspector."
+                text: qsTrId("Main.obiectul_nu_are_interactiuni_alege_select_si_adauga_una")
             }
         }
         Connections {
@@ -2046,7 +2109,7 @@ Window {
         width: window.rightPanelVisible ? Theme.sidePanelWidth : 0
         visible: width > 0
         clip: true
-        title: "Inspector"
+        title: qsTrId("Main.inspector")
 
         Behavior on width { NumberAnimation { duration: Theme.motionNormal; easing.type: Easing.OutCubic } }
 
@@ -2068,16 +2131,18 @@ Window {
                 workMode: doc.workMode
                 onEditRules: window.openRulesEditor()
                 onToolRequested: (id) => window.selectTool(id)
+                onCommandRequested: (id) => window.runCommand(id)
+                onParameterRequested: (key, value) => window.setParameterChecked(key, value)
             }
 
             // Fără selecție, Inspector-ul descrie modelul întreg.
             Section {
                 visible: doc.entityInfo.kind === "none" && doc.selectedObject.kind === "none"
                 width: parent.width
-                title: "Model"
+                title: qsTrId("Main.model")
                 Text {
-                    text: (doc.faceCount === 1 ? "1 față" : doc.faceCount + " fețe") + " · "
-                          + (doc.edgeCount === 1 ? "1 muchie" : doc.edgeCount + " muchii")
+                    text: (doc.faceCount === 1 ? qsTrId("Main.1_fata") : doc.faceCount + qsTrId("Main.fete")) + " · "
+                          + (doc.edgeCount === 1 ? qsTrId("Main.1_muchie") : doc.edgeCount + qsTrId("Main.muchii"))
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeSm
                     font.family: Theme.fontMono
@@ -2085,8 +2150,7 @@ Window {
                 Text {
                     width: parent.width
                     wrapMode: Text.Wrap
-                    text: "Selectează ceva ca să-i vezi proprietățile. Stilul, umbrele, secțiunile și proiecția sunt "
-                          + "în bara din colțul viewport-ului."
+                    text: qsTrId("Main.selecteaza_ceva_ca_sa_i_vezi_proprietatile_stilul_umbre")
                     color: Theme.textTertiary
                     font.pixelSize: Theme.fontSizeXs
                 }
@@ -2126,12 +2190,12 @@ Window {
         anchors.right: parent.right
         framesPerSecond: UserPrefs.showFps ? viewport.framesPerSecond : 0
         // Modul de lucru, apoi indicația uneltei.
-        message: ["Modelare", "Animare", "Interacțiune"][doc.workMode] + "  ·  "
+        message: [qsTrId("Main.modelare"), qsTrId("Main.animare"), qsTrId("Main.interactiune")][doc.workMode] + "  ·  "
                + (window.pendingToolMessage.length > 0 ? window.pendingToolMessage
-                  : doc.toolStatus.length > 0 ? doc.toolStatus : "Gata")
+                  : doc.toolStatus.length > 0 ? doc.toolStatus : qsTrId("Main.gata"))
         selectionText: doc.selectionSummary
         orthographic: viewport.orthographic
-        unitText: ["Auto", "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"
+        unitText: [qsTrId("Main.auto"), "mm", "cm", "m", "inci", "picioare"][doc.displayUnit] ?? "mm"
         snapToGrid: doc.snapToGrid
         gridText: doc.gridStep > 0 ? doc.formatLength(doc.gridStep) : "auto"
         onSnapToggled: window.runCommand("view.snapGrid")
@@ -2165,6 +2229,62 @@ Window {
         }
     }
 
+    // O întrebare cu „Anulează” / acțiune, pentru operații care pierd date.
+    Popover {
+        id: confirmDialog
+        property var action: null
+        property string title: ""
+        property string message: ""
+        property string actionText: ""
+        function ask(title, message, actionText, action) {
+            confirmDialog.title = title
+            confirmDialog.message = message
+            confirmDialog.actionText = actionText
+            confirmDialog.action = action
+            confirmDialog.open()
+        }
+        modal: true
+        anchors.centerIn: parent
+        width: 380
+        padding: Theme.space6
+
+        contentItem: Column {
+            spacing: Theme.space4
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: confirmDialog.title
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeLg
+                font.weight: Font.DemiBold
+            }
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: confirmDialog.message
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeMd
+            }
+            Row {
+                anchors.right: parent.right
+                spacing: Theme.space2
+                Button {
+                    text: qsTrId("Main.anuleaza")
+                    onClicked: confirmDialog.close()
+                }
+                Button {
+                    variant: "primary"
+                    text: confirmDialog.actionText
+                    onClicked: {
+                        const action = confirmDialog.action
+                        confirmDialog.close()
+                        if (action) action()
+                    }
+                }
+            }
+        }
+    }
+
     // „Salvezi modificările?” înainte de a închide documentul.
     Popover {
         id: unsavedDialog
@@ -2179,7 +2299,7 @@ Window {
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Salvezi modificările din „" + doc.fileName + "”?"
+                text: qsTrId("Main.salvezi_modificarile_din") + doc.fileName + "”?"
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.DemiBold
@@ -2187,7 +2307,7 @@ Window {
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Dacă nu le salvezi, se pierd."
+                text: qsTrId("Main.daca_nu_le_salvezi_se_pierd")
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeMd
             }
@@ -2195,11 +2315,11 @@ Window {
                 anchors.right: parent.right
                 spacing: Theme.space2
                 Button {
-                    text: "Anulează"
+                    text: qsTrId("Main.anuleaza")
                     onClicked: unsavedDialog.close()
                 }
                 Button {
-                    text: "Nu salva"
+                    text: qsTrId("Main.nu_salva")
                     onClicked: {
                         const action = unsavedDialog.action
                         unsavedDialog.close()
@@ -2208,7 +2328,7 @@ Window {
                 }
                 Button {
                     variant: "primary"
-                    text: "Salvează"
+                    text: qsTrId("Main.salveaza")
                     onClicked: {
                         const action = unsavedDialog.action
                         unsavedDialog.close()

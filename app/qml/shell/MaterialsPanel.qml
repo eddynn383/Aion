@@ -130,12 +130,12 @@ Item {
                 id: search
                 width: parent.width
                 iconName: "search"
-                placeholderText: "Caută un material"
+                placeholderText: qsTrId("MaterialsPanel.cauta_un_material")
             }
 
             Text {
                 visible: root.document.modelMaterials.length > 0 || root.query.length === 0
-                text: "În model"
+                text: qsTrId("MaterialsPanel.in_model")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.Medium
@@ -160,13 +160,13 @@ Item {
                 visible: root.document.modelMaterials.length === 0
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Niciun material în model. Alege unul din bibliotecă sau creează-l pe al tău cu +."
+                text: qsTrId("MaterialsPanel.niciun_material_in_model_alege_unul_din_bibli")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
 
             Text {
-                text: "Bibliotecă"
+                text: qsTrId("MaterialsPanel.biblioteca")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.Medium
@@ -197,15 +197,21 @@ Item {
         property real alpha: 1
         property real roughness: 0.6
         property real metallic: 0
+        // Categoria (ADR 0044): decide cum apar în lista de debitare obiectele fără date de piesă.
+        property string category: ""
+        readonly property var categories: [
+            { value: "", label: qsTrId("MaterialsPanel.fara") }, { value: "board-decor", label: qsTrId("MaterialsPanel.decor_de_placa") },
+            { value: "wood", label: qsTrId("MaterialsPanel.lemn_masiv") }, { value: "metal", label: qsTrId("MaterialsPanel.metal") }, { value: "glass", label: qsTrId("MaterialsPanel.sticla") },
+            { value: "plastic", label: qsTrId("MaterialsPanel.plastic") }, { value: "stone", label: qsTrId("MaterialsPanel.piatra") } ]
         // Textura: "" = fără, „procedural:brick”…, „file:/cale”; mărimea unei repetiții, în mm.
         property string texture: ""
         property string textureThumbnail: ""
         property real textureWidth: 1000
         property real textureHeight: 1000
         readonly property var textures: [
-            { value: "", label: "Fără" }, { value: "procedural:brick", label: "Cărămidă" },
-            { value: "procedural:parquet", label: "Parchet" }, { value: "procedural:wood", label: "Lemn" },
-            { value: "procedural:concrete", label: "Beton" }, { value: "procedural:tiles", label: "Gresie" } ]
+            { value: "", label: qsTrId("MaterialsPanel.fara") }, { value: "procedural:brick", label: qsTrId("MaterialsPanel.caramida") },
+            { value: "procedural:parquet", label: qsTrId("MaterialsPanel.parchet") }, { value: "procedural:wood", label: qsTrId("MaterialsPanel.lemn") },
+            { value: "procedural:concrete", label: qsTrId("MaterialsPanel.beton") }, { value: "procedural:tiles", label: qsTrId("MaterialsPanel.gresie") } ]
         readonly property var presets: ["#F5F5F4", "#A8A29E", "#44403C", "#1C1917", "#B45309", "#92400E", "#DC2626",
             "#EA580C", "#CA8A04", "#16A34A", "#0891B2", "#2563EB", "#7C3AED", "#DB2777"]
 
@@ -217,6 +223,7 @@ Item {
             alpha = m ? m.color.a : 1
             roughness = m ? m.roughness : 0.6
             metallic = m ? m.metallic : 0
+            category = m ? (m.category ?? "") : ""
             texture = m && m.textureSource ? (m.textureSource.startsWith("procedural:") ? m.textureSource : "file:" + m.textureSource) : ""
             textureThumbnail = m ? (m.thumbnail ?? "") : ""
             textureWidth = m ? (m.textureWidth ?? 1000) : 1000
@@ -226,7 +233,8 @@ Item {
         }
         function properties() {
             return { name: editor.name, color: editor.color.toString(), opacity: editor.alpha,
-                     roughness: editor.roughness, metallic: editor.metallic, texture: editor.texture,
+                     roughness: editor.roughness, metallic: editor.metallic, category: editor.category,
+                     texture: editor.texture,
                      textureWidth: editor.textureWidth, textureHeight: editor.textureHeight }
         }
         function save() {
@@ -269,7 +277,7 @@ Item {
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: editor.materialId > 0 ? "Editează materialul" : "Material nou"
+                    text: editor.materialId > 0 ? qsTrId("MaterialsPanel.editeaza_materialul") : qsTrId("MaterialsPanel.material_nou")
                     color: Theme.textPrimary
                     font.pixelSize: Theme.fontSizeMd
                     font.weight: Font.DemiBold
@@ -277,7 +285,7 @@ Item {
             }
             Input {
                 width: parent.width
-                placeholderText: "Nume (de exemplu „Stejar natur”)"
+                placeholderText: qsTrId("MaterialsPanel.nume_de_exemplu_stejar_natur")
                 text: editor.name
                 onTextChanged: editor.name = text
             }
@@ -308,9 +316,9 @@ Item {
                 placeholderText: "#RRGGBB"
                 onTextChanged: if (/^#[0-9a-fA-F]{6}$/.test(text)) editor.color = text
             }
-            // Textura.
+            // Categoria.
             Text {
-                text: "Textură"
+                text: qsTrId("MaterialsPanel.categorie_pentru_lista_de_debitare")
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSm
             }
@@ -318,7 +326,43 @@ Item {
                 width: parent.width
                 spacing: 4
                 Repeater {
-                    model: editor.textures.concat([{ value: "file", label: "Imagine…" }])
+                    model: editor.categories
+                    delegate: Rectangle {
+                        id: categoryChip
+                        required property var modelData
+                        readonly property bool current: editor.category === modelData.value
+                        width: categoryText.implicitWidth + Theme.space3 * 2
+                        height: 24
+                        radius: 12
+                        color: current ? Theme.accentSubtle : categoryArea.containsMouse ? Theme.bgHover : "transparent"
+                        border.color: current ? Theme.accent : Theme.borderStrong
+                        Text {
+                            id: categoryText
+                            anchors.centerIn: parent
+                            text: categoryChip.modelData.label
+                            color: categoryChip.current ? Theme.textPrimary : Theme.textSecondary
+                            font.pixelSize: Theme.fontSizeXs
+                        }
+                        MouseArea {
+                            id: categoryArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: editor.category = categoryChip.modelData.value
+                        }
+                    }
+                }
+            }
+            // Textura.
+            Text {
+                text: qsTrId("MaterialsPanel.textura")
+                color: Theme.textSecondary
+                font.pixelSize: Theme.fontSizeSm
+            }
+            Flow {
+                width: parent.width
+                spacing: 4
+                Repeater {
+                    model: editor.textures.concat([{ value: "file", label: qsTrId("MaterialsPanel.imagine") }])
                     delegate: Rectangle {
                         id: chip
                         required property var modelData
@@ -363,7 +407,7 @@ Item {
                 spacing: Theme.space1
                 NumberField {
                     width: (parent.width - Theme.space1) / 2
-                    label: "L"
+                    label: qsTrId("MaterialsPanel.l")
                     unit: "mm"
                     from: 1
                     step: 50
@@ -372,7 +416,7 @@ Item {
                 }
                 NumberField {
                     width: (parent.width - Theme.space1) / 2
-                    label: "H"
+                    label: qsTrId("MaterialsPanel.h")
                     unit: "mm"
                     from: 1
                     step: 50
@@ -384,13 +428,13 @@ Item {
                 visible: editor.texture.length > 0
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Mărimea reală a unei repetiții. Culoarea nuanțează textura (alb = neschimbată)."
+                text: qsTrId("MaterialsPanel.marimea_reala_a_unei_repetitii_culoarea_nuant")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
             Slider {
                 width: parent.width
-                label: "Opacitate"
+                label: qsTrId("MaterialsPanel.opacitate")
                 from: 0.05
                 to: 1
                 value: editor.alpha
@@ -399,7 +443,7 @@ Item {
             }
             Slider {
                 width: parent.width
-                label: "Rugozitate"
+                label: qsTrId("MaterialsPanel.rugozitate")
                 from: 0
                 to: 1
                 value: editor.roughness
@@ -408,7 +452,7 @@ Item {
             }
             Slider {
                 width: parent.width
-                label: "Metalic"
+                label: qsTrId("MaterialsPanel.metalic")
                 from: 0
                 to: 1
                 value: editor.metallic
@@ -420,17 +464,17 @@ Item {
                 spacing: Theme.space2
                 Button {
                     visible: editor.materialId > 0
-                    text: "Șterge"
+                    text: qsTrId("MaterialsPanel.sterge")
                     onClicked: { root.document.removeMaterial(editor.materialId); editor.close() }
                 }
                 Item { width: parent.width - (editor.materialId > 0 ? 180 : 0) - 180; height: 1 }
                 Button {
-                    text: "Anulează"
+                    text: qsTrId("MaterialsPanel.anuleaza")
                     onClicked: editor.close()
                 }
                 Button {
                     variant: "primary"
-                    text: editor.materialId > 0 ? "Salvează" : "Creează"
+                    text: editor.materialId > 0 ? qsTrId("MaterialsPanel.salveaza") : qsTrId("MaterialsPanel.creeaza")
                     onClicked: editor.save()
                 }
             }

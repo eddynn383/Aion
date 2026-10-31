@@ -9,10 +9,10 @@
 #include <string_view>
 #include <vector>
 
-// Obiecte dinamice (parametrice): uși, ferestre, mese, rafturi, scări, dulapuri. Definiția păstrează generatorul și
-// parametrii; părțile (toc, foaie, blat, picioare…) sunt subgrupuri refăcute la fiecare schimbare. Copiile legate se
-// schimbă împreună. Originea fiecărui obiect e colțul din stânga-față-jos; X = lățime, Y = adâncime, Z = înălțime.
-// Vezi ADR 0025.
+// Obiecte dinamice (parametrice): uși, ferestre, mese, rafturi, scări, dulapuri. Definiția păstrează
+// generatorul și parametrii; părțile (toc, foaie, blat, picioare…) sunt subgrupuri refăcute la fiecare
+// schimbare. Copiile legate se schimbă împreună. Originea fiecărui obiect e colțul din stânga-față-jos; X =
+// lățime, Y = adâncime, Z = înălțime. Vezi ADR 0025.
 namespace aion::model {
 
 struct ParameterSpec {
@@ -30,6 +30,9 @@ struct GeneratorInfo {
     std::string name;
     std::string category;
     std::vector<ParameterSpec> parameters;
+    // Un generator păstrat doar pentru fișierele vechi (`cabinet`, `shelf`): nu apare în bibliotecă și în
+    // paleta de comenzi; „Actualizează” îl înlocuiește (model/Carcass.h).
+    bool legacy = false;
 };
 
 [[nodiscard]] std::span<const GeneratorInfo> generators();
@@ -39,11 +42,13 @@ struct GeneratorInfo {
 [[nodiscard]] std::map<std::string, double> resolvedParameters(
     const GeneratorInfo& generator, const std::map<std::string, double>& given);
 
-// Un obiect dinamic nou în `context`, cu transformarea dată. Întoarce instanța (nulă dacă generatorul nu există).
+// Un obiect dinamic nou în `context`, cu transformarea dată. Întoarce instanța (nulă dacă generatorul nu
+// există).
 InstanceId createParametric(Model& model, DefinitionId context, std::string_view generator,
     const std::map<std::string, double>& parameters, const math::Transform& placement);
 
-// Schimbă un parametru (limitat la min / max) și reface obiectul. Întoarce false dacă definiția nu e parametrică.
+// Schimbă un parametru (limitat la min / max) și reface obiectul. Întoarce false dacă definiția nu e
+// parametrică.
 bool setParameter(Model& model, DefinitionId definition, const std::string& key, double value);
 
 // Reface părțile definiției din generator și parametri.

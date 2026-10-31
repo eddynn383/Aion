@@ -53,10 +53,10 @@ Rectangle {
         if (name.length === 0)
             return // doar un modificator: se așteaptă și tasta
         const parts = []
-        if (event.modifiers & Qt.ControlModifier) parts.push("Ctrl")
-        if (event.modifiers & Qt.MetaModifier) parts.push("Meta")
-        if (event.modifiers & Qt.AltModifier) parts.push("Alt")
-        if (event.modifiers & Qt.ShiftModifier) parts.push("Shift")
+        if (event.modifiers & Qt.ControlModifier) parts.push(qsTrId("ShortcutRecorder.ctrl"))
+        if (event.modifiers & Qt.MetaModifier) parts.push(qsTrId("ShortcutRecorder.meta"))
+        if (event.modifiers & Qt.AltModifier) parts.push(qsTrId("ShortcutRecorder.alt"))
+        if (event.modifiers & Qt.ShiftModifier) parts.push(qsTrId("ShortcutRecorder.shift"))
         parts.push(name)
         root.recording = false
         root.recorded(parts.join("+"))
@@ -98,7 +98,7 @@ Rectangle {
             id: hint
             anchors.centerIn: parent
             visible: root.recording
-            text: "Apasă combinația…"
+            text: qsTrId("ShortcutRecorder.apasa_combinatia")
             color: Theme.accent
             font.pixelSize: Theme.fontSizeXs
         }

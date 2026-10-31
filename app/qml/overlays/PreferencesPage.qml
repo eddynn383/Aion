@@ -24,14 +24,15 @@ Item {
     property string shortcutNotice: ""
 
     readonly property var categories: [
-        { name: "General", icon: "settings", description: "Ajutorul din aplicație, ecranul de start și documentele recente." },
-        { name: "Unități", icon: "ruler", description: "Cum se afișează și cum se citesc lungimile." },
-        { name: "Salvare", icon: "check", description: "Copiile de recuperare ale documentului deschis." },
-        { name: "Aspect", icon: "palette", description: "Tema, culoarea de accent și culorile interfeței." },
-        { name: "Viewport", icon: "monitor", description: "Calitatea randării, lumina și informațiile din viewport." },
-        { name: "Navigare", icon: "orbit", description: "Orbita, zoom-ul și planurile de tăiere ale camerei." },
-        { name: "Grid și snap", icon: "grid-3x3", description: "Grid-ul de pe sol și prinderea punctelor de el." },
-        { name: "Scurtături", icon: "search", description: "Tastele comenzilor și ale uneltelor; click pe una ca s-o schimbi." }
+        { name: qsTrId("PreferencesPage.general"), icon: "settings", description: qsTrId("PreferencesPage.ajutorul_din_aplicatie_ecranul_de_start_si_d") },
+        { name: qsTrId("PreferencesPage.unitati"), icon: "ruler", description: qsTrId("PreferencesPage.cum_se_afiseaza_si_cum_se_citesc_lungimile") },
+        { name: qsTrId("PreferencesPage.salvare"), icon: "check", description: qsTrId("PreferencesPage.copiile_de_recuperare_ale_documentului_desch") },
+        { name: qsTrId("PreferencesPage.aspect"), icon: "palette", description: qsTrId("PreferencesPage.tema_culoarea_de_accent_si_culorile_interfet") },
+        { name: qsTrId("PreferencesPage.viewport"), icon: "monitor", description: qsTrId("PreferencesPage.calitatea_randarii_lumina_si_informatiile_di") },
+        { name: qsTrId("PreferencesPage.navigare"), icon: "orbit", description: qsTrId("PreferencesPage.orbita_zoom_ul_si_planurile_de_taiere_ale_ca") },
+        { name: qsTrId("PreferencesPage.grid_si_snap"), icon: "grid-3x3", description: qsTrId("PreferencesPage.grid_ul_de_pe_sol_si_prinderea_punctelor_de_") },
+        { name: qsTrId("PreferencesPage.scurtaturi"), icon: "search", description: qsTrId("PreferencesPage.tastele_comenzilor_si_ale_uneltelor_click_pe") },
+        { name: qsTrId("PreferencesPage.mobilier"), icon: "box", description: qsTrId("PreferencesPage.cantul_cum_se_vede_in_viewport_si_cat_se_ada") }
     ]
 
     Keys.onEscapePressed: root.closeRequested()
@@ -99,7 +100,7 @@ Item {
                 id: sidebarTitle
                 x: Theme.space6
                 y: Theme.space6
-                text: "Preferințe"
+                text: qsTrId("PreferencesPage.preferinte")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.DemiBold
@@ -196,7 +197,7 @@ Item {
                 anchors.top: parent.top
                 anchors.topMargin: Theme.space4
                 iconName: "x"
-                tooltip: "Închide (Esc)"
+                tooltip: qsTrId("PreferencesPage.inchide_esc")
                 onClicked: root.closeRequested()
             }
             Rectangle {
@@ -232,10 +233,36 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
-                        title: "Ajutor"
+                        title: qsTrId("PreferencesPage.limba")
                         SettingsRow {
-                            title: "Ghiduri animate"
-                            description: "Un ghid scurt apare când ții cursorul pe o unealtă din toolbar."
+                            stacked: true
+                            title: qsTrId("PreferencesPage.limba_interfetei")
+                            description: qsTrId("PreferencesPage.se_aplica_dupa_repornire_traducerea_e_in_luc")
+                            Flow {
+                                width: parent.width
+                                spacing: Theme.space2
+                                Repeater {
+                                    model: [{ key: "ro", name: qsTrId("PreferencesPage.romana") }, { key: "en", name: qsTrId("PreferencesPage.english") },
+                                        { key: "de", name: qsTrId("PreferencesPage.deutsch_beta") }, { key: "pl", name: qsTrId("PreferencesPage.polski_beta") },
+                                        { key: "it", name: qsTrId("PreferencesPage.italiano_beta") }, { key: "fr", name: qsTrId("PreferencesPage.francais_beta") },
+                                        { key: "es", name: qsTrId("PreferencesPage.espanol_beta") }, { key: "pt", name: qsTrId("PreferencesPage.portugues_beta") }]
+                                    delegate: Button {
+                                        required property var modelData
+                                        small: true
+                                        text: modelData.name
+                                        variant: UserPrefs.language === modelData.key ? "primary" : "secondary"
+                                        onClicked: UserPrefs.language = modelData.key
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    SettingsGroup {
+                        width: parent.width
+                        title: qsTrId("PreferencesPage.ajutor")
+                        SettingsRow {
+                            title: qsTrId("PreferencesPage.ghiduri_animate")
+                            description: qsTrId("PreferencesPage.un_ghid_scurt_apare_cand_tii_cursorul_pe_o_u")
                             Toggle {
                                 checked: UserPrefs.hoverGuides
                                 onToggled: UserPrefs.hoverGuides = checked
@@ -244,10 +271,10 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Pornire"
+                        title: qsTrId("PreferencesPage.pornire")
                         SettingsRow {
-                            title: "Ecranul de start"
-                            description: "La pornire: document nou, deschide, ultimul fișier și documentele recente. După o închidere bruscă apare oricum, cu copia de recuperare."
+                            title: qsTrId("PreferencesPage.ecranul_de_start")
+                            description: qsTrId("PreferencesPage.la_pornire_document_nou_deschide_ultimul_fis")
                             Toggle {
                                 checked: UserPrefs.startScreen
                                 onToggled: UserPrefs.startScreen = checked
@@ -256,13 +283,13 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Documente recente"
+                        title: qsTrId("PreferencesPage.documente_recente")
                         SettingsRow {
-                            title: "Lista documentelor recente"
-                            description: root.document ? (root.document.recentFiles.length === 1 ? "Un document în listă."
-                                : root.document.recentFiles.length + " documente în listă.") : ""
+                            title: qsTrId("PreferencesPage.lista_documentelor_recente")
+                            description: root.document ? (root.document.recentFiles.length === 1 ? qsTrId("PreferencesPage.un_document_in_lista")
+                                : root.document.recentFiles.length + qsTrId("PreferencesPage.documente_in_lista")) : ""
                             Button {
-                                text: "Golește lista"
+                                text: qsTrId("PreferencesPage.goleste_lista")
                                 enabled: root.document ? root.document.recentFiles.length > 0 : false
                                 onClicked: root.document.clearRecentFiles()
                             }
@@ -277,30 +304,30 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
-                        title: "Lungimi"
+                        title: qsTrId("PreferencesPage.lungimi")
                         SettingsRow {
                             stacked: true
-                            title: "Unitatea"
-                            description: "Auto: milimetri sub 1 m, metri peste. Valorile tastate fără unitate se citesc în unitatea aleasă."
+                            title: qsTrId("PreferencesPage.unitatea")
+                            description: qsTrId("PreferencesPage.auto_milimetri_sub_1_m_metri_peste_valorile_")
                             Tabs {
                                 width: parent.width
-                                model: ["Auto", "mm", "cm", "m", "inci", "picioare"]
+                                model: [qsTrId("PreferencesPage.auto"), "mm", "cm", "m", "inci", "picioare"]
                                 currentIndex: root.document ? root.document.displayUnit : 0
                                 onCurrentIndexChanged: if (root.document) root.document.displayUnit = currentIndex
                             }
                         }
                         SettingsRow {
-                            title: "Precizie"
-                            description: "Câte zecimale se afișează."
+                            title: qsTrId("PreferencesPage.precizie")
+                            description: qsTrId("PreferencesPage.cate_zecimale_se_afiseaza")
                             Tabs {
                                 width: 300
-                                model: ["Implicit", "0", "0.0", "0.00", "0.000"]
+                                model: [qsTrId("PreferencesPage.implicit"), "0", "0.0", "0.00", "0.000"]
                                 currentIndex: root.document ? root.document.displayDecimals + 1 : 0
                                 onCurrentIndexChanged: if (root.document) root.document.displayDecimals = currentIndex - 1
                             }
                         }
                         SettingsRow {
-                            title: "Exemplu"
+                            title: qsTrId("PreferencesPage.exemplu")
                             Text {
                                 text: root.document
                                       ? (root.document.displayUnit, root.document.displayDecimals,
@@ -321,10 +348,10 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
-                        title: "Autosalvare"
+                        title: qsTrId("PreferencesPage.autosalvare")
                         SettingsRow {
-                            title: "Salvează automat o copie de recuperare"
-                            description: "Doar când documentul are modificări nesalvate. Se oferă la repornire dacă aplicația s-a închis neașteptat; fișierul tău nu e suprascris."
+                            title: qsTrId("PreferencesPage.salveaza_automat_o_copie_de_recuperare")
+                            description: qsTrId("PreferencesPage.doar_cand_documentul_are_modificari_nesalvat")
                             Toggle {
                                 checked: root.document ? root.document.autosaveEnabled : false
                                 onToggled: root.document.autosaveEnabled = checked
@@ -333,14 +360,14 @@ Item {
                         SettingsRow {
                             visible: root.document ? root.document.autosaveEnabled : false
                             height: visible ? implicitHeight : 0
-                            title: "Intervalul"
+                            title: qsTrId("PreferencesPage.intervalul")
                             Slider {
                                 width: 260
                                 from: 1
                                 to: 30
                                 stepSize: 1
                                 value: root.document ? root.document.autosaveMinutes : 1
-                                valueText: Math.round(value) + (Math.round(value) === 1 ? " minut" : " minute")
+                                valueText: Math.round(value) + (Math.round(value) === 1 ? qsTrId("PreferencesPage.minut") : qsTrId("PreferencesPage.minute"))
                                 onMoved: root.document.autosaveMinutes = Math.round(value)
                             }
                         }
@@ -354,19 +381,19 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
-                        title: "Interfață"
+                        title: qsTrId("PreferencesPage.interfata")
                         SettingsRow {
-                            title: "Tema"
-                            description: "Sistem urmează setarea calculatorului."
+                            title: qsTrId("PreferencesPage.tema")
+                            description: qsTrId("PreferencesPage.sistem_urmeaza_setarea_calculatorului")
                             Tabs {
                                 width: 260
-                                model: ["Sistem", "Light", "Dark"]
+                                model: [qsTrId("PreferencesPage.sistem"), qsTrId("PreferencesPage.light"), qsTrId("PreferencesPage.dark")]
                                 currentIndex: Theme.mode
                                 onCurrentIndexChanged: Theme.mode = currentIndex
                             }
                         }
                         SettingsRow {
-                            title: "Culoarea de accent"
+                            title: qsTrId("PreferencesPage.culoarea_de_accent")
                             Row {
                                 spacing: Theme.space2
                                 Repeater {
@@ -391,18 +418,18 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Culori personalizate (tema " + (Theme.dark ? "dark" : "light") + ")"
+                        title: qsTrId("PreferencesPage.culori_personalizate_tema") + (Theme.dark ? "dark" : "light") + ")"
                         Repeater {
                             model: [
-                                { key: "accent", name: "Accent" },
-                                { key: "bgApp", name: "Fundalul aplicației" },
-                                { key: "bgPanel", name: "Panouri" },
-                                { key: "bgElevated", name: "Ferestre plutitoare" },
-                                { key: "viewportTop", name: "Viewport — sus" },
-                                { key: "viewportBottom", name: "Viewport — jos" },
-                                { key: "faceFront", name: "Fețele (față)" },
-                                { key: "faceBack", name: "Fețele (verso)" },
-                                { key: "edge", name: "Muchiile" }
+                                { key: "accent", name: qsTrId("PreferencesPage.accent") },
+                                { key: "bgApp", name: qsTrId("PreferencesPage.fundalul_aplicatiei") },
+                                { key: "bgPanel", name: qsTrId("PreferencesPage.panouri") },
+                                { key: "bgElevated", name: qsTrId("PreferencesPage.ferestre_plutitoare") },
+                                { key: "viewportTop", name: qsTrId("PreferencesPage.viewport_sus") },
+                                { key: "viewportBottom", name: qsTrId("PreferencesPage.viewport_jos") },
+                                { key: "faceFront", name: qsTrId("PreferencesPage.fetele_fata") },
+                                { key: "faceBack", name: qsTrId("PreferencesPage.fetele_verso") },
+                                { key: "edge", name: qsTrId("PreferencesPage.muchiile") }
                             ]
                             delegate: SettingsRow {
                                 id: colorRow
@@ -418,7 +445,7 @@ Item {
                                         enabled: colorRow.custom
                                         width: 24; height: 24; iconSize: Theme.iconSizeSm
                                         iconName: "rotate-ccw"
-                                        tooltip: "Revino la culoarea implicită"
+                                        tooltip: qsTrId("PreferencesPage.revino_la_culoarea_implicita")
                                         onClicked: Theme.setOverride(colorRow.modelData.key, "")
                                     }
                                     Rectangle {
@@ -443,7 +470,7 @@ Item {
                     }
                     Button {
                         anchors.right: parent.right
-                        text: "Resetează tema " + (Theme.dark ? "dark" : "light")
+                        text: qsTrId("PreferencesPage.reseteaza_tema") + (Theme.dark ? "dark" : "light")
                         iconName: "rotate-ccw"
                         onClicked: Theme.resetOverrides()
                     }
@@ -458,18 +485,18 @@ Item {
                     SettingsGroup {
                         id: qualitySection
                         width: parent.width
-                        title: "Calitate"
+                        title: qsTrId("PreferencesPage.calitate")
                         readonly property var presets: [
-                            { name: "Performanță", msaa: 2, shadows: 1024, ao: false, aa: false },
-                            { name: "Echilibrat", msaa: 4, shadows: 2048, ao: true, aa: true },
-                            { name: "Calitate", msaa: 8, shadows: 4096, ao: true, aa: true } ]
+                            { name: qsTrId("PreferencesPage.performanta"), msaa: 2, shadows: 1024, ao: false, aa: false },
+                            { name: qsTrId("PreferencesPage.echilibrat"), msaa: 4, shadows: 2048, ao: true, aa: true },
+                            { name: qsTrId("PreferencesPage.calitate"), msaa: 8, shadows: 4096, ao: true, aa: true } ]
                         readonly property int current: root.settings ? presets.findIndex(p => p.msaa === root.settings.msaa
                             && p.shadows === root.settings.shadowQuality && p.ao === root.settings.ambientOcclusion
                             && p.aa === root.settings.progressiveAA) : -1
                         SettingsRow {
-                            title: "Preset"
-                            description: qualitySection.current < 0 ? "Personalizat (setările de mai jos)."
-                                : "Performanță: modele mari sau calculatoare mai slabe. Calitate: cele mai fine margini și umbre."
+                            title: qsTrId("PreferencesPage.preset")
+                            description: qualitySection.current < 0 ? qsTrId("PreferencesPage.personalizat_setarile_de_mai_jos")
+                                : qsTrId("PreferencesPage.performanta_modele_mari_sau_calculatoare_mai")
                             Tabs {
                                 width: 330
                                 model: qualitySection.presets.map(p => p.name)
@@ -488,36 +515,36 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Randare"
+                        title: qsTrId("PreferencesPage.randare")
                         SettingsRow {
-                            title: "Anti-aliasing (MSAA)"
+                            title: qsTrId("PreferencesPage.anti_aliasing_msaa")
                             Tabs {
                                 width: 260
-                                model: ["Fără", "2×", "4×", "8×"]
+                                model: [qsTrId("PreferencesPage.fara"), "2×", "4×", "8×"]
                                 currentIndex: root.settings ? [1, 2, 4, 8].indexOf(root.settings.msaa) : 2
                                 onCurrentIndexChanged: if (root.settings && currentIndex >= 0) root.settings.msaa = [1, 2, 4, 8][currentIndex]
                             }
                         }
                         SettingsRow {
-                            title: "Margini mai fine cu camera oprită"
-                            description: "Trece la 8× cât camera stă pe loc."
+                            title: qsTrId("PreferencesPage.margini_mai_fine_cu_camera_oprita")
+                            description: qsTrId("PreferencesPage.trece_la_8_cat_camera_sta_pe_loc")
                             Toggle {
                                 checked: root.settings ? root.settings.progressiveAA : true
                                 onToggled: root.settings.progressiveAA = checked
                             }
                         }
                         SettingsRow {
-                            title: "Calitatea umbrelor"
+                            title: qsTrId("PreferencesPage.calitatea_umbrelor")
                             Tabs {
                                 width: 260
-                                model: ["Scăzută", "Medie", "Înaltă"]
+                                model: [qsTrId("PreferencesPage.scazuta"), qsTrId("PreferencesPage.medie"), qsTrId("PreferencesPage.inalta")]
                                 currentIndex: root.settings ? Math.max(0, [1024, 2048, 4096].indexOf(root.settings.shadowQuality)) : 1
                                 onCurrentIndexChanged: if (root.settings) root.settings.shadowQuality = [1024, 2048, 4096][currentIndex]
                             }
                         }
                         SettingsRow {
-                            title: "Umbrire ambientală (SSAO)"
-                            description: "Colțurile și contactele dintre obiecte mai întunecate."
+                            title: qsTrId("PreferencesPage.umbrire_ambientala_ssao")
+                            description: qsTrId("PreferencesPage.colturile_si_contactele_dintre_obiecte_mai_i")
                             Toggle {
                                 checked: root.settings ? root.settings.ambientOcclusion : true
                                 onToggled: root.settings.ambientOcclusion = checked
@@ -526,38 +553,38 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Lumină"
+                        title: qsTrId("PreferencesPage.lumina")
                         SettingsRow {
                             stacked: true
-                            title: "Mediul de iluminare"
-                            description: "Culoarea luminii ambientale și reflexiile pe suprafețele netede (sticlă, metal, lac)."
+                            title: qsTrId("PreferencesPage.mediul_de_iluminare")
+                            description: qsTrId("PreferencesPage.culoarea_luminii_ambientale_si_reflexiile_pe")
                             Tabs {
                                 width: parent.width
                                 readonly property var keys: ["simplu", "studio", "exterior", "innorat"]
-                                model: ["Simplu", "Studio", "Exterior", "Înnorat"]
+                                model: [qsTrId("PreferencesPage.simplu"), qsTrId("PreferencesPage.studio"), qsTrId("PreferencesPage.exterior"), qsTrId("PreferencesPage.innorat")]
                                 currentIndex: root.settings ? Math.max(0, keys.indexOf(root.settings.environment)) : 0
                                 onCurrentIndexChanged: if (root.settings) root.settings.environment = keys[currentIndex]
                             }
                         }
                         SettingsRow {
-                            title: "Latitudinea"
-                            description: "Pentru poziția soarelui și umbre."
+                            title: qsTrId("PreferencesPage.latitudinea")
+                            description: qsTrId("PreferencesPage.pentru_pozitia_soarelui_si_umbre")
                             Slider {
                                 width: 260
                                 from: -66
                                 to: 66
                                 stepSize: 0.5
                                 value: root.viewport ? root.viewport.latitude : 45
-                                valueText: Math.abs(value).toFixed(1) + "° " + (value >= 0 ? "N" : "S")
+                                valueText: Math.abs(value).toFixed(1) + "° " + (value >= 0 ? qsTrId("PreferencesPage.n") : qsTrId("PreferencesPage.s"))
                                 onMoved: if (root.viewport) root.viewport.latitude = value
                             }
                         }
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Informații"
+                        title: qsTrId("PreferencesPage.informatii")
                         SettingsRow {
-                            title: "Arată fps în bara de jos"
+                            title: qsTrId("PreferencesPage.arata_fps_in_bara_de_jos")
                             Toggle {
                                 checked: UserPrefs.showFps
                                 onToggled: UserPrefs.showFps = checked
@@ -573,21 +600,21 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
-                        title: "Cameră"
+                        title: qsTrId("PreferencesPage.camera")
                         SettingsRow {
                             stacked: true
-                            title: "Centrul orbitei"
-                            description: "În jurul cărui punct se rotește camera la orbit."
+                            title: qsTrId("PreferencesPage.centrul_orbitei")
+                            description: qsTrId("PreferencesPage.in_jurul_carui_punct_se_roteste_camera_la_or")
                             Tabs {
                                 width: parent.width
-                                model: ["Centrul vederii", "Selecția", "Punctul de sub cursor"]
+                                model: [qsTrId("PreferencesPage.centrul_vederii"), qsTrId("PreferencesPage.selectia"), qsTrId("PreferencesPage.punctul_de_sub_cursor")]
                                 currentIndex: root.viewport ? root.viewport.orbitPivot : 0
                                 onCurrentIndexChanged: if (root.viewport) root.viewport.orbitPivot = currentIndex
                             }
                         }
                         SettingsRow {
-                            title: "Zoom spre suprafața de sub cursor"
-                            description: "Zoom-ul încetinește lângă detalii și nu trece prin ele."
+                            title: qsTrId("PreferencesPage.zoom_spre_suprafata_de_sub_cursor")
+                            description: qsTrId("PreferencesPage.zoom_ul_incetineste_langa_detalii_si_nu_trec")
                             Toggle {
                                 checked: root.viewport ? root.viewport.zoomToSurface : true
                                 onToggled: if (root.viewport) root.viewport.zoomToSurface = checked
@@ -596,10 +623,10 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Planuri de tăiere"
+                        title: qsTrId("PreferencesPage.planuri_de_taiere")
                         SettingsRow {
-                            title: "Clip start"
-                            description: "0 = automat (după distanța camerei și mărimea modelului)."
+                            title: qsTrId("PreferencesPage.clip_start")
+                            description: qsTrId("PreferencesPage.0_automat_dupa_distanta_camerei_si_marimea_m")
                             NumberField {
                                 width: 180
                                 unit: "mm"
@@ -612,8 +639,8 @@ Item {
                             }
                         }
                         SettingsRow {
-                            title: "Clip end"
-                            description: "0 = automat."
+                            title: qsTrId("PreferencesPage.clip_end")
+                            description: qsTrId("PreferencesPage.0_automat")
                             NumberField {
                                 width: 180
                                 unit: "m"
@@ -634,9 +661,9 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
-                        title: "Grid"
+                        title: qsTrId("PreferencesPage.grid")
                         SettingsRow {
-                            title: "Arată grid-ul"
+                            title: qsTrId("PreferencesPage.arata_grid_ul")
                             Toggle {
                                 checked: root.viewport ? root.viewport.gridVisible : false
                                 onToggled: root.viewport.gridVisible = checked
@@ -645,10 +672,10 @@ Item {
                     }
                     SettingsGroup {
                         width: parent.width
-                        title: "Snap la grid (" + AppInfo.shortcutText("Alt+G") + ")"
+                        title: qsTrId("PreferencesPage.snap_la_grid") + AppInfo.shortcutText("Alt+G") + ")"
                         SettingsRow {
-                            title: "Punctele libere cad pe grid"
-                            description: "Doar punctele fără altă inferență (capăt, mijloc, muchie) și distanțele pe direcții."
+                            title: qsTrId("PreferencesPage.punctele_libere_cad_pe_grid")
+                            description: qsTrId("PreferencesPage.doar_punctele_fara_alta_inferenta_capat_mijl")
                             Toggle {
                                 checked: root.document ? root.document.snapToGrid : false
                                 onToggled: if (root.document) root.document.snapToGrid = checked
@@ -656,14 +683,69 @@ Item {
                         }
                         SettingsRow {
                             stacked: true
-                            title: "Pasul"
-                            description: "Auto urmează grid-ul afișat (se schimbă cu zoom-ul)."
+                            title: qsTrId("PreferencesPage.pasul")
+                            description: qsTrId("PreferencesPage.auto_urmeaza_grid_ul_afisat_se_schimba_cu_zo")
                             Tabs {
                                 width: parent.width
                                 readonly property var steps: [0, 1, 5, 10, 50, 100, 500, 1000]
-                                model: ["Auto", "1 mm", "5 mm", "1 cm", "5 cm", "10 cm", "50 cm", "1 m"]
+                                model: [qsTrId("PreferencesPage.auto"), qsTrId("PreferencesPage.1_mm"), qsTrId("PreferencesPage.5_mm"), qsTrId("PreferencesPage.1_cm"), qsTrId("PreferencesPage.5_cm"), qsTrId("PreferencesPage.10_cm"), qsTrId("PreferencesPage.50_cm"), qsTrId("PreferencesPage.1_m")]
                                 currentIndex: root.document ? Math.max(0, steps.indexOf(root.document.gridStep)) : 0
                                 onCurrentIndexChanged: if (root.document) root.document.gridStep = steps[currentIndex]
+                            }
+                        }
+                    }
+                }
+
+                // Mobilier: cantul.
+                Column {
+                    visible: root.category === 8
+                    width: parent.width
+                    spacing: Theme.space6
+                    SettingsGroup {
+                        width: parent.width
+                        title: qsTrId("PreferencesPage.cant")
+                        SettingsRow {
+                            title: qsTrId("PreferencesPage.liniile_de_cant_in_viewport")
+                            description: qsTrId("PreferencesPage.laturile_placilor_cu_cant_au_o_linie_in_culo")
+                            Toggle {
+                                checked: UserPrefs.showBands
+                                onToggled: UserPrefs.showBands = checked
+                            }
+                        }
+                        SettingsRow {
+                            title: qsTrId("PreferencesPage.adaosul_pe_muchie")
+                            description: qsTrId("PreferencesPage.cat_cant_in_plus_se_numara_la_fiecare_muchie")
+                            NumberField {
+                                width: 180
+                                unit: "mm"
+                                from: 0
+                                to: 500
+                                value: UserPrefs.bandAllowance
+                                onValueModified: (v) => UserPrefs.bandAllowance = v
+                            }
+                        }
+                        Repeater {
+                            model: root.document ? root.document.allBandTypes() : []
+                            delegate: SettingsRow {
+                                required property var modelData
+                                readonly property var byType: {
+                                    try { return JSON.parse(UserPrefs.bandAllowanceByType) } catch (e) { return ({}) }
+                                }
+                                title: qsTrId("PreferencesPage.adaosul_pentru") + modelData.label
+                                description: qsTrId("PreferencesPage.gol_sau_egal_cu_cel_general_cel_general")
+                                NumberField {
+                                    width: 180
+                                    unit: "mm"
+                                    from: 0
+                                    to: 500
+                                    value: parent.byType[modelData.key] ?? UserPrefs.bandAllowance
+                                    onValueModified: (v) => {
+                                        const map = parent.byType
+                                        if (Math.abs(v - UserPrefs.bandAllowance) < 0.001) delete map[modelData.key]
+                                        else map[modelData.key] = v
+                                        UserPrefs.bandAllowanceByType = JSON.stringify(map)
+                                    }
+                                }
                             }
                         }
                     }
@@ -682,20 +764,20 @@ Item {
                             id: shortcutSearch
                             width: parent.width - resetAll.width - Theme.space2
                             iconName: "search"
-                            placeholderText: "Caută o comandă sau o scurtătură"
+                            placeholderText: qsTrId("PreferencesPage.cauta_o_comanda_sau_o_scurtatura")
                         }
                         Button {
                             id: resetAll
-                            text: "Resetează toate"
+                            text: qsTrId("PreferencesPage.reseteaza_toate")
                             iconName: "rotate-ccw"
-                            onClicked: { root.shortcutsReset(); root.shortcutNotice = "Toate scurtăturile au revenit la cele implicite." }
+                            onClicked: { root.shortcutsReset(); root.shortcutNotice = qsTrId("PreferencesPage.toate_scurtaturile_au_revenit_la_cele_implic") }
                         }
                     }
                     Text {
                         width: parent.width
                         wrapMode: Text.Wrap
                         text: root.shortcutNotice.length > 0 ? root.shortcutNotice
-                            : "Click pe scurtătură și apasă noua combinație. Esc anulează, Backspace o șterge. O combinație folosită deja trece la comanda nouă."
+                            : qsTrId("PreferencesPage.click_pe_scurtatura_si_apasa_noua_combinatie")
                         color: root.shortcutNotice.length > 0 ? Theme.accent : Theme.textTertiary
                         font.pixelSize: Theme.fontSizeXs
                     }
@@ -744,7 +826,7 @@ Item {
                                             iconName: "rotate-ccw"
                                             opacity: shortcutRow.changed ? 1 : 0
                                             enabled: shortcutRow.changed
-                                            tooltip: "Înapoi la " + (shortcutRow.modelData.defaultShortcut ? AppInfo.shortcutText(shortcutRow.modelData.defaultShortcut) : "fără scurtătură")
+                                            tooltip: qsTrId("PreferencesPage.inapoi_la") + (shortcutRow.modelData.defaultShortcut ? AppInfo.shortcutText(shortcutRow.modelData.defaultShortcut) : qsTrId("PreferencesPage.fara_scurtatura"))
                                             onClicked: root.shortcutChanged(shortcutRow.modelData.id, null)
                                         }
                                     }
@@ -760,7 +842,7 @@ Item {
     ColorDialog {
         id: colorDialog
         property string key: ""
-        title: "Alege culoarea"
+        title: qsTrId("PreferencesPage.alege_culoarea")
         onAccepted: Theme.setOverride(key, selectedColor.toString())
     }
 }

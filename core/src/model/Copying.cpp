@@ -75,7 +75,8 @@ bool usedOutside(const Model& model, DefinitionId definition, const std::set<Ins
 // O copie a definiției: geometria și instanțele din ea (cu id-uri noi, aceleași definiții); perechile vechi → noi.
 DefinitionId cloneShallow(Model& model, DefinitionId source, std::map<InstanceId, InstanceId>& instances)
 {
-    const Definition copy = model.definition(source);
+    Definition copy = model.definition(source);
+    copy.sourceKey.clear(); // o copie unică nu mai e legată de componenta salvată (ADR 0044)
     const std::vector<InstanceId> children = model.childrenOf(source);
     const DefinitionId id = model.addDefinition(copy);
     geom::copyEntities(model.mesh(source), everything(model.mesh(source)), model.mesh(id), {});
@@ -226,7 +227,9 @@ CopyResult copyDeep(Model& target, DefinitionId context, const Model& source, co
     // Definițiile noi (cu geometria), apoi instanțele din ele, apoi copiile de sus.
     std::map<DefinitionId, DefinitionId> newDefinition;
     for (const DefinitionData& d : definitions) {
-        const DefinitionId id = target.addDefinition(d.value);
+        Definition value = d.value;
+        value.sourceKey.clear(); // copiile sunt unice: nu se mai leagă de componenta salvată (ADR 0044)
+        const DefinitionId id = target.addDefinition(value);
         geom::copyEntities(source.mesh(d.id), everything(source.mesh(d.id)), target.mesh(id), {});
         newDefinition[d.id] = id;
     }
@@ -242,6 +245,8 @@ CopyResult copyDeep(Model& target, DefinitionId context, const Model& source, co
         inst.parent = context;
         inst.definition = newDefinition.at(inst.definition);
         inst.transform = delta * inst.transform;
+        inst.roleKey.clear(); // o piesă copiată singură nu mai are rol în corpul ei (ADR 0043)
+        inst.relativePosition.reset();
         const InstanceId copy = target.addInstance(inst);
         result.instances[id] = copy;
         result.roots.push_back(copy);
@@ -417,6 +422,8 @@ InstanceId copyLinked(Model& model, InstanceId id, const math::Transform& delta)
 {
     Instance copy = model.instance(id);
     copy.transform = delta * copy.transform;
+    copy.roleKey.clear(); // o piesă copiată singură nu mai are rol în corpul ei (ADR 0043)
+    copy.relativePosition.reset();
     Definition d = model.definition(copy.definition);
     if (d.group && !d.collection) {
         d.group = false;

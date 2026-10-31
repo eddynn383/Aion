@@ -64,20 +64,20 @@ Popover {
     contentItem: Column {
         spacing: Theme.space3
         Text {
-            text: "Array"
+            text: qsTrId("ArrayPanel.array")
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
         }
         Tabs {
             width: parent.width
-            model: ["În linie", "În cerc"]
+            model: [qsTrId("ArrayPanel.in_linie"), qsTrId("ArrayPanel.in_cerc")]
             currentIndex: root.mode
             onCurrentIndexChanged: root.mode = currentIndex
         }
         NumberField {
             width: parent.width
-            label: "Copii"
+            label: qsTrId("ArrayPanel.copii")
             from: 1
             to: 500
             value: root.count
@@ -91,13 +91,13 @@ Popover {
             spacing: Theme.space2
             Tabs {
                 width: parent.width
-                model: ["X (roșu)", "Y (verde)", "Z (albastru)"]
+                model: [qsTrId("ArrayPanel.x_rosu"), qsTrId("ArrayPanel.y_verde"), qsTrId("ArrayPanel.z_albastru")]
                 currentIndex: root.axis
                 onCurrentIndexChanged: root.axis = currentIndex
             }
             NumberField {
                 width: parent.width
-                label: "Pas"
+                label: qsTrId("ArrayPanel.pas")
                 unit: "mm"
                 step: 50
                 value: root.stepLength
@@ -106,7 +106,7 @@ Popover {
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Lungimea totală: " + Math.round(root.stepLength * root.count) + " mm. Pas negativ = în sens invers."
+                text: qsTrId("ArrayPanel.lungimea_totala") + Math.round(root.stepLength * root.count) + qsTrId("ArrayPanel.mm_pas_negativ_in_sens_invers")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -119,13 +119,13 @@ Popover {
             spacing: Theme.space2
             Tabs {
                 width: parent.width
-                model: ["Axa X", "Axa Y", "Axa Z"]
+                model: [qsTrId("ArrayPanel.axa_x"), qsTrId("ArrayPanel.axa_y"), qsTrId("ArrayPanel.axa_z")]
                 currentIndex: root.polarAxis
                 onCurrentIndexChanged: root.polarAxis = currentIndex
             }
             NumberField {
                 width: parent.width
-                label: "Rază"
+                label: qsTrId("ArrayPanel.raza")
                 unit: "mm"
                 step: 50
                 from: 0
@@ -134,14 +134,14 @@ Popover {
             }
             Toggle {
                 width: parent.width
-                text: "Distribuie pe tot cercul"
+                text: qsTrId("ArrayPanel.distribuie_pe_tot_cercul")
                 checked: root.fullCircle
                 onToggled: root.fullCircle = checked
             }
             NumberField {
                 visible: !root.fullCircle
                 width: parent.width
-                label: "Unghi între copii"
+                label: qsTrId("ArrayPanel.unghi_intre_copii")
                 unit: "°"
                 decimals: 1
                 from: -360
@@ -151,7 +151,7 @@ Popover {
             }
             Toggle {
                 width: parent.width
-                text: "Rotește copiile"
+                text: qsTrId("ArrayPanel.roteste_copiile")
                 checked: root.rotateCopies
                 onToggled: root.rotateCopies = checked
             }
@@ -161,12 +161,12 @@ Popover {
             anchors.right: parent.right
             spacing: Theme.space2
             Button {
-                text: "Anulează"
+                text: qsTrId("ArrayPanel.anuleaza")
                 onClicked: { root.document.cancelOperation(); root.close() }
             }
             Button {
                 variant: "primary"
-                text: "Gata"
+                text: qsTrId("ArrayPanel.gata")
                 onClicked: { root.document.commitOperation(); root.close() }
             }
         }

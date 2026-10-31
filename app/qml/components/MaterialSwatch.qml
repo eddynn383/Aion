@@ -7,7 +7,7 @@ Rectangle {
     id: root
 
     property var document
-    property var material: ({ id: 0, name: "Implicit" })
+    property var material: ({ id: 0, name: qsTrId("MaterialSwatch.implicit") })
     property string label: ""
 
     signal picked(var material)
@@ -53,7 +53,7 @@ Rectangle {
         }
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.material.name ?? "Implicit"
+            text: root.material.name ?? qsTrId("MaterialSwatch.implicit")
             elide: Text.ElideRight
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeSm
@@ -117,7 +117,7 @@ Rectangle {
         contentItem: Column {
             spacing: Theme.space2
             Text {
-                text: "În model"
+                text: qsTrId("MaterialSwatch.in_model")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -126,7 +126,7 @@ Rectangle {
                 spacing: Theme.space1 + 2
                 Swatch {
                     none: true
-                    name: "Fără material"
+                    name: qsTrId("MaterialSwatch.fara_material")
                     onChosen: { root.picked({}); picker.close() }
                 }
                 Repeater {
@@ -140,7 +140,7 @@ Rectangle {
                 }
             }
             Text {
-                text: "Bibliotecă"
+                text: qsTrId("MaterialSwatch.biblioteca")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }

@@ -67,14 +67,14 @@ Platform.MenuBar {
     }
 
     Platform.Menu {
-        title: "Aion"
+        title: qsTrId("AppMenuBar.aion")
         Platform.MenuItem {
-            text: "Despre Aion"
+            text: qsTrId("AppMenuBar.despre_aion")
             role: Platform.MenuItem.AboutRole
             onTriggered: root.aboutRequested()
         }
         Platform.MenuItem {
-            text: "Preferințe…"
+            text: qsTrId("AppMenuBar.preferinte")
             shortcut: StandardKey.Preferences
             role: Platform.MenuItem.PreferencesRole
             onTriggered: root.preferencesRequested()
@@ -84,14 +84,14 @@ Platform.MenuBar {
     CommandMenu {
         bar: root
         id: fileMenu
-        title: "Fișier"
+        title: qsTrId("AppMenuBar.fisier")
         commandIds: ["file.new", "file.open", "-", "file.save", "file.saveAs", "-", "file.import",
                      "file.exportObj", "file.exportGlb", "file.exportGltf", "file.exportPng", "file.exportVideo", "-", "file.quantities", "-"]
 
         // Rămâne la sfârșitul meniului: comenzile se inserează înaintea lui.
         Platform.Menu {
             id: recentMenu
-            title: "Deschise recent"
+            title: qsTrId("AppMenuBar.deschise_recent")
             enabled: root.document !== null && root.document.recentFiles.length > 0
             Instantiator {
                 model: root.document ? root.document.recentFiles : []
@@ -108,14 +108,14 @@ Platform.MenuBar {
     }
     CommandMenu {
         bar: root
-        title: "Editare"
+        title: qsTrId("AppMenuBar.editare")
         commandIds: ["edit.undo", "edit.redo", "-", "edit.delete", "edit.copy", "edit.paste", "edit.selectAll", "edit.selectNone",
                      "edit.selectConnected", "-", "edit.reverseFaces", "edit.intersectModel", "edit.intersectSelection",
                      "guides.clear"]
     }
     CommandMenu {
         bar: root
-        title: "Vedere"
+        title: qsTrId("AppMenuBar.vedere")
         commandIds: ["view.iso", "view.top", "view.front", "view.right", "view.back", "view.left", "view.bottom", "-",
                      "view.extents", "view.zoomSelection", "view.projection", "view.grid", "view.snapGrid", "-",
                      "nav.pivotView", "nav.pivotSelection", "nav.pivotCursor", "-",
@@ -123,47 +123,47 @@ Platform.MenuBar {
     }
     CommandMenu {
         bar: root
-        title: "Stil"
+        title: qsTrId("AppMenuBar.stil")
         commandIds: ["style.shaded", "style.clay", "style.hiddenline", "style.wireframe", "style.xray", "-",
                      "style.shadows", "style.profiles", "style.fog"]
     }
     CommandMenu {
         bar: root
-        title: "Animare"
+        title: qsTrId("AppMenuBar.animare")
         commandIds: ["anim.play", "anim.prevFrame", "anim.nextFrame", "anim.prevKey", "anim.nextKey", "anim.start", "anim.end", "-",
                      "anim.key", "anim.copyKeys", "anim.pasteKeys", "anim.deleteKeys", "-", "anim.autoKey", "anim.fit",
                      "file.exportVideo"]
     }
     CommandMenu {
         bar: root
-        title: "Organizare"
+        title: qsTrId("AppMenuBar.organizare")
         commandIds: ["org.makeGroup", "org.group", "org.duplicateLinked", "org.explode", "org.makeUnique", "-",
                      "org.enter", "org.exit", "-", "org.hide", "org.unhideAll", "org.lock", "org.unlock", "-",
                      "solid.union", "solid.subtract", "solid.intersect"]
     }
     CommandMenu {
         bar: root
-        title: "Unelte"
+        title: qsTrId("AppMenuBar.unelte")
         // Lista uneltelor nu se schimbă: o calculăm o dată (altfel meniul s-ar reconstrui la fiecare schimbare
         // a comenzilor, de exemplu a titlului „Undo …”).
         commandIds: root.toolCommandIds
     }
     Platform.Menu {
-        title: "Ajutor"
+        title: qsTrId("AppMenuBar.ajutor")
         Platform.MenuItem {
-            text: "Ecranul de start"
+            text: qsTrId("AppMenuBar.ecranul_de_start")
             onTriggered: root.host.runCommand("app.start")
         }
         Platform.MenuItem {
-            text: "Turul uneltelor"
+            text: qsTrId("AppMenuBar.turul_uneltelor")
             onTriggered: root.host.runCommand("app.tour")
         }
         Platform.MenuItem {
-            text: "Caută comenzi…"
+            text: qsTrId("AppMenuBar.cauta_comenzi")
             onTriggered: root.host.openPalette()
         }
         Platform.MenuItem {
-            text: "Despre Aion"
+            text: qsTrId("AppMenuBar.despre_aion")
             onTriggered: root.aboutRequested()
         }
     }

@@ -125,6 +125,8 @@ TEST_CASE("Lista de debitare: dimensiunile pieselor, piese identice, necesar de 
     CHECK(list.sheets[0].sheets == 1);
 
     const std::string csv = model::toCsv(list, options);
-    CHECK(csv.find("Lateral;Implicit;720,0;560,0;18,0;2") != std::string::npos);
-    CHECK(csv.find("Picior (masiv)") != std::string::npos);
+    // Formatul v1.5 (ADR 0044): secțiune; nume; tip; grosime; lungime; lățime; buc.; decor; …
+    CHECK(csv.find("Dimensiuni: finite") != std::string::npos);
+    CHECK(csv.find("Plăci;Lateral;;18,0;720,0;560,0;2;Implicit") != std::string::npos);
+    CHECK(csv.find("Picior;;120,0;700,0;120,0;1;Implicit") != std::string::npos);
 }

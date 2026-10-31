@@ -22,20 +22,20 @@ Popover {
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Aion"
+            text: qsTrId("AboutDialog.aion")
             color: Theme.textPrimary
             font.pixelSize: 22
             font.weight: Font.DemiBold
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Aion — modelează ce rămâne."
+            text: qsTrId("AboutDialog.aion_modeleaza_ce_ramane")
             color: Theme.textSecondary
             font.pixelSize: Theme.fontSizeMd
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Versiunea " + AppInfo.version + " · " + AppInfo.graphicsApi + (AppInfo.debugBuild ? " · debug" : "")
+            text: qsTrId("AboutDialog.versiunea") + AppInfo.version + " · " + AppInfo.graphicsApi + (AppInfo.debugBuild ? qsTrId("AboutDialog.debug") : "")
             color: Theme.textTertiary
             font.family: Theme.fontMono
             font.pixelSize: Theme.fontSizeXs
@@ -45,15 +45,14 @@ Popover {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
-            text: "Construit cu Qt, glm, earcut, Manifold, tinygltf, miniz, nlohmann/json.\n"
-                  + "Fonturi: Inter și Geist Mono (OFL). Iconițe: Lucide (ISC)."
+            text: qsTrId("AboutDialog.construit_cu_qt_glm_earcut_manifold_tinygltf_min")
             color: Theme.textSecondary
             font.pixelSize: Theme.fontSizeXs
             lineHeight: 1.3
         }
         Button {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Închide"
+            text: qsTrId("AboutDialog.inchide")
             onClicked: root.close()
         }
     }

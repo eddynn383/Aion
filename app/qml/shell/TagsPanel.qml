@@ -83,26 +83,26 @@ Item {
                     RowAction {
                         shown: tagHover.hovered
                         iconName: "trash-2"
-                        tooltip: "Șterge tag-ul"
+                        tooltip: qsTrId("TagsPanel.sterge_tag_ul")
                         onClicked: root.document.removeTag(tagRow.modelData.id)
                     }
                     RowAction {
                         shown: tagHover.hovered
                         iconName: "tag"
-                        tooltip: "Atribuie selecției"
+                        tooltip: qsTrId("TagsPanel.atribuie_selectiei")
                         onClicked: root.document.assignTag(tagRow.modelData.id)
                     }
                     RowAction {
                         shown: tagHover.hovered
                         iconName: "mouse-pointer-2"
-                        tooltip: "Selectează ce are tag-ul"
+                        tooltip: qsTrId("TagsPanel.selecteaza_ce_are_tag_ul")
                         onClicked: root.document.selectByTag(tagRow.modelData.id)
                     }
                     RowAction {
                         shown: tagHover.hovered
                         active: !tagRow.modelData.visible
                         iconName: tagRow.modelData.visible ? "eye" : "eye-off"
-                        tooltip: tagRow.modelData.visible ? "Ascunde tot ce are tag-ul" : "Arată"
+                        tooltip: tagRow.modelData.visible ? qsTrId("TagsPanel.ascunde_tot_ce_are_tag_ul") : qsTrId("TagsPanel.arata")
                         onClicked: root.document.setTagVisible(tagRow.modelData.id, !tagRow.modelData.visible)
                     }
                 }
@@ -112,7 +112,7 @@ Item {
             visible: root.document && root.document.tags.length === 0
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Opționale: pune același tag pe elemente din grupuri diferite (de exemplu toți pereții) ca să le ascunzi sau selectezi împreună."
+            text: qsTrId("TagsPanel.optionale_pune_acelasi_tag_pe_elemente_din_grupuri")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }

@@ -11,10 +11,10 @@ Popover {
     property bool failed: false
 
     function runScript() {
-        const r = root.engine.run(editor.text, "Script")
+        const r = root.engine.run(editor.text, qsTrId("ScriptConsole.script"))
         root.failed = !r.ok
-        root.output = r.ok ? (r.output.length > 0 ? r.output : "Gata (un pas de undo: ⌘Z îl anulează).")
-                           : "Eroare" + (r.line > 0 ? " pe linia " + r.line : "") + ": " + r.error
+        root.output = r.ok ? (r.output.length > 0 ? r.output : qsTrId("ScriptConsole.gata_un_pas_de_undo_z_il_anuleaza"))
+                           : qsTrId("ScriptConsole.eroare") + (r.line > 0 ? qsTrId("ScriptConsole.pe_linia") + r.line : "") + ": " + r.error
                              + (r.output.length > 0 ? "\n" + r.output : "")
     }
 
@@ -32,7 +32,7 @@ Popover {
             spacing: Theme.space2
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Scripturi"
+                text: qsTrId("ScriptConsole.scripturi")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.DemiBold
@@ -56,12 +56,12 @@ Popover {
             Button {
                 variant: "primary"
                 iconName: "play"
-                text: "Rulează  ⌘↵"
+                text: qsTrId("ScriptConsole.ruleaza")
                 onClicked: root.runScript()
             }
             IconButton {
                 iconName: "x"
-                tooltip: "Închide"
+                tooltip: qsTrId("ScriptConsole.inchide")
                 onClicked: root.close()
             }
         }
@@ -129,7 +129,7 @@ Popover {
                     id: outputText
                     width: parent.width
                     wrapMode: Text.Wrap
-                    text: root.output.length > 0 ? root.output : "Rezultatul apare aici (aion.log(…), print(…))."
+                    text: root.output.length > 0 ? root.output : qsTrId("ScriptConsole.rezultatul_apare_aici_aion_log_print")
                     color: root.failed ? Theme.danger : root.output.length > 0 ? Theme.textPrimary : Theme.textTertiary
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeXs
@@ -146,7 +146,7 @@ Popover {
             width: 260
             spacing: Theme.space2
             Text {
-                text: "API (aion.…)"
+                text: qsTrId("ScriptConsole.api_aion")
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSizeSm
                 font.weight: Font.DemiBold
@@ -155,11 +155,7 @@ Popover {
                 width: parent.width
                 wrapMode: Text.Wrap
                 textFormat: Text.PlainText
-                text: "box(x, y, z, l, a, h, nume)\ncylinder(x, y, z, d, h)  cone(…)  sphere(x, y, z, d)\n"
-                      + "object(\"door\", { width: 900 }, x, y, z)\nmove(id, dx, dy, dz)\nrotate(id, °, \"z\", [pivot])\n"
-                      + "place(id, { x, rz, width… })  remove(id)\nmaterial(id, \"Lemn de stejar\" | \"#c0392b\")\n"
-                      + "line([x,y,z], [x,y,z])  face([[…], …])\nobjects()  selection()  select([id…])\n"
-                      + "command(\"view.top\")  message(text)  log(…)\n\nmm, în contextul editat."
+                text: qsTrId("ScriptConsole.box_x_y_z_l_a_h_nume_ncylinder_x_y_z_d_h_cone_")
                 color: Theme.textTertiary
                 font.family: Theme.fontMono
                 font.pixelSize: 11
@@ -171,7 +167,7 @@ Popover {
                 Text {
                     width: parent.width - 48
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Plugin-uri"
+                    text: qsTrId("ScriptConsole.plugin_uri")
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeSm
                     font.weight: Font.DemiBold
@@ -179,13 +175,13 @@ Popover {
                 IconButton {
                     width: 24; height: 24; iconSize: 13
                     iconName: "rotate-ccw"
-                    tooltip: "Reîncarcă plugin-urile"
+                    tooltip: qsTrId("ScriptConsole.reincarca_plugin_urile")
                     onClicked: root.engine.reloadPlugins()
                 }
                 IconButton {
                     width: 24; height: 24; iconSize: 13
                     iconName: "folder"
-                    tooltip: "Deschide dosarul plugin-urilor"
+                    tooltip: qsTrId("ScriptConsole.deschide_dosarul_plugin_urilor")
                     onClicked: Qt.openUrlExternally("file://" + root.engine.pluginFolder())
                 }
             }
@@ -214,7 +210,7 @@ Popover {
                                 onClicked: {
                                     const r = root.engine.runPluginCommand(modelData.id)
                                     root.failed = !r.ok
-                                    root.output = r.ok ? (r.output || "Gata.") : "Eroare: " + r.error
+                                    root.output = r.ok ? (r.output || qsTrId("ScriptConsole.gata")) : qsTrId("ScriptConsole.eroare_2") + r.error
                                 }
                             }
                         }
@@ -225,8 +221,7 @@ Popover {
                 visible: !root.engine || root.engine.plugins.length === 0
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Un plugin = un dosar cu manifest.json (nume, comenzi: { title, function }) și main.js. "
-                      + "Comenzile apar și în palette (⌘K). Detalii în docs/scripting.md."
+                text: qsTrId("ScriptConsole.un_plugin_un_dosar_cu_manifest_json_nume_comen")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }

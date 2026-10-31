@@ -49,7 +49,7 @@ Item {
                 width: 18; height: 18; iconSize: 12
                 iconName: "chevron-right"
                 rotation: root.row.open ? 90 : 0
-                tooltip: root.row.open ? "Închide (ascunde canalele)" : "Deschide: proprietățile animate"
+                tooltip: root.row.open ? qsTrId("TimelineRow.inchide_ascunde_canalele") : qsTrId("TimelineRow.deschide_proprietatile_animate")
                 onClicked: root.timeline.toggleExpanded(root.row.instance)
             }
             Item { visible: !root.isObject && !root.isChannel; width: 18; height: 18 }
@@ -79,7 +79,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 20; height: 20; iconSize: 11
             iconName: "diamond"
-            tooltip: "Keyframe pe toate proprietățile, la timpul curent"
+            tooltip: qsTrId("TimelineRow.keyframe_pe_toate_proprietatile_la_timpul_curent")
             onClicked: root.doc.keyInstance(root.row.instance)
         }
 
@@ -193,7 +193,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.timeline.segmentClicked(root.row, segment.index, segment)
                 }
-                Tooltip { visible: segmentArea.containsMouse; text: "Curba tranziției (click pentru editor)" }
+                Tooltip { visible: segmentArea.containsMouse; text: qsTrId("TimelineRow.curba_tranzitiei_click_pentru_editor") }
             }
         }
 
@@ -227,7 +227,7 @@ Item {
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
-                text: (pathBar.p.anchors ?? []).length > 0 ? pathBar.p.anchors.join(", ") : "fără obiecte"
+                text: (pathBar.p.anchors ?? []).length > 0 ? pathBar.p.anchors.join(", ") : qsTrId("TimelineRow.fara_obiecte")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -288,8 +288,8 @@ Item {
             }
             Tooltip {
                 visible: (barArea.containsMouse && !barArea.pressed) || endArea.containsMouse
-                text: endArea.containsMouse ? "Trage: durata parcurgerii"
-                                            : "Trage: startul · capătul drept: durata · dublu click: curba parcurgerii"
+                text: endArea.containsMouse ? qsTrId("TimelineRow.trage_durata_parcurgerii")
+                                            : qsTrId("TimelineRow.trage_startul_capatul_drept_durata_dublu_click_c")
             }
         }
 

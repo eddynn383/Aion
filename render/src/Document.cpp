@@ -1,46 +1,52 @@
 #include "aion/render/Document.h"
 
+#include "ProceduralTextures.h"
+#include "RecoveryStore.h"
 #include "aion/core/geom/Bevel.h"
-#include "aion/core/geom/Subdivide.h"
 #include "aion/core/geom/Operations.h"
+#include "aion/core/geom/Primitives.h"
 #include "aion/core/geom/Shapes.h"
+#include "aion/core/geom/Subdivide.h"
 #include "aion/core/inference/Inference.h"
 #include "aion/core/io/AionFile.h"
 #include "aion/core/io/Exchange.h"
-#include "aion/core/geom/Primitives.h"
-#include "aion/core/model/MaterialLibrary.h"
+#include "aion/core/math/Tolerance.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/CameraLens.h"
-#include "aion/core/model/Interaction.h"
-#include "aion/core/model/Modeling.h"
-#include "aion/core/model/Parametric.h"
-#include "aion/core/model/SnapSources.h"
-#include "aion/core/model/Transfer.h"
-#include "ProceduralTextures.h"
-#include "RecoveryStore.h"
+#include "aion/core/model/Carcass.h"
 #include "aion/core/model/Copying.h"
-#include "aion/core/model/Operations.h"
-#include "aion/core/math/Tolerance.h"
+#include "aion/core/model/Furniture.h"
+#include "aion/core/model/Interaction.h"
+#include "aion/core/model/MaterialLibrary.h"
+#include "aion/core/model/Modeling.h"
 #include "aion/core/model/MotionPaths.h"
+#include "aion/core/model/Operations.h"
+#include "aion/core/model/Parametric.h"
 #include "aion/core/model/PenCurves.h"
 #include "aion/core/model/Quantities.h"
+#include "aion/core/model/SnapSources.h"
+#include "aion/core/model/Transfer.h"
 #include "aion/core/text/Dates.h"
 #include "aion/core/units/Length.h"
-#include "aion/core/view/ModelPicking.h"
 #include "aion/core/view/Camera.h"
+#include "aion/core/view/ModelPicking.h"
 #include "aion/core/view/Picking.h"
 
+#include <QBuffer>
 #include <QColor>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QBuffer>
 #include <QImage>
+#include <QPainter>
+#include <QPainterPath>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QUuid>
 
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
@@ -49,12 +55,29 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
-#include <span>
-#include <utility>
 #include <limits>
 #include <set>
+#include <span>
+#include <utility>
 
 namespace aion::render {
+
+namespace {
+
+// Traducerea (ADR 0043, pasul 12): textele din nucleu și cele scrise aici au ca sursă textul românesc; la
+// rulare se caută în tabelul „aion” al limbii alese (translations/core_<limbă>.json). Un text fără traducere
+// (o cheie, o cale) rămâne neschimbat.
+QString trCore(const std::string& text)
+{
+    return QCoreApplication::translate("aion", text.c_str());
+}
+
+QString ui(const char* text)
+{
+    return QCoreApplication::translate("aion", text);
+}
+
+} // namespace
 
 namespace {
 
@@ -73,12 +96,12 @@ math::Vec3d pivotPreset(const QString& preset, const math::Vec3d& size, const ma
     return fallback;
 }
 
-// Căile vin din Qt ca UTF-16; pe Windows, std::string ar fi interpretat în codepage-ul local (diacriticele s-ar pierde).
+// Căile vin din Qt ca UTF-16; pe Windows, std::string ar fi interpretat în codepage-ul local (diacriticele
+// s-ar pierde).
 std::filesystem::path toPath(const QString& path)
 {
     return std::filesystem::path(path.toStdU16String());
 }
-
 
 QString plural(std::size_t n, const char* one, const char* many)
 {
@@ -98,16 +121,22 @@ model::TagId toTagId(double id)
 
 // Culorile tag-urilor noi, pe rând.
 const model::Color kTagPalette[] = {
-    { 0x3B, 0x82, 0xF6, 255 }, { 0xF5, 0x9E, 0x0B, 255 }, { 0x10, 0xB9, 0x81, 255 }, { 0xEC, 0x48, 0x99, 255 },
-    { 0x8B, 0x5C, 0xF6, 255 }, { 0x14, 0xB8, 0xA6, 255 }, { 0xEF, 0x44, 0x44, 255 }, { 0x84, 0xCC, 0x16, 255 },
+    { 0x3B, 0x82, 0xF6, 255 },
+    { 0xF5, 0x9E, 0x0B, 255 },
+    { 0x10, 0xB9, 0x81, 255 },
+    { 0xEC, 0x48, 0x99, 255 },
+    { 0x8B, 0x5C, 0xF6, 255 },
+    { 0x14, 0xB8, 0xA6, 255 },
+    { 0xEF, 0x44, 0x44, 255 },
+    { 0x84, 0xCC, 0x16, 255 },
 };
 
 QString formatArea(double mm2)
 {
     if (mm2 >= 1e6) {
-        return QString::number(mm2 / 1e6, 'f', 2) + QStringLiteral(" m²");
+        return QString::number(mm2 / 1e6, 'f', 2) + ui(" m²");
     }
-    return QString::number(mm2, 'f', 0) + QStringLiteral(" mm²");
+    return QString::number(mm2, 'f', 0) + ui(" mm²");
 }
 
 } // namespace
@@ -119,26 +148,32 @@ Document::Document(QObject* parent)
     {
         QSettings settings;
         units::DisplaySettings display;
-        display.unit = static_cast<units::Unit>(std::clamp(settings.value(QStringLiteral("units/unit"), 0).toInt(), 0, 5));
+        display.unit = static_cast<units::Unit>(
+            std::clamp(settings.value(QStringLiteral("units/unit"), 0).toInt(), 0, 5));
         display.decimals = std::clamp(settings.value(QStringLiteral("units/decimals"), -1).toInt(), -1, 6);
         units::setDisplaySettings(display);
     }
-    // Orice schimbare a istoricului (și cele făcute direct de unelte, nu doar prin runOnModel) schimbă modelul: copia
-    // pozată din Animare trebuie refăcută.
+    // Orice schimbare a istoricului (și cele făcute direct de unelte, nu doar prin runOnModel) schimbă
+    // modelul: copia pozată din Animare trebuie refăcută.
     m_stack.setOnChanged([this] {
         ++m_modelRevision;
         emit historyChanged();
+    });
+    // Plăcile își preiau dimensiunile după Push/Pull pe un capăt, în aceeași comandă (ADR 0044).
+    m_stack.setFinalizer([](model::Model& model, std::span<const model::DefinitionId> changed) {
+        model::finalizeBoards(model, changed);
     });
     // În debug, un model invalid oprește aplicația (CommandStack); în release nu se verifică.
     retriangulate(m_model.root());
     setActiveTool(QStringLiteral("select"));
 
-    // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate; copiile rămase de la sesiunile închise
-    // brusc se oferă la pornire (ADR 0040).
+    // Autosalvare: la fiecare minut, dacă documentul are modificări nesalvate; copiile rămase de la sesiunile
+    // închise brusc se oferă la pornire (ADR 0040).
     m_recovery = std::make_unique<RecoveryStore>();
     {
         QSettings settings;
-        m_autosaveTimer.setInterval(std::clamp(settings.value(QStringLiteral("files/autosaveMinutes"), 1).toInt(), 1, 60) * 60'000);
+        m_autosaveTimer.setInterval(
+            std::clamp(settings.value(QStringLiteral("files/autosaveMinutes"), 1).toInt(), 1, 60) * 60'000);
         connect(&m_autosaveTimer, &QTimer::timeout, this, &Document::autosave);
         if (settings.value(QStringLiteral("files/autosave"), true).toBool()) {
             m_autosaveTimer.start();
@@ -148,8 +183,8 @@ Document::Document(QObject* parent)
 
 Document::~Document()
 {
-    // O închidere normală nu lasă copie de recuperare (RecoveryStore o șterge): modificările au fost deja salvate sau
-    // utilizatorul a ales să renunțe la ele.
+    // O închidere normală nu lasă copie de recuperare (RecoveryStore o șterge): modificările au fost deja
+    // salvate sau utilizatorul a ales să renunțe la ele.
     m_model.removeObserver(this);
 }
 
@@ -237,6 +272,16 @@ model::CutListOptions cutListOptions(const QVariantMap& options)
     o.sheetWidth = options.value(QStringLiteral("sheetWidth"), o.sheetWidth).toDouble();
     o.waste = options.value(QStringLiteral("waste"), o.waste).toDouble();
     o.maxThickness = options.value(QStringLiteral("maxThickness"), o.maxThickness).toDouble();
+    for (const QVariant& key : options.value(QStringLiteral("excluded")).toList()) {
+        o.excluded.insert(key.toString().toStdString());
+    }
+    o.cutDimensions = options.value(QStringLiteral("cutDimensions"), false).toBool();
+    o.headerRow = options.value(QStringLiteral("headerRow"), true).toBool();
+    o.bandAllowance = options.value(QStringLiteral("bandAllowance"), o.bandAllowance).toDouble();
+    const QVariantMap byType = options.value(QStringLiteral("bandAllowanceByType")).toMap();
+    for (auto it = byType.begin(); it != byType.end(); ++it) {
+        o.bandAllowanceByType[it.key().toStdString()] = it.value().toDouble();
+    }
     return o;
 }
 
@@ -248,7 +293,7 @@ QVariantMap Document::quantityReport() const
     QVariantList objects;
     for (const model::ObjectQuantity& o : r.objects) {
         objects.append(QVariantMap {
-            { QStringLiteral("name"), QString::fromStdString(o.name) },
+            { QStringLiteral("name"), trCore(o.name) },
             { QStringLiteral("component"), o.component },
             { QStringLiteral("count"), o.count },
             { QStringLiteral("area"), o.area / 1e6 },
@@ -257,15 +302,15 @@ QVariantMap Document::quantityReport() const
             { QStringLiteral("sizeX"), o.size.x },
             { QStringLiteral("sizeY"), o.size.y },
             { QStringLiteral("sizeZ"), o.size.z },
-            { QStringLiteral("material"), QString::fromStdString(o.material) },
-            { QStringLiteral("tag"), QString::fromStdString(o.tag) },
+            { QStringLiteral("material"), trCore(o.material) },
+            { QStringLiteral("tag"), trCore(o.tag) },
         });
     }
     const auto named = [](const std::vector<model::NamedArea>& list) {
         QVariantList out;
         for (const model::NamedArea& n : list) {
-            out.append(QVariantMap { { QStringLiteral("name"), QString::fromStdString(n.name) },
-                { QStringLiteral("area"), n.area / 1e6 } });
+            out.append(QVariantMap {
+                { QStringLiteral("name"), trCore(n.name) }, { QStringLiteral("area"), n.area / 1e6 } });
         }
         return out;
     };
@@ -287,27 +332,82 @@ QVariantMap Document::cutList(const QVariantMap& options) const
     QVariantList parts;
     for (const model::CutPart& p : list.parts) {
         parts.append(QVariantMap {
-            { QStringLiteral("name"), QString::fromStdString(p.name) },
-            { QStringLiteral("material"), QString::fromStdString(p.material) },
+            { QStringLiteral("name"), trCore(p.name) },
+            { QStringLiteral("material"), trCore(p.material) },
             { QStringLiteral("length"), p.length },
             { QStringLiteral("width"), p.width },
             { QStringLiteral("thickness"), p.thickness },
             { QStringLiteral("count"), p.count },
             { QStringLiteral("panel"), p.panel },
             { QStringLiteral("flat"), p.flat },
+            { QStringLiteral("section"), static_cast<int>(p.section) },
+            { QStringLiteral("type"),
+                [&] {
+                    if (const model::BoardType* t = model::findBoardType(p.typeKey)) {
+                        return trCore(t->label);
+                    }
+                    return trCore(p.typeKey);
+                }() },
+            { QStringLiteral("nominalThickness"), p.nominalThickness },
+            { QStringLiteral("cutLength"), p.cutLength },
+            { QStringLiteral("cutWidth"), p.cutWidth },
+            { QStringLiteral("bands"),
+                [&] {
+                    QStringList labels;
+                    for (const std::string& b : p.bands) {
+                        const model::BandType* band = model::findBandType(b);
+                        labels.append(band ? trCore(band->label) : trCore(b));
+                    }
+                    return labels;
+                }() },
+            { QStringLiteral("hidden"), p.hidden },
+            { QStringLiteral("rowKey"), trCore(p.rowKey) },
+            { QStringLiteral("usedIn"),
+                [&] {
+                    QStringList names;
+                    for (const std::string& n : p.usedIn) {
+                        names.append(trCore(n));
+                    }
+                    return names.join(QStringLiteral(", "));
+                }() },
+            { QStringLiteral("flags"),
+                [&] {
+                    QStringList flags;
+                    for (const std::string& f : p.flags) {
+                        flags.append(trCore(f));
+                    }
+                    return flags.join(QStringLiteral(", "));
+                }() },
         });
     }
     QVariantList sheets;
     for (const model::SheetNeed& s : list.sheets) {
         sheets.append(QVariantMap {
-            { QStringLiteral("material"), QString::fromStdString(s.material) },
+            { QStringLiteral("material"), trCore(s.material) },
             { QStringLiteral("thickness"), s.thickness },
             { QStringLiteral("area"), s.partsArea / 1e6 },
             { QStringLiteral("sheets"), s.sheets },
+            { QStringLiteral("sheetSize"), QStringLiteral("%1 × %2").arg(s.sheetLength).arg(s.sheetWidth) },
         });
     }
+    QVariantList bands;
+    for (const model::BandNeed& b : list.bands) {
+        const model::BandType* band = model::findBandType(b.bandKey);
+        bands.append(QVariantMap {
+            { QStringLiteral("band"), band ? trCore(band->label) : trCore(b.bandKey) },
+            { QStringLiteral("decor"), trCore(b.decor) },
+            { QStringLiteral("edges"), b.edges },
+            { QStringLiteral("meters"), b.length / 1000.0 },
+        });
+    }
+    QVariantList hardware;
+    for (const model::HardwareNeed& h : list.hardware) {
+        hardware.append(QVariantMap {
+            { QStringLiteral("label"), trCore(h.label) }, { QStringLiteral("count"), h.count } });
+    }
     return { { QStringLiteral("parts"), parts }, { QStringLiteral("sheets"), sheets },
-        { QStringLiteral("edgeBanding"), list.edgeBanding / 1000.0 } };
+        { QStringLiteral("edgeBanding"), list.edgeBanding / 1000.0 }, { QStringLiteral("bands"), bands },
+        { QStringLiteral("hardware"), hardware }, { QStringLiteral("hiddenPieces"), list.hiddenPieces } };
 }
 
 bool Document::exportReport(const QString& path, const QString& kind, const QVariantMap& options)
@@ -318,7 +418,7 @@ bool Document::exportReport(const QString& path, const QString& kind, const QVar
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly)
         || file.write(csv.data(), static_cast<qint64>(csv.size())) != static_cast<qint64>(csv.size())) {
-        setError(QStringLiteral("Raportul nu s-a putut salva în „%1”.").arg(QFileInfo(path).fileName()));
+        setError(ui("Raportul nu s-a putut salva în „%1”.").arg(QFileInfo(path).fileName()));
         return false;
     }
     return true;
@@ -326,7 +426,7 @@ bool Document::exportReport(const QString& path, const QString& kind, const QVar
 
 QString Document::formatLength(double mm) const
 {
-    return QString::fromStdString(units::formatLength(mm));
+    return trCore(units::formatLength(mm));
 }
 
 // --- Fișiere ---
@@ -341,9 +441,10 @@ QString describeTime(const QDateTime& time)
 {
     const auto local = [](const QDateTime& t) {
         const QDateTime l = t.toLocalTime();
-        return text::LocalTime { l.date().year(), l.date().month(), l.date().day(), l.time().hour(), l.time().minute() };
+        return text::LocalTime { l.date().year(), l.date().month(), l.date().day(), l.time().hour(),
+            l.time().minute() };
     };
-    return QString::fromStdString(text::describeTime(local(time), local(QDateTime::currentDateTime())));
+    return trCore(text::describeTime(local(time), local(QDateTime::currentDateTime())));
 }
 
 // Dosarul unui fișier, cu „~” pentru dosarul utilizatorului.
@@ -358,13 +459,15 @@ QString displayFolder(const QString& path)
 
 QString Document::fileName() const
 {
-    return m_filePath.isEmpty() ? QStringLiteral("Fără titlu") : QFileInfo(m_filePath).completeBaseName();
+    return m_filePath.isEmpty() ? ui("Fără titlu") : QFileInfo(m_filePath).completeBaseName();
 }
 
 QStringList Document::recentFiles() const
 {
     QStringList files = QSettings().value(kRecentKey).toStringList();
-    files.erase(std::remove_if(files.begin(), files.end(), [](const QString& f) { return !QFile::exists(f); }), files.end());
+    files.erase(
+        std::remove_if(files.begin(), files.end(), [](const QString& f) { return !QFile::exists(f); }),
+        files.end());
     return files;
 }
 
@@ -379,7 +482,8 @@ QString Document::recoveryInfo() const
         return {};
     }
     const RecoveryStore::Entry& latest = m_recovery->orphans().front();
-    const QString name = latest.source.isEmpty() ? QStringLiteral("un document nesalvat") : QFileInfo(latest.source).fileName();
+    const QString name
+        = latest.source.isEmpty() ? ui("un document nesalvat") : QFileInfo(latest.source).fileName();
     return name + QStringLiteral(" (") + describeTime(latest.savedAt) + QStringLiteral(")");
 }
 
@@ -388,9 +492,11 @@ QVariantList Document::recoveries() const
     QVariantList out;
     for (const RecoveryStore::Entry& e : m_recovery->orphans()) {
         out.append(QVariantMap { { QStringLiteral("session"), e.session },
-            { QStringLiteral("name"), e.source.isEmpty() ? QStringLiteral("Fără titlu") : QFileInfo(e.source).completeBaseName() },
+            { QStringLiteral("name"),
+                e.source.isEmpty() ? ui("Fără titlu") : QFileInfo(e.source).completeBaseName() },
             { QStringLiteral("source"), e.source },
-            { QStringLiteral("folder"), e.source.isEmpty() ? QStringLiteral("Document nesalvat") : displayFolder(e.source) },
+            { QStringLiteral("folder"),
+                e.source.isEmpty() ? ui("Document nesalvat") : displayFolder(e.source) },
             { QStringLiteral("when"), describeTime(e.savedAt) } });
     }
     return out;
@@ -408,17 +514,22 @@ QVariantList Document::recentDocuments() const
             QFile file(path);
             if (file.open(QIODevice::ReadOnly)) {
                 const QByteArray bytes = file.readAll();
-                const std::vector<std::uint8_t> png = io::readThumbnail(
-                    std::span(reinterpret_cast<const std::uint8_t*>(bytes.constData()), static_cast<std::size_t>(bytes.size())));
+                const std::vector<std::uint8_t> png
+                    = io::readThumbnail(std::span(reinterpret_cast<const std::uint8_t*>(bytes.constData()),
+                        static_cast<std::size_t>(bytes.size())));
                 if (!png.empty()) {
                     thumbnail = QStringLiteral("data:image/png;base64,")
-                        + QString::fromLatin1(QByteArray(reinterpret_cast<const char*>(png.data()), qsizetype(png.size())).toBase64());
+                        + QString::fromLatin1(
+                            QByteArray(reinterpret_cast<const char*>(png.data()), qsizetype(png.size()))
+                                .toBase64());
                 }
             }
             cached = { modifiedAt, thumbnail };
         }
-        out.append(QVariantMap { { QStringLiteral("path"), path }, { QStringLiteral("name"), info.completeBaseName() },
-            { QStringLiteral("folder"), displayFolder(path) }, { QStringLiteral("when"), describeTime(modifiedAt) },
+        out.append(QVariantMap { { QStringLiteral("path"), path },
+            { QStringLiteral("name"), info.completeBaseName() },
+            { QStringLiteral("folder"), displayFolder(path) },
+            { QStringLiteral("when"), describeTime(modifiedAt) },
             { QStringLiteral("thumbnail"), cached.second } });
     }
     return out;
@@ -466,6 +577,9 @@ void Document::replaceModel(const model::Model& model)
     if (m_place) {
         finishPaste(std::nullopt);
     }
+    if (m_dividerActive) {
+        finishDivider(std::nullopt, false);
+    }
     if (m_tool) {
         const view::Camera camera;
         tools::ToolContext ctx { m_model.mesh(activeDefinition()), m_stack, m_selection, camera };
@@ -508,8 +622,7 @@ bool Document::openFile(const QString& path)
 {
     const io::LoadResult result = io::loadFile(toPath(path));
     if (!result.model) {
-        setError(QStringLiteral("„%1” nu a putut fi deschis. %2")
-                     .arg(QFileInfo(path).fileName(), QString::fromStdString(result.error)));
+        setError(ui("„%1” nu a putut fi deschis. %2").arg(QFileInfo(path).fileName(), trCore(result.error)));
         return false;
     }
     if (m_clipboard) {
@@ -527,15 +640,14 @@ bool Document::saveFile(const QString& path, const QByteArray& thumbnailPng)
 {
     const QString target = path.isEmpty() ? m_filePath : path;
     if (target.isEmpty()) {
-        setError(QStringLiteral("Alege unde salvezi documentul."));
+        setError(ui("Alege unde salvezi documentul."));
         return false;
     }
     std::string error;
     const auto* bytes = reinterpret_cast<const std::uint8_t*>(thumbnailPng.constData());
     if (!io::saveFile(toPath(target), m_model,
             std::span(bytes, static_cast<std::size_t>(thumbnailPng.size())), &error)) {
-        setError(QStringLiteral("„%1” nu a putut fi salvat. %2")
-                     .arg(QFileInfo(target).fileName(), QString::fromStdString(error)));
+        setError(ui("„%1” nu a putut fi salvat. %2").arg(QFileInfo(target).fileName(), trCore(error)));
         return false;
     }
     m_stack.markClean();
@@ -555,7 +667,8 @@ bool Document::importFile(const QString& path)
     io::ImportResult result;
     const auto run = [&](const std::function<io::ImportResult(model::Model&)>& import) {
         const geom::Selection before = m_selection;
-        m_stack.run("Importă " + info.fileName().toStdString(), [&](model::Model& model) { result = import(model); });
+        m_stack.run(
+            "Importă " + info.fileName().toStdString(), [&](model::Model& model) { result = import(model); });
         m_selection.clear();
         if (result.instance && m_model.instances().contains(result.instance)) {
             m_selection.instances.insert(result.instance);
@@ -566,25 +679,23 @@ bool Document::importFile(const QString& path)
     if (ext == QLatin1String("obj")) {
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly)) {
-            setError(QStringLiteral("„%1” nu poate fi citit.").arg(info.fileName()));
+            setError(ui("„%1” nu poate fi citit.").arg(info.fileName()));
             return false;
         }
         const QByteArray text = file.readAll();
         run([&](model::Model& model) {
-            return io::importObj(model, activeDefinition(), std::string_view(text.constData(), std::size_t(text.size())),
+            return io::importObj(model, activeDefinition(),
+                std::string_view(text.constData(), std::size_t(text.size())),
                 info.completeBaseName().toStdString());
         });
     } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
-        run([&](model::Model& model) {
-            return io::importGltf(model, activeDefinition(), toPath(path));
-        });
+        run([&](model::Model& model) { return io::importGltf(model, activeDefinition(), toPath(path)); });
     } else {
-        setError(QStringLiteral("Formatul „.%1” nu se poate importa (OBJ, glTF, GLB).").arg(ext));
+        setError(ui("Formatul „.%1” nu se poate importa (OBJ, glTF, GLB).").arg(ext));
         return false;
     }
     if (!result.instance) {
-        setError(QStringLiteral("„%1” nu a putut fi importat. %2")
-                     .arg(info.fileName(), QString::fromStdString(result.error)));
+        setError(ui("„%1” nu a putut fi importat. %2").arg(info.fileName(), trCore(result.error)));
         return false;
     }
     return true;
@@ -600,7 +711,8 @@ bool Document::exportFile(const QString& path)
         const QString mtlName = info.completeBaseName() + QStringLiteral(".mtl");
         QFile obj(path);
         QFile mtl(info.dir().filePath(mtlName));
-        ok = obj.open(QIODevice::WriteOnly | QIODevice::Truncate) && mtl.open(QIODevice::WriteOnly | QIODevice::Truncate);
+        ok = obj.open(QIODevice::WriteOnly | QIODevice::Truncate)
+            && mtl.open(QIODevice::WriteOnly | QIODevice::Truncate);
         if (ok) {
             const std::string objText = io::exportObj(m_model, {}, mtlName.toStdString());
             const std::string mtlText = io::exportMtl(m_model);
@@ -608,19 +720,20 @@ bool Document::exportFile(const QString& path)
                 && mtl.write(mtlText.data(), qint64(mtlText.size())) == qint64(mtlText.size());
             // Imaginile texturilor, lângă .mtl (map_Kd le caută acolo).
             for (const auto& [name, bytes] : io::exportTextureFiles(m_model)) {
-                QFile image(info.dir().filePath(QString::fromStdString(name)));
+                QFile image(info.dir().filePath(trCore(name)));
                 ok = ok && image.open(QIODevice::WriteOnly | QIODevice::Truncate)
-                    && image.write(reinterpret_cast<const char*>(bytes.data()), qint64(bytes.size())) == qint64(bytes.size());
+                    && image.write(reinterpret_cast<const char*>(bytes.data()), qint64(bytes.size()))
+                        == qint64(bytes.size());
             }
         }
     } else if (ext == QLatin1String("gltf") || ext == QLatin1String("glb")) {
         ok = io::exportGltf(m_model, toPath(path), ext == QLatin1String("glb"), {}, &error);
     } else {
-        setError(QStringLiteral("Formatul „.%1” nu se poate exporta (OBJ, glTF, GLB).").arg(ext));
+        setError(ui("Formatul „.%1” nu se poate exporta (OBJ, glTF, GLB).").arg(ext));
         return false;
     }
     if (!ok) {
-        setError(QStringLiteral("„%1” nu a putut fi exportat. %2").arg(info.fileName(), QString::fromStdString(error)));
+        setError(ui("„%1” nu a putut fi exportat. %2").arg(info.fileName(), trCore(error)));
     }
     return ok;
 }
@@ -647,7 +760,7 @@ void Document::recoverSession(const QString& session)
     const RecoveryStore::Entry entry = *it;
     const io::LoadResult result = m_recovery->load(entry.session);
     if (!result.model) {
-        setError(QStringLiteral("Copia nu a putut fi recuperată. %1").arg(QString::fromStdString(result.error)));
+        setError(ui("Copia nu a putut fi recuperată. %1").arg(trCore(result.error)));
         discardRecovery(entry.session);
         return;
     }
@@ -657,8 +770,8 @@ void Document::recoverSession(const QString& session)
     }
     replaceModel(*result.model);
     setFilePath(entry.source);
-    // Recuperat, dar nesalvat: documentul rămâne marcat ca modificat. Copia trece în sesiunea curentă înainte să
-    // ștergem originalul, ca o nouă închidere bruscă să nu-l piardă.
+    // Recuperat, dar nesalvat: documentul rămâne marcat ca modificat. Copia trece în sesiunea curentă înainte
+    // să ștergem originalul, ca o nouă închidere bruscă să nu-l piardă.
     m_stack.markDirty();
     emit historyChanged();
     autosave();
@@ -677,7 +790,8 @@ void Document::discardRecovery(const QString& session)
 
 std::uint64_t Document::modelRevision() const
 {
-    return m_stack.inTransaction() ? (std::uint64_t { m_revision } << 32U) ^ m_modelRevision : m_modelRevision;
+    return m_stack.inTransaction() ? (std::uint64_t { m_revision } << 32U) ^ m_modelRevision
+                                   : m_modelRevision;
 }
 
 void Document::touch()
@@ -688,7 +802,8 @@ void Document::touch()
 
 std::size_t Document::validPathLength() const
 {
-    // În mijlocul unui undo, calea poate indica pentru scurt timp instanțe dispărute (până la repairContext()).
+    // În mijlocul unui undo, calea poate indica pentru scurt timp instanțe dispărute (până la
+    // repairContext()).
     std::size_t valid = 0;
     model::DefinitionId parent = m_model.root();
     for (; valid < m_path.size(); ++valid) {
@@ -713,10 +828,12 @@ math::Transform Document::contextTransform() const
     if (valid == m_path.size()) {
         return model::worldTransform(m_model, m_path);
     }
-    return model::worldTransform(m_model, { m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid) });
+    return model::worldTransform(
+        m_model, { m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid) });
 }
 
-const std::unordered_map<geom::FaceId, geom::FaceTriangles>& Document::triangles(model::DefinitionId definition) const
+const std::unordered_map<geom::FaceId, geom::FaceTriangles>& Document::triangles(
+    model::DefinitionId definition) const
 {
     static const std::unordered_map<geom::FaceId, geom::FaceTriangles> kEmpty;
     const auto it = m_triangles.find(definition);
@@ -726,14 +843,17 @@ const std::unordered_map<geom::FaceId, geom::FaceTriangles>& Document::triangles
 void Document::setActiveTool(const QString& requested)
 {
     // O unealtă din alt mod de lucru nu pornește (de exemplu Line în Animare): rămâne Select.
-    const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested) ? requested
-                                                                                                 : QStringLiteral("select");
-    if (m_suspendedTool) { // o tragere a pivotului, o editare de curbă sau o lipire întreruptă: revine unealta
+    const QString id = requested.isEmpty() || commandAllowed(QStringLiteral("tool.") + requested)
+        ? requested
+        : QStringLiteral("select");
+    if (m_suspendedTool) { // o tragere a pivotului, o editare de curbă sau o lipire întreruptă: revine
+                           // unealta
         m_tool = std::move(m_suspendedTool);
         m_pivotDragPoint.reset();
         m_editCurve = {};
         m_editPath = {};
         m_place.reset();
+        m_dividerActive = false;
     }
     if (id == m_toolId) {
         return;
@@ -755,27 +875,28 @@ void Document::setActiveTool(const QString& requested)
 QString Document::toolStatus() const
 {
     if (m_runtime) {
-        return QStringLiteral("Modul interacțiune · click, hover, trage sau apasă taste pe obiecte · Esc: ieșire");
+        return QStringLiteral(
+            "Modul interacțiune · click, hover, trage sau apasă taste pe obiecte · Esc: ieșire");
     }
     if (!m_tool) {
         return {};
     }
-    QString status = QString::fromStdString(m_tool->status());
+    QString status = trCore(m_tool->status());
 #ifndef Q_OS_MACOS
     // Textele din core folosesc numele tastelor de pe Mac; pe Windows și Linux: Alt și Ctrl.
-    status.replace(QStringLiteral("Option"), QStringLiteral("Alt")).replace(QStringLiteral("Cmd"), QStringLiteral("Ctrl"));
+    status.replace(ui("Option"), ui("Alt")).replace(ui("Cmd"), ui("Ctrl"));
 #endif
     return status;
 }
 
 QString Document::undoName() const
 {
-    return QString::fromStdString(m_stack.undoName());
+    return trCore(m_stack.undoName());
 }
 
 QString Document::redoName() const
 {
-    return QString::fromStdString(m_stack.redoName());
+    return trCore(m_stack.redoName());
 }
 
 QString Document::selectionSummary() const
@@ -801,10 +922,11 @@ QString Document::selectionSummary() const
     if (!m_selection.edges.empty()) {
         parts << plural(m_selection.edges.size(), "muchie", "muchii");
     }
-    const std::size_t total = m_selection.faces.size() + m_selection.edges.size() + m_selection.instances.size();
+    const std::size_t total
+        = m_selection.faces.size() + m_selection.edges.size() + m_selection.instances.size();
     const bool onlyObjects = m_selection.faces.empty() && m_selection.edges.empty();
-    const QString adjective = total == 1 ? (onlyObjects ? QStringLiteral(" selectat") : QStringLiteral(" selectată"))
-                                         : QStringLiteral(" selectate");
+    const QString adjective
+        = total == 1 ? (onlyObjects ? ui(" selectat") : ui(" selectată")) : ui(" selectate");
     return parts.join(QStringLiteral(", ")) + adjective;
 }
 
@@ -816,13 +938,13 @@ bool Document::hasMeasurement() const
 QString Document::measurementLabel() const
 {
     const auto m = m_tool ? m_tool->measurement() : std::nullopt;
-    return m ? QString::fromStdString(m->label) : QString();
+    return m ? trCore(m->label) : QString();
 }
 
 QString Document::measurementValue() const
 {
     const auto m = m_tool ? m_tool->measurement() : std::nullopt;
-    return m ? QString::fromStdString(m->value) : QString();
+    return m ? trCore(m->value) : QString();
 }
 
 int Document::faceCount() const
@@ -847,8 +969,7 @@ QStringList Document::contextPath() const
 {
     QStringList out;
     for (model::InstanceId id : m_path) {
-        const model::Instance& inst = m_model.instance(id);
-        out << QString::fromStdString(inst.name.empty() ? m_model.definition(inst.definition).name : inst.name);
+        out << trCore(model::partName(m_model, id));
     }
     return out;
 }
@@ -865,15 +986,17 @@ QVariantList Document::outline() const
             const model::Definition& def = m_model.definition(inst.definition);
             out.append(QVariantMap {
                 { QStringLiteral("id"), static_cast<double>(id.value) },
-                { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
-                { QStringLiteral("definition"), QString::fromStdString(def.name) },
-                { QStringLiteral("kind"), def.collection ? QStringLiteral("group") : QStringLiteral("object") },
-                { QStringLiteral("shape"), QString::fromStdString(def.shape) },
+                { QStringLiteral("name"), trCore(model::partName(m_model, id)) },
+                { QStringLiteral("definition"), trCore(def.name) },
+                { QStringLiteral("kind"),
+                    def.collection ? QStringLiteral("group") : QStringLiteral("object") },
+                { QStringLiteral("shape"), trCore(def.shape) },
                 { QStringLiteral("copies"), static_cast<int>(uses.at(inst.definition.value)) },
                 { QStringLiteral("canMakeUnique"), model::canMakeUnique(m_model, id, uses) },
                 { QStringLiteral("parentDefinition"), static_cast<double>(inst.parent.value) },
                 { QStringLiteral("hasChildren"), !m_model.childrenOf(inst.definition).empty() },
-                { QStringLiteral("tagColor"), inst.tag && m_model.tags().contains(inst.tag)
+                { QStringLiteral("tagColor"),
+                    inst.tag && m_model.tags().contains(inst.tag)
                         ? QVariant(QColor(m_model.tag(inst.tag).color.r, m_model.tag(inst.tag).color.g,
                               m_model.tag(inst.tag).color.b))
                         : QVariant() },
@@ -911,7 +1034,7 @@ QVariantList Document::tags() const
         }
         out.append(QVariantMap {
             { QStringLiteral("id"), static_cast<double>(id.value) },
-            { QStringLiteral("name"), QString::fromStdString(tag.name) },
+            { QStringLiteral("name"), trCore(tag.name) },
             { QStringLiteral("color"), QColor(tag.color.r, tag.color.g, tag.color.b, tag.color.a) },
             { QStringLiteral("visible"), tag.visible },
             { QStringLiteral("count"), count },
@@ -927,7 +1050,7 @@ QVariantMap materialEntry(const model::Material& m); // mai jos, la materiale
 QVariantMap Document::materialInfo(model::MaterialId id) const
 {
     if (!id || !m_model.materials().contains(id)) {
-        return { { QStringLiteral("id"), 0.0 }, { QStringLiteral("name"), QStringLiteral("Implicit") } };
+        return { { QStringLiteral("id"), 0.0 }, { QStringLiteral("name"), ui("Implicit") } };
     }
     QVariantMap entry = materialEntry(m_model.material(id));
     entry[QStringLiteral("id")] = static_cast<double>(id.value);
@@ -952,25 +1075,28 @@ QVariantMap Document::entityInfo() const
         const model::Instance& inst = m_model.instance(id);
         const model::Definition& def = m_model.definition(inst.definition);
         info[QStringLiteral("kind")] = QStringLiteral("instance");
-        info[QStringLiteral("title")] = def.collection ? QStringLiteral("Grup") : QStringLiteral("Obiect");
+        info[QStringLiteral("title")] = def.collection ? ui("Grup") : ui("Obiect");
+        info[QStringLiteral("collection")] = def.collection;
         info[QStringLiteral("instanceId")] = static_cast<double>(id.value);
         if (const auto onPath = model::pathOf(m_model, m_activeAnimation, id)) {
             const model::MotionPath& path = m_model.motionPaths().at(*onPath);
             for (const model::PathAnchor& a : path.anchors) {
                 if (a.instance == id) {
-                    info[QStringLiteral("anchor")] = QVariantMap { { QStringLiteral("path"), static_cast<double>(onPath->value) },
-                        { QStringLiteral("pathName"), QString::fromStdString(path.name) }, { QStringLiteral("along"), a.along },
-                        { QStringLiteral("lateral"), a.lateral }, { QStringLiteral("up"), a.up }, { QStringLiteral("yaw"), a.yaw } };
+                    info[QStringLiteral("anchor")]
+                        = QVariantMap { { QStringLiteral("path"), static_cast<double>(onPath->value) },
+                              { QStringLiteral("pathName"), trCore(path.name) },
+                              { QStringLiteral("along"), a.along }, { QStringLiteral("lateral"), a.lateral },
+                              { QStringLiteral("up"), a.up }, { QStringLiteral("yaw"), a.yaw } };
                 }
             }
         }
-        info[QStringLiteral("name")] = QString::fromStdString(def.group ? inst.name : def.name);
+        info[QStringLiteral("name")] = trCore(def.group ? inst.name : def.name);
         info[QStringLiteral("tagId")] = static_cast<double>(inst.tag.value);
         info[QStringLiteral("locked")] = inst.locked;
         info[QStringLiteral("copies")] = static_cast<int>(m_model.instancesOf(inst.definition).size());
         info[QStringLiteral("canMakeUnique")] = model::canMakeUnique(m_model, id);
         if (!def.group) {
-            details << detail(QStringLiteral("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
+            details << detail(ui("Copii"), QString::number(m_model.instancesOf(inst.definition).size()));
         }
         // Dimensiunile și materialul au controale proprii în Inspector (editabile).
         const model::Placement placement = model::placementOf(m_workMode == Animation ? pose() : m_model, id);
@@ -996,7 +1122,7 @@ QVariantMap Document::entityInfo() const
         const model::Behavior& b = inst.behavior;
         info[QStringLiteral("behavior")] = QVariantMap {
             { QStringLiteral("kind"),
-                b.kind == model::Behavior::Kind::Rotate ? QStringLiteral("rotate")
+                b.kind == model::Behavior::Kind::Rotate      ? QStringLiteral("rotate")
                     : b.kind == model::Behavior::Kind::Slide ? QStringLiteral("slide")
                                                              : QStringLiteral("none") },
             { QStringLiteral("anchor"), static_cast<int>(b.anchor) },
@@ -1012,17 +1138,78 @@ QVariantMap Document::entityInfo() const
             QVariantList parameters;
             for (const model::ParameterSpec& spec : g->parameters) {
                 const auto it = definition.parameters.find(spec.key);
-                parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
-                    { QStringLiteral("label"), QString::fromStdString(spec.label) },
-                    { QStringLiteral("unit"), QString::fromStdString(spec.unit) },
+                parameters.append(QVariantMap { { QStringLiteral("key"), trCore(spec.key) },
+                    { QStringLiteral("label"), trCore(spec.label) },
+                    { QStringLiteral("unit"), trCore(spec.unit) },
                     { QStringLiteral("value"), it != definition.parameters.end() ? it->second : spec.value },
                     { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max },
                     { QStringLiteral("step"), spec.step } });
             }
-            info[QStringLiteral("parametric")] = QVariantMap { { QStringLiteral("generator"), QString::fromStdString(g->id) },
-                { QStringLiteral("name"), QString::fromStdString(g->name) },
+            info[QStringLiteral("parametric")] = QVariantMap { { QStringLiteral("generator"), trCore(g->id) },
+                { QStringLiteral("name"), trCore(g->name) },
                 { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
-                { QStringLiteral("parameters"), parameters } };
+                { QStringLiteral("parameters"), parameters }, { QStringLiteral("legacy"), g->legacy },
+                { QStringLiteral("carcass"), model::isCarcassGenerator(g->id) } };
+        }
+        // Placă parametrică sau desprinsă (ADR 0044): tipul, grosimea, dimensiunile și starea.
+        if (definition.part && definition.part->kind == model::PartSpec::Kind::Board) {
+            const model::BoardStatus status
+                = model::boardState(m_model, id, contextTransform() * inst.transform);
+            static const std::map<model::BoardReason, QString> kReasons {
+                { model::BoardReason::None, QString() },
+                { model::BoardReason::Geometry, ui("forma s-a schimbat") },
+                { model::BoardReason::Thickness, ui("grosimea nu mai e cea nominală") },
+                { model::BoardReason::Scaled, ui("placa e scalată") },
+                { model::BoardReason::ScaledParent,
+                    ui("corpul e scalat, plăcile nu mai au grosimea nominală") },
+                { model::BoardReason::Children, ui("placa are alte obiecte în ea") },
+            };
+            QVariantList types;
+            for (const model::BoardType& t : model::boardTypes()) {
+                types.append(QVariantMap {
+                    { QStringLiteral("key"), trCore(t.key) }, { QStringLiteral("label"), trCore(t.label) } });
+            }
+            QVariantList thicknesses;
+            if (const model::BoardType* t = model::findBoardType(definition.part->typeKey)) {
+                for (const double v : t->thicknesses) {
+                    thicknesses.append(v);
+                }
+            }
+            const auto param = [&](const char* key) {
+                const auto it = definition.parameters.find(key);
+                return it != definition.parameters.end() ? it->second : 0.0;
+            };
+            info[QStringLiteral("board")] = QVariantMap {
+                { QStringLiteral("type"), trCore(definition.part->typeKey) },
+                { QStringLiteral("types"), types },
+                { QStringLiteral("thickness"), definition.part->nominalThickness },
+                { QStringLiteral("thicknesses"), thicknesses },
+                { QStringLiteral("length"), param("length") },
+                { QStringLiteral("width"), param("width") },
+                { QStringLiteral("parametric"), status.state != model::BoardState::Detached },
+                { QStringLiteral("matches"), status.state == model::BoardState::Matches },
+                { QStringLiteral("reason"), kReasons.at(status.reason) },
+                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+                { QStringLiteral("bands"), boardBandsInfo(inst.definition) },
+                { QStringLiteral("bandTypes"), bandTypesFor(definition.part->typeKey) },
+                { QStringLiteral("bandDecors"), bandDecors() },
+            };
+        }
+        // Feronerie (pasul 9): varianta și celelalte variante din aceeași familie.
+        if (definition.part && definition.part->kind == model::PartSpec::Kind::Hardware) {
+            const std::string_view family = model::hardwareFamily(definition.part->typeKey);
+            QVariantList variants;
+            for (const model::HardwareType& t : model::hardwareTypes()) {
+                if (model::hardwareFamily(t.key) == family) {
+                    variants.append(QVariantMap { { QStringLiteral("key"), trCore(t.key) },
+                        { QStringLiteral("label"), trCore(t.label) } });
+                }
+            }
+            info[QStringLiteral("hardware")] = QVariantMap {
+                { QStringLiteral("type"), trCore(definition.part->typeKey) },
+                { QStringLiteral("variants"), variants },
+                { QStringLiteral("copies"), static_cast<int>(m_model.instancesOf(inst.definition).size()) },
+            };
         }
         // Sferă / cilindru / con nemodificate: numărul de segmente (0 = nu se poate schimba).
         info[QStringLiteral("segments")] = model::primitiveSegments(m_model, inst.definition);
@@ -1037,7 +1224,8 @@ QVariantMap Document::entityInfo() const
             const geom::FaceTriangles& t = it->second;
             for (std::size_t i = 0; i + 2 < t.indices.size(); i += 3) {
                 const auto& a = t.points[t.indices[i]];
-                area += 0.5 * glm::length(glm::cross(t.points[t.indices[i + 1]] - a, t.points[t.indices[i + 2]] - a));
+                area += 0.5
+                    * glm::length(glm::cross(t.points[t.indices[i + 1]] - a, t.points[t.indices[i + 2]] - a));
             }
         }
         // Materialele de pe față și verso: comune tuturor fețelor selectate sau „mixt”.
@@ -1053,7 +1241,7 @@ QVariantMap Document::entityInfo() const
             if (ids.size() == 1) {
                 return materialInfo(*ids.begin());
             }
-            return QVariantMap { { QStringLiteral("id"), -1.0 }, { QStringLiteral("name"), QStringLiteral("Mixt") } };
+            return QVariantMap { { QStringLiteral("id"), -1.0 }, { QStringLiteral("name"), ui("Mixt") } };
         };
         std::set<model::TagId> faceTags;
         for (geom::FaceId f : m_selection.faces) {
@@ -1061,13 +1249,16 @@ QVariantMap Document::entityInfo() const
                 faceTags.insert(face->tag);
             }
         }
-        info[QStringLiteral("tagId")] = faceTags.size() == 1 ? static_cast<double>(faceTags.begin()->value) : -1.0;
+        info[QStringLiteral("tagId")]
+            = faceTags.size() == 1 ? static_cast<double>(faceTags.begin()->value) : -1.0;
         info[QStringLiteral("frontMaterial")] = sideInfo(fronts);
         info[QStringLiteral("backMaterial")] = sideInfo(backs);
-        // Poziționarea texturii (a primei fețe), dacă vreuna are o textură (material propriu sau al obiectului).
+        // Poziționarea texturii (a primei fețe), dacă vreuna are o textură (material propriu sau al
+        // obiectului).
         for (geom::FaceId f : m_selection.faces) {
             const geom::Face* face = mesh.faces().find(f);
-            const model::Material* material = face && face->material ? m_model.materials().find(face->material) : nullptr;
+            const model::Material* material
+                = face && face->material ? m_model.materials().find(face->material) : nullptr;
             if (material != nullptr && material->texture) {
                 const geom::TextureTransform& t = face->texture;
                 info[QStringLiteral("texture")] = QVariantMap { { QStringLiteral("ox"), t.offset.x },
@@ -1078,8 +1269,8 @@ QVariantMap Document::entityInfo() const
         }
         info[QStringLiteral("kind")] = QStringLiteral("faces");
         info[QStringLiteral("title")]
-            = m_selection.faces.size() == 1 ? QStringLiteral("Față") : plural(m_selection.faces.size(), "față", "fețe");
-        details << detail(QStringLiteral("Arie"), formatArea(area));
+            = m_selection.faces.size() == 1 ? ui("Față") : plural(m_selection.faces.size(), "față", "fețe");
+        details << detail(ui("Arie"), formatArea(area));
     } else if (m_selection.instances.empty() && m_selection.faces.empty()) {
         double length = 0.0;
         std::set<model::TagId> edgeTags;
@@ -1089,12 +1280,13 @@ QVariantMap Document::entityInfo() const
                 edgeTags.insert(edge->tag);
             }
         }
-        info[QStringLiteral("tagId")] = edgeTags.size() == 1 ? static_cast<double>(edgeTags.begin()->value) : -1.0;
+        info[QStringLiteral("tagId")]
+            = edgeTags.size() == 1 ? static_cast<double>(edgeTags.begin()->value) : -1.0;
         info[QStringLiteral("kind")] = QStringLiteral("edges");
         info[QStringLiteral("title")] = m_selection.edges.size() == 1
-            ? QStringLiteral("Muchie")
+            ? ui("Muchie")
             : plural(m_selection.edges.size(), "muchie", "muchii");
-        details << detail(QStringLiteral("Lungime"), QString::fromStdString(units::formatLength(length)));
+        details << detail(ui("Lungime"), trCore(units::formatLength(length)));
     } else {
         info[QStringLiteral("kind")] = QStringLiteral("mixed");
         info[QStringLiteral("title")] = selectionSummary();
@@ -1115,18 +1307,21 @@ QVariantMap Document::entityInfo() const
             // Poziția e a pivotului (ca la obiecte și în timeline); pivotul, ca distanță de la colțul minim.
             const math::Vec3d at = same && m_geometryPivot ? *m_geometryPivot : (lo + hi) * 0.5;
             const math::Vec3d pivot = at - lo;
-            info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), at.x }, { QStringLiteral("py"), at.y },
-                { QStringLiteral("pz"), at.z }, { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
-                { QStringLiteral("dz"), hi.z - lo.z }, { QStringLiteral("rx"), r.x }, { QStringLiteral("ry"), r.y },
-                { QStringLiteral("rz"), r.z }, { QStringLiteral("sx"), k.x }, { QStringLiteral("sy"), k.y },
-                { QStringLiteral("sz"), k.z }, { QStringLiteral("vx"), pivot.x }, { QStringLiteral("vy"), pivot.y },
+            info[QStringLiteral("geometry")] = QVariantMap { { QStringLiteral("px"), at.x },
+                { QStringLiteral("py"), at.y }, { QStringLiteral("pz"), at.z },
+                { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
+                { QStringLiteral("dz"), hi.z - lo.z }, { QStringLiteral("rx"), r.x },
+                { QStringLiteral("ry"), r.y }, { QStringLiteral("rz"), r.z }, { QStringLiteral("sx"), k.x },
+                { QStringLiteral("sy"), k.y }, { QStringLiteral("sz"), k.z },
+                { QStringLiteral("vx"), pivot.x }, { QStringLiteral("vy"), pivot.y },
                 { QStringLiteral("vz"), pivot.z } };
         }
     }
-    // O curbă Pen (nu un arc): titlul ei, doar când selecția e numai curba (toate muchiile au id-ul ei); editarea e cu
-    // dublu click în viewport.
-    model::PenCurveId pen
-        = m_selection.edges.empty() ? model::PenCurveId {} : model::penCurveForEdge(m_model, activeDefinition(), *m_selection.edges.begin());
+    // O curbă Pen (nu un arc): titlul ei, doar când selecția e numai curba (toate muchiile au id-ul ei);
+    // editarea e cu dublu click în viewport.
+    model::PenCurveId pen = m_selection.edges.empty()
+        ? model::PenCurveId {}
+        : model::penCurveForEdge(m_model, activeDefinition(), *m_selection.edges.begin());
     if (pen) {
         const std::uint32_t curve = mesh.edge(*m_selection.edges.begin()).curve;
         const bool onlyCurve = m_selection.faces.empty() && m_selection.instances.empty()
@@ -1137,9 +1332,9 @@ QVariantMap Document::entityInfo() const
         }
     }
     if (pen) {
-        info[QStringLiteral("title")] = QStringLiteral("Curbă");
+        info[QStringLiteral("title")] = ui("Curbă");
         if (model::penCurveEditable(m_model, pen)) {
-            details << detail(QStringLiteral("Editare"), QStringLiteral("dublu click pe curbă"));
+            details << detail(ui("Editare"), ui("dublu click pe curbă"));
         }
     }
     // Forma recunoscută (linie, arc, cerc, poligon, dreptunghi), cu mărimile ei editabile.
@@ -1155,7 +1350,8 @@ QVariantMap Document::entityInfo() const
             { QStringLiteral("length"), shape->length }, { QStringLiteral("radius"), shape->radius },
             { QStringLiteral("angle"), shape->angle }, { QStringLiteral("segments"), shape->segments },
             { QStringLiteral("width"), shape->width }, { QStringLiteral("height"), shape->height },
-            { QStringLiteral("segmentsEditable"), shape->segmentsEditable } };
+            { QStringLiteral("segmentsEditable"), shape->segmentsEditable }
+        };
     }
     // Muchiile selectate: soft (toate, niciuna sau mixt).
     if (!m_selection.edges.empty()) {
@@ -1164,14 +1360,15 @@ QVariantMap Document::entityInfo() const
             const geom::Edge* edge = mesh.edges().find(e);
             soft += edge != nullptr && edge->soft ? 1 : 0;
         }
-        info[QStringLiteral("edgesSoft")] = soft == 0 ? 0 : soft == static_cast<int>(m_selection.edges.size()) ? 1 : -1;
+        info[QStringLiteral("edgesSoft")] = soft == 0            ? 0
+            : soft == static_cast<int>(m_selection.edges.size()) ? 1
+                                                                 : -1;
     }
     info[QStringLiteral("details")] = details;
     return info;
 }
 
-template <class Fn>
-void Document::withTool(const view::Camera& camera, Fn&& fn)
+template <class Fn> void Document::withTool(const view::Camera& camera, Fn&& fn)
 {
     if (!m_tool) {
         return;
@@ -1180,8 +1377,8 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     // În grupul editat, uneltele lucrează în coordonatele lui (camera face conversia).
     const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
     tools::ToolRequests requests;
-    // În Animare, uneltele lucrează pe poza de la timpul curent, cu un istoric propriu (aruncat); ce mută ele devine
-    // keyframe-uri, mai jos.
+    // În Animare, uneltele lucrează pe poza de la timpul curent, cu un istoric propriu (aruncat); ce mută ele
+    // devine keyframe-uri, mai jos.
     const bool animating = m_workMode == Animation;
     if (animating && m_model.isRecording()) {
         return; // o tranzacție deschisă (tragerea pivotului): poza nu se poate face acum
@@ -1197,7 +1394,8 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
             posedBefore[target.instances().keys()[i]] = target.instances().values()[i].transform;
         }
     }
-    tools::ToolContext ctx { target.mesh(activeDefinition()), animating ? *poseStack : m_stack, m_selection, local };
+    tools::ToolContext ctx { target.mesh(activeDefinition()), animating ? *poseStack : m_stack, m_selection,
+        local };
     ctx.model = &target;
     ctx.context = activeDefinition();
     // În Animare scena vine din copia pozată (`target`), fără cache; altfel din cache-ul documentului.
@@ -1205,11 +1403,17 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (animating) {
         posedSnap = model::snapScene(target, m_path, snapExclude());
         ctx.snap = &posedSnap;
+    } else if (m_doorsOpen && m_workMode == Modeling && !m_runtime) {
+        // Ușile deschise: clicurile și prinderea pe ce se vede (interiorul corpurilor), editările în model.
+        ctx.pickModel = &doorsOpenModel();
+        posedSnap = model::snapScene(doorsOpenModel(), m_path, snapExclude());
+        ctx.snap = &posedSnap;
     } else {
         ctx.snap = &snapScene(snapExclude());
     }
     ctx.requests = &requests;
     ctx.paintMaterial = m_currentMaterial;
+    ctx.boardDefaults = &m_boardDefaults;
     ctx.toWorld = contextTransform();
     ctx.drawsPaths = m_workMode == Animation; // Pen-ul desenează căi în Animare
     if (const model::PenCurve* c = m_editCurve ? m_model.penCurves().find(m_editCurve) : nullptr) {
@@ -1223,8 +1427,8 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     }
     ctx.pivot = selectionPivot(); // Rotate pornește din el, Scale cu Option îl ține fix
     ctx.place = m_place;
-    // O cameră sau o lumină selectată (în Modelare, la nivelul modelului): ținta lui Move / Rotate / Scale, cu pivotul
-    // în poziția ei. Camerele și luminile nu se animă, deci nu și în Animare.
+    // O cameră sau o lumină selectată (în Modelare, la nivelul modelului): ținta lui Move / Rotate / Scale,
+    // cu pivotul în poziția ei. Camerele și luminile nu se animă, deci nu și în Animare.
     const bool sceneObject = !animating && m_path.empty() && m_selection.empty()
         && (m_model.cameras().contains(m_selectedCamera) || m_model.lights().contains(m_selectedLight));
     if (sceneObject) {
@@ -1236,8 +1440,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (m_snapToGrid) {
         ctx.gridStep = inferenceGridStep(camera);
     }
-    ctx.libraryMaterial
-        = m_libraryMaterial >= 0 ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)] : nullptr;
+    ctx.libraryMaterial = m_libraryMaterial >= 0
+        ? &model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)]
+        : nullptr;
     fn(*m_tool, ctx);
     if (sceneObject) {
         emit selectionChanged(); // Inspector-ul camerei / luminii
@@ -1323,6 +1528,9 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (m_place && (requests.placeAt || requests.placeCancel)) {
         finishPaste(requests.placeCancel ? std::nullopt : requests.placeAt);
     }
+    if (m_dividerActive && (requests.dividerAt || requests.dividerCancel)) {
+        finishDivider(requests.dividerCancel ? std::nullopt : requests.dividerAt, requests.dividerAtClick);
+    }
     // Tragerea pivotului: previzualizarea, apoi punctul ales (sau anularea).
     if (requests.pivotDone && pivotDragging()) {
         finishPivotDrag(requests.pivot);
@@ -1336,7 +1544,8 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (requests.penPath) {
         createMotionPath(*requests.penPath, requests.penNormal);
     }
-    if (requests.curveEdit && m_editPath && m_workMode == Animation && m_model.motionPaths().contains(m_editPath)) {
+    if (requests.curveEdit && m_editPath && m_workMode == Animation
+        && m_model.motionPaths().contains(m_editPath)) {
         model::MotionPath p = m_model.motionPaths().at(m_editPath);
         p.curve = geom::transformed(*requests.curveEdit, p.transform.inverse() * contextTransform());
         const model::MotionPathId id = m_editPath;
@@ -1349,7 +1558,8 @@ void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (requests.curveEdit && m_editCurve && m_workMode == Modeling) {
         const geom::BezierPath path = *requests.curveEdit;
         bool replaced = false;
-        runOnModel("Editează curba", [&](model::Model& model) { replaced = model::replacePenCurve(model, m_editCurve, path); });
+        runOnModel("Editează curba",
+            [&](model::Model& model) { replaced = model::replacePenCurve(model, m_editCurve, path); });
         if (!replaced) {
             finishCurveEdit();
         }
@@ -1373,9 +1583,10 @@ void Document::afterInteraction(const geom::Selection& before)
         emit outlineChanged();
     }
     emit toolStatusChanged();
-    // O mișcare de mouse care lasă desenul la fel (aceeași față sub cursor, același overlay, nimic schimbat în model
-    // sau în selecție, nicio tranzacție deschisă): viewport-ul nu are ce reface.
-    if (m_lookBeforeMove && m_selection == before && !m_stack.inTransaction() && *m_lookBeforeMove == toolLook()) {
+    // O mișcare de mouse care lasă desenul la fel (aceeași față sub cursor, același overlay, nimic schimbat
+    // în model sau în selecție, nicio tranzacție deschisă): viewport-ul nu are ce reface.
+    if (m_lookBeforeMove && m_selection == before && !m_stack.inTransaction()
+        && *m_lookBeforeMove == toolLook()) {
         return;
     }
     touch();
@@ -1418,8 +1629,8 @@ std::set<model::InstanceId> Document::snapExclude() const
 
 const inference::SnapScene& Document::snapScene(const std::set<model::InstanceId>& exclude) const
 {
-    // Vizibilitatea (instanțe și tag-uri) trece prin model, deci îi schimbă revizia; hiddenTags() intră în cheie
-    // pentru că e o stare globală separată.
+    // Vizibilitatea (instanțe și tag-uri) trece prin model, deci îi schimbă revizia; hiddenTags() intră în
+    // cheie pentru că e o stare globală separată.
     const SnapKey key { modelRevision(), m_path, exclude, view::hiddenTags() };
     if (!m_snapCache || m_snapCache->first != key) {
         m_snapCache.emplace(key, model::snapScene(m_model, m_path, exclude));
@@ -1443,11 +1654,14 @@ double Document::inferenceGridStep(const view::Camera& camera) const
     return m_gridStep > 0.0 ? m_gridStep : inference::autoGridStep(camera.pose().distance);
 }
 
-inference::Inference Document::inferDrop(inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const
+inference::Inference Document::inferDrop(
+    inference::Engine& engine, const view::Camera& camera, view::Vec2d screen) const
 {
     const view::Camera local = m_path.empty() ? camera : camera.inContext(contextTransform());
     const std::vector<inference::GuideRef> guides = inferenceGuides();
-    engine.withGuides(guides).withScene(&snapScene()).withGridSnap(m_snapToGrid ? inferenceGridStep(camera) : 0.0);
+    engine.withGuides(guides)
+        .withScene(&snapScene())
+        .withGridSnap(m_snapToGrid ? inferenceGridStep(camera) : 0.0);
     return engine.infer(mesh(), local, screen, std::nullopt);
 }
 
@@ -1548,12 +1762,14 @@ void Document::pointerUp(const view::Camera& camera, const tools::PointerEvent& 
 
 void Document::escape()
 {
-    withTool(view::Camera {}, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Escape, {} }); });
+    withTool(view::Camera {},
+        [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Escape, {} }); });
 }
 
 void Document::enter()
 {
-    withTool(view::Camera {}, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Enter, {} }); });
+    withTool(view::Camera {},
+        [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Enter, {} }); });
 }
 
 void Document::replayPointer()
@@ -1620,16 +1836,15 @@ void Document::redo()
     stepHistory([this] { m_stack.redo(); });
 }
 
-template <class Fn>
-void Document::stepHistory(Fn&& step)
+template <class Fn> void Document::stepHistory(Fn&& step)
 {
     const geom::Selection before = m_selection;
     const std::vector<model::AnimationId> animationsBefore = m_model.animations().keys();
     m_geometryKey.clear(); // rotirea / scara afișate pentru geometria liberă pornesc din nou de la 0° / 1
     ++m_modelRevision;
     step();
-    // O animație readusă (ștergere anulată, creare refăcută) devine cea activă; dacă cea activă a dispărut, rămâne
-    // prima care există.
+    // O animație readusă (ștergere anulată, creare refăcută) devine cea activă; dacă cea activă a dispărut,
+    // rămâne prima care există.
     const std::vector<model::AnimationId>& animations = m_model.animations().keys();
     for (model::AnimationId id : animations) {
         if (std::ranges::find(animationsBefore, id) == animationsBefore.end()) {
@@ -1653,7 +1868,8 @@ void Document::stepHistory(Fn&& step)
     }
     ++m_interactionRevision;
     afterInteraction(before);
-    // Pasul poate schimba orice: cheile din timeline, valorile de la playhead, Inspector-ul, lista obiectelor.
+    // Pasul poate schimba orice: cheile din timeline, valorile de la playhead, Inspector-ul, lista
+    // obiectelor.
     emit timelineTimeChanged();
     emit timelineChanged();
     emit playheadValuesChanged();
@@ -1664,7 +1880,8 @@ void Document::stepHistory(Fn&& step)
 void Document::deleteSelection(bool keepFaces)
 {
     if (curveEditing()) { // ⌫ în editarea unei curbe: punctul selectat
-        withTool(m_lastCamera, [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Delete, {} }); });
+        withTool(m_lastCamera,
+            [](tools::Tool& t, tools::ToolContext& ctx) { t.key(ctx, { tools::Key::Delete, {} }); });
         return;
     }
     if (m_model.motionPaths().contains(m_selectedPath)) {
@@ -1713,23 +1930,26 @@ void Document::clearSelection()
     afterInteraction(before);
 }
 
-template <class Fn>
-bool Document::runOnModel(const std::string& name, Fn&& fn)
+template <class Fn> bool Document::runOnModel(const std::string& name, Fn&& fn)
 {
-    // O editare a modelului iese din previzualizarea animației (altfel viewport-ul ar arăta poza animată, nu ce s-a
-    // schimbat); doar keyframe-urile (editAnimation) o păstrează.
+    // O editare a modelului iese din previzualizarea animației (altfel viewport-ul ar arăta poza animată, nu
+    // ce s-a schimbat); doar keyframe-urile (editAnimation) o păstrează.
     if (!m_keepPreview && m_workMode != Animation) {
         endPreview();
     }
     ++m_modelRevision;
     const geom::Selection before = m_selection;
     if (m_macro) {
-        // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo), iar endMacro
-        // anunță o singură dată selecția, Outliner-ul și viewport-ul (altfel 300 de cutii refăceau lista de 300 de ori).
+        // Într-un script: totul intră în tranzacția deschisă de beginMacro (un singur pas de undo), iar
+        // endMacro anunță o singură dată selecția, Outliner-ul și viewport-ul (altfel 300 de cutii refăceau
+        // lista de 300 de ori).
         fn(m_model);
         return true;
     }
     const bool changed = m_stack.run(name, [&](model::Model& model) { fn(model); });
+    if (!changed && !m_stack.lastError().empty()) {
+        setError(ui("Operația a fost anulată: %1").arg(trCore(m_stack.lastError())));
+    }
     afterInteraction(before);
     // Entity Info arată și proprietăți ale obiectelor (tag, nume, blocare), nu doar ce e selectat.
     emit selectionChanged();
@@ -1750,7 +1970,8 @@ void Document::makeGroup()
         return;
     }
     runOnModel("Creează obiect", [&](model::Model& model) {
-        const model::InstanceId id = model::makeGroup(model, activeDefinition(), m_selection, false, "Obiect");
+        const model::InstanceId id
+            = model::makeGroup(model, activeDefinition(), m_selection, false, "Obiect");
         m_selection.clear();
         m_selection.instances.insert(id);
     });
@@ -1762,11 +1983,13 @@ void Document::groupSelection()
         return;
     }
     if (m_selection.instances.empty()) {
-        setError(QStringLiteral("Selectează unul sau mai multe obiecte ca să le grupezi (formele devin întâi obiect, cu ⌘G)."));
+        setError(QStringLiteral(
+            "Selectează unul sau mai multe obiecte ca să le grupezi (formele devin întâi obiect, cu ⌘G)."));
         return;
     }
     runOnModel("Grupează", [&](model::Model& model) {
-        const model::InstanceId id = model::groupInstances(model, activeDefinition(), m_selection.instances, "Grup");
+        const model::InstanceId id
+            = model::groupInstances(model, activeDefinition(), m_selection.instances, "Grup");
         m_selection.clear();
         m_selection.instances.insert(id);
     });
@@ -1808,10 +2031,30 @@ void Document::moveInstanceTo(double instanceId, double targetInstance)
         target = m_model.instance(t).definition;
     }
     bool moved = false;
-    runOnModel("Mută în grup", [&](model::Model& model) { moved = model::moveToParent(model, id, target); });
+    const model::DefinitionId body = model::carcassOfPiece(m_model, id);
+    runOnModel("Mută în grup", [&](model::Model& model) {
+        moved = model::moveToParent(model, id, target);
+        if (moved && body) {
+            model::makePlainBody(model, body); // corpul nu se mai reface (piesa lui a plecat)
+        }
+    });
     if (!moved) {
-        setError(QStringLiteral("Obiectul nu poate fi mutat acolo (ar intra în el însuși sau ținta are copii)."));
+        setError(ui("Obiectul nu poate fi mutat acolo (ar intra în el însuși sau ținta are copii)."));
     }
+}
+
+bool Document::moveBreaksCarcass(double instanceId, double targetInstance) const
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    const model::DefinitionId body = model::carcassOfPiece(m_model, id);
+    if (!body) {
+        return false;
+    }
+    const model::DefinitionId target
+        = targetInstance > 0 && m_model.instances().contains(toInstanceId(targetInstance))
+        ? m_model.instance(toInstanceId(targetInstance)).definition
+        : m_model.root();
+    return target != m_model.instance(id).parent;
 }
 
 void Document::selectByTag(double tagId)
@@ -1854,6 +2097,16 @@ void Document::makeComponent(const QString& name)
     });
 }
 
+bool Document::explodeLosesPartData() const
+{
+    for (model::InstanceId id : m_selection.instances) {
+        if (m_model.instances().contains(id) && model::explodeLosesPartData(m_model, id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Document::explodeSelection()
 {
     if (!require(Modeling)) {
@@ -1871,6 +2124,159 @@ void Document::explodeSelection()
         }
         m_selection = result;
     });
+}
+
+void Document::makeBoardSelection()
+{
+    if (!require(Modeling)) {
+        return;
+    }
+    if (m_selection.instances.empty()) {
+        setError(ui("Selectează obiectele care trebuie să devină plăci."));
+        return;
+    }
+    int refused = 0;
+    runOnModel("Fă placă", [&](model::Model& model) {
+        for (model::InstanceId id : m_selection.instances) {
+            if (model.instances().contains(id) && !model::makeBoard(model, id, "pal")) {
+                ++refused;
+            }
+        }
+    });
+    if (refused > 0) {
+        setError(ui("%1 obiecte nu pot deveni plăci (au alte obiecte în ele sau nu au fețe).").arg(refused));
+    }
+    emit selectionChanged();
+}
+
+model::DefinitionId Document::carcassTarget(math::Transform* bodyFromContext) const
+{
+    const std::size_t valid = validPathLength();
+    const std::vector<model::InstanceId> path(
+        m_path.begin(), m_path.begin() + static_cast<std::ptrdiff_t>(valid));
+    if (const model::InstanceId body = model::carcassInPath(m_model, path)) {
+        if (bodyFromContext != nullptr) {
+            std::vector<model::InstanceId> prefix;
+            for (model::InstanceId id : path) {
+                prefix.push_back(id);
+                if (id == body) {
+                    break;
+                }
+            }
+            *bodyFromContext = model::worldTransform(m_model, prefix).inverse() * contextTransform();
+        }
+        return m_model.instance(body).definition;
+    }
+    if (m_selection.instances.size() == 1) {
+        const model::InstanceId id = *m_selection.instances.begin();
+        if (m_model.instances().contains(id)
+            && model::isCarcassGenerator(m_model.definition(m_model.instance(id).definition).generator)) {
+            if (bodyFromContext != nullptr) {
+                *bodyFromContext = m_model.instance(id).transform.inverse();
+            }
+            return m_model.instance(id).definition;
+        }
+    }
+    return {};
+}
+
+void Document::upgradeGenerator()
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Actualizează corpul", [&](model::Model& model) { model::upgradeGenerator(model, def); });
+    emit selectionChanged();
+}
+
+void Document::makePlainBody()
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Corp obișnuit", [&](model::Model& model) { model::makePlainBody(model, def); });
+    emit selectionChanged();
+}
+
+bool Document::rolePiecesDiffer() const
+{
+    if (m_selection.instances.size() != 1) {
+        return false;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    return m_model.instances().contains(id)
+        && model::rolePiecesDiffer(m_model, m_model.instance(id).definition);
+}
+
+bool Document::selectionBreaksCarcass() const
+{
+    math::Transform unused;
+    const model::DefinitionId body = carcassTarget(&unused);
+    if (!body || body != activeDefinition()) {
+        return false; // doar piesele directe ale corpului (contextul de editare e corpul)
+    }
+    for (model::InstanceId id : m_selection.instances) {
+        if (m_model.instances().contains(id) && !m_model.instance(id).roleKey.empty()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Document::makeContextPlain()
+{
+    const model::DefinitionId body = carcassTarget(nullptr);
+    if (!require(Modeling) || !body || body != activeDefinition()) {
+        return;
+    }
+    runOnModel("Corp obișnuit", [&](model::Model& model) { model::makePlainBody(model, body); });
+}
+
+void Document::beginAddDivider()
+{
+    if (!require(Modeling) || m_suspendedTool || !m_tool) {
+        return;
+    }
+    if (!carcassTarget(nullptr)) {
+        setError(QStringLiteral(
+            "Selectează un corp din bibliotecă (sau intră în el) ca să-i adaugi un separator."));
+        return;
+    }
+    m_dividerActive = true;
+    m_suspendedTool = std::exchange(m_tool, tools::makeTool("divider"));
+    replayPointer();
+    emit toolStatusChanged();
+    touch();
+}
+
+void Document::finishDivider(const std::optional<math::Vec3d>& at, bool atClick)
+{
+    if (!m_dividerActive) {
+        return;
+    }
+    m_dividerActive = false;
+    if (m_suspendedTool) {
+        m_tool = std::move(m_suspendedTool);
+    }
+    math::Transform bodyFromContext;
+    const model::DefinitionId body = carcassTarget(&bodyFromContext);
+    if (at && body && m_workMode == Modeling) {
+        model::DividerResult result = model::DividerResult::NotCarcass;
+        runOnModel("Adaugă separator", [&](model::Model& model) {
+            result = model::addDivider(model, body, bodyFromContext.applyToPoint(*at), atClick);
+        });
+        if (result == model::DividerResult::TooClose) {
+            setError(ui("Separatorul ar fi la mai puțin de 50 mm de altul sau de o laterală."));
+        } else if (result == model::DividerResult::Outside) {
+            setError(ui("Clicul nu e între lateralele corpului."));
+        } else if (result == model::DividerResult::NotCarcass) {
+            setError(ui("Corpul acesta nu are separatoare."));
+        }
+    }
+    emit toolStatusChanged();
+    touch();
 }
 
 void Document::makeUniqueSelection()
@@ -1919,7 +2325,8 @@ void Document::pasteClipboard()
     if (!require(Modeling) || !m_clipboard || m_suspendedTool || !m_tool) {
         return;
     }
-    // Copia se ține de colțul minim al cutiei comune (în coordonatele părintelui), ca să se pună colț la colț.
+    // Copia se ține de colțul minim al cutiei comune (în coordonatele părintelui), ca să se pună colț la
+    // colț.
     tools::PlaceSource place;
     place.edges = model::instanceOutline(*m_clipboard->model, m_clipboard->instances);
     if (place.edges.empty()) {
@@ -1951,7 +2358,8 @@ void Document::finishPaste(const std::optional<math::Vec3d>& at)
         const Clipboard clip = *m_clipboard;
         const math::Transform delta = math::Transform::translation(*at - place.base);
         runOnModel("Lipește", [&](model::Model& model) {
-            const model::CopyResult r = model::copyDeep(model, activeDefinition(), *clip.model, clip.instances, delta);
+            const model::CopyResult r
+                = model::copyDeep(model, activeDefinition(), *clip.model, clip.instances, delta);
             model::copyAnimations(model, *clip.model, r, delta, model::CopyKind::Copy);
             m_selection.clear();
             m_selection.instances.insert(r.roots.begin(), r.roots.end());
@@ -2207,8 +2615,10 @@ void Document::selectForContextMenu(const view::Camera& camera, math::Vec2d scre
     ctx.context = activeDefinition();
     const geom::Selection hit = tools::selectionAt(ctx, screen);
     const bool alreadySelected = !hit.empty()
-        && std::all_of(hit.faces.begin(), hit.faces.end(), [&](geom::FaceId f) { return m_selection.contains(f); })
-        && std::all_of(hit.edges.begin(), hit.edges.end(), [&](geom::EdgeId e) { return m_selection.contains(e); })
+        && std::all_of(
+            hit.faces.begin(), hit.faces.end(), [&](geom::FaceId f) { return m_selection.contains(f); })
+        && std::all_of(
+            hit.edges.begin(), hit.edges.end(), [&](geom::EdgeId e) { return m_selection.contains(e); })
         && std::all_of(hit.instances.begin(), hit.instances.end(),
             [&](model::InstanceId i) { return m_selection.contains(i); });
     if (!alreadySelected) {
@@ -2224,8 +2634,9 @@ QVariantList Document::animations() const
     QVariantList out;
     for (std::size_t i = 0; i < m_model.animations().size(); ++i) {
         const model::Animation& a = m_model.animations().values()[i];
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.animations().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(a.name) }, { QStringLiteral("duration"), a.duration } });
+        out.append(
+            QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.animations().keys()[i].value) },
+                { QStringLiteral("name"), trCore(a.name) }, { QStringLiteral("duration"), a.duration } });
     }
     return out;
 }
@@ -2258,7 +2669,7 @@ namespace {
 
 QVariantMap easingToVariant(const model::Easing& e)
 {
-    return { { QStringLiteral("name"), QString::fromStdString(e.name) }, { QStringLiteral("x1"), e.x1 },
+    return { { QStringLiteral("name"), trCore(e.name) }, { QStringLiteral("x1"), e.x1 },
         { QStringLiteral("y1"), e.y1 }, { QStringLiteral("x2"), e.x2 }, { QStringLiteral("y2"), e.y2 },
         { QStringLiteral("step"), e.step } };
 }
@@ -2290,11 +2701,14 @@ QString colorText(const model::Color& c)
 // Numele canalului ca în Inspector și unitatea valorilor.
 std::pair<QString, QString> channelLabel(model::Property p)
 {
-    static const char* const kLabels[] = { "Poziție X", "Poziție Y", "Poziție Z", "Rotație X", "Rotație Y", "Rotație Z",
-        "Scară X", "Scară Y", "Scară Z", "Culoare" };
+    static const char* const kLabels[] = { "Poziție X", "Poziție Y", "Poziție Z", "Rotație X", "Rotație Y",
+        "Rotație Z", "Scară X", "Scară Y", "Scară Z", "Culoare" };
     const int i = static_cast<int>(p);
     return { QString::fromUtf8(kLabels[i]),
-        i < 3 ? QStringLiteral("mm") : i < 6 ? QStringLiteral("°") : i < 9 ? QStringLiteral("×") : QStringLiteral("color") };
+        i < 3       ? QStringLiteral("mm")
+            : i < 6 ? QStringLiteral("°")
+            : i < 9 ? QStringLiteral("×")
+                    : QStringLiteral("color") };
 }
 
 } // namespace
@@ -2306,7 +2720,8 @@ QString Document::channelValueText(model::Property p, double value) const
         return formatLength(value);
     }
     if (i < 6) {
-        return QString::number(value, 'f', std::abs(value - std::round(value)) < 1e-6 ? 0 : 1) + QStringLiteral("°");
+        return QString::number(value, 'f', std::abs(value - std::round(value)) < 1e-6 ? 0 : 1)
+            + QStringLiteral("°");
     }
     return QString::number(value, 'g', 4);
 }
@@ -2320,12 +2735,12 @@ QVariantMap Document::timeline() const
     QVariantList tracks;
     for (const model::ObjectTrack& t : a->tracks) {
         const model::Instance* inst = m_model.instances().find(t.instance);
-        QString name = QStringLiteral("(șters)");
+        QString name = ui("(șters)");
         if (inst != nullptr) {
-            const model::Definition& def = m_model.definition(inst->definition);
-            name = QString::fromStdString(inst->name.empty() ? def.name : inst->name);
+            name = trCore(model::partName(m_model, t.instance));
         }
-        const model::TransformValues now = inst != nullptr ? currentValues(t.instance) : model::TransformValues {};
+        const model::TransformValues now
+            = inst != nullptr ? currentValues(t.instance) : model::TransformValues {};
         const std::optional<model::Color> color = model::evaluateColor(t, m_timelineTime);
         QVariantList channels;
         for (const model::Channel& c : t.channels) {
@@ -2335,15 +2750,21 @@ QVariantMap Document::timeline() const
             for (const model::Key& k : c.keys) {
                 keys.append(QVariantMap { { QStringLiteral("time"), k.time },
                     { QStringLiteral("value"), isColor ? QVariant(colorText(k.color)) : QVariant(k.value) },
-                    { QStringLiteral("text"), isColor ? colorText(k.color) : channelValueText(c.property, k.value) },
+                    { QStringLiteral("text"),
+                        isColor ? colorText(k.color) : channelValueText(c.property, k.value) },
                     { QStringLiteral("easing"), easingToVariant(k.easing) } });
             }
             const double current = now.get(c.property);
-            channels.append(QVariantMap { { QStringLiteral("property"), QString::fromLatin1(model::propertyName(c.property).data(),
-                                                                        qsizetype(model::propertyName(c.property).size())) },
-                { QStringLiteral("label"), label }, { QStringLiteral("unit"), unit }, { QStringLiteral("keys"), keys },
-                { QStringLiteral("current"), isColor ? QVariant(color ? colorText(*color) : QString()) : QVariant(current) },
-                { QStringLiteral("currentText"), isColor ? (color ? colorText(*color) : QString()) : channelValueText(c.property, current) } });
+            channels.append(QVariantMap { { QStringLiteral("property"),
+                                              QString::fromLatin1(model::propertyName(c.property).data(),
+                                                  qsizetype(model::propertyName(c.property).size())) },
+                { QStringLiteral("label"), label }, { QStringLiteral("unit"), unit },
+                { QStringLiteral("keys"), keys },
+                { QStringLiteral("current"),
+                    isColor ? QVariant(color ? colorText(*color) : QString()) : QVariant(current) },
+                { QStringLiteral("currentText"),
+                    isColor ? (color ? colorText(*color) : QString())
+                            : channelValueText(c.property, current) } });
         }
         QVariantList times;
         std::set<model::InstanceId> one { t.instance };
@@ -2351,7 +2772,8 @@ QVariantMap Document::timeline() const
             times.append(time);
         }
         tracks.append(QVariantMap { { QStringLiteral("instance"), static_cast<double>(t.instance.value) },
-            { QStringLiteral("name"), name }, { QStringLiteral("times"), times }, { QStringLiteral("channels"), channels },
+            { QStringLiteral("name"), name }, { QStringLiteral("times"), times },
+            { QStringLiteral("channels"), channels },
             { QStringLiteral("selected"), m_selection.instances.contains(t.instance) } });
     }
     QVariantList paths;
@@ -2362,25 +2784,27 @@ QVariantMap Document::timeline() const
         }
         QStringList anchors;
         for (const model::PathAnchor& anchor : p.anchors) {
-            if (const model::Instance* inst = m_model.instances().find(anchor.instance)) {
-                const model::Definition& def = m_model.definition(inst->definition);
-                anchors.append(QString::fromStdString(inst->name.empty() ? def.name : inst->name));
+            if (m_model.instances().contains(anchor.instance)) {
+                anchors.append(trCore(model::partName(m_model, anchor.instance)));
             }
         }
-        paths.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.motionPaths().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(p.name) }, { QStringLiteral("start"), p.start },
-            { QStringLiteral("duration"), p.duration }, { QStringLiteral("easing"), easingToVariant(p.easing) },
-            { QStringLiteral("anchors"), anchors },
+        paths.append(QVariantMap {
+            { QStringLiteral("id"), static_cast<double>(m_model.motionPaths().keys()[i].value) },
+            { QStringLiteral("name"), trCore(p.name) }, { QStringLiteral("start"), p.start },
+            { QStringLiteral("duration"), p.duration },
+            { QStringLiteral("easing"), easingToVariant(p.easing) }, { QStringLiteral("anchors"), anchors },
             { QStringLiteral("selected"), m_model.motionPaths().keys()[i] == m_selectedPath } });
     }
     QVariantList camera;
     for (const model::CameraKey& k : a->camera) {
-        camera.append(QVariantMap { { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), easingToVariant(k.easing) } });
+        camera.append(QVariantMap {
+            { QStringLiteral("time"), k.time }, { QStringLiteral("easing"), easingToVariant(k.easing) } });
     }
-    return { { QStringLiteral("name"), QString::fromStdString(a->name) }, { QStringLiteral("duration"), a->duration },
+    return { { QStringLiteral("name"), trCore(a->name) }, { QStringLiteral("duration"), a->duration },
         { QStringLiteral("fps"), a->fps }, { QStringLiteral("loop"), a->loop },
-        { QStringLiteral("defaultEasing"), easingToVariant(a->defaultEasing) }, { QStringLiteral("tracks"), tracks },
-        { QStringLiteral("camera"), camera }, { QStringLiteral("paths"), paths } };
+        { QStringLiteral("defaultEasing"), easingToVariant(a->defaultEasing) },
+        { QStringLiteral("tracks"), tracks }, { QStringLiteral("camera"), camera },
+        { QStringLiteral("paths"), paths } };
 }
 
 void Document::setTimelineTime(double seconds)
@@ -2401,8 +2825,7 @@ void Document::setTimelineTime(double seconds)
     emit changed();
 }
 
-template <class Fn>
-void Document::editAnimation(const char* name, Fn&& fn)
+template <class Fn> void Document::editAnimation(const char* name, Fn&& fn)
 {
     if (!currentAnimation()) {
         return;
@@ -2482,7 +2905,7 @@ void Document::keySelection()
         return;
     }
     if (m_selection.instances.empty()) {
-        setError(QStringLiteral("Selectează obiectele pe care vrei să le animezi, apoi pune keyframe-ul."));
+        setError(ui("Selectează obiectele pe care vrei să le animezi, apoi pune keyframe-ul."));
         return;
     }
     const double t = m_timelineTime;
@@ -2514,7 +2937,7 @@ void Document::keySelectionColor()
         return;
     }
     if (m_selection.instances.empty()) {
-        setError(QStringLiteral("Selectează obiectele, apoi pune keyframe-ul de culoare."));
+        setError(ui("Selectează obiectele, apoi pune keyframe-ul de culoare."));
         return;
     }
     const double t = m_timelineTime;
@@ -2537,11 +2960,14 @@ void Document::keyCamera(const QVariantMap& camera)
     }
     const double t = m_timelineTime;
     editAnimation("Keyframe cameră", [&](model::Animation& a) {
-        model::setCameraKey(a, { t,
-            { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
-                camera.value(QStringLiteral("tz")).toDouble() },
-            camera.value(QStringLiteral("yaw")).toDouble(), camera.value(QStringLiteral("pitch")).toDouble(),
-            camera.value(QStringLiteral("distance")).toDouble(), a.defaultEasing });
+        model::setCameraKey(a,
+            { t,
+                { camera.value(QStringLiteral("tx")).toDouble(),
+                    camera.value(QStringLiteral("ty")).toDouble(),
+                    camera.value(QStringLiteral("tz")).toDouble() },
+                camera.value(QStringLiteral("yaw")).toDouble(),
+                camera.value(QStringLiteral("pitch")).toDouble(),
+                camera.value(QStringLiteral("distance")).toDouble(), a.defaultEasing });
     });
 }
 
@@ -2553,7 +2979,8 @@ std::vector<model::KeyRef> keyRefs(const QVariantList& list)
     for (const QVariant& v : list) {
         const QVariantMap m = v.toMap();
         model::KeyRef r;
-        r.instance = model::InstanceId { static_cast<std::uint64_t>(m.value(QStringLiteral("instance")).toDouble()) };
+        r.instance = model::InstanceId { static_cast<std::uint64_t>(
+            m.value(QStringLiteral("instance")).toDouble()) };
         r.property = model::propertyFromName(m.value(QStringLiteral("property")).toString().toStdString());
         r.time = m.value(QStringLiteral("time")).toDouble();
         out.push_back(r);
@@ -2626,7 +3053,8 @@ void Document::setKeyValue(const QVariantMap& key, double value)
         return;
     }
     const std::vector<model::KeyRef> refs = keyRefs({ key });
-    editAnimation("Valoarea keyframe-ului", [&](model::Animation& a) { model::setKeyValue(a, refs.front(), value); });
+    editAnimation(
+        "Valoarea keyframe-ului", [&](model::Animation& a) { model::setKeyValue(a, refs.front(), value); });
 }
 
 void Document::setChannelValue(double instance, const QString& property, double value)
@@ -2664,12 +3092,14 @@ QVariantList Document::pasteKeys()
         }
     }
     model::InstanceId target;
-    if (sources.size() == 1 && m_selection.instances.size() == 1 && !sources.contains(*m_selection.instances.begin())) {
+    if (sources.size() == 1 && m_selection.instances.size() == 1
+        && !sources.contains(*m_selection.instances.begin())) {
         target = *m_selection.instances.begin();
     }
     const double t = m_timelineTime;
     std::vector<model::KeyRef> pasted;
-    editAnimation("Lipește keyframe-urile", [&](model::Animation& a) { pasted = model::pasteKeys(a, m_keyClipboard, t, target); });
+    editAnimation("Lipește keyframe-urile",
+        [&](model::Animation& a) { pasted = model::pasteKeys(a, m_keyClipboard, t, target); });
     return keyRefsToVariant(pasted);
 }
 
@@ -2821,8 +3251,9 @@ QVariantMap Document::animationCamera() const
     if (!c) {
         return {};
     }
-    return { { QStringLiteral("tx"), c->target.x }, { QStringLiteral("ty"), c->target.y }, { QStringLiteral("tz"), c->target.z },
-        { QStringLiteral("yaw"), c->yaw }, { QStringLiteral("pitch"), c->pitch }, { QStringLiteral("distance"), c->distance } };
+    return { { QStringLiteral("tx"), c->target.x }, { QStringLiteral("ty"), c->target.y },
+        { QStringLiteral("tz"), c->target.z }, { QStringLiteral("yaw"), c->yaw },
+        { QStringLiteral("pitch"), c->pitch }, { QStringLiteral("distance"), c->distance } };
 }
 
 std::optional<model::Color> Document::displayColor(model::InstanceId instance) const
@@ -2840,11 +3271,28 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
 
 // --- Modurile de lucru ---
 
+const model::Model& Document::doorsOpenModel() const
+{
+    if (!m_doorsOpenModel || m_doorsOpenRevision != m_modelRevision) {
+        m_doorsOpenModel = m_model;
+        for (std::size_t i = 0; i < m_model.instances().size(); ++i) {
+            const model::InstanceId id = m_model.instances().keys()[i];
+            if (const auto open = model::doorOpenTransform(m_model, id)) {
+                model::Instance inst = m_doorsOpenModel->instance(id);
+                inst.transform = *open;
+                m_doorsOpenModel->setInstance(id, inst);
+            }
+        }
+        m_doorsOpenRevision = m_modelRevision;
+    }
+    return *m_doorsOpenModel;
+}
+
 model::Model& Document::pose() const
 {
     const auto key = std::make_tuple(m_modelRevision, m_timelineTime, m_activeAnimation.value);
-    // Într-o tranzacție deschisă (un script) modelul nu se poate copia: până la sfârșitul ei, poza e modelul de bază
-    // (îl citesc doar legăturile QML; editările pe poză nu rulează în scripturi).
+    // Într-o tranzacție deschisă (un script) modelul nu se poate copia: până la sfârșitul ei, poza e modelul
+    // de bază (îl citesc doar legăturile QML; editările pe poză nu rulează în scripturi).
     if (m_model.isRecording()) {
         return const_cast<model::Model&>(m_model);
     }
@@ -2855,8 +3303,8 @@ model::Model& Document::pose() const
                 const model::InstanceId id = m_model.instances().keys()[i];
                 if (const model::ObjectTrack* t = model::findTrack(*a, id)) {
                     const model::Instance& base = m_model.instances().values()[i];
-                    if (const auto value
-                        = model::evaluateInstance(*t, m_timelineTime, base.transform, model::pivotLocal(m_model, id))) {
+                    if (const auto value = model::evaluateInstance(
+                            *t, m_timelineTime, base.transform, model::pivotLocal(m_model, id))) {
                         model::Instance inst = m_pose->instance(id);
                         inst.transform = *value;
                         m_pose->setInstance(id, inst);
@@ -2887,7 +3335,8 @@ void Document::keyTransforms(const std::map<model::InstanceId, math::Transform>&
     std::map<model::InstanceId, std::pair<model::TransformValues, model::TransformValues>> changes;
     for (const auto& [id, transform] : transforms) {
         if (m_model.instances().contains(id)) {
-            changes[id] = { currentValues(id), model::transformValues(transform, model::pivotLocal(m_model, id)) };
+            changes[id]
+                = { currentValues(id), model::transformValues(transform, model::pivotLocal(m_model, id)) };
         }
     }
     if (!m_autoKey) {
@@ -2898,8 +3347,8 @@ void Document::keyTransforms(const std::map<model::InstanceId, math::Transform>&
             model::Animation a = model.animations().at(animation);
             for (const auto& [id, values] : changes) {
                 model::Instance inst = model.instance(id);
-                inst.transform = model::adjustWithoutKeys(a, id, values.first, values.second, inst.transform,
-                    model::pivotLocal(model, id));
+                inst.transform = model::adjustWithoutKeys(
+                    a, id, values.first, values.second, inst.transform, model::pivotLocal(model, id));
                 model.setInstance(id, inst);
             }
             model.setAnimation(animation, a);
@@ -2925,7 +3374,8 @@ math::Transform Document::shownTransform(model::InstanceId instance) const
         }
         if (const model::Animation* a = currentAnimation()) {
             if (const model::ObjectTrack* t = model::findTrack(*a, instance)) {
-                if (const auto v = model::evaluateInstance(*t, m_timelineTime, inst.transform, model::pivotLocal(m_model, instance))) {
+                if (const auto v = model::evaluateInstance(
+                        *t, m_timelineTime, inst.transform, model::pivotLocal(m_model, instance))) {
                     return *v;
                 }
             }
@@ -2942,7 +3392,6 @@ model::TransformValues Document::currentValues(model::InstanceId instance) const
     const model::ObjectTrack* track = a != nullptr ? model::findTrack(*a, instance) : nullptr;
     return track != nullptr ? model::evaluateValues(*track, m_timelineTime, base) : base;
 }
-
 
 void Document::setWorkMode(int mode)
 {
@@ -2962,6 +3411,9 @@ void Document::setWorkMode(int mode)
     finishCurveEdit(); // o curbă Pen se editează doar în Modelare, o cale doar în Animare
     if (m_place) {
         finishPaste(std::nullopt); // o lipire neterminată nu continuă în alt mod
+    }
+    if (m_dividerActive) {
+        finishDivider(std::nullopt, false);
     }
     if (mode != Interaction) {
         setInteractionMode(false);
@@ -2985,11 +3437,11 @@ bool Document::require(int mode)
         return true;
     }
     static const char* const kNames[] = { "Modelare", "Animare", "Interacțiune" };
-    static const char* const kVerbs[] = { "nu se modifică geometria", "nu se animă obiectele",
-        "nu se adaugă interacțiuni" };
-    setError(QStringLiteral("În modul %1 %2. Treci în %3 (⌥%4).")
-                 .arg(QString::fromUtf8(kNames[m_workMode]), QString::fromUtf8(kVerbs[mode]),
-                     QString::fromUtf8(kNames[mode]), QString::number(mode + 1)));
+    static const char* const kVerbs[]
+        = { "nu se modifică geometria", "nu se animă obiectele", "nu se adaugă interacțiuni" };
+    setError(ui("În modul %1 %2. Treci în %3 (⌥%4).")
+            .arg(QString::fromUtf8(kNames[m_workMode]), QString::fromUtf8(kVerbs[mode]),
+                QString::fromUtf8(kNames[mode]), QString::number(mode + 1)));
     return false;
 }
 
@@ -3002,13 +3454,14 @@ QList<int> Document::commandModes(const QString& id)
 {
     static const QList<int> all { Modeling, Animation, Interaction };
     static const QList<int> modeling { Modeling };
-    // Uneltele: desen, modificare, măsurare, ștergere și vopsire doar în Modelare; transformările și în Animare
-    // (acolo scriu keyframe-uri); Interact doar în Interacțiune; selecția și navigarea peste tot.
+    // Uneltele: desen, modificare, măsurare, ștergere și vopsire doar în Modelare; transformările și în
+    // Animare (acolo scriu keyframe-uri); Interact doar în Interacțiune; selecția și navigarea peste tot.
     if (id.startsWith(QLatin1String("tool."))) {
         const QString tool = id.mid(5);
-        static const QStringList common { QStringLiteral("select"), QStringLiteral("orbit"), QStringLiteral("pan"),
-            QStringLiteral("zoom") };
-        static const QStringList transforms { QStringLiteral("move"), QStringLiteral("rotate"), QStringLiteral("scale") };
+        static const QStringList common { QStringLiteral("select"), QStringLiteral("orbit"),
+            QStringLiteral("pan"), QStringLiteral("zoom") };
+        static const QStringList transforms { QStringLiteral("move"), QStringLiteral("rotate"),
+            QStringLiteral("scale") };
         if (common.contains(tool)) {
             return all;
         }
@@ -3022,9 +3475,9 @@ QList<int> Document::commandModes(const QString& id)
     }
     // Comune: fișierul, vizualizarea, interfața, selecția, undo, modurile, scripturile și plugin-urile.
     static const QStringList commonEdit { QStringLiteral("edit.undo"), QStringLiteral("edit.redo"),
-        QStringLiteral("edit.selectAll"), QStringLiteral("edit.selectNone"), QStringLiteral("edit.selectConnected"),
-        QStringLiteral("org.exit"), QStringLiteral("org.hide"), QStringLiteral("org.unhideAll"),
-        QStringLiteral("view.zoomSelection") };
+        QStringLiteral("edit.selectAll"), QStringLiteral("edit.selectNone"),
+        QStringLiteral("edit.selectConnected"), QStringLiteral("org.exit"), QStringLiteral("org.hide"),
+        QStringLiteral("org.unhideAll"), QStringLiteral("view.zoomSelection") };
     if (commonEdit.contains(id)) {
         return all;
     }
@@ -3034,9 +3487,10 @@ QList<int> Document::commandModes(const QString& id)
     if (id == QLatin1String("rules.edit")) {
         return { Interaction };
     }
-    static const QStringList modelingPrefixes { QStringLiteral("edit."), QStringLiteral("org."), QStringLiteral("solid."),
-        QStringLiteral("guides."), QStringLiteral("material."), QStringLiteral("library."), QStringLiteral("object."),
-        QStringLiteral("texture.") };
+    static const QStringList modelingPrefixes { QStringLiteral("edit."), QStringLiteral("org."),
+        QStringLiteral("solid."), QStringLiteral("guides."), QStringLiteral("material."),
+        QStringLiteral("library."), QStringLiteral("object."), QStringLiteral("texture."),
+        QStringLiteral("furniture.") };
     for (const QString& prefix : modelingPrefixes) {
         if (id.startsWith(prefix)) {
             return modeling;
@@ -3086,7 +3540,8 @@ namespace {
 // Ce eveniment are o instanță (pentru cursor): drag > click > restul.
 bool hasTrigger(const model::Instance& inst, model::Trigger t)
 {
-    return std::any_of(inst.rules.begin(), inst.rules.end(), [&](const model::Rule& r) { return r.trigger == t; });
+    return std::any_of(
+        inst.rules.begin(), inst.rules.end(), [&](const model::Rule& r) { return r.trigger == t; });
 }
 
 } // namespace
@@ -3110,7 +3565,8 @@ model::InstanceId Document::ruleTargetAt(const view::Camera& camera, math::Vec2d
 
 bool Document::objectWithoutInteractionsAt(const view::Camera& camera, math::Vec2d screen) const
 {
-    return view::pickInstance(model(), model().root(), camera, screen).has_value() && !ruleTargetAt(camera, screen);
+    return view::pickInstance(model(), model().root(), camera, screen).has_value()
+        && !ruleTargetAt(camera, screen);
 }
 
 QString Document::interactionHover(const view::Camera& camera, math::Vec2d screen)
@@ -3159,9 +3615,9 @@ bool Document::interactionEvent(const view::Camera& camera, math::Vec2d screen, 
         return false;
     }
     const model::Trigger trigger = event == QLatin1String("rightClick") ? model::Trigger::RightClick
-        : event == QLatin1String("doubleClick")                       ? model::Trigger::DoubleClick
-        : event == QLatin1String("longPress")                         ? model::Trigger::LongPress
-                                                                       : model::Trigger::Click;
+        : event == QLatin1String("doubleClick")                         ? model::Trigger::DoubleClick
+        : event == QLatin1String("longPress")                           ? model::Trigger::LongPress
+                                                                        : model::Trigger::Click;
     bool fired = m_rules.fire(*m_runtime, hit, trigger);
     // Fără o regulă de click, o ușă sau un sertar (comportamentul simplu) se deschide / închide.
     if (!fired && trigger == model::Trigger::Click
@@ -3233,7 +3689,8 @@ void Document::interactionKey(const QString& key)
         return;
     }
     bool fired = false;
-    for (model::InstanceId id : std::vector(m_runtime->instances().keys().begin(), m_runtime->instances().keys().end())) {
+    for (model::InstanceId id :
+        std::vector(m_runtime->instances().keys().begin(), m_runtime->instances().keys().end())) {
         fired = m_rules.fire(*m_runtime, id, model::Trigger::Key, key.toStdString()) || fired;
     }
     handleRuleRequests();
@@ -3244,14 +3701,13 @@ void Document::interactionKey(const QString& key)
 
 namespace {
 
-const char* const kTriggerNames[] = { "click", "rightClick", "doubleClick", "hoverEnter", "hoverLeave", "longPress",
-    "drag", "key" };
-const char* const kActionNames[] = { "moveBy", "moveTo", "rotateBy", "scaleTo", "show", "hide", "toggleVisible",
-    "setMaterial", "playAnimation", "goToScene", "wait", "alternate" };
+const char* const kTriggerNames[]
+    = { "click", "rightClick", "doubleClick", "hoverEnter", "hoverLeave", "longPress", "drag", "key" };
+const char* const kActionNames[] = { "moveBy", "moveTo", "rotateBy", "scaleTo", "show", "hide",
+    "toggleVisible", "setMaterial", "playAnimation", "goToScene", "wait", "alternate" };
 const char* const kDirectionNames[] = { "forward", "reverse", "toggle" };
 
-template <std::size_t N>
-int indexOf(const char* const (&names)[N], const QString& name)
+template <std::size_t N> int indexOf(const char* const (&names)[N], const QString& name)
 {
     for (std::size_t i = 0; i < N; ++i) {
         if (name == QLatin1String(names[i])) {
@@ -3272,8 +3728,9 @@ QVariantMap actionToMap(const model::Action& a)
         second.append(actionToMap(c));
     }
     return { { QStringLiteral("kind"), QString::fromLatin1(kActionNames[static_cast<int>(a.kind)]) },
-        { QStringLiteral("target"), static_cast<double>(a.target.value) }, { QStringLiteral("x"), a.vector.x },
-        { QStringLiteral("y"), a.vector.y }, { QStringLiteral("z"), a.vector.z }, { QStringLiteral("duration"), a.duration },
+        { QStringLiteral("target"), static_cast<double>(a.target.value) },
+        { QStringLiteral("x"), a.vector.x }, { QStringLiteral("y"), a.vector.y },
+        { QStringLiteral("z"), a.vector.z }, { QStringLiteral("duration"), a.duration },
         { QStringLiteral("material"), static_cast<double>(a.material.value) },
         { QStringLiteral("animation"), static_cast<double>(a.animation.value) },
         { QStringLiteral("scene"), static_cast<double>(a.scene.value) }, { QStringLiteral("first"), first },
@@ -3285,13 +3742,16 @@ QVariantMap actionToMap(const model::Action& a)
 model::Action actionFromMap(const QVariantMap& m)
 {
     model::Action a;
-    a.kind = static_cast<model::ActionKind>(indexOf(kActionNames, m.value(QStringLiteral("kind")).toString()));
+    a.kind
+        = static_cast<model::ActionKind>(indexOf(kActionNames, m.value(QStringLiteral("kind")).toString()));
     a.target = model::InstanceId { static_cast<std::uint64_t>(m.value(QStringLiteral("target")).toDouble()) };
     a.vector = { m.value(QStringLiteral("x")).toDouble(), m.value(QStringLiteral("y")).toDouble(),
         m.value(QStringLiteral("z")).toDouble() };
     a.duration = m.value(QStringLiteral("duration"), 0.5).toDouble();
-    a.material = model::MaterialId { static_cast<std::uint64_t>(m.value(QStringLiteral("material")).toDouble()) };
-    a.animation = model::AnimationId { static_cast<std::uint64_t>(m.value(QStringLiteral("animation")).toDouble()) };
+    a.material
+        = model::MaterialId { static_cast<std::uint64_t>(m.value(QStringLiteral("material")).toDouble()) };
+    a.animation
+        = model::AnimationId { static_cast<std::uint64_t>(m.value(QStringLiteral("animation")).toDouble()) };
     a.scene = model::SceneId { static_cast<std::uint64_t>(m.value(QStringLiteral("scene")).toDouble()) };
     a.direction = static_cast<model::PlayDirection>(
         indexOf(kDirectionNames, m.value(QStringLiteral("direction"), QStringLiteral("forward")).toString()));
@@ -3319,8 +3779,9 @@ QVariantList Document::rulesOf(double instanceId) const
         for (const model::Action& a : r.actions) {
             actions.append(actionToMap(a));
         }
-        out.append(QVariantMap { { QStringLiteral("trigger"), QString::fromLatin1(kTriggerNames[static_cast<int>(r.trigger)]) },
-            { QStringLiteral("key"), QString::fromStdString(r.key) }, { QStringLiteral("actions"), actions } });
+        out.append(QVariantMap {
+            { QStringLiteral("trigger"), QString::fromLatin1(kTriggerNames[static_cast<int>(r.trigger)]) },
+            { QStringLiteral("key"), trCore(r.key) }, { QStringLiteral("actions"), actions } });
     }
     return out;
 }
@@ -3338,7 +3799,8 @@ void Document::setRules(double instanceId, const QVariantList& rules)
     for (const QVariant& v : rules) {
         const QVariantMap m = v.toMap();
         model::Rule r;
-        r.trigger = static_cast<model::Trigger>(indexOf(kTriggerNames, m.value(QStringLiteral("trigger")).toString()));
+        r.trigger = static_cast<model::Trigger>(
+            indexOf(kTriggerNames, m.value(QStringLiteral("trigger")).toString()));
         r.key = m.value(QStringLiteral("key")).toString().toStdString();
         for (const QVariant& a : m.value(QStringLiteral("actions")).toList()) {
             r.actions.push_back(actionFromMap(a.toMap()));
@@ -3366,13 +3828,15 @@ QVariantList Document::interactions() const
             for (const model::Action& a : r.actions) {
                 actions.append(QString::fromLatin1(kActionNames[static_cast<int>(a.kind)]));
             }
-            rules.append(QVariantMap { { QStringLiteral("trigger"), QString::fromLatin1(kTriggerNames[static_cast<int>(r.trigger)]) },
-                { QStringLiteral("key"), QString::fromStdString(r.key) }, { QStringLiteral("actions"), actions } });
+            rules.append(QVariantMap { { QStringLiteral("trigger"),
+                                           QString::fromLatin1(kTriggerNames[static_cast<int>(r.trigger)]) },
+                { QStringLiteral("key"), trCore(r.key) }, { QStringLiteral("actions"), actions } });
         }
         const model::Definition& def = m_model.definition(inst.definition);
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.instances().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? def.name : inst.name) },
-            { QStringLiteral("shape"), QString::fromStdString(def.shape) }, { QStringLiteral("rules"), rules } });
+        out.append(
+            QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.instances().keys()[i].value) },
+                { QStringLiteral("name"), trCore(model::partName(m_model, m_model.instances().keys()[i])) },
+                { QStringLiteral("shape"), trCore(def.shape) }, { QStringLiteral("rules"), rules } });
     }
     return out;
 }
@@ -3491,7 +3955,8 @@ bool Document::advanceInteractions(double dt)
         active = active || m_sceneTransition.has_value();
     }
 
-    // Ușile și sertarele (Interact): la sfârșit, starea nouă intră în model (cu undo) sau în copia Modului interacțiune.
+    // Ușile și sertarele (Interact): la sfârșit, starea nouă intră în model (cu undo) sau în copia Modului
+    // interacțiune.
     if (!m_interactions.empty()) {
         std::vector<model::InstanceId> finished;
         for (InteractionAnimation& a : m_interactions) {
@@ -3508,7 +3973,8 @@ bool Document::advanceInteractions(double dt)
                 }
             } else if (m_model.instances().contains(id)) {
                 const bool opening = !m_model.instance(id).behavior.open;
-                runOnModel(opening ? "Deschide" : "Închide", [id](model::Model& model) { model::toggleBehavior(model, id); });
+                runOnModel(opening ? "Deschide" : "Închide",
+                    [id](model::Model& model) { model::toggleBehavior(model, id); });
             }
         }
         moved = true;
@@ -3537,6 +4003,12 @@ bool Document::advanceInteractions(double dt)
 
 std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
 {
+    // „Uși deschise” (Modelare): ușile corpurilor la finalul animației lor.
+    if (m_doorsOpen && m_workMode == Modeling && !m_runtime) {
+        if (auto open = model::doorOpenTransform(m_model, instance)) {
+            return open;
+        }
+    }
     if (m_previewing && currentAnimation() != nullptr) {
         if (const math::Transform* onPath = pathPoseOf(instance)) {
             return *onPath;
@@ -3544,9 +4016,10 @@ std::optional<math::Transform> Document::displayTransform(model::InstanceId inst
     }
     if (m_previewing) {
         if (const model::Animation* a = currentAnimation()) {
-            if (const model::ObjectTrack* t = model::findTrack(*a, instance); t && m_model.instances().contains(instance)) {
-                if (auto value = model::evaluateInstance(
-                        *t, m_timelineTime, m_model.instance(instance).transform, model::pivotLocal(m_model, instance))) {
+            if (const model::ObjectTrack* t = model::findTrack(*a, instance);
+                t && m_model.instances().contains(instance)) {
+                if (auto value = model::evaluateInstance(*t, m_timelineTime,
+                        m_model.instance(instance).transform, model::pivotLocal(m_model, instance))) {
                     return value;
                 }
             }
@@ -3589,12 +4062,13 @@ void Document::setBehavior(const QVariantMap& behavior)
         }
         model::Instance inst = model.instance(id);
         inst.behavior.kind = kind == QLatin1String("rotate") ? model::Behavior::Kind::Rotate
-            : kind == QLatin1String("slide")                ? model::Behavior::Kind::Slide
-                                                            : model::Behavior::Kind::None;
-        inst.behavior.anchor
-            = static_cast<model::Behavior::Anchor>(std::clamp(behavior.value(QStringLiteral("anchor")).toInt(), 0, 5));
+            : kind == QLatin1String("slide")                 ? model::Behavior::Kind::Slide
+                                                             : model::Behavior::Kind::None;
+        inst.behavior.anchor = static_cast<model::Behavior::Anchor>(
+            std::clamp(behavior.value(QStringLiteral("anchor")).toInt(), 0, 5));
         inst.behavior.amount = behavior.value(QStringLiteral("amount"), inst.behavior.amount).toDouble();
-        inst.behavior.duration = std::clamp(behavior.value(QStringLiteral("duration"), 0.6).toDouble(), 0.0, 10.0);
+        inst.behavior.duration
+            = std::clamp(behavior.value(QStringLiteral("duration"), 0.6).toDouble(), 0.0, 10.0);
         inst.behavior.open = false;
         model.setInstance(id, inst);
     });
@@ -3648,7 +4122,8 @@ std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() c
             continue;
         }
         for (int k = 0; k < 8; ++k) {
-            add(inst.transform.applyToPoint({ (k & 1) ? bhi.x : blo.x, (k & 2) ? bhi.y : blo.y, (k & 4) ? bhi.z : blo.z }));
+            add(inst.transform.applyToPoint(
+                { (k & 1) ? bhi.x : blo.x, (k & 2) ? bhi.y : blo.y, (k & 4) ? bhi.z : blo.z }));
         }
     }
     if (lo.x > hi.x) {
@@ -3660,8 +4135,8 @@ std::optional<std::pair<math::Vec3d, math::Vec3d>> Document::selectionBounds() c
 QVariantList Document::contextMenuItems() const
 {
     QVariantList items;
-    const auto item = [&](const QString& id, const QString& name, const QString& shortcut = {}, bool enabled = true,
-                          bool destructive = false) {
+    const auto item = [&](const QString& id, const QString& name, const QString& shortcut = {},
+                          bool enabled = true, bool destructive = false) {
         if (!commandAllowed(id)) {
             return; // comanda altui mod de lucru
         }
@@ -3674,25 +4149,25 @@ QVariantList Document::contextMenuItems() const
             items.append(QVariantMap { { QStringLiteral("separator"), true } });
         }
     };
-    const bool anyHidden = std::any_of(m_model.instances().values().begin(), m_model.instances().values().end(),
-        [](const model::Instance& i) { return i.hidden; });
+    const bool anyHidden = std::any_of(m_model.instances().values().begin(),
+        m_model.instances().values().end(), [](const model::Instance& i) { return i.hidden; });
 
     if (m_selection.empty()) {
         if (!m_path.empty()) {
             const bool group = m_model.definition(activeDefinition()).group;
-            item(QStringLiteral("org.exit"), group ? QStringLiteral("Ieși din grup") : QStringLiteral("Ieși din obiect"),
+            item(QStringLiteral("org.exit"), group ? ui("Ieși din grup") : ui("Ieși din obiect"),
                 QStringLiteral("Escape"));
             separator();
         }
-        item(QStringLiteral("edit.selectAll"), QStringLiteral("Selectează tot"), QStringLiteral("Ctrl+A"));
+        item(QStringLiteral("edit.selectAll"), ui("Selectează tot"), QStringLiteral("Ctrl+A"));
         if (!m_model.guides().empty()) {
-            item(QStringLiteral("guides.clear"), QStringLiteral("Șterge ghidajele"));
+            item(QStringLiteral("guides.clear"), ui("Șterge ghidajele"));
         }
         if (anyHidden) {
-            item(QStringLiteral("org.unhideAll"), QStringLiteral("Arată tot"));
+            item(QStringLiteral("org.unhideAll"), ui("Arată tot"));
         }
         separator();
-        item(QStringLiteral("view.extents"), QStringLiteral("Zoom Extents"), QStringLiteral("Shift+Z"));
+        item(QStringLiteral("view.extents"), ui("Zoom Extents"), QStringLiteral("Shift+Z"));
         return items;
     }
 
@@ -3709,71 +4184,71 @@ QVariantList Document::contextMenuItems() const
         const model::InstanceId id = *m_selection.instances.begin();
         const model::Instance& inst = m_model.instance(id);
         const bool group = m_model.definition(inst.definition).group;
-        item(QStringLiteral("org.enter"), group ? QStringLiteral("Editează grupul") : QStringLiteral("Editează obiectul"),
-            {}, !inst.locked);
+        item(QStringLiteral("org.enter"), group ? ui("Editează grupul") : ui("Editează obiectul"), {},
+            !inst.locked);
         separator();
-        item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !inst.locked);
+        item(QStringLiteral("org.explode"), ui("Desface"), {}, !inst.locked);
         if (model::canMakeUnique(m_model, id)) {
-            item(QStringLiteral("org.makeUnique"), QStringLiteral("Fă unic"));
+            item(QStringLiteral("org.makeUnique"), ui("Fă unic"));
         }
-        item(QStringLiteral("org.group"), QStringLiteral("Grupează"), QStringLiteral("Ctrl+Alt+G"));
-        item(QStringLiteral("org.duplicateLinked"), QStringLiteral("Duplicare legată"), QStringLiteral("Alt+D"));
+        item(QStringLiteral("org.group"), ui("Grupează"), QStringLiteral("Ctrl+Alt+G"));
+        item(QStringLiteral("org.duplicateLinked"), ui("Duplicare legată"), QStringLiteral("Alt+D"));
     } else {
         if (geometry) {
-            item(QStringLiteral("org.makeGroup"), QStringLiteral("Creează obiect"), QStringLiteral("Ctrl+G"));
+            item(QStringLiteral("org.makeGroup"), ui("Creează obiect"), QStringLiteral("Ctrl+G"));
         }
         if (instances) {
-            item(QStringLiteral("org.group"), QStringLiteral("Grupează"), QStringLiteral("Ctrl+Alt+G"));
+            item(QStringLiteral("org.group"), ui("Grupează"), QStringLiteral("Ctrl+Alt+G"));
         }
         if (instances) {
-            item(QStringLiteral("org.explode"), QStringLiteral("Desface"), {}, !allLocked);
+            item(QStringLiteral("org.explode"), ui("Desface"), {}, !allLocked);
         }
     }
     if (!geometry && m_selection.instances.size() == 2) {
         separator();
-        item(QStringLiteral("solid.union"), QStringLiteral("Reuniune"));
-        item(QStringLiteral("solid.subtract"), QStringLiteral("Scade al doilea din primul"));
-        item(QStringLiteral("solid.intersect"), QStringLiteral("Intersecție"));
+        item(QStringLiteral("solid.union"), ui("Reuniune"));
+        item(QStringLiteral("solid.subtract"), ui("Scade al doilea din primul"));
+        item(QStringLiteral("solid.intersect"), ui("Intersecție"));
     }
     separator();
-    item(QStringLiteral("edit.mirrorX"), QStringLiteral("Oglindește pe X"));
-    item(QStringLiteral("edit.mirrorY"), QStringLiteral("Oglindește pe Y"));
-    item(QStringLiteral("edit.mirrorZ"), QStringLiteral("Oglindește pe Z"));
-    item(QStringLiteral("edit.array"), QStringLiteral("Array…"));
-    item(QStringLiteral("edit.subdivide"), QStringLiteral("Subdivide…"));
-    item(QStringLiteral("edit.soften"), QStringLiteral("Muchii netede…"));
+    item(QStringLiteral("edit.mirrorX"), ui("Oglindește pe X"));
+    item(QStringLiteral("edit.mirrorY"), ui("Oglindește pe Y"));
+    item(QStringLiteral("edit.mirrorZ"), ui("Oglindește pe Z"));
+    item(QStringLiteral("edit.array"), ui("Array…"));
+    item(QStringLiteral("edit.subdivide"), ui("Subdivide…"));
+    item(QStringLiteral("edit.soften"), ui("Muchii netede…"));
     if (!m_selection.edges.empty() || m_selection.faces.size() == 1) {
-        item(QStringLiteral("edit.chamfer"), QStringLiteral("Chamfer…"));
-        item(QStringLiteral("edit.bevel"), QStringLiteral("Bevel…"));
+        item(QStringLiteral("edit.chamfer"), ui("Chamfer…"));
+        item(QStringLiteral("edit.bevel"), ui("Bevel…"));
     }
     if (geometry) {
         separator();
-        item(QStringLiteral("edit.selectConnected"), QStringLiteral("Selectează ce e conectat"));
+        item(QStringLiteral("edit.selectConnected"), ui("Selectează ce e conectat"));
         if (!m_selection.edges.empty()) {
-            item(QStringLiteral("edit.createFaces"), QStringLiteral("Creează fețe din muchii"));
+            item(QStringLiteral("edit.createFaces"), ui("Creează fețe din muchii"));
         }
         if (!m_selection.faces.empty()) {
-            item(QStringLiteral("edit.intersectModel"), QStringLiteral("Intersectează cu modelul"));
+            item(QStringLiteral("edit.intersectModel"), ui("Intersectează cu modelul"));
         }
         if (!m_selection.faces.empty()) {
-            item(QStringLiteral("edit.reverseFaces"), m_selection.faces.size() == 1 ? QStringLiteral("Inversează fața")
-                                                                                    : QStringLiteral("Inversează fețele"));
+            item(QStringLiteral("edit.reverseFaces"),
+                m_selection.faces.size() == 1 ? ui("Inversează fața") : ui("Inversează fețele"));
         }
     }
     if (instances) {
         separator();
-        item(QStringLiteral("org.hide"), QStringLiteral("Ascunde"));
+        item(QStringLiteral("org.hide"), ui("Ascunde"));
         if (anyLocked) {
-            item(QStringLiteral("org.unlock"), QStringLiteral("Deblochează"));
+            item(QStringLiteral("org.unlock"), ui("Deblochează"));
         }
         if (!allLocked) {
-            item(QStringLiteral("org.lock"), QStringLiteral("Blochează"));
+            item(QStringLiteral("org.lock"), ui("Blochează"));
         }
     }
     separator();
-    item(QStringLiteral("view.zoomSelection"), QStringLiteral("Zoom la selecție"));
+    item(QStringLiteral("view.zoomSelection"), ui("Zoom la selecție"));
     separator();
-    item(QStringLiteral("edit.delete"), QStringLiteral("Șterge"), QStringLiteral("Delete"), geometry || !allLocked, true);
+    item(QStringLiteral("edit.delete"), ui("Șterge"), QStringLiteral("Delete"), geometry || !allLocked, true);
     // Fără separatori la capete (după ce comenzile altor moduri au lipsit).
     while (!items.isEmpty() && items.last().toMap().value(QStringLiteral("separator")).toBool()) {
         items.removeLast();
@@ -3789,10 +4264,11 @@ namespace {
 QVariantMap materialEntry(const model::Material& m)
 {
     return QVariantMap {
-        { QStringLiteral("name"), QString::fromStdString(m.name) },
+        { QStringLiteral("name"), trCore(m.name) },
         { QStringLiteral("color"), QColor(m.color.r, m.color.g, m.color.b, m.color.a) },
         { QStringLiteral("roughness"), m.roughness },
         { QStringLiteral("metallic"), m.metallic },
+        { QStringLiteral("category"), trCore(m.category) },
     };
 }
 
@@ -3840,7 +4316,8 @@ QVariantList Document::libraryMaterials() const
             static std::map<std::string_view, QString> thumbnails;
             auto& url = thumbnails[key];
             if (url.isEmpty()) {
-                url = thumbnailUrl(proceduralTexture(QString::fromLatin1(key.data(), static_cast<qsizetype>(key.size())), 256));
+                url = thumbnailUrl(proceduralTexture(
+                    QString::fromLatin1(key.data(), static_cast<qsizetype>(key.size())), 256));
             }
             entry[QStringLiteral("thumbnail")] = url;
         }
@@ -3873,7 +4350,8 @@ QVariantList Document::modelMaterials() const
         const model::Material& m = m_model.materials().values()[i];
         entry[QStringLiteral("thumbnail")] = textureThumbnail(m.texture);
         entry[QStringLiteral("textureSource")] = m.texture && m_model.textures().contains(m.texture)
-            ? QString::fromStdString(m_model.textures().at(m.texture).source) : QString();
+            ? trCore(m_model.textures().at(m.texture).source)
+            : QString();
         entry[QStringLiteral("textureWidth")] = m.textureSize.x;
         entry[QStringLiteral("textureHeight")] = m.textureSize.y;
         out.append(entry);
@@ -3884,7 +4362,8 @@ QVariantList Document::modelMaterials() const
 QVariantMap Document::currentMaterial() const
 {
     if (m_libraryMaterial >= 0) {
-        QVariantMap entry = materialEntry(model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)]);
+        QVariantMap entry
+            = materialEntry(model::builtinMaterials()[static_cast<std::size_t>(m_libraryMaterial)]);
         entry[QStringLiteral("source")] = QStringLiteral("library");
         entry[QStringLiteral("index")] = m_libraryMaterial;
         return entry;
@@ -3896,7 +4375,7 @@ QVariantMap Document::currentMaterial() const
         return entry;
     }
     return QVariantMap { { QStringLiteral("source"), QStringLiteral("default") },
-        { QStringLiteral("name"), QStringLiteral("Implicit") }, { QStringLiteral("color"), QColor(0, 0, 0, 0) } };
+        { QStringLiteral("name"), ui("Implicit") }, { QStringLiteral("color"), QColor(0, 0, 0, 0) } };
 }
 
 void Document::setPlacementLock(int bit, bool locked)
@@ -3908,7 +4387,8 @@ void Document::setPlacementLock(int bit, bool locked)
     runOnModel(locked ? "Blochează valoarea" : "Deblochează valoarea", [&](model::Model& model) {
         model::Instance inst = model.instance(id);
         const auto mask = static_cast<std::uint16_t>(1u << bit);
-        inst.placementLocks = static_cast<std::uint16_t>(locked ? (inst.placementLocks | mask) : (inst.placementLocks & ~mask));
+        inst.placementLocks = static_cast<std::uint16_t>(
+            locked ? (inst.placementLocks | mask) : (inst.placementLocks & ~mask));
         model.setInstance(id, inst);
     });
 }
@@ -3925,9 +4405,9 @@ bool Document::hasTransformKey(double instanceId) const
         return false;
     }
     return std::any_of(track->channels.begin(), track->channels.end(), [&](const model::Channel& c) {
-        return model::isTransform(c.property) && std::any_of(c.keys.begin(), c.keys.end(), [&](const model::Key& k) {
-            return std::abs(k.time - m_timelineTime) < 1e-3;
-        });
+        return model::isTransform(c.property)
+            && std::any_of(c.keys.begin(), c.keys.end(),
+                [&](const model::Key& k) { return std::abs(k.time - m_timelineTime) < 1e-3; });
     });
 }
 
@@ -3964,7 +4444,8 @@ void Document::setPlacement(const QVariantMap& placement)
             return;
         }
         p.position = { value("px", p.position.x), value("py", p.position.y), value("pz", p.position.z) };
-        p.rotation = { value("rx", p.rotation.x), value("ry", p.rotation.y), value("rz", value("rotation", p.rotation.z)) };
+        p.rotation = { value("rx", p.rotation.x), value("ry", p.rotation.y),
+            value("rz", value("rotation", p.rotation.z)) };
         p.scale = { value("sx", p.scale.x), value("sy", p.scale.y), value("sz", p.scale.z) };
         p.size = math::Vec3d { 0.0 };
         model::setPlacement(posed, id, p);
@@ -3979,6 +4460,28 @@ void Document::setPlacement(const QVariantMap& placement)
         return;
     }
     const model::InstanceId id = *m_selection.instances.begin();
+    // O placă în acord cu parametrii: dimensiunile X / Y (pe axele ei) sunt lungimea și lățimea; Z (grosimea)
+    // nu se schimbă de aici (ADR 0044).
+    if (placement.contains(QStringLiteral("dx")) || placement.contains(QStringLiteral("dy"))
+        || placement.contains(QStringLiteral("dz"))) {
+        const model::InstanceId selected = id;
+        if (model::boardState(m_model, selected, contextTransform() * m_model.instance(selected).transform)
+                .state
+            == model::BoardState::Matches) {
+            const model::DefinitionId def = m_model.instance(selected).definition;
+            runOnModel("Placă", [&](model::Model& model) {
+                if (placement.contains(QStringLiteral("dx"))) {
+                    model::setBoardValue(
+                        model, def, "length", placement.value(QStringLiteral("dx")).toDouble());
+                }
+                if (placement.contains(QStringLiteral("dy"))) {
+                    model::setBoardValue(
+                        model, def, "width", placement.value(QStringLiteral("dy")).toDouble());
+                }
+            });
+            return;
+        }
+    }
     model::Placement p = model::placementOf(m_model, id);
     const auto value = [&](const char* key, double fallback) {
         return placement.value(QLatin1String(key), fallback).toDouble();
@@ -3999,9 +4502,11 @@ void Document::setPlacement(const QVariantMap& placement)
         }
         p.pivot = math::Vec3d { value("vx", v.x), value("vy", v.y), value("vz", v.z) };
     }
-    const bool onlyPivot = placement.contains(QStringLiteral("pivot")) || placement.contains(QStringLiteral("vx"))
-        || placement.contains(QStringLiteral("vy")) || placement.contains(QStringLiteral("vz"));
-    runOnModel(onlyPivot ? "Pivot" : "Transformare", [&](model::Model& model) { model::setPlacement(model, id, p); });
+    const bool onlyPivot = placement.contains(QStringLiteral("pivot"))
+        || placement.contains(QStringLiteral("vx")) || placement.contains(QStringLiteral("vy"))
+        || placement.contains(QStringLiteral("vz"));
+    runOnModel(onlyPivot ? "Pivot" : "Transformare",
+        [&](model::Model& model) { model::setPlacement(model, id, p); });
 }
 
 namespace {
@@ -4015,7 +4520,7 @@ model::TextureId proceduralTextureIn(model::Model& model, const std::string& key
             return model.textures().keys()[i];
         }
     }
-    const QByteArray png = proceduralTexturePng(QString::fromStdString(key));
+    const QByteArray png = proceduralTexturePng(trCore(key));
     model::Texture texture;
     texture.name = key;
     texture.source = source;
@@ -4024,14 +4529,25 @@ model::TextureId proceduralTextureIn(model::Model& model, const std::string& key
     return model.addTexture(std::move(texture));
 }
 
-// Materialul din bibliotecă, în model (după nume; cu textura lui, dacă are).
+// Materialul din model care vine din materialul inclus `lib`: după cheie (ADR 0044) sau, în fișierele vechi
+// fără cheie, după nume.
+model::MaterialId modelMaterialFor(const model::Model& model, const model::Material& lib)
+{
+    for (std::size_t i = 0; i < model.materials().size(); ++i) {
+        const model::Material& mine = model.materials().values()[i];
+        if (mine.libraryKey == lib.libraryKey || (mine.libraryKey.empty() && mine.name == lib.name)) {
+            return model.materials().keys()[i];
+        }
+    }
+    return {};
+}
+
+// Materialul din bibliotecă, în model (cu textura lui, dacă are).
 model::MaterialId libraryMaterialIn(model::Model& model, std::size_t index)
 {
     const model::Material& lib = model::builtinMaterials()[index];
-    for (std::size_t i = 0; i < model.materials().size(); ++i) {
-        if (model.materials().values()[i].name == lib.name) {
-            return model.materials().keys()[i];
-        }
+    if (const model::MaterialId existing = modelMaterialFor(model, lib)) {
+        return existing;
     }
     model::Material copy = lib;
     if (const std::string_view key = model::builtinTexture(index); !key.empty()) {
@@ -4052,7 +4568,8 @@ void Document::assignMaterial(const QVariantMap& material, const QString& side)
     }
     const bool back = side == QLatin1String("back");
     runOnModel("Material", [&](model::Model& model) {
-        model::MaterialId id { static_cast<std::uint64_t>(material.value(QStringLiteral("id"), 0.0).toDouble()) };
+        model::MaterialId id { static_cast<std::uint64_t>(
+            material.value(QStringLiteral("id"), 0.0).toDouble()) };
         if (material.contains(QStringLiteral("library"))) {
             const int index = material.value(QStringLiteral("library")).toInt();
             if (index >= 0 && index < static_cast<int>(model::builtinMaterials().size())) {
@@ -4085,20 +4602,17 @@ void Document::selectLibraryMaterial(int index)
     if (index < 0 || index >= static_cast<int>(model::builtinMaterials().size())) {
         return;
     }
-    // Dacă modelul are deja un material cu același nume, îl folosim pe acela.
-    const std::string& name = model::builtinMaterials()[static_cast<std::size_t>(index)].name;
-    for (std::size_t i = 0; i < m_model.materials().size(); ++i) {
-        if (m_model.materials().values()[i].name == name) {
-            selectModelMaterial(static_cast<double>(m_model.materials().keys()[i].value));
-            return;
-        }
+    // Dacă modelul are deja materialul (după cheie sau, în fișierele vechi, după nume), îl folosim pe acela.
+    if (const model::MaterialId existing
+        = modelMaterialFor(m_model, model::builtinMaterials()[static_cast<std::size_t>(index)])) {
+        selectModelMaterial(static_cast<double>(existing.value));
+        return;
     }
     // Cu textură: intră în model acum (Paint Bucket vopsește apoi cu un material din model).
     if (!model::builtinTexture(static_cast<std::size_t>(index)).empty()) {
         model::MaterialId added;
-        runOnModel("Material din bibliotecă", [&](model::Model& model) {
-            added = libraryMaterialIn(model, static_cast<std::size_t>(index));
-        });
+        runOnModel("Material din bibliotecă",
+            [&](model::Model& model) { added = libraryMaterialIn(model, static_cast<std::size_t>(index)); });
         selectModelMaterial(static_cast<double>(added.value));
         return;
     }
@@ -4135,13 +4649,24 @@ void applyMaterialProperties(model::Material& m, const QVariantMap& p)
         }
     }
     if (p.contains(QStringLiteral("opacity"))) {
-        m.color.a = static_cast<std::uint8_t>(std::lround(std::clamp(p.value(QStringLiteral("opacity")).toDouble(), 0.0, 1.0) * 255.0));
+        m.color.a = static_cast<std::uint8_t>(
+            std::lround(std::clamp(p.value(QStringLiteral("opacity")).toDouble(), 0.0, 1.0) * 255.0));
     }
     if (p.contains(QStringLiteral("roughness"))) {
-        m.roughness = static_cast<float>(std::clamp(p.value(QStringLiteral("roughness")).toDouble(), 0.0, 1.0));
+        m.roughness
+            = static_cast<float>(std::clamp(p.value(QStringLiteral("roughness")).toDouble(), 0.0, 1.0));
     }
     if (p.contains(QStringLiteral("metallic"))) {
         m.metallic = static_cast<float>(std::clamp(p.value(QStringLiteral("metallic")).toDouble(), 0.0, 1.0));
+    }
+    if (p.contains(QStringLiteral("category"))) {
+        static const QStringList kCategories { QString(), QStringLiteral("wood"), QStringLiteral("metal"),
+            QStringLiteral("glass"), QStringLiteral("plastic"), QStringLiteral("stone"),
+            QStringLiteral("board-decor") };
+        const QString category = p.value(QStringLiteral("category")).toString();
+        if (kCategories.contains(category)) {
+            m.category = category.toStdString();
+        }
     }
     if (p.contains(QStringLiteral("textureWidth"))) {
         m.textureSize.x = std::max(1.0, p.value(QStringLiteral("textureWidth")).toDouble());
@@ -4283,9 +4808,9 @@ QVariantList Document::scenes() const
     QVariantList out;
     for (std::size_t i = 0; i < m_model.scenes().size(); ++i) {
         const model::Scene& s = m_model.scenes().values()[i];
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.scenes().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(s.name) },
-            { QStringLiteral("style"), QString::fromStdString(s.style) } });
+        out.append(
+            QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.scenes().keys()[i].value) },
+                { QStringLiteral("name"), trCore(s.name) }, { QStringLiteral("style"), trCore(s.style) } });
     }
     return out;
 }
@@ -4295,8 +4820,9 @@ QVariantList Document::sections() const
     QVariantList out;
     for (std::size_t i = 0; i < m_model.sections().size(); ++i) {
         const model::SectionPlane& s = m_model.sections().values()[i];
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.sections().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(s.name) }, { QStringLiteral("active"), s.active } });
+        out.append(
+            QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.sections().keys()[i].value) },
+                { QStringLiteral("name"), trCore(s.name) }, { QStringLiteral("active"), s.active } });
     }
     return out;
 }
@@ -4317,7 +4843,7 @@ void Document::intersectSelection(bool withModel)
         return;
     }
     if (m_selection.faces.empty()) {
-        setError(QStringLiteral("Selectează fețele de intersectat."));
+        setError(ui("Selectează fețele de intersectat."));
         return;
     }
     std::size_t count = 0;
@@ -4325,7 +4851,7 @@ void Document::intersectSelection(bool withModel)
         count = geom::intersectFaces(model.mesh(activeDefinition()), m_selection.faces, withModel);
     });
     if (count == 0) {
-        setError(QStringLiteral("Fețele selectate nu intersectează nimic."));
+        setError(ui("Fețele selectate nu intersectează nimic."));
     }
 }
 
@@ -4335,16 +4861,18 @@ void Document::booleanSelection(const QString& kind)
         return;
     }
     if (m_selection.instances.size() != 2 || !m_selection.faces.empty() || !m_selection.edges.empty()) {
-        setError(QStringLiteral("Selectează exact două grupuri sau obiecte."));
+        setError(ui("Selectează exact două grupuri sau obiecte."));
         return;
     }
     const model::InstanceId a = *m_selection.instances.begin();
     const model::InstanceId b = *std::next(m_selection.instances.begin());
     const model::BooleanKind k = kind == QLatin1String("union") ? model::BooleanKind::Union
-        : kind == QLatin1String("subtract")                    ? model::BooleanKind::Subtract
-                                                               : model::BooleanKind::Intersect;
+        : kind == QLatin1String("subtract")                     ? model::BooleanKind::Subtract
+                                                                : model::BooleanKind::Intersect;
     model::BooleanResult result;
-    const char* name = k == model::BooleanKind::Union ? "Reuniune" : k == model::BooleanKind::Subtract ? "Scădere" : "Intersecție";
+    const char* name = k == model::BooleanKind::Union ? "Reuniune"
+        : k == model::BooleanKind::Subtract           ? "Scădere"
+                                                      : "Intersecție";
     runOnModel(name, [&](model::Model& model) {
         result = model::booleanOperation(model, a, b, k);
         m_selection.clear();
@@ -4353,7 +4881,7 @@ void Document::booleanSelection(const QString& kind)
         }
     });
     if (!result.instance) {
-        setError(QString::fromStdString(result.error));
+        setError(trCore(result.error));
     }
 }
 
@@ -4505,9 +5033,9 @@ QVariantMap Document::sceneCamera(double sceneId) const
     }
     const model::Scene& s = m_model.scenes().at(id);
     return QVariantMap { { QStringLiteral("tx"), s.target.x }, { QStringLiteral("ty"), s.target.y },
-        { QStringLiteral("tz"), s.target.z }, { QStringLiteral("yaw"), s.yaw }, { QStringLiteral("pitch"), s.pitch },
-        { QStringLiteral("distance"), s.distance }, { QStringLiteral("ortho"), s.orthographic },
-        { QStringLiteral("style"), QString::fromStdString(s.style) } };
+        { QStringLiteral("tz"), s.target.z }, { QStringLiteral("yaw"), s.yaw },
+        { QStringLiteral("pitch"), s.pitch }, { QStringLiteral("distance"), s.distance },
+        { QStringLiteral("ortho"), s.orthographic }, { QStringLiteral("style"), trCore(s.style) } };
 }
 
 void Document::reverseSelectedFaces()
@@ -4518,16 +5046,17 @@ void Document::reverseSelectedFaces()
     if (m_selection.faces.empty()) {
         return;
     }
-    runOnModel(m_selection.faces.size() == 1 ? "Inversează fața" : "Inversează fețele", [&](model::Model& model) {
-        geom::Mesh& mesh = model.mesh(activeDefinition());
-        std::set<geom::FaceId> flipped;
-        for (geom::FaceId f : m_selection.faces) {
-            if (mesh.faces().contains(f)) {
-                flipped.insert(geom::orientFace(mesh, f, -mesh.face(f).plane.normal));
+    runOnModel(
+        m_selection.faces.size() == 1 ? "Inversează fața" : "Inversează fețele", [&](model::Model& model) {
+            geom::Mesh& mesh = model.mesh(activeDefinition());
+            std::set<geom::FaceId> flipped;
+            for (geom::FaceId f : m_selection.faces) {
+                if (mesh.faces().contains(f)) {
+                    flipped.insert(geom::orientFace(mesh, f, -mesh.face(f).plane.normal));
+                }
             }
-        }
-        m_selection.faces = flipped;
-    });
+            m_selection.faces = flipped;
+        });
 }
 
 void Document::setFaceTexture(const QVariantMap& changes)
@@ -4544,8 +5073,9 @@ void Document::setFaceTexture(const QVariantMap& changes)
             if (!mesh.faces().contains(f)) {
                 continue;
             }
-            geom::TextureTransform t = changes.value(QStringLiteral("reset")).toBool() ? geom::TextureTransform {}
-                                                                                      : mesh.face(f).texture;
+            geom::TextureTransform t = changes.value(QStringLiteral("reset")).toBool()
+                ? geom::TextureTransform {}
+                : mesh.face(f).texture;
             const auto value = [&](const char* key, double fallback) {
                 return changes.value(QLatin1String(key), fallback).toDouble();
             };
@@ -4561,31 +5091,38 @@ QVariantList Document::generators() const
 {
     QVariantList out;
     for (const model::GeneratorInfo& g : model::generators()) {
+        if (g.legacy) {
+            continue; // doar pentru fișierele vechi
+        }
         QVariantList parameters;
         for (const model::ParameterSpec& spec : g.parameters) {
-            parameters.append(QVariantMap { { QStringLiteral("key"), QString::fromStdString(spec.key) },
-                { QStringLiteral("label"), QString::fromStdString(spec.label) },
-                { QStringLiteral("unit"), QString::fromStdString(spec.unit) }, { QStringLiteral("value"), spec.value },
-                { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max }, { QStringLiteral("step"), spec.step } });
+            parameters.append(QVariantMap { { QStringLiteral("key"), trCore(spec.key) },
+                { QStringLiteral("label"), trCore(spec.label) },
+                { QStringLiteral("unit"), trCore(spec.unit) }, { QStringLiteral("value"), spec.value },
+                { QStringLiteral("min"), spec.min }, { QStringLiteral("max"), spec.max },
+                { QStringLiteral("step"), spec.step } });
         }
-        out.append(QVariantMap { { QStringLiteral("id"), QString::fromStdString(g.id) },
-            { QStringLiteral("name"), QString::fromStdString(g.name) },
-            { QStringLiteral("category"), QString::fromStdString(g.category) }, { QStringLiteral("parameters"), parameters } });
+        out.append(QVariantMap { { QStringLiteral("id"), trCore(g.id) },
+            { QStringLiteral("name"), trCore(g.name) }, { QStringLiteral("category"), trCore(g.category) },
+            { QStringLiteral("parameters"), parameters } });
     }
     return out;
 }
 
-double Document::createParametric(const QString& generator, const QVector3D& at, const QVariantMap& parameters)
+double Document::createParametric(
+    const QString& generator, const QVector3D& at, const QVariantMap& parameters)
 {
     return createParametricAt(generator, at, parameters, true);
 }
 
-double Document::createParametricAtCorner(const QString& generator, const QVector3D& corner, const QVariantMap& parameters)
+double Document::createParametricAtCorner(
+    const QString& generator, const QVector3D& corner, const QVariantMap& parameters)
 {
     return createParametricAt(generator, corner, parameters, false);
 }
 
-double Document::createParametricAt(const QString& generator, const QVector3D& at, const QVariantMap& parameters, bool baseCenter)
+double Document::createParametricAt(
+    const QString& generator, const QVector3D& at, const QVariantMap& parameters, bool baseCenter)
 {
     if (!require(Modeling)) {
         return 0.0;
@@ -4598,13 +5135,14 @@ double Document::createParametricAt(const QString& generator, const QVector3D& a
     for (auto it = parameters.begin(); it != parameters.end(); ++it) {
         given[it.key().toStdString()] = it.value().toDouble();
     }
-    // `at` = centrul bazei (sau colțul minim, dacă `baseCenter` e fals), în coordonatele lumii; originea generatorului
-    // e colțul stânga-față-jos (ADR 0025), deci pentru centrul bazei o mutăm cu jumătate din lățime și adâncime.
-    // Dimensiunile vin din parametrii rezolvați.
+    // `at` = centrul bazei (sau colțul minim, dacă `baseCenter` e fals), în coordonatele lumii; originea
+    // generatorului e colțul stânga-față-jos (ADR 0025), deci pentru centrul bazei o mutăm cu jumătate din
+    // lățime și adâncime. Dimensiunile vin din parametrii rezolvați.
     math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
     if (baseCenter) {
         model::Model probe;
-        if (const model::InstanceId i = model::createParametric(probe, probe.root(), info->id, given, {}); i) {
+        if (const model::InstanceId i = model::createParametric(probe, probe.root(), info->id, given, {});
+            i) {
             const auto [lo, hi] = model::bounds(probe, probe.root());
             if (lo.x <= hi.x) {
                 point -= math::Vec3d((hi.x - lo.x) * 0.5, (hi.y - lo.y) * 0.5, 0.0);
@@ -4613,7 +5151,8 @@ double Document::createParametricAt(const QString& generator, const QVector3D& a
     }
     model::InstanceId created;
     runOnModel("Obiect dinamic: " + info->name, [&](model::Model& model) {
-        created = model::createParametric(model, activeDefinition(), info->id, given, math::Transform::translation(point));
+        created = model::createParametric(
+            model, activeDefinition(), info->id, given, math::Transform::translation(point));
     });
     if (created) {
         const geom::Selection before = m_selection;
@@ -4660,10 +5199,11 @@ model::InstanceId instanceIdOf(double id)
 
 } // namespace
 
-double Document::createPrimitive(const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name)
+double Document::createPrimitive(
+    const QString& kind, const QVector3D& corner, const QVector3D& size, const QString& name)
 {
-    static const QStringList kinds { QStringLiteral("box"), QStringLiteral("cylinder"), QStringLiteral("cone"),
-        QStringLiteral("sphere") };
+    static const QStringList kinds { QStringLiteral("box"), QStringLiteral("cylinder"),
+        QStringLiteral("cone"), QStringLiteral("sphere") };
     static const char* const kNames[] = { "Cutie", "Cilindru", "Con", "Sferă" };
     const auto index = kinds.indexOf(kind);
     const math::Vec3d s { std::abs(size.x()), std::abs(size.y()), std::abs(size.z()) };
@@ -4740,14 +5280,14 @@ bool Document::setInstanceMaterialByName(double instanceId, const QString& nameO
     runOnModel("Material", [&](model::Model& model) {
         model::MaterialId material;
         for (std::size_t i = 0; i < model.materials().size(); ++i) {
-            if (QString::fromStdString(model.materials().values()[i].name) == nameOrColor) {
+            if (trCore(model.materials().values()[i].name) == nameOrColor) {
                 material = model.materials().keys()[i];
             }
         }
         if (!material) {
             const auto library = model::builtinMaterials();
             for (std::size_t i = 0; i < library.size(); ++i) {
-                if (QString::fromStdString(library[i].name) == nameOrColor) {
+                if (trCore(library[i].name) == nameOrColor) {
                     material = libraryMaterialIn(model, i);
                 }
             }
@@ -4786,13 +5326,15 @@ bool Document::drawFace(const QVariantList& points)
     for (const QVariant& v : points) {
         const QVariantList xyz = v.toList();
         if (xyz.size() >= 3) {
-            polygon.push_back(toLocal.applyToPoint({ xyz[0].toDouble(), xyz[1].toDouble(), xyz[2].toDouble() }));
+            polygon.push_back(
+                toLocal.applyToPoint({ xyz[0].toDouble(), xyz[1].toDouble(), xyz[2].toDouble() }));
         }
     }
     if (polygon.size() < 3) {
         return false;
     }
-    runOnModel("Față", [&](model::Model& model) { geom::drawPolygon(model.mesh(activeDefinition()), polygon); });
+    runOnModel(
+        "Față", [&](model::Model& model) { geom::drawPolygon(model.mesh(activeDefinition()), polygon); });
     return true;
 }
 
@@ -4800,12 +5342,12 @@ QVariantList Document::objectList() const
 {
     QVariantList out;
     for (model::InstanceId id : m_model.childrenOf(activeDefinition())) {
-        const model::Instance& inst = m_model.instance(id);
         const model::Placement p = model::placementOf(m_model, id);
         out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(id.value) },
-            { QStringLiteral("name"), QString::fromStdString(inst.name.empty() ? m_model.definition(inst.definition).name : inst.name) },
-            { QStringLiteral("x"), p.position.x }, { QStringLiteral("y"), p.position.y }, { QStringLiteral("z"), p.position.z },
-            { QStringLiteral("width"), p.size.x }, { QStringLiteral("depth"), p.size.y }, { QStringLiteral("height"), p.size.z } });
+            { QStringLiteral("name"), trCore(model::partName(m_model, id)) },
+            { QStringLiteral("x"), p.position.x }, { QStringLiteral("y"), p.position.y },
+            { QStringLiteral("z"), p.position.z }, { QStringLiteral("width"), p.size.x },
+            { QStringLiteral("depth"), p.size.y }, { QStringLiteral("height"), p.size.z } });
     }
     return out;
 }
@@ -4825,7 +5367,8 @@ void Document::selectInstances(const QVariantList& ids)
 
 QString Document::libraryFolder() const
 {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/Biblioteca");
+    const QString dir
+        = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/Biblioteca");
     QDir().mkpath(dir);
     return dir;
 }
@@ -4834,10 +5377,22 @@ QVariantList Document::libraryItems() const
 {
     QVariantList out;
     for (const model::GeneratorInfo& g : model::generators()) {
-        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("gen:") + QString::fromStdString(g.id) },
-            { QStringLiteral("name"), QString::fromStdString(g.name) },
-            { QStringLiteral("category"), QString::fromStdString(g.category) }, { QStringLiteral("user"), false },
-            { QStringLiteral("dynamic"), true } });
+        if (g.legacy) {
+            continue;
+        }
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("gen:") + trCore(g.id) },
+            { QStringLiteral("name"), trCore(g.name) }, { QStringLiteral("category"), trCore(g.category) },
+            { QStringLiteral("user"), false }, { QStringLiteral("dynamic"), true } });
+    }
+    for (const model::BoardType& b : model::boardTypes()) {
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("board:") + trCore(b.key) },
+            { QStringLiteral("name"), trCore(b.label) }, { QStringLiteral("category"), ui("Plăci") },
+            { QStringLiteral("user"), false }, { QStringLiteral("dynamic"), true } });
+    }
+    for (const model::HardwareType& h : model::hardwareTypes()) {
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("hardware:") + trCore(h.key) },
+            { QStringLiteral("name"), trCore(h.label) }, { QStringLiteral("category"), ui("Feronerie") },
+            { QStringLiteral("user"), false }, { QStringLiteral("dynamic"), false } });
     }
     const QDir dir(libraryFolder());
     for (const QFileInfo& file : dir.entryInfoList({ QStringLiteral("*.aion") }, QDir::Files, QDir::Name)) {
@@ -4845,16 +5400,20 @@ QVariantList Document::libraryItems() const
         QString thumbnail;
         if (f.open(QIODevice::ReadOnly)) {
             const QByteArray bytes = f.readAll();
-            const std::vector<std::uint8_t> png = io::readThumbnail(
-                std::span(reinterpret_cast<const std::uint8_t*>(bytes.constData()), static_cast<std::size_t>(bytes.size())));
+            const std::vector<std::uint8_t> png
+                = io::readThumbnail(std::span(reinterpret_cast<const std::uint8_t*>(bytes.constData()),
+                    static_cast<std::size_t>(bytes.size())));
             if (!png.empty()) {
                 thumbnail = QStringLiteral("data:image/png;base64,")
-                    + QString::fromLatin1(QByteArray(reinterpret_cast<const char*>(png.data()), qsizetype(png.size())).toBase64());
+                    + QString::fromLatin1(
+                        QByteArray(reinterpret_cast<const char*>(png.data()), qsizetype(png.size()))
+                            .toBase64());
             }
         }
         out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("file:") + file.absoluteFilePath() },
-            { QStringLiteral("name"), file.completeBaseName() }, { QStringLiteral("category"), QStringLiteral("Ale mele") },
-            { QStringLiteral("thumbnail"), thumbnail }, { QStringLiteral("user"), true }, { QStringLiteral("dynamic"), false } });
+            { QStringLiteral("name"), file.completeBaseName() },
+            { QStringLiteral("category"), ui("Ale mele") }, { QStringLiteral("thumbnail"), thumbnail },
+            { QStringLiteral("user"), true }, { QStringLiteral("dynamic"), false } });
     }
     return out;
 }
@@ -4868,15 +5427,71 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
         createParametric(id.mid(4), at);
         return;
     }
+    if (id.startsWith(QLatin1String("board:"))) {
+        const model::BoardType* type = model::findBoardType(id.mid(6).toStdString());
+        if (type == nullptr) {
+            return;
+        }
+        // `at` = centrul bazei; placa nouă e culcată, 600 × 400, cu colțul minim în origine.
+        const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() })
+            - math::Vec3d { 300.0, 200.0, 0.0 };
+        model::InstanceId created;
+        runOnModel("Din bibliotecă: " + type->label, [&](model::Model& model) {
+            created = model::createBoard(model, activeDefinition(), type->key, type->defaultThickness, 600.0,
+                400.0, math::Transform::translation(point));
+        });
+        if (created) {
+            const geom::Selection before = m_selection;
+            m_selection.clear();
+            m_selection.instances.insert(created);
+            afterInteraction(before);
+        }
+        return;
+    }
+    if (id.startsWith(QLatin1String("hardware:"))) {
+        const std::string key = id.mid(9).toStdString();
+        const model::HardwareType* type = model::findHardwareType(key);
+        if (type == nullptr) {
+            return;
+        }
+        const math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+        model::InstanceId created;
+        runOnModel("Din bibliotecă: " + type->label, [&](model::Model& model) {
+            created
+                = model::createHardware(model, activeDefinition(), key, math::Transform::translation(point));
+        });
+        if (created) {
+            const geom::Selection before = m_selection;
+            m_selection.clear();
+            m_selection.instances.insert(created);
+            afterInteraction(before);
+        }
+        return;
+    }
+    if (id.startsWith(QLatin1String("def:"))) {
+        placeDefinitionAt(model::DefinitionId { id.mid(4).toULongLong() }, at, "Din model");
+        return;
+    }
     if (!id.startsWith(QLatin1String("file:"))) {
         return;
     }
     const QString path = id.mid(5);
     const io::LoadResult loaded = io::loadFile(toPath(path));
     if (!loaded.model) {
-        setError(QStringLiteral("„%1” nu a putut fi citit. %2").arg(QFileInfo(path).fileName(),
-            QString::fromStdString(loaded.error)));
+        setError(ui("„%1” nu a putut fi citit. %2").arg(QFileInfo(path).fileName(), trCore(loaded.error)));
         return;
+    }
+    // O componentă salvată deja în model (aceeași cheie): o copie legată a ei, nu una nouă (§6). Definiția
+    // din model câștigă față de fișier.
+    const std::string& key = loaded.model->definition(loaded.model->root()).sourceKey;
+    if (const model::DefinitionId linked = model::findLinkedDefinition(m_model, key, activeDefinition())) {
+        qInfo("Bibliotecă: definiție refolosită %llu (%s)", static_cast<unsigned long long>(linked.value),
+            key.c_str());
+        placeDefinitionAt(linked, at, "Din bibliotecă: " + QFileInfo(path).completeBaseName().toStdString());
+        return;
+    }
+    if (!key.empty()) {
+        qInfo("Bibliotecă: definiție nouă (%s; niciuna accesibilă)", key.c_str());
     }
     math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
     // `at` = centrul bazei: translația duce centrul bazei modelului încărcat în punctul dat.
@@ -4889,7 +5504,8 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
     const std::string name = QFileInfo(path).completeBaseName().toStdString();
     model::InstanceId created;
     runOnModel("Din bibliotecă: " + name, [&](model::Model& model) {
-        created = model::insertModel(model, activeDefinition(), *loaded.model, name, math::Transform::translation(point));
+        created = model::insertModel(
+            model, activeDefinition(), *loaded.model, name, math::Transform::translation(point));
     });
     if (created) {
         const geom::Selection before = m_selection;
@@ -4899,11 +5515,180 @@ void Document::placeLibraryItem(const QString& id, const QVector3D& at)
     }
 }
 
+void Document::placeDefinitionAt(
+    model::DefinitionId definition, const QVector3D& at, const std::string& label)
+{
+    if (!m_model.definitions().contains(definition)) {
+        return;
+    }
+    // O componentă nu se pune în ea însăși (contextul de editare e în ea).
+    const std::size_t valid = validPathLength();
+    for (std::size_t i = 0; i < valid; ++i) {
+        if (m_model.instance(m_path[i]).definition == definition) {
+            setError(ui("O componentă nu se poate pune în ea însăși."));
+            return;
+        }
+    }
+    // `at` = centrul bazei componentei.
+    math::Vec3d point = contextTransform().inverse().applyToPoint({ at.x(), at.y(), at.z() });
+    const auto [lo, hi] = model::bounds(m_model, definition);
+    if (lo.x <= hi.x) {
+        point -= math::Vec3d((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, lo.z);
+    }
+    model::InstanceId created;
+    runOnModel(label, [&](model::Model& model) {
+        created
+            = model::placeLinked(model, definition, activeDefinition(), math::Transform::translation(point));
+    });
+    if (created) {
+        const geom::Selection before = m_selection;
+        m_selection.clear();
+        m_selection.instances.insert(created);
+        afterInteraction(before);
+    }
+}
+
+namespace {
+
+// Miniatura unei componente (lista „În model”): fețele și muchiile ei într-o vedere izometrică, desenate cu
+// QPainter (fețele de la cea mai depărtată la cea mai apropiată), ca PNG în base64 (`data:` URL). Fără
+// randare în viewport, deci fără pâlpâiri.
+QString componentThumbnail(const model::Model& model, model::DefinitionId definition)
+{
+    struct Polygon {
+        QPolygonF points;
+        double depth = 0.0;
+        QColor color;
+    };
+    std::vector<Polygon> polygons;
+    std::vector<QLineF> edges;
+    const double c = std::cos(glm::radians(30.0));
+    const double s = std::sin(glm::radians(30.0));
+    const auto project
+        = [&](const math::Vec3d& p) { return QPointF((p.x - p.y) * c, -(p.z + (p.x + p.y) * s)); };
+    const auto depthOf = [&](const math::Vec3d& p) { return p.x + p.y - p.z; }; // mai mic = mai aproape
+    const std::function<void(model::DefinitionId, const math::Transform&, model::MaterialId, int)> visit
+        = [&](model::DefinitionId d, const math::Transform& t, model::MaterialId inherited, int depth) {
+              if (depth > 16) {
+                  return;
+              }
+              const geom::Mesh& mesh = model.mesh(d);
+              for (const geom::Face& face : mesh.faces().values()) {
+                  Polygon poly;
+                  double sum = 0.0;
+                  const std::vector<geom::VertexId> ids = mesh.loopVertices(face.outer);
+                  for (const geom::VertexId v : ids) {
+                      const math::Vec3d p = t.applyToPoint(mesh.vertex(v).position);
+                      poly.points.append(project(p));
+                      sum += depthOf(p);
+                  }
+                  poly.depth = ids.empty() ? 0.0 : sum / static_cast<double>(ids.size());
+                  const model::MaterialId m = face.material ? face.material : inherited;
+                  const model::Material* material = m ? model.materials().find(m) : nullptr;
+                  QColor color = material != nullptr
+                      ? QColor(material->color.r, material->color.g, material->color.b)
+                      : QColor(205, 208, 214);
+                  // Umbrire simplă după normală: sus luminos, laturile mai închise.
+                  const math::Vec3d n = glm::normalize(t.applyToNormal(face.plane.normal));
+                  const double light = 0.62 + 0.38 * std::max(0.0, n.z) + 0.12 * std::max(0.0, -n.y);
+                  poly.color = color.darker(static_cast<int>(100.0 / std::min(light, 1.0)));
+                  polygons.push_back(poly);
+              }
+              for (const geom::Edge& e : mesh.edges().values()) {
+                  if (!e.soft) {
+                      edges.emplace_back(project(t.applyToPoint(mesh.vertex(e.v0).position)),
+                          project(t.applyToPoint(mesh.vertex(e.v1).position)));
+                  }
+              }
+              for (model::InstanceId id : model.childrenOf(d)) {
+                  const model::Instance& inst = model.instance(id);
+                  if (!inst.hidden) {
+                      visit(inst.definition, t * inst.transform, inst.material ? inst.material : inherited,
+                          depth + 1);
+                  }
+              }
+          };
+    visit(definition, math::Transform {}, {}, 0);
+    QRectF box;
+    for (const Polygon& p : polygons) {
+        box = box.isNull() ? p.points.boundingRect() : box.united(p.points.boundingRect());
+    }
+    for (const QLineF& l : edges) {
+        box = box.united(QRectF(l.p1(), l.p2()).normalized());
+    }
+    if (box.width() <= 0.0 && box.height() <= 0.0) {
+        return {};
+    }
+    constexpr int kWidth = 192;
+    constexpr int kHeight = 120;
+    QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const double scale
+        = 0.84 * std::min(kWidth / std::max(box.width(), 1e-6), kHeight / std::max(box.height(), 1e-6));
+    painter.translate(kWidth / 2.0, kHeight / 2.0);
+    painter.scale(scale, scale);
+    painter.translate(-box.center());
+    std::sort(polygons.begin(), polygons.end(),
+        [](const Polygon& a, const Polygon& b) { return a.depth > b.depth; });
+    painter.setPen(Qt::NoPen);
+    for (const Polygon& p : polygons) {
+        painter.setBrush(p.color);
+        painter.drawPolygon(p.points);
+    }
+    painter.setPen(QPen(QColor(40, 42, 48, 170), 1.0 / scale));
+    for (const QLineF& l : edges) {
+        painter.drawLine(l);
+    }
+    painter.end();
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "PNG");
+    return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
+}
+
+} // namespace
+
+QVariantList Document::modelComponents() const
+{
+    QVariantList out;
+    for (const auto& [d, count] : model::userComponents(m_model)) {
+        const model::Definition& def = m_model.definition(d);
+        // Miniatura se reface doar când se schimbă modelul.
+        auto& cached = m_componentThumbnails[d];
+        if (cached.first != m_modelRevision || cached.second.isEmpty()) {
+            cached = { m_modelRevision, componentThumbnail(m_model, d) };
+        }
+        out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("def:%1").arg(d.value) },
+            { QStringLiteral("name"), trCore(def.name.empty() ? "Componentă" : def.name) },
+            { QStringLiteral("category"), ui("În model") }, { QStringLiteral("user"), false },
+            { QStringLiteral("dynamic"), false }, { QStringLiteral("count"), count },
+            { QStringLiteral("thumbnail"), cached.second } });
+    }
+    return out;
+}
+
 bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thumbnailPng)
 {
     if (m_selection.instances.size() != 1 || name.trimmed().isEmpty()) {
-        setError(QStringLiteral("Selectează un singur obiect ca să-l salvezi în bibliotecă."));
+        setError(ui("Selectează un singur obiect ca să-l salvezi în bibliotecă."));
         return false;
+    }
+    // Cheia componentei (§6): nouă, sau păstrată la resalvarea aceleiași definiții; un grup devine
+    // componentă.
+    const model::InstanceId selected = *m_selection.instances.begin();
+    const model::DefinitionId savedDef = m_model.instance(selected).definition;
+    if (m_model.definition(savedDef).sourceKey.empty() || m_model.definition(savedDef).group) {
+        runOnModel("Salvează în bibliotecă", [&](model::Model& model) {
+            model::Definition def = model.definition(savedDef);
+            if (def.sourceKey.empty()) {
+                def.sourceKey = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+            }
+            def.group = false;
+            model.setDefinition(savedDef, def);
+        });
     }
     const model::Model extracted = model::extractInstance(m_model, *m_selection.instances.begin());
     QString safe = name.trimmed();
@@ -4911,10 +5696,11 @@ bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thu
     const QString path = QDir(libraryFolder()).filePath(safe + QStringLiteral(".aion"));
     std::string error;
     const bool ok = io::saveFile(toPath(path), extracted,
-        std::span(reinterpret_cast<const std::uint8_t*>(thumbnailPng.constData()), static_cast<std::size_t>(thumbnailPng.size())),
+        std::span(reinterpret_cast<const std::uint8_t*>(thumbnailPng.constData()),
+            static_cast<std::size_t>(thumbnailPng.size())),
         &error);
     if (!ok) {
-        setError(QStringLiteral("Obiectul nu a putut fi salvat în bibliotecă. %1").arg(QString::fromStdString(error)));
+        setError(ui("Obiectul nu a putut fi salvat în bibliotecă. %1").arg(trCore(error)));
         return false;
     }
     emit libraryChanged();
@@ -4923,6 +5709,19 @@ bool Document::saveSelectionToLibrary(const QString& name, const QByteArray& thu
 
 QVariantMap Document::libraryItemSize(const QString& id) const
 {
+    // O componentă din model: mărimea ei de acum (se poate schimba, deci fără cache).
+    if (id.startsWith(QLatin1String("def:"))) {
+        const model::DefinitionId d { id.mid(4).toULongLong() };
+        if (!m_model.definitions().contains(d)) {
+            return {};
+        }
+        const auto [lo, hi] = model::bounds(m_model, d);
+        if (lo.x > hi.x) {
+            return {};
+        }
+        return { { QStringLiteral("dx"), hi.x - lo.x }, { QStringLiteral("dy"), hi.y - lo.y },
+            { QStringLiteral("dz"), hi.z - lo.z } };
+    }
     if (const auto it = m_librarySizes.find(id); it != m_librarySizes.end()) {
         return it->second;
     }
@@ -4931,6 +5730,14 @@ QVariantMap Document::libraryItemSize(const QString& id) const
     if (id.startsWith(QLatin1String("gen:"))) {
         temp.emplace();
         model::createParametric(*temp, temp->root(), id.mid(4).toStdString(), {}, {});
+    } else if (id.startsWith(QLatin1String("board:"))) {
+        temp.emplace();
+        if (const model::BoardType* type = model::findBoardType(id.mid(6).toStdString())) {
+            model::createBoard(*temp, temp->root(), type->key, type->defaultThickness, 600.0, 400.0, {});
+        }
+    } else if (id.startsWith(QLatin1String("hardware:"))) {
+        temp.emplace();
+        model::createHardware(*temp, temp->root(), id.mid(9).toStdString(), {});
     } else if (id.startsWith(QLatin1String("file:"))) {
         io::LoadResult loaded = io::loadFile(toPath(id.mid(5)));
         if (loaded.model) {
@@ -4968,11 +5775,265 @@ void Document::setParameter(const QString& key, double value)
     if (m_model.definition(def).generator.empty()) {
         return;
     }
-    const auto it = m_model.definition(def).parameters.find(key.toStdString());
-    if (it != m_model.definition(def).parameters.end() && std::abs(it->second - value) < 1e-9) {
+    // O valoare în afara limitelor câmpului (sau o grosime care nu există pentru tipul plăcii) se aduce la
+    // cea permisă, cu un mesaj.
+    double applied = value;
+    QString why;
+    const model::Definition& definition = m_model.definition(def);
+    if (const model::GeneratorInfo* g = model::findGenerator(definition.generator)) {
+        for (const model::ParameterSpec& spec : g->parameters) {
+            if (spec.key != key.toStdString()) {
+                continue;
+            }
+            const QString unit = trCore(spec.unit);
+            if (model::isCarcassGenerator(g->id)
+                && (key == QLatin1String("board") || key == QLatin1String("back"))) {
+                const std::string type = key == QLatin1String("board") ? "pal" : "hdf";
+                applied = model::nearestThickness(type, value);
+                QStringList allowed;
+                for (const double t : model::findBoardType(type)->thicknesses) {
+                    allowed.append(QString::number(t));
+                }
+                why = ui("grosimile %1 sunt %2 mm")
+                          .arg(trCore(model::findBoardType(type)->label), allowed.join(QStringLiteral(", ")));
+            } else if (value < spec.min) {
+                applied = spec.min;
+                why = ui("minimul e %1 %2").arg(spec.min).arg(unit);
+            } else if (value > spec.max) {
+                applied = spec.max;
+                why = ui("maximul e %1 %2").arg(spec.max).arg(unit);
+            }
+            if (std::abs(applied - value) > 1e-9) {
+                setError(ui("„%1”: %2 %3 nu se poate (%4); s-a folosit %5 %3.")
+                        .arg(
+                            trCore(spec.label), QString::number(value), unit, why, QString::number(applied)));
+            }
+        }
+    }
+    const auto it = definition.parameters.find(key.toStdString());
+    if (it != definition.parameters.end() && std::abs(it->second - applied) < 1e-9) {
+        emit selectionChanged(); // câmpul revine la valoarea de acum
         return;
     }
-    runOnModel("Parametru", [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), value); });
+    runOnModel("Parametru",
+        [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), applied); });
+}
+
+void Document::setBoardValue(const QString& key, const QVariant& value)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    const model::DefinitionId def = m_model.instance(id).definition;
+    runOnModel("Placă", [&](model::Model& model) {
+        if (key == QLatin1String("type")) {
+            model::setBoardType(model, def, value.toString().toStdString());
+        } else {
+            model::setBoardValue(model, def, key.toStdString(), value.toDouble());
+        }
+    });
+}
+
+double Document::createBoardAt(
+    const QString& type, double thickness, double length, double width, const QVector3D& corner)
+{
+    if (!require(Modeling)) {
+        return 0.0;
+    }
+    model::InstanceId created;
+    runOnModel("Placă", [&](model::Model& model) {
+        created = model::createBoard(model, activeDefinition(), type.toStdString(), thickness, length, width,
+            math::Transform::translation({ corner.x(), corner.y(), corner.z() }));
+    });
+    return created ? static_cast<double>(created.value) : 0.0;
+}
+
+QVariantList Document::boardBandsInfo(model::DefinitionId definition) const
+{
+    QVariantList out;
+    const std::array<model::BandSide, 4> bands = model::boardBands(m_model, definition);
+    for (int k = 0; k < 4; ++k) {
+        const model::BandSide& b = bands[static_cast<std::size_t>(k)];
+        const model::BandType* type = model::findBandType(b.bandKey);
+        QString decorName;
+        if (const auto i = model::libraryMaterialByKey(b.decor)) {
+            decorName = trCore(model::builtinMaterials()[*i].name);
+        }
+        out.append(QVariantMap { { QStringLiteral("side"), k },
+            { QStringLiteral("name"), QString::fromLatin1(model::bandSideName(k).data()) },
+            { QStringLiteral("bandKey"), trCore(b.bandKey) },
+            { QStringLiteral("label"), type ? trCore(type->label) : QString() },
+            { QStringLiteral("decor"), trCore(b.decor) }, { QStringLiteral("decorName"), decorName },
+            { QStringLiteral("rounded"), b.rounded } });
+    }
+    return out;
+}
+
+QVariantList Document::bandTypesFor(const std::string& boardType) const
+{
+    QVariantList out;
+    for (const model::BandType& t : model::bandTypes()) {
+        if (model::bandFitsBoard(t.key, boardType)) {
+            out.append(QVariantMap {
+                { QStringLiteral("key"), trCore(t.key) }, { QStringLiteral("label"), trCore(t.label) } });
+        }
+    }
+    return out;
+}
+
+QVariantList Document::bandDecors() const
+{
+    // Decorul cantului: doar materialele incluse de tip decor sau lemn (cheia lor rămâne aceeași în orice
+    // fișier).
+    QVariantList out;
+    for (const model::Material& m : model::builtinMaterials()) {
+        if (m.category == "board-decor" || m.category == "wood") {
+            out.append(QVariantMap { { QStringLiteral("key"), trCore(m.libraryKey) },
+                { QStringLiteral("name"), trCore(m.name) },
+                { QStringLiteral("color"), QColor(m.color.r, m.color.g, m.color.b) } });
+        }
+    }
+    return out;
+}
+
+QVariantList Document::allBandTypes() const
+{
+    QVariantList out;
+    for (const model::BandType& t : model::bandTypes()) {
+        out.append(QVariantMap {
+            { QStringLiteral("key"), trCore(t.key) }, { QStringLiteral("label"), trCore(t.label) } });
+    }
+    return out;
+}
+
+QVariantList Document::bandPresets() const
+{
+    QVariantList out;
+    for (const model::BandPreset& p : model::builtinBandPresets()) {
+        QVariantList sides;
+        for (const model::BandSide& s : p.sides) {
+            sides.append(QVariantMap { { QStringLiteral("bandKey"), trCore(s.bandKey) },
+                { QStringLiteral("decor"), trCore(s.decor) }, { QStringLiteral("rounded"), s.rounded } });
+        }
+        out.append(
+            QVariantMap { { QStringLiteral("name"), trCore(p.name) }, { QStringLiteral("sides"), sides } });
+    }
+    return out;
+}
+
+void Document::setBand(int side, const QString& bandKey, const QString& decor, bool rounded)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    bool ok = true;
+    runOnModel("Cant", [&](model::Model& model) {
+        ok = model::setBand(model, def, side, bandKey.toStdString(), decor.toStdString(), rounded);
+    });
+    if (!ok) {
+        setError(ui("Cantul ales nu se pune pe acest tip de placă."));
+    }
+    emit selectionChanged();
+}
+
+void Document::setBands(const QVariantList& sides)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1 || sides.size() != 4) {
+        return;
+    }
+    std::array<model::BandSide, 4> bands {};
+    for (int k = 0; k < 4; ++k) {
+        const QVariantMap s = sides[k].toMap();
+        bands[static_cast<std::size_t>(k)] = { s.value(QStringLiteral("bandKey")).toString().toStdString(),
+            s.value(QStringLiteral("decor")).toString().toStdString(),
+            s.value(QStringLiteral("rounded")).toBool() };
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    int skipped = 0;
+    runOnModel("Cant", [&](model::Model& model) { skipped = model::applyBandPreset(model, def, bands); });
+    if (skipped > 0) {
+        setError(ui("%1 laturi au rămas fără cant: cantul nu se potrivește tipului plăcii.").arg(skipped));
+    }
+    emit selectionChanged();
+}
+
+void Document::setHardwareVariant(const QString& typeKey)
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Variantă de feronerie",
+        [&](model::Model& model) { model::replaceHardwareVariant(model, def, typeKey.toStdString()); });
+    emit selectionChanged();
+}
+
+QVariantMap Document::boardDefaults() const
+{
+    QVariantList types;
+    for (const model::BoardType& t : model::boardTypes()) {
+        QVariantList thicknesses;
+        for (const double v : t.thicknesses) {
+            thicknesses.append(v);
+        }
+        types.append(QVariantMap { { QStringLiteral("key"), trCore(t.key) },
+            { QStringLiteral("label"), trCore(t.label) }, { QStringLiteral("thicknesses"), thicknesses } });
+    }
+    return { { QStringLiteral("type"), trCore(m_boardDefaults.type) },
+        { QStringLiteral("thickness"), m_boardDefaults.thickness }, { QStringLiteral("types"), types } };
+}
+
+void Document::setBoardDefaults(const QString& type, double thickness)
+{
+    if (model::findBoardType(type.toStdString()) == nullptr) {
+        return;
+    }
+    m_boardDefaults.type = type.toStdString();
+    m_boardDefaults.thickness = model::nearestThickness(m_boardDefaults.type, thickness);
+    emit boardDefaultsChanged();
+}
+
+void Document::setDoorsOpen(bool open)
+{
+    if (open != m_doorsOpen) {
+        m_doorsOpen = open;
+        ++m_interactionRevision; // desenul modelului se reface
+        emit doorsOpenChanged();
+        touch();
+    }
+}
+
+bool Document::hasDoors() const
+{
+    return model::hasDoors(m_model);
+}
+
+void Document::setHoveredBandSide(int side)
+{
+    if (side != m_hoveredBandSide) {
+        m_hoveredBandSide = side;
+        emit hoveredBandSideChanged();
+    }
+}
+
+void Document::restoreBoard()
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::InstanceId id = *m_selection.instances.begin();
+    runOnModel("Readu la parametri", [&](model::Model& model) { model::restoreBoard(model, id); });
+}
+
+void Document::detachBoard()
+{
+    if (!require(Modeling) || m_selection.instances.size() != 1) {
+        return;
+    }
+    const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
+    runOnModel("Desprinde de parametri", [&](model::Model& model) { model::detachBoard(model, def); });
 }
 
 void Document::setPrimitiveSegments(int segments)
@@ -5016,14 +6077,15 @@ void Document::setShapeValue(const QString& key, double value)
         } else if (key == QLatin1String("width") || key == QLatin1String("height")) {
             ok = geom::setRectangleSize(mesh, *shape, key == QLatin1String("width") ? value : shape->width,
                 key == QLatin1String("height") ? value : shape->height);
-        } else if (const auto selection = geom::setShapeSegments(mesh, *shape, static_cast<int>(std::lround(value)))) {
+        } else if (const auto selection
+            = geom::setShapeSegments(mesh, *shape, static_cast<int>(std::lround(value)))) {
             m_selection = *selection;
         } else {
             ok = false;
         }
     });
     if (!ok) {
-        setError(QStringLiteral("Mărimea nu se poate schimba așa (o muchie ar ajunge de lungime zero)."));
+        setError(ui("Mărimea nu se poate schimba așa (o muchie ar ajunge de lungime zero)."));
     }
 }
 
@@ -5086,7 +6148,8 @@ void Document::setPivotPosition(const QVariantMap& coordinates)
         return;
     }
     const auto axis = [&](const char* key, double fallback) {
-        return coordinates.contains(QLatin1String(key)) ? coordinates.value(QLatin1String(key)).toDouble() : fallback;
+        return coordinates.contains(QLatin1String(key)) ? coordinates.value(QLatin1String(key)).toDouble()
+                                                        : fallback;
     };
     setSelectionPivot({ axis("x", p->x), axis("y", p->y), axis("z", p->z) });
 }
@@ -5249,8 +6312,8 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
         name = "Rotește";
         m_geometryRotation = wanted;
     } else if (has("sx") || has("sy") || has("sz")) {
-        const math::Vec3d wanted { has("sx") ? value("sx") : m_geometryScale.x, has("sy") ? value("sy") : m_geometryScale.y,
-            has("sz") ? value("sz") : m_geometryScale.z };
+        const math::Vec3d wanted { has("sx") ? value("sx") : m_geometryScale.x,
+            has("sy") ? value("sy") : m_geometryScale.y, has("sz") ? value("sz") : m_geometryScale.z };
         if (std::abs(wanted.x) < 1e-6 || std::abs(wanted.y) < 1e-6 || std::abs(wanted.z) < 1e-6) {
             return;
         }
@@ -5262,12 +6325,15 @@ void Document::setGeometryPlacement(const QVariantMap& changes)
         return;
     }
     bool ok = true;
-    runOnModel(name, [&](model::Model& model) { ok = geom::transformVertices(model.mesh(activeDefinition()), vertices, t); });
+    runOnModel(name, [&](model::Model& model) {
+        ok = geom::transformVertices(model.mesh(activeDefinition()), vertices, t);
+    });
     if (!ok) {
-        setError(QStringLiteral("Transformarea ar strânge o muchie într-un punct."));
+        setError(ui("Transformarea ar strânge o muchie într-un punct."));
         m_geometryKey.clear();
     } else {
-        m_geometryKey = geometrySelectionKey(); // fețele pot primi ID-uri noi: rotirea rămâne a acestei selecții
+        m_geometryKey
+            = geometrySelectionKey(); // fețele pot primi ID-uri noi: rotirea rămâne a acestei selecții
     }
     emit selectionChanged();
 }
@@ -5280,13 +6346,14 @@ void Document::createFacesFromSelection()
     // Muchiile selectate și cele ale fețelor selectate (o față vecină ajută la închiderea buclei).
     std::vector<geom::EdgeId> edges(m_selection.edges.begin(), m_selection.edges.end());
     if (edges.empty()) {
-        setError(QStringLiteral("Selectează muchiile care închid fața (dublu click pe o față vecină le prinde și pe ele)."));
+        setError(QStringLiteral(
+            "Selectează muchiile care închid fața (dublu click pe o față vecină le prinde și pe ele)."));
         return;
     }
     // Încercat întâi pe o copie: fără un pas gol în istoric când nu se închide nimic.
     geom::Mesh trial = m_model.mesh(activeDefinition());
     if (geom::createFaces(trial, edges).createdFaces.empty()) {
-        setError(QStringLiteral("Muchiile selectate nu închid nicio buclă plană fără față."));
+        setError(ui("Muchiile selectate nu închid nicio buclă plană fără față."));
         return;
     }
     runOnModel("Creează fețe", [&](model::Model& model) {
@@ -5320,7 +6387,7 @@ void Document::mirrorSelection(int axis)
         return;
     }
     if (m_selection.empty()) {
-        setError(QStringLiteral("Selectează ce vrei să oglindești."));
+        setError(ui("Selectează ce vrei să oglindești."));
         return;
     }
     const auto [lo, hi] = model::selectionBounds(m_model, activeDefinition(), m_selection);
@@ -5354,7 +6421,7 @@ void Document::previewArray(const QVariantMap& options)
         return;
     }
     if (!m_previewApplied && m_selection.empty()) {
-        setError(QStringLiteral("Selectează obiectele sau geometria pe care vrei s-o multiplici."));
+        setError(ui("Selectează obiectele sau geometria pe care vrei s-o multiplici."));
         return;
     }
     if (m_previewApplied) {
@@ -5366,14 +6433,16 @@ void Document::previewArray(const QVariantMap& options)
     const int count = std::clamp(options.value(QStringLiteral("count"), 3).toInt(), 1, 500);
     const geom::Selection source = m_previewSelection;
     const bool polar = options.value(QStringLiteral("mode")).toString() == QStringLiteral("polar");
-    // Doar un pas adăugat în istoric se anulează la următoarea previzualizare (altfel undo-ul ar lua pasul de dinainte).
+    // Doar un pas adăugat în istoric se anulează la următoarea previzualizare (altfel undo-ul ar lua pasul de
+    // dinainte).
     m_previewApplied = runOnModel(polar ? "Array polar" : "Array liniar", [&](model::Model& model) {
         if (polar) {
             math::Vec3d axis { 0.0 };
             axis[std::clamp(options.value(QStringLiteral("axis"), 2).toInt(), 0, 2)] = 1.0;
             math::Vec3d center { 0.0 };
             if (!options.value(QStringLiteral("aroundOrigin")).toBool()) {
-                // În jurul unui punct la o latură de selecție, ca obiectele să se rotească „în cerc” (scaune la masă).
+                // În jurul unui punct la o latură de selecție, ca obiectele să se rotească „în cerc” (scaune
+                // la masă).
                 const auto [lo, hi] = model::selectionBounds(model, activeDefinition(), source);
                 center = (lo + hi) * 0.5;
                 const int sideAxis = axis.x != 0.0 ? 1 : 0;
@@ -5383,7 +6452,8 @@ void Document::previewArray(const QVariantMap& options)
                 glm::radians(options.value(QStringLiteral("angle"), 90.0).toDouble()), count,
                 options.value(QStringLiteral("rotate"), true).toBool());
         } else {
-            const math::Vec3d step { options.value(QStringLiteral("dx")).toDouble(), options.value(QStringLiteral("dy")).toDouble(),
+            const math::Vec3d step { options.value(QStringLiteral("dx")).toDouble(),
+                options.value(QStringLiteral("dy")).toDouble(),
                 options.value(QStringLiteral("dz")).toDouble() };
             model::linearArray(model, activeDefinition(), source, step, count);
         }
@@ -5398,7 +6468,7 @@ QVariantMap Document::previewSoften(double maxAngleDegrees, bool includeCoplanar
         return {};
     }
     if (!m_previewApplied && m_selection.empty()) {
-        setError(QStringLiteral("Selectează muchiile, fețele sau obiectele de netezit."));
+        setError(ui("Selectează muchiile, fețele sau obiectele de netezit."));
         return {};
     }
     if (m_previewApplied) {
@@ -5417,7 +6487,8 @@ QVariantMap Document::previewSoften(double maxAngleDegrees, bool includeCoplanar
             total += edge != nullptr && edge->faces.size() == 2 ? 1 : 0;
         }
     };
-    // Când nicio muchie nu-și schimbă starea (un cub sub prag), nu intră nimic în istoric: nu e nimic de anulat.
+    // Când nicio muchie nu-și schimbă starea (un cub sub prag), nu intră nimic în istoric: nu e nimic de
+    // anulat.
     m_previewApplied = runOnModel("Muchii netede", [&](model::Model& model) {
         // Muchiile selectate și ale fețelor selectate, în context.
         geom::Mesh& mesh = model.mesh(activeDefinition());
@@ -5436,7 +6507,8 @@ QVariantMap Document::previewSoften(double maxAngleDegrees, bool includeCoplanar
             }
         }
         soften(mesh, edges);
-        // Obiectele selectate: toate muchiile din definiția lor și din subobiecte (blatul și picioarele unei mese).
+        // Obiectele selectate: toate muchiile din definiția lor și din subobiecte (blatul și picioarele unei
+        // mese).
         std::set<model::DefinitionId> definitions;
         std::vector<model::InstanceId> pending(source.instances.begin(), source.instances.end());
         while (!pending.empty()) {
@@ -5468,7 +6540,7 @@ QVariantMap Document::previewSubdivide(int levels)
         return {};
     }
     if (!m_previewApplied && m_selection.empty()) {
-        setError(QStringLiteral("Selectează obiectele sau fețele de subdivizat."));
+        setError(ui("Selectează obiectele sau fețele de subdivizat."));
         return {};
     }
     if (m_previewApplied) {
@@ -5479,8 +6551,8 @@ QVariantMap Document::previewSubdivide(int levels)
         m_previewSelection = m_selection;
     }
     const geom::Selection source = m_previewSelection;
-    // Ce se subdivizează: în context, fețele conectate de cele selectate (altfel s-ar rupe de vecinele lor); pentru
-    // obiectele selectate, toată geometria lor și a subobiectelor.
+    // Ce se subdivizează: în context, fețele conectate de cele selectate (altfel s-ar rupe de vecinele lor);
+    // pentru obiectele selectate, toată geometria lor și a subobiectelor.
     std::set<geom::FaceId> contextFaces;
     if (!source.faces.empty() || !source.edges.empty()) {
         const geom::Selection seed { source.edges, source.faces, {} };
@@ -5528,7 +6600,7 @@ QVariantMap Document::previewSubdivide(int levels)
     if (!error.empty()) {
         emit selectionChanged();
         touch();
-        return { { QStringLiteral("faces"), 0 }, { QStringLiteral("error"), QString::fromStdString(error) } };
+        return { { QStringLiteral("faces"), 0 }, { QStringLiteral("error"), trCore(error) } };
     }
     m_previewApplied = runOnModel("Subdivide", [&](model::Model& model) {
         if (!contextFaces.empty()) {
@@ -5544,7 +6616,8 @@ QVariantMap Document::previewSubdivide(int levels)
     kept.instances = source.instances;
     m_selection = kept;
     emit selectionChanged();
-    return { { QStringLiteral("faces"), static_cast<qulonglong>(total) }, { QStringLiteral("error"), QString() } };
+    return { { QStringLiteral("faces"), static_cast<qulonglong>(total) },
+        { QStringLiteral("error"), QString() } };
 }
 
 void Document::previewBevel(double distance, int segments)
@@ -5553,7 +6626,7 @@ void Document::previewBevel(double distance, int segments)
         return;
     }
     if (!m_previewApplied && m_selection.edges.empty() && m_selection.faces.empty()) {
-        setError(QStringLiteral("Selectează muchiile sau fața de teșit."));
+        setError(ui("Selectează muchiile sau fața de teșit."));
         return;
     }
     if (m_previewApplied) {
@@ -5565,7 +6638,7 @@ void Document::previewBevel(double distance, int segments)
     }
     const geom::Selection source = m_previewSelection;
     if (source.edges.empty() && source.faces.size() != 1) {
-        setError(QStringLiteral("Bevel pe fețe: alege o singură față (sau muchiile pe care le vrei teșite)."));
+        setError(ui("Bevel pe fețe: alege o singură față (sau muchiile pe care le vrei teșite)."));
         emit selectionChanged();
         touch();
         return;
@@ -5578,15 +6651,14 @@ void Document::previewBevel(double distance, int segments)
     geom::Mesh trial = m_model.mesh(activeDefinition());
     const geom::BevelResult check = apply(trial);
     if (!check.ok()) {
-        setError(QString::fromStdString(check.error));
+        setError(trCore(check.error));
         emit selectionChanged();
         touch();
         return;
     }
     geom::Selection created;
-    m_previewApplied = runOnModel(segments > 1 ? "Bevel" : "Chamfer", [&](model::Model& model) {
-        created = apply(model.mesh(activeDefinition())).selection;
-    });
+    m_previewApplied = runOnModel(segments > 1 ? "Bevel" : "Chamfer",
+        [&](model::Model& model) { created = apply(model.mesh(activeDefinition())).selection; });
     m_selection = created;
     emit selectionChanged();
 }
@@ -5628,7 +6700,8 @@ void Document::retriangulate(model::DefinitionId definition)
     }
 }
 
-void Document::meshChanged(model::DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary)
+void Document::meshChanged(
+    model::DefinitionId definition, const geom::Mesh& mesh, const geom::ChangeSummary& summary)
 {
     // Fețele adăugate sau modificate se retriangulează; la fel cele ale căror vârfuri s-au mutat.
     auto& tris = m_triangles[definition];
@@ -5659,8 +6732,8 @@ void Document::meshChanged(model::DefinitionId definition, const geom::Mesh& mes
 
 namespace {
 
-const std::array<QString, 4> kLightKinds { QStringLiteral("point"), QStringLiteral("spot"), QStringLiteral("directional"),
-    QStringLiteral("area") };
+const std::array<QString, 4> kLightKinds { QStringLiteral("point"), QStringLiteral("spot"),
+    QStringLiteral("directional"), QStringLiteral("area") };
 
 QString colorName(const model::Color& c)
 {
@@ -5681,12 +6754,13 @@ math::Vec3d vec3From(const QVariant& value, const math::Vec3d& fallback)
 // Ochiul și ținta vederii date ca { tx, ty, tz, yaw, pitch, distance }.
 std::pair<math::Vec3d, math::Vec3d> eyeAndTarget(const QVariantMap& camera)
 {
-    const math::Vec3d target { camera.value(QStringLiteral("tx")).toDouble(), camera.value(QStringLiteral("ty")).toDouble(),
-        camera.value(QStringLiteral("tz")).toDouble() };
+    const math::Vec3d target { camera.value(QStringLiteral("tx")).toDouble(),
+        camera.value(QStringLiteral("ty")).toDouble(), camera.value(QStringLiteral("tz")).toDouble() };
     const double yaw = camera.value(QStringLiteral("yaw")).toDouble();
     const double pitch = camera.value(QStringLiteral("pitch")).toDouble();
     const double distance = camera.value(QStringLiteral("distance"), 10000.0).toDouble();
-    const math::Vec3d forward { std::cos(pitch) * std::cos(yaw), std::cos(pitch) * std::sin(yaw), std::sin(pitch) };
+    const math::Vec3d forward { std::cos(pitch) * std::cos(yaw), std::cos(pitch) * std::sin(yaw),
+        std::sin(pitch) };
     return { target - forward * distance, target };
 }
 
@@ -5697,8 +6771,9 @@ QVariantList Document::cameras() const
     QVariantList out;
     for (std::size_t i = 0; i < m_model.cameras().size(); ++i) {
         const model::CameraObject& c = m_model.cameras().values()[i];
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.cameras().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(c.name) }, { QStringLiteral("kind"), QStringLiteral("camera") },
+        out.append(QVariantMap {
+            { QStringLiteral("id"), static_cast<double>(m_model.cameras().keys()[i].value) },
+            { QStringLiteral("name"), trCore(c.name) }, { QStringLiteral("kind"), QStringLiteral("camera") },
             { QStringLiteral("visible"), c.visible }, { QStringLiteral("enabled"), true } });
     }
     return out;
@@ -5709,11 +6784,12 @@ QVariantList Document::lights() const
     QVariantList out;
     for (std::size_t i = 0; i < m_model.lights().size(); ++i) {
         const model::Light& l = m_model.lights().values()[i];
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.lights().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(l.name) },
-            { QStringLiteral("kind"), kLightKinds[static_cast<std::size_t>(l.kind)] },
-            { QStringLiteral("visible"), l.visible }, { QStringLiteral("enabled"), l.enabled },
-            { QStringLiteral("color"), colorName(l.color) } });
+        out.append(
+            QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.lights().keys()[i].value) },
+                { QStringLiteral("name"), trCore(l.name) },
+                { QStringLiteral("kind"), kLightKinds[static_cast<std::size_t>(l.kind)] },
+                { QStringLiteral("visible"), l.visible }, { QStringLiteral("enabled"), l.enabled },
+                { QStringLiteral("color"), colorName(l.color) } });
     }
     return out;
 }
@@ -5725,21 +6801,20 @@ QVariantMap Document::cameraInfo(double cameraId) const
     if (c == nullptr) {
         return {};
     }
-        return { { QStringLiteral("kind"), QStringLiteral("camera") },
-            { QStringLiteral("id"), cameraId },
-            { QStringLiteral("name"), QString::fromStdString(c->name) },
-            { QStringLiteral("position"), vec3List(c->position) }, { QStringLiteral("target"), vec3List(c->target) },
-            { QStringLiteral("focalLength"), c->focalLength }, { QStringLiteral("sensorWidth"), c->sensorWidth },
-            { QStringLiteral("fovH"), glm::degrees(model::cameraFov(*c).first) },
-            { QStringLiteral("fovV"), glm::degrees(model::cameraFov(*c).second) },
-            { QStringLiteral("formatWidth"), c->formatWidth }, { QStringLiteral("formatHeight"), c->formatHeight },
-            { QStringLiteral("shiftX"), c->shift.x }, { QStringLiteral("shiftY"), c->shift.y },
-            { QStringLiteral("roll"), c->roll }, { QStringLiteral("orthographic"), c->orthographic },
-            { QStringLiteral("orthoScale"), c->orthoScale }, { QStringLiteral("dofEnabled"), c->dof.enabled },
-            { QStringLiteral("focusDistance"), c->dof.focusDistance }, { QStringLiteral("fStop"), c->dof.fStop },
-            { QStringLiteral("displaySize"), c->displaySize },
-            { QStringLiteral("nearClip"), c->nearClip }, { QStringLiteral("farClip"), c->farClip },
-            { QStringLiteral("visible"), c->visible } };
+    return { { QStringLiteral("kind"), QStringLiteral("camera") }, { QStringLiteral("id"), cameraId },
+        { QStringLiteral("name"), trCore(c->name) }, { QStringLiteral("position"), vec3List(c->position) },
+        { QStringLiteral("target"), vec3List(c->target) }, { QStringLiteral("focalLength"), c->focalLength },
+        { QStringLiteral("sensorWidth"), c->sensorWidth },
+        { QStringLiteral("fovH"), glm::degrees(model::cameraFov(*c).first) },
+        { QStringLiteral("fovV"), glm::degrees(model::cameraFov(*c).second) },
+        { QStringLiteral("formatWidth"), c->formatWidth },
+        { QStringLiteral("formatHeight"), c->formatHeight }, { QStringLiteral("shiftX"), c->shift.x },
+        { QStringLiteral("shiftY"), c->shift.y }, { QStringLiteral("roll"), c->roll },
+        { QStringLiteral("orthographic"), c->orthographic }, { QStringLiteral("orthoScale"), c->orthoScale },
+        { QStringLiteral("dofEnabled"), c->dof.enabled },
+        { QStringLiteral("focusDistance"), c->dof.focusDistance }, { QStringLiteral("fStop"), c->dof.fStop },
+        { QStringLiteral("displaySize"), c->displaySize }, { QStringLiteral("nearClip"), c->nearClip },
+        { QStringLiteral("farClip"), c->farClip }, { QStringLiteral("visible"), c->visible } };
 }
 
 QVariantMap Document::selectedObject() const
@@ -5753,9 +6828,10 @@ QVariantMap Document::selectedObject() const
     if (const model::Light* l = m_model.lights().find(m_selectedLight)) {
         return { { QStringLiteral("kind"), QStringLiteral("light") },
             { QStringLiteral("id"), static_cast<double>(m_selectedLight.value) },
-            { QStringLiteral("name"), QString::fromStdString(l->name) },
+            { QStringLiteral("name"), trCore(l->name) },
             { QStringLiteral("lightKind"), kLightKinds[static_cast<std::size_t>(l->kind)] },
-            { QStringLiteral("position"), vec3List(l->position) }, { QStringLiteral("direction"), vec3List(l->direction) },
+            { QStringLiteral("position"), vec3List(l->position) },
+            { QStringLiteral("direction"), vec3List(l->direction) },
             { QStringLiteral("color"), colorName(l->color) }, { QStringLiteral("intensity"), l->intensity },
             { QStringLiteral("range"), l->range }, { QStringLiteral("cone"), l->cone },
             { QStringLiteral("softness"), l->softness }, { QStringLiteral("width"), l->width },
@@ -5775,13 +6851,15 @@ void Document::addCamera(const QVariantMap& camera, double fovDegrees)
         model::CameraObject c;
         std::tie(c.position, c.target) = eyeAndTarget(camera);
         // Focala care vede pe verticală cât vederea curentă (formatul implicit, 16:9).
-        const double fov = fovDegrees > 0.0 ? fovDegrees : camera.value(QStringLiteral("fov"), 0.0).toDouble();
+        const double fov
+            = fovDegrees > 0.0 ? fovDegrees : camera.value(QStringLiteral("fov"), 0.0).toDouble();
         if (fov > 0.0) {
             c.focalLength = std::clamp(model::focalForVerticalFov(c, glm::radians(fov)), 8.0, 600.0);
         }
         c.orthographic = camera.value(QStringLiteral("ortho")).toBool();
         if (c.orthographic) {
-            c.orthoScale = std::max(1.0, 2.0 * glm::length(c.target - c.position) * std::tan(glm::radians(std::max(fov, 1.0)) * 0.5)
+            c.orthoScale = std::max(1.0,
+                2.0 * glm::length(c.target - c.position) * std::tan(glm::radians(std::max(fov, 1.0)) * 0.5)
                     * double(c.formatWidth) / double(c.formatHeight));
         }
         c.name = "Cameră " + std::to_string(model.cameras().size() + 1);
@@ -5795,7 +6873,8 @@ void Document::addLight(const QString& kind, const QVector3D& at)
     if (!require(Modeling)) {
         return;
     }
-    const auto index = static_cast<std::size_t>(std::max<qsizetype>(0, std::find(kLightKinds.begin(), kLightKinds.end(), kind) - kLightKinds.begin()));
+    const auto index = static_cast<std::size_t>(std::max<qsizetype>(
+        0, std::find(kLightKinds.begin(), kLightKinds.end(), kind) - kLightKinds.begin()));
     model::LightId added;
     runOnModel("Lumină nouă", [&](model::Model& model) {
         model::Light l;
@@ -5839,7 +6918,8 @@ void Document::selectObject(const QString& kind, double id)
         m_selectedCamera = model::CameraId { static_cast<std::uint64_t>(id) };
     } else if (kind == QStringLiteral("light")) {
         m_selectedLight = model::LightId { static_cast<std::uint64_t>(id) };
-    } else if (kind == QStringLiteral("path") && m_model.motionPaths().contains(model::MotionPathId { static_cast<std::uint64_t>(id) })) {
+    } else if (kind == QStringLiteral("path")
+        && m_model.motionPaths().contains(model::MotionPathId { static_cast<std::uint64_t>(id) })) {
         m_selectedPath = model::MotionPathId { static_cast<std::uint64_t>(id) };
     }
     if (m_selectedCamera || m_selectedLight || m_selectedPath) {
@@ -5871,7 +6951,8 @@ void Document::setCameraProperties(double cameraId, const QVariantMap& changes)
         c.position = vec3From(changes.value(QStringLiteral("position")), c.position);
         c.target = vec3From(changes.value(QStringLiteral("target")), c.target);
         if (changes.contains(QStringLiteral("fov"))) { // unghiul vertical (scripturile vechi)
-            c.focalLength = model::focalForVerticalFov(c, glm::radians(std::clamp(changes.value(QStringLiteral("fov")).toDouble(), 0.5, 170.0)));
+            c.focalLength = model::focalForVerticalFov(
+                c, glm::radians(std::clamp(changes.value(QStringLiteral("fov")).toDouble(), 0.5, 170.0)));
         }
         num("focalLength", c.focalLength);
         c.focalLength = std::clamp(c.focalLength, 1.0, 2000.0);
@@ -5934,7 +7015,8 @@ void Document::setObjectProperties(const QVariantMap& changes)
             l.name = changes.value(QStringLiteral("name")).toString().toStdString();
         }
         if (changes.contains(QStringLiteral("lightKind"))) {
-            const auto it = std::find(kLightKinds.begin(), kLightKinds.end(), changes.value(QStringLiteral("lightKind")).toString());
+            const auto it = std::find(kLightKinds.begin(), kLightKinds.end(),
+                changes.value(QStringLiteral("lightKind")).toString());
             if (it != kLightKinds.end()) {
                 l.kind = static_cast<model::Light::Kind>(it - kLightKinds.begin());
             }
@@ -5995,7 +7077,8 @@ QVariantList Document::cameraFormatPresets() const
 {
     QVariantList out;
     for (const model::FormatPreset& p : model::formatPresets()) {
-        out.append(QVariantMap { { QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size())) },
+        out.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size())) },
             { QStringLiteral("width"), p.width }, { QStringLiteral("height"), p.height } });
     }
     return out;
@@ -6005,7 +7088,8 @@ QVariantList Document::cameraSensorPresets() const
 {
     QVariantList out;
     for (const model::SensorPreset& p : model::sensorPresets()) {
-        out.append(QVariantMap { { QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size())) },
+        out.append(QVariantMap {
+            { QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size())) },
             { QStringLiteral("width"), p.width } });
     }
     return out;
@@ -6013,7 +7097,8 @@ QVariantList Document::cameraSensorPresets() const
 
 QVariantMap Document::cameraView(double cameraId) const
 {
-    const model::CameraObject* c = m_model.cameras().find(model::CameraId { static_cast<std::uint64_t>(cameraId) });
+    const model::CameraObject* c
+        = m_model.cameras().find(model::CameraId { static_cast<std::uint64_t>(cameraId) });
     if (c == nullptr) {
         return {};
     }
@@ -6021,7 +7106,8 @@ QVariantMap Document::cameraView(double cameraId) const
     return { { QStringLiteral("tx"), pose.target.x }, { QStringLiteral("ty"), pose.target.y },
         { QStringLiteral("tz"), pose.target.z }, { QStringLiteral("yaw"), pose.yaw },
         { QStringLiteral("pitch"), pose.pitch }, { QStringLiteral("distance"), pose.distance },
-        { QStringLiteral("ortho"), c->orthographic }, { QStringLiteral("fov"), glm::degrees(model::cameraFov(*c).second) } };
+        { QStringLiteral("ortho"), c->orthographic },
+        { QStringLiteral("fov"), glm::degrees(model::cameraFov(*c).second) } };
 }
 
 std::optional<math::Vec3d> Document::selectedObjectPosition() const
@@ -6033,7 +7119,8 @@ std::optional<math::Vec3d> Document::selectedObjectPosition() const
         return l->position;
     }
     if (const model::MotionPath* p = m_model.motionPaths().find(m_selectedPath)) {
-        return p->transform.applyToPoint(p->curve.points.empty() ? math::Vec3d { 0.0 } : p->curve.points.front().point);
+        return p->transform.applyToPoint(
+            p->curve.points.empty() ? math::Vec3d { 0.0 } : p->curve.points.front().point);
     }
     return std::nullopt;
 }
@@ -6042,7 +7129,8 @@ void Document::moveSelectedObjectTo(const math::Vec3d& position)
 {
     if (const model::CameraObject* c = m_model.cameras().find(m_selectedCamera)) {
         const math::Vec3d target = c->target + (position - c->position);
-        setObjectProperties({ { QStringLiteral("position"), vec3List(position) }, { QStringLiteral("target"), vec3List(target) } });
+        setObjectProperties({ { QStringLiteral("position"), vec3List(position) },
+            { QStringLiteral("target"), vec3List(target) } });
     } else if (m_model.lights().contains(m_selectedLight)) {
         setObjectProperties({ { QStringLiteral("position"), vec3List(position) } });
     } else if (const model::MotionPath* p = m_model.motionPaths().find(m_selectedPath)) {
@@ -6061,8 +7149,9 @@ void Document::placeSelectedObjectAtView(const QVariantMap& camera)
 {
     const auto [eye, target] = eyeAndTarget(camera);
     if (m_model.cameras().contains(m_selectedCamera)) {
-        setObjectProperties({ { QStringLiteral("position"), vec3List(eye) }, { QStringLiteral("target"), vec3List(target) },
-            { QStringLiteral("orthographic"), camera.value(QStringLiteral("ortho")) } });
+        setObjectProperties(
+            { { QStringLiteral("position"), vec3List(eye) }, { QStringLiteral("target"), vec3List(target) },
+                { QStringLiteral("orthographic"), camera.value(QStringLiteral("ortho")) } });
     } else if (const model::Light* l = m_model.lights().find(m_selectedLight)) {
         // Lumina vine în ținta vederii (la înălțimea ei), îndreptată ca privirea.
         QVariantMap changes { { QStringLiteral("direction"), vec3List(glm::normalize(target - eye)) } };
@@ -6082,8 +7171,8 @@ void Document::structureChanged(const model::Model& model)
         }
     }
     std::erase_if(m_triangles, [&](const auto& entry) { return !model.definitions().contains(entry.first); });
-    // Înainte ca interfața să citească selecția (selectionSummary, Entity Info): după un undo, instanțele selectate
-    // sau cele din calea contextului pot să nu mai existe.
+    // Înainte ca interfața să citească selecția (selectionSummary, Entity Info): după un undo, instanțele
+    // selectate sau cele din calea contextului pot să nu mai existe.
     dropStaleReferences();
     updateHiddenTags();
     emit outlineChanged();
@@ -6100,11 +7189,12 @@ QVariantList Document::paths() const
     for (std::size_t i = 0; i < m_model.motionPaths().size(); ++i) {
         const model::MotionPath& p = m_model.motionPaths().values()[i];
         const model::Animation* animation = m_model.animations().find(p.animation);
-        out.append(QVariantMap { { QStringLiteral("id"), static_cast<double>(m_model.motionPaths().keys()[i].value) },
-            { QStringLiteral("name"), QString::fromStdString(p.name) }, { QStringLiteral("kind"), QStringLiteral("path") },
+        out.append(QVariantMap {
+            { QStringLiteral("id"), static_cast<double>(m_model.motionPaths().keys()[i].value) },
+            { QStringLiteral("name"), trCore(p.name) }, { QStringLiteral("kind"), QStringLiteral("path") },
             { QStringLiteral("visible"), p.visible }, { QStringLiteral("enabled"), true },
             { QStringLiteral("active"), p.animation == m_activeAnimation },
-            { QStringLiteral("animationName"), animation ? QString::fromStdString(animation->name) : QString() } });
+            { QStringLiteral("animationName"), animation ? trCore(animation->name) : QString() } });
     }
     return out;
 }
@@ -6139,23 +7229,24 @@ QVariantMap Document::pathInfo(model::MotionPathId id) const
         if (inst == nullptr) {
             continue;
         }
-        const model::Definition& def = m_model.definition(inst->definition);
         anchors.append(QVariantMap { { QStringLiteral("instance"), static_cast<double>(a.instance.value) },
-            { QStringLiteral("name"), QString::fromStdString(inst->name.empty() ? def.name : inst->name) },
-            { QStringLiteral("along"), a.along }, { QStringLiteral("lateral"), a.lateral }, { QStringLiteral("up"), a.up },
-            { QStringLiteral("yaw"), a.yaw } });
+            { QStringLiteral("name"), trCore(model::partName(m_model, a.instance)) },
+            { QStringLiteral("along"), a.along }, { QStringLiteral("lateral"), a.lateral },
+            { QStringLiteral("up"), a.up }, { QStringLiteral("yaw"), a.yaw } });
     }
     const model::Animation* animation = m_model.animations().find(p.animation);
-    return { { QStringLiteral("kind"), QStringLiteral("path") }, { QStringLiteral("id"), static_cast<double>(id.value) },
-        { QStringLiteral("name"), QString::fromStdString(p.name) },
+    return { { QStringLiteral("kind"), QStringLiteral("path") },
+        { QStringLiteral("id"), static_cast<double>(id.value) }, { QStringLiteral("name"), trCore(p.name) },
         { QStringLiteral("position"), vec3List(p.transform.applyToPoint((lo + hi) * 0.5)) },
         { QStringLiteral("rotation"), vec3List(model::eulerDegrees(d.rotation)) },
-        { QStringLiteral("size"), vec3List(glm::abs((hi - lo) * d.scale)) }, { QStringLiteral("start"), p.start },
-        { QStringLiteral("duration"), p.duration }, { QStringLiteral("easing"), easingToVariant(p.easing) },
-        { QStringLiteral("closed"), p.curve.closed }, { QStringLiteral("visible"), p.visible },
+        { QStringLiteral("size"), vec3List(glm::abs((hi - lo) * d.scale)) },
+        { QStringLiteral("start"), p.start }, { QStringLiteral("duration"), p.duration },
+        { QStringLiteral("easing"), easingToVariant(p.easing) }, { QStringLiteral("closed"), p.curve.closed },
+        { QStringLiteral("visible"), p.visible },
         { QStringLiteral("animation"), static_cast<double>(p.animation.value) },
-        { QStringLiteral("animationName"), animation ? QString::fromStdString(animation->name) : QString() },
-        { QStringLiteral("active"), p.animation == m_activeAnimation }, { QStringLiteral("anchors"), anchors } };
+        { QStringLiteral("animationName"), animation ? trCore(animation->name) : QString() },
+        { QStringLiteral("active"), p.animation == m_activeAnimation },
+        { QStringLiteral("anchors"), anchors } };
 }
 
 void Document::setPathProperties(const QVariantMap& changes)
@@ -6184,7 +7275,8 @@ void Document::setPathProperties(const QVariantMap& changes)
     if (changes.contains(QStringLiteral("visible"))) {
         p.visible = changes.value(QStringLiteral("visible")).toBool();
     }
-    // Poziția (centrul cutiei), rotația (Euler XYZ) și dimensiunile: transformarea căii, în jurul centrului ei.
+    // Poziția (centrul cutiei), rotația (Euler XYZ) și dimensiunile: transformarea căii, în jurul centrului
+    // ei.
     if (changes.contains(QStringLiteral("position")) || changes.contains(QStringLiteral("rotation"))
         || changes.contains(QStringLiteral("size"))) {
         const math::Vec3d center = vec("position", p.transform.applyToPoint(centerLocal));
@@ -6199,7 +7291,8 @@ void Document::setPathProperties(const QVariantMap& changes)
             }
         }
         math::Mat4d m(1.0);
-        const glm::dmat3 linear = model::rotationFromEuler(rotation) * glm::dmat3(scale.x, 0, 0, 0, scale.y, 0, 0, 0, scale.z);
+        const glm::dmat3 linear
+            = model::rotationFromEuler(rotation) * glm::dmat3(scale.x, 0, 0, 0, scale.y, 0, 0, 0, scale.z);
         for (int c = 0; c < 3; ++c) {
             m[c] = glm::dvec4(linear[c], 0.0);
         }
@@ -6256,7 +7349,8 @@ void Document::createMotionPath(const geom::BezierPath& curve, const math::Vec3d
     for (int n = 1;; ++n) {
         const std::string name = "Calea " + std::to_string(n);
         const auto& paths = m_model.motionPaths().values();
-        if (std::none_of(paths.begin(), paths.end(), [&](const model::MotionPath& other) { return other.name == name; })) {
+        if (std::none_of(paths.begin(), paths.end(),
+                [&](const model::MotionPath& other) { return other.name == name; })) {
             p.name = name;
             break;
         }
@@ -6284,16 +7378,18 @@ bool Document::anchorToPath(double pathId, double instanceId)
         return false;
     }
     if (!m_model.instances().contains(instance) || m_model.instance(instance).parent != m_model.root()) {
-        setError(QStringLiteral("Pe o cale se pune doar un obiect de la rădăcina modelului. Scoate-l întâi din grup."));
+        setError(QStringLiteral(
+            "Pe o cale se pune doar un obiect de la rădăcina modelului. Scoate-l întâi din grup."));
         return false;
     }
     if (model::pathOf(m_model, m_model.motionPaths().at(path).animation, instance)) {
-        setError(QStringLiteral("Obiectul e deja pe o cale a acestei animații."));
+        setError(ui("Obiectul e deja pe o cale a acestei animații."));
         return false;
     }
     bool ok = false;
     m_keepPreview = true;
-    runOnModel("Ancorează pe cale", [&](model::Model& model) { ok = model::attachToPath(model, path, instance); });
+    runOnModel(
+        "Ancorează pe cale", [&](model::Model& model) { ok = model::attachToPath(model, path, instance); });
     m_keepPreview = false;
     ++m_interactionRevision;
     emit timelineChanged();
@@ -6309,7 +7405,8 @@ void Document::detachFromPath(double pathId, double instanceId)
         return;
     }
     m_keepPreview = true;
-    runOnModel("Scoate de pe cale", [&](model::Model& model) { model::detachFromPath(model, path, instance); });
+    runOnModel(
+        "Scoate de pe cale", [&](model::Model& model) { model::detachFromPath(model, path, instance); });
     m_keepPreview = false;
     ++m_interactionRevision;
     emit timelineChanged();
@@ -6324,7 +7421,8 @@ void Document::rotateAnchor(double pathId, double instanceId)
         return;
     }
     m_keepPreview = true;
-    runOnModel("Rotește pe cale", [&](model::Model& model) { model::rotateAnchorFront(model, path, instance); });
+    runOnModel(
+        "Rotește pe cale", [&](model::Model& model) { model::rotateAnchorFront(model, path, instance); });
     m_keepPreview = false;
     ++m_interactionRevision;
     emit selectionChanged();
@@ -6391,7 +7489,8 @@ void Document::keyAnchoredScale(model::InstanceId instance, const math::Vec3d& s
 {
     model::TransformValues values = currentValues(instance);
     values.scale = scale;
-    keyTransforms({ { instance, model::composeTransform(values, model::pivotLocal(m_model, instance)) } }, "Keyframe");
+    keyTransforms(
+        { { instance, model::composeTransform(values, model::pivotLocal(m_model, instance)) } }, "Keyframe");
 }
 
 QString Document::pathsDebug() const
@@ -6404,8 +7503,9 @@ QString Document::pathsDebug() const
             if (!m_model.instances().contains(a.instance)) {
                 continue;
             }
-            const math::Vec3d at = shownTransform(a.instance).applyToPoint(model::pivotLocal(m_model, a.instance));
-            anchors << QStringLiteral("%1@(%2,%3,%4) along=%5 lateral=%6")
+            const math::Vec3d at
+                = shownTransform(a.instance).applyToPoint(model::pivotLocal(m_model, a.instance));
+            anchors << ui("%1@(%2,%3,%4) along=%5 lateral=%6")
                            .arg(a.instance.value)
                            .arg(at.x, 0, 'f', 0)
                            .arg(at.y, 0, 'f', 0)
@@ -6413,8 +7513,8 @@ QString Document::pathsDebug() const
                            .arg(a.along, 0, 'f', 0)
                            .arg(a.lateral, 0, 'f', 0);
         }
-        out << QStringLiteral("%1 [%2] start=%3 dur=%4 anim=%5 points=%6: %7")
-                   .arg(QString::fromStdString(p.name))
+        out << ui("%1 [%2] start=%3 dur=%4 anim=%5 points=%6: %7")
+                   .arg(trCore(p.name))
                    .arg(m_model.motionPaths().keys()[i].value)
                    .arg(p.start)
                    .arg(p.duration)

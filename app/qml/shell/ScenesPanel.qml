@@ -47,7 +47,7 @@ Item {
                     Icon { anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 14; color: Theme.textSecondary }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Scenă nouă din vederea curentă"
+                        text: qsTrId("ScenesPanel.scena_noua_din_vederea_curenta")
                         color: Theme.textSecondary
                         font.pixelSize: Theme.fontSizeSm
                     }
@@ -63,8 +63,7 @@ Item {
                 visible: list.count === 0
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "O scenă reține camera și starea modelului (pozițiile obiectelor, ce e ascuns), ca să revii "
-                      + "oricând la ea — de exemplu „Ușile închise” și „Ușile deschise”."
+                text: qsTrId("ScenesPanel.o_scena_retine_camera_si_starea_modelului_poziti")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -126,13 +125,13 @@ Item {
                 RowAction {
                     shown: rowHover.hovered
                     iconName: "trash-2"
-                    tooltip: "Șterge scena"
+                    tooltip: qsTrId("ScenesPanel.sterge_scena")
                     onClicked: root.document.removeScene(row.modelData.id)
                 }
                 RowAction {
                     shown: rowHover.hovered
                     iconName: "rotate-ccw"
-                    tooltip: "Actualizează cu starea curentă (camera și obiectele)"
+                    tooltip: qsTrId("ScenesPanel.actualizeaza_cu_starea_curenta_camera_si_obiecte")
                     onClicked: root.document.updateScene(row.modelData.id, root.viewport.cameraState(), root.viewport.displayStyle)
                 }
             }
@@ -153,25 +152,25 @@ Item {
         contentItem: Column {
             spacing: Theme.space2
             Text {
-                text: "Setările scenelor"
+                text: qsTrId("ScenesPanel.setarile_scenelor")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeSm
                 font.weight: Font.DemiBold
             }
             Slider {
                 width: 214
-                label: "Durata tranziției"
+                label: qsTrId("ScenesPanel.durata_tranzitiei")
                 from: 0
                 to: 3
                 stepSize: 0.1
                 value: root.transition
-                valueText: value.toFixed(1) + " s"
+                valueText: value.toFixed(1) + qsTrId("ScenesPanel.s")
                 onMoved: root.transition = value
             }
             Text {
                 width: 214
                 wrapMode: Text.Wrap
-                text: "0 s = salt direct la scenă."
+                text: qsTrId("ScenesPanel.0_s_salt_direct_la_scena")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
