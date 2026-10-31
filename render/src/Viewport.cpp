@@ -87,6 +87,9 @@ struct BandSegment {
     std::pair<double, double> length { 0.0, 0.0 };
     std::pair<double, double> depth { 0.0, 0.0 };
     double bandThickness = 0.0;
+    double outside = 0.3; // cât iese cantul în afara feței plăcii
+    double overFaces = 0.3; // cât trece peste fețele mari ale plăcii (pe grosime)
+    double radius = 0.0; // raza rotunjirii (0 = drept)
     int side = 0; // L1, L2, W1, W2
     const model::BandSide* band = nullptr;
 };
@@ -108,6 +111,19 @@ std::vector<BandSegment> bandSegments(const model::Model& model, model::Definiti
     const int v = t == 2 ? 1 : 2;
     const std::array<int, 4> sideSlots
         = model::bandSlots(*def.part, model::measurePart(model, definition, {}));
+    const auto banded
+        = [&](int slot) { return !def.part->bands[static_cast<std::size_t>(slot)].bandKey.empty(); };
+    // Grosimea, raza și cât iese în afară fiecare cant (după indicele din `bands`).
+    std::array<double, 4> thickOf {}, radiusOf {}, outsideOf {};
+    for (std::size_t slot = 0; slot < 4; ++slot) {
+        const model::BandSide& band = def.part->bands[slot];
+        const model::BandType* type = model::findBandType(band.bandKey);
+        thickOf[slot] = std::max(type != nullptr ? type->thickness : 0.0, 0.4);
+        // Rotunjit: raza = grosimea cantului; iese în afară doar cât arcul să acopere colțul ascuțit al
+        // plăcii (≈ 0,3 din rază), nu toată grosimea lui.
+        radiusOf[slot] = band.rounded ? std::min(thickOf[slot], (hi[t] - lo[t]) / 2) : 0.0;
+        outsideOf[slot] = band.rounded ? std::max(kOutside, 0.3 * radiusOf[slot] + 0.05) : kOutside;
+    }
     for (int side = 0; side < 4; ++side) {
         const int slot = sideSlots[static_cast<std::size_t>(side)];
         glm::dvec3 a { 0.0 }, b { 0.0 };
@@ -118,10 +134,31 @@ std::vector<BandSegment> bandSegments(const model::Model& model, model::Definiti
         b[along] = hi[along];
         a[across] = b[across] = (slot % 2 == 0) ? lo[across] - kOutside : hi[across] + kOutside;
         const model::BandSide& band = def.part->bands[static_cast<std::size_t>(slot)];
-        const model::BandType* type = model::findBandType(band.bandKey);
-        const double thick = std::max(type != nullptr ? type->thickness : 0.0, 0.4);
-        glm::dvec3 slabLo = lo - glm::dvec3(kOutside);
-        glm::dvec3 slabHi = hi + glm::dvec3(kOutside);
+        const double thick = thickOf[static_cast<std::size_t>(slot)];
+        const double radius = radiusOf[static_cast<std::size_t>(slot)];
+        const double outside = outsideOf[static_cast<std::size_t>(slot)];
+        // Îmbinarea la colț (ca la cantuire): cantul laturii lungi (L1, L2) acoperă capătul cantului vecin,
+        // deci trece puțin peste fața lui; cantul laturii scurte (W1, W2) se oprește la marginea plăcii, sub
+        // el. Lângă o latură fără cant, depășește marginea cu 0,1 mm (să nu se amestece cu fața plăcii).
+        const bool longSide = side < 2;
+        const auto end = [&](int neighbour) {
+            constexpr double kEndOver = 0.1;
+            if (!banded(neighbour)) {
+                return kEndOver;
+            }
+            return longSide ? outsideOf[static_cast<std::size_t>(neighbour)] + 0.05 : 0.0;
+        };
+        const int lowNeighbour = slot < 2 ? 2 : 0;
+        const int highNeighbour = slot < 2 ? 3 : 1;
+        // Pe grosime, cantul laturii scurte trece cu 0,05 mm mai puțin peste fețele mari, ca la colț fața de
+        // sus a cantului lung să fie deasupra (fără fețe suprapuse în același plan).
+        const double overFaces = longSide ? outside : outside - 0.05;
+        glm::dvec3 slabLo = lo - glm::dvec3(outside);
+        glm::dvec3 slabHi = hi + glm::dvec3(outside);
+        slabLo[t] = lo[t] - overFaces;
+        slabHi[t] = hi[t] + overFaces;
+        slabLo[along] = lo[along] - end(lowNeighbour);
+        slabHi[along] = hi[along] + end(highNeighbour);
         if (slot % 2 == 0) {
             slabHi[across] = lo[across] + thick;
         } else {
@@ -133,9 +170,12 @@ std::vector<BandSegment> bandSegments(const model::Model& model, model::Definiti
         seg.thickAxis = t;
         seg.face = slot % 2 == 0 ? lo[across] : hi[across];
         seg.outward = slot % 2 == 0 ? -1.0 : 1.0;
-        seg.length = { lo[along], hi[along] };
+        seg.length = { slabLo[along], slabHi[along] };
         seg.depth = { lo[t], hi[t] };
         seg.bandThickness = thick;
+        seg.outside = outside;
+        seg.overFaces = overFaces;
+        seg.radius = radius;
         seg.side = side;
         seg.band = &band;
         out.push_back(seg);
@@ -148,19 +188,18 @@ glm::vec4 colorOf(const model::Color& c, float darken = 1.0f)
     return { c.r / 255.0f * darken, c.g / 255.0f * darken, c.b / 255.0f * darken, 1.0f };
 }
 
-// Cantul rotunjit: un profil cu colțurile exterioare rotunde (raza = grosimea cantului), ieșit cât grosimea
-// cantului în afara feței, ca să acopere colțul ascuțit al plăcii; extrudat pe lungimea laturii.
+// Cantul rotunjit: un profil cu colțurile exterioare rotunde (raza = grosimea cantului), ieșit puțin în afara
+// feței, cât să acopere colțul ascuțit al plăcii; extrudat pe lungimea laturii.
 template <class Pass>
 void appendRoundedBand(
     Pass& f, const BandSegment& s, const math::Transform& t, const glm::vec4& color, const glm::vec4& edge)
 {
-    constexpr double kOver = 0.3;
     constexpr int kArc = 6;
-    const double r = std::clamp(s.bandThickness, 0.4, (s.depth.second - s.depth.first) / 2);
-    const double outer = s.face + s.outward * s.bandThickness;
-    const double inner = s.face - s.outward * kOver;
-    const double t0 = s.depth.first - kOver;
-    const double t1 = s.depth.second + kOver;
+    const double r = s.radius;
+    const double outer = s.face + s.outward * s.outside;
+    const double inner = s.face - s.outward * s.bandThickness;
+    const double t0 = s.depth.first - s.overFaces;
+    const double t1 = s.depth.second + s.overFaces;
     // Profilul (peste latură, pe grosime): interior jos → arcul de jos → arcul de sus → interior sus.
     std::vector<glm::dvec2> profile { { inner, t0 } };
     const auto arc = [&](double centerT, double fromDeg, double toDeg) {
@@ -195,8 +234,8 @@ void appendRoundedBand(
         v.material = { 0.6f, 0.0f };
         f.triangles.push_back(v);
     };
-    const double l0 = s.length.first - kOver;
-    const double l1 = s.length.second + kOver;
+    const double l0 = s.length.first;
+    const double l1 = s.length.second;
     const glm::dvec2 center { (inner + outer) / 2, (t0 + t1) / 2 };
     for (std::size_t i = 0; i < profile.size(); ++i) {
         const glm::dvec2 a = profile[i];
