@@ -40,7 +40,7 @@ Column {
     Input {
         visible: root.isInstance
         width: parent.width
-        placeholderText: root.info.title === "Grup" ? qsTrId("EntityInfo.numele_grupului") : qsTrId("EntityInfo.numele_obiectului")
+        placeholderText: root.info.collection ? qsTrId("EntityInfo.numele_grupului") : qsTrId("EntityInfo.numele_obiectului")
         text: root.isInstance ? root.info.name : ""
         onEditingFinished: if (root.isInstance && text !== root.info.name) root.document.renameInstance(root.info.instanceId, text)
     }

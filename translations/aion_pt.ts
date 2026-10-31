@@ -4756,4 +4756,2759 @@
         <translation type="unfinished"></translation>
     </message>
 </context>
+<context>
+    <name>aion</name>
+    <message>
+        <source>
+newmtl </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>    return ('0' + Math.round(v * 255).toString(16)).slice(-2); };</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>  const f = function(n) { const k = (n + h * 12) % 12; const v = l - s * Math.min(l, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>  return { toString: function() { return '#' + f(0) + f(8) + f(4); } }; } };</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> (copie </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> (copie)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> (pe o față: în planul ei)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> cm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> laturi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> m</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> min</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> mm²</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> m²</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> obiecte în model.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> rotunjit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> segmente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> selectat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> selectate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> selectată</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> trepte.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> x </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> · click sau tastează o lungime pentru ghidaj · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> · plan: orizontal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> · plan: vertical (X)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> · plan: vertical (Y)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> · săgeți: planul X/Y/Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%.0f, %.0f, %.0f</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%.1f°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%.2f m²</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 [%2] start=%3 dur=%4 anim=%5 points=%6: %7</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 laturi au rămas fără cant: cantul nu se potrivește tipului plăcii.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 obiecte nu pot deveni plăci (au alte obiecte în ele sau nu au fețe).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1@(%2,%3,%4) along=%5 lateral=%6</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>(șters)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>). Alege mai puține niveluri.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>1 inch (13,2 mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>16:9 · 4K</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>16:9 · Full HD</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>2.39:1 · cinema</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>4:5 · portret</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>9:16 · vertical</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>: coordonată invalidă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>: față invalidă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>: vârf inexistent.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A4 / A3 · peisaj (√2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A4 / A3 · portret (√2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ABS 0,4 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ABS 1 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ABS 2 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>APS-C (23,6 mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Activează secțiunea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Actualizează corpul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Actualizează scena</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adaugă separator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adâncime</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ajustează (fără keyframe)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ale mele</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege al doilea punct</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege capătul arcului sau tastează lungimea coardei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege centrul (pe o față: în planul ei) · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege centrul bazei </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege centrul rotației (pe o față: planul ei) · săgeți: axa X/Y/Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege colțul opus al plăcii sau tastează dimensiunile (600,400) · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege colțul opus sau tastează dimensiunile (3000,2000) · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege direcția de referință</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege direcția de referință (unghiul 0)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege fața al cărei contur îl deplasezi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege fața de extrudat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege fața de extrudat · dublu-click repetă ultima distanță</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege mărimea bazei sau tastează-o (1000, sau 1000,500 cu înălțimea) · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege o față (profilul) și un traseu de muchii.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege o față și o distanță pozitivă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege o muchie și o distanță pozitivă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege primul colț (pe sol sau pe o față)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege primul punct (pe o muchie: o linie de construcție paralelă) · Option: doar măsoară</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege primul punct al cotei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege punctul de destinație sau tastează distanța · Option: copiază · săgeți/Shift: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege punctul de pornire: un colț sau mijlocul unei muchii al obiectului, sau orice punct</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege punctul de început al liniei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege raza sau tastează-o · „</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege săgeata (cât de curbat e) sau tastează-o · „</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege un mâner: colțurile scalează uniform, muchiile pe două axe, fețele pe una</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege unde pui copia: un colț sau mijlocul unei muchii al altui obiect, grid-ul sau orice </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege unde salvezi documentul.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege unghiul liniei de construcție sau tastează-l în grade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege unghiul sau tastează-l în grade · Option: copiază · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege următorul punct sau tastează lungimea · săgeți/Shift: blochează direcția · Esc termină</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege vârful unghiului (pe o față: în planul ei)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege începutul arcului · săgeți: planul X/Y/Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alege înălțimea deasupra bazei sau tastează-o · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alt</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alte componente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ancorează pe cale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Animare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Animația </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Animație nouă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Aplică scena</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ar ieși prea multe fețe (</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arată</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arată tag-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arată tot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arie (m²)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arie piese (m²)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Array liniar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Array polar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Array…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ascunde</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ascunde tag-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Balama aplicată 110°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Balama aplicată 165°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Balama semi-aplicată 110°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Balama semi-aplicată 165°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Balama încastrată 110°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Balama încastrată 165°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bază</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bevel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bevel pe fețe: alege o singură față (sau muchiile pe care le vrei teșite).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bevel…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bibliotecă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Blat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Blochează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Blochează valoarea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Brad</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Braț drept</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Braț stâng</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Buc.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cale nouă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calea </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cameră </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cameră nouă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Canate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cant</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cant estimat, piese fără tip (m)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cantul ales nu se pune pe acest tip de placă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capac</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capetele muchiei trebuie să aibă exact trei muchii (ca la colțul unei cutii).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cele două obiecte trebuie să fie în același grup.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Center</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Centru</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Centrul e pivotul: alege direcția de referință (unghiul 0) · săgeți: axa X/Y/Z · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Centrul feței</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cerc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chamfer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Chamfer…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cilindru</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Circle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clanță</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clanță (spate)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clic în spațiul corpului: separatorul se pune la mijlocul lui · ⌥: la locul clicului · Esc: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pe o față pentru a-i lua materialul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pe o față pentru un plan de secțiune paralel cu ea (sau pe sol)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pe o față sau un grup pentru a-l vopsi · Option: pipetă · Cmd: tot ce e conectat · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pe o față, o muchie sau un punct pentru un text (îl poți edita imediat)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pe o muchie pentru a o șterge · trage peste mai multe · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pe profilul (fața) de extrudat de-a lungul traseului selectat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click pentru a selecta · Shift: adaugă/scoate · Cmd: adaugă · trage pentru dreptunghi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click: punct cu colț · trage: punct neted · click pe primul punct: închide · Enter: termină · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clicul nu e între lateralele corpului.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cmd</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cmd: trage stânga / dreapta ca să scalezi textura în jurul punctului apăsat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Coloană</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Colț</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Colț: uniform</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Colțurile feței trebuie să aibă exact trei muchii (ca la o cutie sau o formă extrudată).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Componentă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Comportament</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Con</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copac</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copia nu a putut fi recuperată. %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Coroană</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Corp la sol</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Corp obișnuit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Corp pentru electrocasnice</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Corp suspendat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Corpul acesta nu are separatoare.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Corpuri</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cotă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Creează fețe</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Creează fețe din muchii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Creează obiect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ctrl</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cub</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Culoare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Culoarea materialului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Curbă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cutie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Deblochează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Deblochează valoarea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Decor</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Deschide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Desface</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Desprinde de parametri</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dezactivează secțiunea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Diametrul coroanei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Diametrul trunchiului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dimensiuni</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dimensiuni: de tăiere</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dimensiuni: finite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Din bibliotecă: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Din model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Direct3D 11</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Direct3D 12</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Distanța</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Distanța e prea mare pentru fața aleasă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Distanța e prea mare pentru muchia aleasă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Distanța: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Distanță</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Document nesalvat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Două laturi ale feței au aceeași față vecină: nu se poate teși.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dreptunghi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dulap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dulap cu uși</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Duplicare legată</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Easing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Easing implicit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editează calea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editează curba</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editează grupul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editează obiectul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editează textul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Endpoint</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Erase</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Esc: înapoi un punct · săgeți: planul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Etaj </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Etaje</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fața are găuri: încă nu se poate teși.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Față</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Față de cale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Față: o axă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fereastră</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ferestre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Feronerie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fețe</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fețele cu găuri nu se pot subdiviza (împarte-le întâi cu o linie până la marginea găurii).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fețele din jurul muchiei au găuri: încă nu se pot teși.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fețele selectate nu intersectează nimic.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fiecare latură a feței trebuie să aibă o singură față vecină, fără găuri (un volum).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fișierul nu conține fețe.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Foaie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Follow Me</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Follow Me nu a putut construi fețele.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Formatul „.%1” nu se poate exporta (OBJ, glTF, GLB).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Formatul „.%1” nu se poate importa (OBJ, glTF, GLB).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>From Point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Full frame (36 mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fă placă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fă unic</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fără</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fără tag</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Fără titlu</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Gard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Gata: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Geam </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Geometria nu formează un volum valid (fețe orientate greșit sau autointersecții).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Geometrie liberă (în afara grupurilor)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ghidaj</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 300 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 350 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 400 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 450 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 500 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 550 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Glisieră 600 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grilă de cuburi colorate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosime (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosimea blatului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosimea corpului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosimea foii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosimea peretelui</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosimea plăcii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grosimea spatelui</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grup</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Grupează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Guide Point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HDF</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ieși din grup</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ieși din obiect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Implicit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import OBJ</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Importă </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Interacțiune</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Interacțiuni</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Intersectează cu modelul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Intersectează selecția</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Intersection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Intersecție</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Inversează fața</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Inversează fețele</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ka 0 0 0
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Kd %.4f %.4f %.4f
+Ka 0 0 0
+Ks %.3f %.3f %.3f
+d %.4f
+illum 2
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Kd 0.85 0.84 0.82
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyframe</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyframe cameră</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyframe culoare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ks 0 0 0
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>L1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>L1 2 mm, restul 0,4 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>L2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>La capătul muchiei trebuie să fie o singură față în plus.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lateral dreapta</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lateral stânga</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Latura piciorului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lemn masiv</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Linia </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Linie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lipește</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lipește keyframe-urile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Locked</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lumină direcțională</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lumină nouă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lumină punctuală</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime (m)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime X (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime de tăiere (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime muchii (m)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungime totală</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lungimea liniei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățime</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățime (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățime Y (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățime de tăiere (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățime la bază</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățimea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățimea ramei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lățimea tocului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>MDF</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Masă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Material </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Material din bibliotecă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Material nou</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Melamină 0,4 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Metal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Micro 4/3 (17,3 mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Midpoint</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mijlocul muchiei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mixt</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mișcă pentru distanță, clic confirmă · tastează 200 sau 200/2 (în 2 locuri egale) · Esc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mișcă pentru mărimea nouă, click ca să confirmi, sau tastează factorul (2 · 2,1,1.5) · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mobilier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Modelare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Modelul nu mai e valid:
+%s</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Modul interacțiune · click, hover, trage sau apasă taste pe obiecte · Esc: ieșire</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Montant </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Motiv</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchia nu e convexă (un colț interior): bevel-ul merge doar pe muchii exterioare.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchia nu mai există.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchia trebuie să fie între exact două fețe.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchie: două axe</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchii netede</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchii netede…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchii soft</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchii vizibile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchiile alese au un vârf comun: alege muchii separate sau fața întreagă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchiile selectate nu închid nicio buclă plană fără față.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Muchiile traseului nu sunt legate între ele.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută calea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută keyframe-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută keyframe-urile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută pentru adâncime, click sau eliberează pentru a termina · tastează distanța · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută planul unde tai, clic îl fixează · sau tastează 200/2 (în 2 locuri egale) · Esc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută secțiunea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută spre interior sau exterior și dă click, sau tastează distanța · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mută în grup</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mâner </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mâner 128 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mărimea nu se poate schimba așa (o muchie ar ajunge de lungime zero).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Necesar plăci</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Necunoscut</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nedefinite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Niciun document.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nișa de la</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nu e nicio față de subdivizat.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nu se poate: planul taie geometrie care nu e placă · Esc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nu se poate: planul taie o placă modificată de mână sau desprinsă · Esc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nu se poate: planul taie o placă prin grosime · Esc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nume (folosită în)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>O componentă nu se poate pune în ea însăși.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>O latură a feței nu e convexă (colț interior): bevel-ul merge doar pe muchii exterioare.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Oameni</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Obiect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Obiect </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Obiect dinamic: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Obiectul e deja pe o cale a acestei animații.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Obiectul nu a putut fi salvat în bibliotecă. %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Obiectul nu poate fi mutat acolo (ar intra în el însuși sau ținta are copii).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Offset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Oglindește pe X</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Oglindește pe Y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Oglindește pe Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Om</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Blue Axis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Face</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Green Axis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Grid</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Guide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On Red Axis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>OpenGL</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Operația a fost anulată: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Operația booleană a eșuat.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Operațiile booleene cer solide (volume închise, fiecare muchie între exact două fețe).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Option</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Option: alt centru</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Option: din pivot · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Option: păstrează fața · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Originea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PAL</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PNG</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Panou luminos</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Parallel to Edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Parametru</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pe o cale se pune doar un obiect de la rădăcina modelului. Scoate-l întâi din grup.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Perete de biblioteci</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Perpendicular to Edge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Picior </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Picior drept</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Picior stâng</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pierderi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pivot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Placaj</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Placă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Placă (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Placă pe față</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Placă pe față: alege primul colț pe o față (placa iese spre exterior) sau pe sol</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plante</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plasare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plugin-ul nu are main.js.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plăci</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poligon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Polițe</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Polițe (pe spațiu)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poliță</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poliță </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poliță nișă (jos)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poliță nișă (sus)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Polygon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poziție X</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poziție Y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poziție Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Poziționează textura</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Primitivă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Profilul are găuri: încă nu se poate folosi la Follow Me.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Profilul e paralel cu traseul: așază-l de-a curmezișul începutului traseului.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Proprietățile camerei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Proprietățile căii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Proprietățile luminii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Proprietățile materialului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Push/Pull</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Raft</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ramă dreapta</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ramă jos</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ramă stânga</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ramă sus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Raportul nu s-a putut salva în „%1”.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Raza</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rază</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Readu la parametri</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rectangle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Redenumește</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Redenumește animația</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Redenumește materialul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Redenumește scena</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Redenumește tag-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reuniune</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rezultatul e gol (obiectele nu se suprapun).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotație X</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotație Y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotație Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotește</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotește pe cale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Salvează în bibliotecă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scade al doilea din primul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scalează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scară</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scară X</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scară Y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scară Z</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scară dreaptă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scară în spirală</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scena </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scenă nouă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Schimbă tag-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scoate de pe cale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scriptul a fost oprit (a durat peste 15 s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scândură</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scădere</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Scări</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Secțiune</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Secțiune </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Segmente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează ce e conectat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează ce vrei să oglindești.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează ce vrei să scalezi (sau click pe o entitate)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează exact două grupuri sau obiecte.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează fețele de intersectat.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează muchiile care închid fața (dublu click pe o față vecină le prinde și pe ele).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează muchiile sau fața de teșit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează muchiile, fețele sau obiectele de netezit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează obiectele care trebuie să devină plăci.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează obiectele pe care vrei să le animezi, apoi pune keyframe-ul.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează obiectele sau fețele de subdivizat.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează obiectele sau geometria pe care vrei s-o multiplici.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează obiectele, apoi pune keyframe-ul de culoare.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează tot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează un corp din bibliotecă (sau intră în el) ca să-i adaugi un separator.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează un singur obiect ca să-l salvezi în bibliotecă.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează unul sau mai multe obiecte ca să le grupezi (formele devin întâi obiect, cu ⌘G).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează întâi traseul (muchii sau o față), apoi click pe profil.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selectează întâi traseul: muchii legate sau o față (conturul ei), apoi click pe profil</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selecția nu are fețe de subdivizat.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Separatoare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Separatorul ar fi la mai puțin de 50 mm de altul sau de o laterală.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Setările animației</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sferă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shaderul %s lipsește din resurse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shift: toate fețele cu același material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shift: trage stânga / dreapta ca să rotești textura în jurul punctului apăsat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Software</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Soldat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Spate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Spot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stâlp </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Subdivide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Subdivide…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Super 35 (24,89 mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Suprafețe orizontale în sus (m²)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Săgeată</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tag</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tag nou</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tastează x3 sau /3 pentru mai multe copii · sau alege ce muți</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tastează x4 sau /4 pentru copii radiale · sau alege centrul rotației</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toate 2 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toc dreapta</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toc stânga</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toc sus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Total arie (m²)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Total volum solide (m³)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Trage linia de cotă la distanța dorită și dă click</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Trage pe o față ca să muți textura · Shift: rotește · Cmd: scalează · pentru un grup, intră în el (dublu-click)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Trage pivotul: se prinde de colțuri, mijloace, muchii, fețe, axe, ghidaje și grid · </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Trage punctele sau mânerele · Option: rupe mânerul, Option + click: colț ↔ neted · click pe curbă: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Transformare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Transformarea ar strânge o muchie într-un punct.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Traseul are muchii care nu mai există.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Traseul are o muchie de lungime zero.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Traseul se ramifică: alege muchii care formează un singur drum.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Traseul trebuie să fie alte muchii decât conturul profilului.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Treaptă </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Trepte</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Trunchi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tufă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Un capăt al muchiei e paralel cu ea: nu se poate teși.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Un cot al traseului e prea strâns pentru mărimea profilului.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unghi</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Uși</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ușă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ușă </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Valoarea keyframe-ului</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Variantă de feronerie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Volum (m³)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Vopsește</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Vulkan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>W1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>W2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Zoom Extents</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Zoom la selecție</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>acum </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>adnotare într-o definiție inexistentă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ascunsă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>azi, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>blochează · Esc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>blochează · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>buc.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>chiar acum</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>corpul e scalat, plăcile nu mai au grosimea nominală</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>d 1
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>definiția „</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>dublu click pe curbă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>față</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>fețe</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>forma s-a schimbat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>formă neregulată</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>geometrie fără definiție</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>geometrie în plus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ghidaj într-o definiție inexistentă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>grosime nepotrivită</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>grosimea nu mai e cea nominală</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>grosimile %1 sunt %2 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ieri, </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>illum 1
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>instanță cu o definiție inexistentă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>instanță cu un material inexistent</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>instanță cu un tag inexistent</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>lemn fără tip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>map_Kd </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>maximul e %1 %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>minimul e %1 %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>mtllib </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>newmtl aion_default
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>nu se adaugă interacțiuni</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>nu se animă obiectele</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>nu se modifică geometria</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>o </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>o instanță a rădăcinii</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>paralelă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>placa are alte obiecte în ea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>placa e scalată</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>punct nou · ⌫: șterge punctul · Esc: gata</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>punct · Esc: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>renunță</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>rădăcina modelului lipsește</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>săgeți/Shift: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>s” schimbă numărul de </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>s” schimbă segmentele · Esc anulează</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>tip necunoscut</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>tip nedefinit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>un document nesalvat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>usemtl </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ușa de jos</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ușa de sus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>v %.6f %.6f %.6f
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>var Qt = { hsla: function(h, s, l, a) { </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>var print = function() { aion.log(Array.prototype.join.call(arguments, ' ')); };</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>vn %.6f %.6f %.6f
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>vt %.6f %.6f
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>În model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>În modul %1 %2. Treci în %3 (⌥%4).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Închide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Întinde</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Întinde: clic pe o față a corpului (axa = normala ei)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Înălțime</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Înălțime Z (mm)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Înălțime totală</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Înălțimea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Înălțimea nișei</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>în placă</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge adnotarea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge animația</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge calea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge camera</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge ghidajele</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge keyframe-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge keyframe-urile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge lumina</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge materialul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge scena</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge secțiunea</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Șterge tag-ul</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>” nu are geometrie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>” se conține pe sine</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>”: față cu un material inexistent</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1” nu a putut fi citit. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1” nu a putut fi deschis. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1” nu a putut fi exportat. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1” nu a putut fi importat. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1” nu a putut fi salvat. %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1” nu poate fi citit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>„%1”: %2 %3 nu se poate (%4); s-a folosit %5 %3.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
 </TS>

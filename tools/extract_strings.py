@@ -148,6 +148,40 @@ def convert(path: Path, keys: Keys) -> int:
     return count
 
 
+CPP_SOURCES = ["core/src", "render/src"]
+CPP_SKIP = ("MeshValidate.cpp", "MaterialLibrary.cpp", "AionFile.cpp", "ObjIo.cpp", "Gltf", "Recovery")
+CORE = TRANSLATIONS / "core.json"
+
+
+def collect_cpp() -> dict:
+    """Textele vizibile din C++ (nucleul și documentul): sursa e textul românesc însuși; la rulare, documentul le
+    traduce cu QCoreApplication::translate("aion", text). Numele materialelor incluse nu se traduc (se trimit înapoi
+    după nume)."""
+    from pathlib import Path as P
+    materials = set(re.findall(r'entry\("([^"]+)"', (ROOT / "core/src/model/MaterialLibrary.cpp").read_text(encoding="utf-8")))
+    found = {}
+    for base in CPP_SOURCES:
+        for f in sorted((ROOT / base).rglob("*.cpp")) + sorted((ROOT / base).rglob("*.h")):
+            if any(x in f.name for x in CPP_SKIP):
+                continue
+            src = f.read_text(encoding="utf-8")
+            for start, end in literal_spans(src):
+                line_start = src.rfind("\n", 0, start) + 1
+                line_end = src.find("\n", end)
+                line = src[line_start:len(src) if line_end < 0 else line_end]
+                if line.lstrip().startswith("#") or re.search(r"qInfo|qWarning|qDebug|console|assert\(|QLatin1String|"
+                                                               r"json\b|\.value\(|\.contains\(|find\(|startsWith", line):
+                    continue
+                text = src[start + 1:end - 1]
+                if "\\" in text.replace("\\n", "") or not is_visible(text) or text in materials:
+                    continue
+                text = text.replace("\\n", "\n")
+                found.setdefault(text, f.name)
+    for unit in ("buc.",):  # unitățile scurte (litere mici) nu trec de is_visible
+        found.setdefault(unit, "Parametric.cpp")
+    return found
+
+
 def write_ts(keys: Keys):
     for lang in LANGUAGES:
         table_path = TRANSLATIONS / f"{lang}.json"
@@ -159,12 +193,27 @@ def write_ts(keys: Keys):
             state = "" if text else ' type="unfinished"'
             lines += [f'    <message id="{escape(key)}">', f"        <source>{escape(ro)}</source>",
                       f"        <translation{state}>{escape(text)}</translation>", "    </message>"]
+        lines += ["</context>"]
+        # Textele din C++ (context „aion”): sursa e textul românesc.
+        core = json.loads(CORE.read_text(encoding="utf-8")) if CORE.exists() else {}
+        core_table_path = TRANSLATIONS / f"core_{lang}.json"
+        core_table = json.loads(core_table_path.read_text(encoding="utf-8")) if core_table_path.exists() else {}
+        lines += ["<context>", "    <name>aion</name>"]
+        for ro in sorted(core):
+            text = ro if lang == "ro" else core_table.get(ro, "")
+            state = "" if text else ' type="unfinished"'
+            lines += ["    <message>", f"        <source>{escape(ro)}</source>",
+                      f"        <translation{state}>{escape(text)}</translation>", "    </message>"]
         lines += ["</context>", "</TS>", ""]
         (TRANSLATIONS / f"aion_{lang}.ts").write_text("\n".join(lines), encoding="utf-8")
 
 
 def main(argv):
     keys = Keys()
+    if "--cpp" in argv:
+        found = collect_cpp()
+        CORE.write_text(json.dumps(dict(sorted(found.items())), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"C++: {len(found)} texte")
     files = [a for a in argv if not a.startswith("--")]
     for f in files:
         n = convert(ROOT / f, keys)

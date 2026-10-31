@@ -42,27 +42,23 @@ std::span<const BandType> bandTypes()
 
 std::span<const HardwareType> hardwareTypes()
 {
-    static const std::vector<HardwareType> kTypes = [] {
-        std::vector<HardwareType> types;
-        const std::array<std::pair<const char*, const char*>, 3> hinges { {
-            { "overlay", "aplicată" },
-            { "half", "semi-aplicată" },
-            { "inset", "încastrată" },
-        } };
-        for (const auto& [kind, label] : hinges) {
-            for (const int angle : { 110, 165 }) {
-                types.push_back({ std::string("hinge.") + kind + "." + std::to_string(angle),
-                    std::string("Balama ") + label + " " + std::to_string(angle) + "°", Unit::Piece,
-                    { 50.0, 12.0, 35.0 } }); // pe spatele ușii: lată 50, groasă 12, înaltă 35 (cupa)
-            }
-        }
-        for (int length = 300; length <= 600; length += 50) {
-            types.push_back({ "slide." + std::to_string(length), "Glisieră " + std::to_string(length) + " mm",
-                Unit::Pair, { static_cast<double>(length), 12.0, 45.0 } });
-        }
-        types.push_back({ "handle.128", "Mâner 128 mm", Unit::Piece, { 20.0, 30.0, 140.0 } });
-        return types;
-    }();
+    // Numele întregi (nu compuse din bucăți), ca interfața să le poată traduce.
+    static const std::vector<HardwareType> kTypes {
+        { "hinge.overlay.110", "Balama aplicată 110°", Unit::Piece, { 50.0, 12.0, 35.0 } },
+        { "hinge.overlay.165", "Balama aplicată 165°", Unit::Piece, { 50.0, 12.0, 35.0 } },
+        { "hinge.half.110", "Balama semi-aplicată 110°", Unit::Piece, { 50.0, 12.0, 35.0 } },
+        { "hinge.half.165", "Balama semi-aplicată 165°", Unit::Piece, { 50.0, 12.0, 35.0 } },
+        { "hinge.inset.110", "Balama încastrată 110°", Unit::Piece, { 50.0, 12.0, 35.0 } },
+        { "hinge.inset.165", "Balama încastrată 165°", Unit::Piece, { 50.0, 12.0, 35.0 } },
+        { "slide.300", "Glisieră 300 mm", Unit::Pair, { 300.0, 12.0, 45.0 } },
+        { "slide.350", "Glisieră 350 mm", Unit::Pair, { 350.0, 12.0, 45.0 } },
+        { "slide.400", "Glisieră 400 mm", Unit::Pair, { 400.0, 12.0, 45.0 } },
+        { "slide.450", "Glisieră 450 mm", Unit::Pair, { 450.0, 12.0, 45.0 } },
+        { "slide.500", "Glisieră 500 mm", Unit::Pair, { 500.0, 12.0, 45.0 } },
+        { "slide.550", "Glisieră 550 mm", Unit::Pair, { 550.0, 12.0, 45.0 } },
+        { "slide.600", "Glisieră 600 mm", Unit::Pair, { 600.0, 12.0, 45.0 } },
+        { "handle.128", "Mâner 128 mm", Unit::Piece, { 20.0, 30.0, 140.0 } },
+    };
     return kTypes;
 }
 

@@ -296,7 +296,10 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
    variante de feronerie, unealta `board` („Placă pe față”), „Întinde” (`model/Stretch.h`, unealta `stretch`),
    unealta internă `divider`. Traducerea: `qsTrId` în QML cu cheile din `translations/strings.json` (scriptul
    `tools/extract_strings.py <fișiere.qml>` le transformă și reface `.ts`; traducerile în `translations/<limbă>.json`);
-   `AION_LANG=en` pentru o rulare în engleză. Acțiuni de script: `debug.board`, `debug.components`, `furniture.addDivider`,
+   `AION_LANG=en` pentru o rulare în engleză. Textele din C++ (nucleul și documentul) au ca sursă textul românesc și se
+   traduc în `Document.cpp` cu `trCore(std::string)` / `ui("…")` (context „aion”): după ce adaugi texte vizibile în C++,
+   rulează `tools/extract_strings.py --cpp` și completează `translations/core_en.json`; `tools/check_translations.py`
+   (și CI) pică dacă o cheie QML n-are text RO / EN sau dacă `.ts` nu sunt la zi. Acțiuni de script: `debug.board`, `debug.components`, `furniture.addDivider`,
    `furniture.makePlain`, `tool.board`, `tool.stretch`; API: `aion.board`, `aion.setBoardValue`, `aion.setBand`.
    Valorile alese provizoriu, de verificat de autor: `docs/plans/mobilier-de-verificat.md`.
    **În lucru (din 2026-10-30): mobilier pe corp** — `docs/plans/mobilier-pe-corp.md`, ADR 0043 / 0044, `PLAN.md` →

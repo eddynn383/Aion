@@ -29,7 +29,7 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Decorul plăcilor desenate cu „Placă pe față” | Fără decor (Implicit), ca plăcile din scripturi; cele din corpuri primesc „Alb (decor)” | Pasul 10 | |
 | „Întinde”: planul | Urmează cursorul după primul clic, al doilea clic îl fixează; „200/2” îl înlocuiește cu N plane egale | Pasul 11 | |
 | „Întinde”: ghidul animat | Text da, scenă animată nu (amânată) | Pasul 11 | |
-| Limba implicită | Româna (nu limba sistemului) cât traducerea acoperă doar lista de debitare și Inspector-ul | Pasul 12a | |
+| Limba implicită | Româna (nu limba sistemului), ca să nu se schimbe interfața fără să alegi; engleza e completă, celelalte 6 cad pe engleză | Pasul 12 | |
 | Propozițiile cu numere în traducere | Lipite din bucăți („Afectează ” + N + „ apariții legate.”), fără plural `%n` încă | Pasul 12a | |
 | Ușile corpurilor | Fiecare ușă are o animație de deschidere (0,8 s, 105° spre față) și interacțiunea „Clic → pornește animația (comută)”; copiile legate ale corpului se deschid împreună | Pasul 6 (cerut de autor după testare) | |
 | Limitele câmpurilor corpurilor | Fără maxime (până la 100 m, 50 de piese); minimele de construcție: lățime și înălțime 100, adâncime 50; o valoare în afara limitelor se aduce la cea permisă, cu mesaj | Cerut de autor după testare | |
@@ -40,3 +40,5 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Afișarea „uși deschise” în Modelare | Butonul cu ușa din bara viewport-ului (sau comanda „Ușile corpurilor”); doar desenul — clicurile nimeresc încă ușile închise | Cerut de autor după testare | |
 | Cantul rotunjit | Pe latură: „Drept” / „Rotunjit”; desenat cu muchiile rotunde (raza = grosimea cantului), ieșit în afara feței cât grosimea cantului; în CSV „ABS 2 mm rotunjit” | Cerut de autor după testare | |
 | Balamalele | O plăcuță 50 × 12 × 35 pe spatele ușii, dincolo de fața interioară a lateralei (nu mai trec prin laterală) | Cerut de autor după testare | |
+| Numele materialelor incluse | Rămân în română în orice limbă (se trimit înapoi după nume) | Pasul 12 | |
+| CSV-ul pentru debitare | Antetele rămân în română | Pasul 12 | |
