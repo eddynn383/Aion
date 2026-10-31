@@ -23,7 +23,7 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Balamaua și mânerul pe ușă | Balamaua la 5 mm de latura ei, pe spatele ușii; mânerul vertical, la 40 mm de marginea liberă, centrat | §4, pasul 6 | |
 | Cantul în viewport | O fâșie pe toată fața îngustă, cu grosimea cantului spre interiorul plăcii (desen, nu geometrie: dimensiunile și lista nu se schimbă); comutatorul e în Preferințe → Mobilier | §7 al planului, pasul 7 (cerut de autor după testare) | |
 | Decorul cantului | Doar materialele incluse de tip decor sau lemn | Pasul 7 | |
-| Lista „În model” | Dalele au iconița și „×N”, fără miniatură randată (amânată); doar componentele (Creează componentă sau copiile ⌥D), nu obiectele simple ⌘G | Pasul 8 | |
+| Lista „În model” | Miniatura e un desen izometric din geometria componentei (fețe colorate + muchii), nu o randare; „×N” = aparițiile; doar componentele (Creează componentă sau copiile ⌥D), nu obiectele simple ⌘G | Pasul 8 | |
 | Mutarea unei piese cu rol în alt părinte (Outliner) | Fără confirmarea „Corpul devine obișnuit” încă (doar Explode și grupările o cer) | Pasul 6 | |
 | „Placă pe față”: ghidul animat | Textul ghidului există; scena animată din ToolDemo lipsește (amânată) | Pasul 10 | |
 | Decorul plăcilor desenate cu „Placă pe față” | Fără decor (Implicit), ca plăcile din scripturi; cele din corpuri primesc „Alb (decor)” | Pasul 10 | |

@@ -40,6 +40,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QPainter>
+#include <QPainterPath>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
@@ -5566,15 +5568,124 @@ void Document::placeDefinitionAt(
     }
 }
 
+namespace {
+
+// Miniatura unei componente (lista „În model”): fețele și muchiile ei într-o vedere izometrică, desenate cu
+// QPainter (fețele de la cea mai depărtată la cea mai apropiată), ca PNG în base64 (`data:` URL). Fără
+// randare în viewport, deci fără pâlpâiri.
+QString componentThumbnail(const model::Model& model, model::DefinitionId definition)
+{
+    struct Polygon {
+        QPolygonF points;
+        double depth = 0.0;
+        QColor color;
+    };
+    std::vector<Polygon> polygons;
+    std::vector<QLineF> edges;
+    const double c = std::cos(glm::radians(30.0));
+    const double s = std::sin(glm::radians(30.0));
+    const auto project
+        = [&](const math::Vec3d& p) { return QPointF((p.x - p.y) * c, -(p.z + (p.x + p.y) * s)); };
+    const auto depthOf = [&](const math::Vec3d& p) { return p.x + p.y - p.z; }; // mai mic = mai aproape
+    const std::function<void(model::DefinitionId, const math::Transform&, model::MaterialId, int)> visit
+        = [&](model::DefinitionId d, const math::Transform& t, model::MaterialId inherited, int depth) {
+              if (depth > 16) {
+                  return;
+              }
+              const geom::Mesh& mesh = model.mesh(d);
+              for (const geom::Face& face : mesh.faces().values()) {
+                  Polygon poly;
+                  double sum = 0.0;
+                  const std::vector<geom::VertexId> ids = mesh.loopVertices(face.outer);
+                  for (const geom::VertexId v : ids) {
+                      const math::Vec3d p = t.applyToPoint(mesh.vertex(v).position);
+                      poly.points.append(project(p));
+                      sum += depthOf(p);
+                  }
+                  poly.depth = ids.empty() ? 0.0 : sum / static_cast<double>(ids.size());
+                  const model::MaterialId m = face.material ? face.material : inherited;
+                  const model::Material* material = m ? model.materials().find(m) : nullptr;
+                  QColor color = material != nullptr
+                      ? QColor(material->color.r, material->color.g, material->color.b)
+                      : QColor(205, 208, 214);
+                  // Umbrire simplă după normală: sus luminos, laturile mai închise.
+                  const math::Vec3d n = glm::normalize(t.applyToNormal(face.plane.normal));
+                  const double light = 0.62 + 0.38 * std::max(0.0, n.z) + 0.12 * std::max(0.0, -n.y);
+                  poly.color = color.darker(static_cast<int>(100.0 / std::min(light, 1.0)));
+                  polygons.push_back(poly);
+              }
+              for (const geom::Edge& e : mesh.edges().values()) {
+                  if (!e.soft) {
+                      edges.emplace_back(project(t.applyToPoint(mesh.vertex(e.v0).position)),
+                          project(t.applyToPoint(mesh.vertex(e.v1).position)));
+                  }
+              }
+              for (model::InstanceId id : model.childrenOf(d)) {
+                  const model::Instance& inst = model.instance(id);
+                  if (!inst.hidden) {
+                      visit(inst.definition, t * inst.transform, inst.material ? inst.material : inherited,
+                          depth + 1);
+                  }
+              }
+          };
+    visit(definition, math::Transform {}, {}, 0);
+    QRectF box;
+    for (const Polygon& p : polygons) {
+        box = box.isNull() ? p.points.boundingRect() : box.united(p.points.boundingRect());
+    }
+    for (const QLineF& l : edges) {
+        box = box.united(QRectF(l.p1(), l.p2()).normalized());
+    }
+    if (box.width() <= 0.0 && box.height() <= 0.0) {
+        return {};
+    }
+    constexpr int kWidth = 192;
+    constexpr int kHeight = 120;
+    QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const double scale
+        = 0.84 * std::min(kWidth / std::max(box.width(), 1e-6), kHeight / std::max(box.height(), 1e-6));
+    painter.translate(kWidth / 2.0, kHeight / 2.0);
+    painter.scale(scale, scale);
+    painter.translate(-box.center());
+    std::sort(polygons.begin(), polygons.end(),
+        [](const Polygon& a, const Polygon& b) { return a.depth > b.depth; });
+    painter.setPen(Qt::NoPen);
+    for (const Polygon& p : polygons) {
+        painter.setBrush(p.color);
+        painter.drawPolygon(p.points);
+    }
+    painter.setPen(QPen(QColor(40, 42, 48, 170), 1.0 / scale));
+    for (const QLineF& l : edges) {
+        painter.drawLine(l);
+    }
+    painter.end();
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "PNG");
+    return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
+}
+
+} // namespace
+
 QVariantList Document::modelComponents() const
 {
     QVariantList out;
     for (const auto& [d, count] : model::userComponents(m_model)) {
         const model::Definition& def = m_model.definition(d);
+        // Miniatura se reface doar când se schimbă modelul.
+        auto& cached = m_componentThumbnails[d];
+        if (cached.first != m_modelRevision || cached.second.isEmpty()) {
+            cached = { m_modelRevision, componentThumbnail(m_model, d) };
+        }
         out.append(QVariantMap { { QStringLiteral("id"), QStringLiteral("def:%1").arg(d.value) },
             { QStringLiteral("name"), QString::fromStdString(def.name.empty() ? "Componentă" : def.name) },
             { QStringLiteral("category"), QStringLiteral("În model") }, { QStringLiteral("user"), false },
-            { QStringLiteral("dynamic"), false }, { QStringLiteral("count"), count } });
+            { QStringLiteral("dynamic"), false }, { QStringLiteral("count"), count },
+            { QStringLiteral("thumbnail"), cached.second } });
     }
     return out;
 }

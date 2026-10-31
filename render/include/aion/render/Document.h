@@ -791,6 +791,8 @@ private:
     // modelului.
     const model::Model& doorsOpenModel() const;
     mutable std::optional<model::Model> m_doorsOpenModel;
+    // Miniaturile din „În model”: revizia modelului la care s-au făcut și imaginea (data URL).
+    mutable std::map<model::DefinitionId, std::pair<std::uint64_t, QString>> m_componentThumbnails;
     mutable std::uint64_t m_doorsOpenRevision = ~std::uint64_t { 0 };
     // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează
     // animația). Auto-key: transformările noi ale obiectelor (la timpul curent) devin chei, doar pe canalele
