@@ -11,6 +11,8 @@ Item {
     property var viewport // pentru camerele noi (vederea curentă)
     property var collapsed: ({}) // id-ul instanței → true dacă e strânsă
     property double dragging: 0 // instanța trasă
+    // Mutarea unei instanțe în alt părinte (Main cere confirmarea dacă scoate o piesă din corpul ei).
+    signal moveRequested(double instance, double target)
 
     // Rândurile vizibile: fără cele din grupurile strânse.
     readonly property var rows: {
@@ -107,7 +109,7 @@ Item {
                 id: rootDrop
                 anchors.fill: parent
                 keys: ["aion-instance"]
-                onDropped: (drop) => { root.document.moveInstanceTo(root.dragging, 0); drop.accept() }
+                onDropped: (drop) => { root.moveRequested(root.dragging, 0); drop.accept() }
             }
         }
 
@@ -150,7 +152,7 @@ Item {
                 anchors.fill: parent
                 keys: ["aion-instance"]
                 enabled: row.isGroup && root.dragging !== row.modelData.id
-                onDropped: (drop) => { root.document.moveInstanceTo(root.dragging, row.modelData.id); drop.accept() }
+                onDropped: (drop) => { root.moveRequested(root.dragging, row.modelData.id); drop.accept() }
             }
 
             MouseArea {

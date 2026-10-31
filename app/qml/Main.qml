@@ -1564,6 +1564,15 @@ Window {
                         anchors.fill: parent
                         document: doc
                         viewport: viewport
+                        onMoveRequested: (instance, target) => {
+                            if (!doc.moveBreaksCarcass(instance, target)) {
+                                doc.moveInstanceTo(instance, target)
+                                return
+                            }
+                            confirmDialog.ask("Scoți piesa din corp?",
+                                "Corpul devine obișnuit: nu se mai reface din câmpurile lui. Poți anula cu ⌘Z.",
+                                "Mută", () => doc.moveInstanceTo(instance, target))
+                        }
                     }
                 }
                 AccordionSection {

@@ -1,9 +1,8 @@
 #include "aion/core/model/Operations.h"
 
+#include "aion/core/geom/Operations.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/view/Camera.h"
-
-#include "aion/core/geom/Operations.h"
 
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
@@ -51,7 +50,8 @@ math::Transform worldTransform(const Model& model, const std::vector<InstanceId>
     return t;
 }
 
-InstanceId makeGroup(Model& model, DefinitionId context, const geom::Selection& selection, bool component, std::string name)
+InstanceId makeGroup(
+    Model& model, DefinitionId context, const geom::Selection& selection, bool component, std::string name)
 {
     if (selection.empty()) {
         return {};
@@ -112,7 +112,8 @@ geom::Selection explode(Model& model, InstanceId id)
         c.parent = inst.parent;
         c.transform = inst.transform * c.transform;
         if (shared) {
-            result.instances.insert(model.addInstance(c)); // celelalte copii ale componentei își păstrează copiii
+            result.instances.insert(
+                model.addInstance(c)); // celelalte copii ale componentei își păstrează copiii
         } else {
             model.setInstance(child, c);
             result.instances.insert(child);
@@ -148,7 +149,8 @@ void transformInstances(Model& model, const std::set<InstanceId>& instances, con
 {
     for (InstanceId id : instances) {
         Instance inst = model.instance(id);
-        const std::optional<Placement> before = inst.placementLocks != 0 ? std::optional(placementOf(model, id)) : std::nullopt;
+        const std::optional<Placement> before
+            = inst.placementLocks != 0 ? std::optional(placementOf(model, id)) : std::nullopt;
         inst.transform = delta * inst.transform;
         model.setInstance(id, inst);
         if (before) {
@@ -182,7 +184,8 @@ std::pair<math::Vec3d, math::Vec3d> bounds(const Model& model, DefinitionId defi
             continue;
         }
         for (int k = 0; k < 8; ++k) {
-            const math::Vec3d corner { (k & 1) ? chi.x : clo.x, (k & 2) ? chi.y : clo.y, (k & 4) ? chi.z : clo.z };
+            const math::Vec3d corner { (k & 1) ? chi.x : clo.x, (k & 2) ? chi.y : clo.y,
+                (k & 4) ? chi.z : clo.z };
             const math::Vec3d p = c.transform.applyToPoint(corner);
             lo = glm::min(lo, p);
             hi = glm::max(hi, p);
@@ -267,8 +270,8 @@ math::Vec3d pivotPoint(const Model& model, InstanceId instance)
 namespace {
 
 // Animațiile instanței după un pivot nou: obiectul rămâne pe loc la fiecare cheie.
-void rebaseAnimations(Model& model, InstanceId instance, const math::Transform& base, const math::Vec3d& oldPivot,
-    const math::Vec3d& newPivot)
+void rebaseAnimations(Model& model, InstanceId instance, const math::Transform& base,
+    const math::Vec3d& oldPivot, const math::Vec3d& newPivot)
 {
     if (glm::length(newPivot - oldPivot) < 1e-12) {
         return;
@@ -315,10 +318,12 @@ void setPlacement(Model& model, InstanceId instance, const Placement& wanted)
         }
         inst.pivot = local;
     }
-    const math::Vec3d pivot = inst.pivot ? *inst.pivot : (lo.x <= hi.x ? (lo + hi) * 0.5 : math::Vec3d { 0.0 });
+    const math::Vec3d pivot
+        = inst.pivot ? *inst.pivot : (lo.x <= hi.x ? (lo + hi) * 0.5 : math::Vec3d { 0.0 });
     const math::Vec3d pivotWorld = inst.transform.applyToPoint(pivot);
 
-    // Rotația: refăcută din unghiuri doar dacă s-a schimbat (altfel rămâne exact cea existentă, fără erori de rotunjire).
+    // Rotația: refăcută din unghiuri doar dacă s-a schimbat (altfel rămâne exact cea existentă, fără erori de
+    // rotunjire).
     if (glm::length(wanted.rotation - current.rotation) > 1e-7) {
         d.rotation = rotationFromEuler(wanted.rotation);
     }
@@ -378,7 +383,8 @@ void restoreLockedPlacement(Model& model, InstanceId instance, const Placement& 
     setPlacement(model, instance, wanted);
 }
 
-InstanceId groupInstances(Model& model, DefinitionId context, const std::set<InstanceId>& instances, std::string name)
+InstanceId groupInstances(
+    Model& model, DefinitionId context, const std::set<InstanceId>& instances, std::string name)
 {
     if (instances.empty()) {
         return {};
@@ -436,6 +442,9 @@ bool moveToParent(Model& model, InstanceId instance, DefinitionId target)
     const math::Transform world = definitionWorldTransform(model, inst.parent) * inst.transform;
     inst.transform = definitionWorldTransform(model, target).inverse() * world;
     inst.parent = target;
+    // Mutată în alt părinte, o piesă nu mai are rol în corpul ei (ADR 0043).
+    inst.roleKey.clear();
+    inst.relativePosition.reset();
     model.setInstance(instance, inst);
     return true;
 }
@@ -493,7 +502,8 @@ void transformSceneObject(Model& model, const SceneObjectRef& object, const math
 {
     if (const CameraObject* found = model.cameras().find(object.camera)) {
         CameraObject c = *found;
-        // „Sus”-ul camerei (cu roll), dus de transformare; roll-ul nou e unghiul lui față de „sus”-ul fără înclinare.
+        // „Sus”-ul camerei (cu roll), dus de transformare; roll-ul nou e unghiul lui față de „sus”-ul fără
+        // înclinare.
         view::Camera before;
         before.setPose(view::poseLookingAt(c.position, c.target));
         before.setRoll(glm::radians(c.roll));

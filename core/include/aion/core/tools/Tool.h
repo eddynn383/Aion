@@ -183,6 +183,10 @@ struct ToolContext {
     // folosire.
     model::MaterialId paintMaterial;
     const model::Material* libraryMaterial = nullptr;
+    // Modelul văzut (de exemplu cu ușile corpurilor deschise în Modelare): clicurile pe obiecte îl folosesc
+    // pe el, ca să nimerească ce se vede; editările merg tot în `model`. Nul = `model`. Aceleași id-uri ca
+    // `model`.
+    const model::Model* pickModel = nullptr;
     // „Placă pe față”: tipul și grosimea plăcii noi; nul = PAL 18.
     const BoardDefaults* boardDefaults = nullptr;
     // Ghidajele contextului, pentru inferență.

@@ -265,6 +265,8 @@ public:
     Q_INVOKABLE void duplicateLinked(); // ⌥D: copie legată (aceeași geometrie, editată împreună)
     // Drag & drop în Outliner: mută obiectul în grupul `targetInstance` (0 = în model), cu poziția păstrată.
     Q_INVOKABLE void moveInstanceTo(double instanceId, double targetInstance);
+    // Mutarea ar scoate o piesă cu rol din corpul ei (din Outliner): corpul devine obișnuit, după confirmare.
+    Q_INVOKABLE bool moveBreaksCarcass(double instanceId, double targetInstance) const;
     // Selectează ce are tag-ul în contextul editat (obiecte, fețe, muchii).
     Q_INVOKABLE void selectByTag(double tagId);
     Q_INVOKABLE void explodeSelection();
@@ -785,6 +787,11 @@ private:
     mutable std::optional<std::pair<SnapKey, inference::SnapScene>> m_snapCache;
     std::set<model::InstanceId> snapExclude() const;
     model::Model& pose() const;
+    // Modelul cu ușile corpurilor deschise (afișarea „uși deschise”), pentru clicuri; cache pe revizia
+    // modelului.
+    const model::Model& doorsOpenModel() const;
+    mutable std::optional<model::Model> m_doorsOpenModel;
+    mutable std::uint64_t m_doorsOpenRevision = ~std::uint64_t { 0 };
     // Transformările noi ale obiectelor devin keyframe-uri la timpul curent (un pas de undo; creează
     // animația). Auto-key: transformările noi ale obiectelor (la timpul curent) devin chei, doar pe canalele
     // schimbate.

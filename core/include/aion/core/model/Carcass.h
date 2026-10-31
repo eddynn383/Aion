@@ -71,6 +71,11 @@ DividerResult addDivider(Model& model, DefinitionId body, const math::Vec3d& poi
 // O ușă a unui corp din bibliotecă: transformarea ei deschisă (animația ușii la final), pentru afișarea „uși
 // deschise” din Modelare; nullopt pentru o instanță care nu e ușă.
 [[nodiscard]] std::optional<math::Transform> doorOpenTransform(const Model& model, InstanceId instance);
+// După o ștergere: animațiile de deschidere ale ușilor care nu mai sunt în model (ușa ștearsă sau corpul ei
+// rămas fără nicio apariție) se șterg și ele. Întoarce câte s-au șters.
+int pruneDoorAnimations(Model& model);
+// Corpul din bibliotecă din care face parte piesa (direct sau prin grupul ușii), dacă are rol; nul altfel.
+[[nodiscard]] DefinitionId carcassOfPiece(const Model& model, InstanceId piece);
 // Modelul are cel puțin o ușă de corp.
 [[nodiscard]] bool hasDoors(const Model& model);
 

@@ -1394,6 +1394,11 @@ template <class Fn> void Document::withTool(const view::Camera& camera, Fn&& fn)
     if (animating) {
         posedSnap = model::snapScene(target, m_path, snapExclude());
         ctx.snap = &posedSnap;
+    } else if (m_doorsOpen && m_workMode == Modeling && !m_runtime) {
+        // Ușile deschise: clicurile și prinderea pe ce se vede (interiorul corpurilor), editările în model.
+        ctx.pickModel = &doorsOpenModel();
+        posedSnap = model::snapScene(doorsOpenModel(), m_path, snapExclude());
+        ctx.snap = &posedSnap;
     } else {
         ctx.snap = &snapScene(snapExclude());
     }
@@ -2018,11 +2023,31 @@ void Document::moveInstanceTo(double instanceId, double targetInstance)
         target = m_model.instance(t).definition;
     }
     bool moved = false;
-    runOnModel("Mută în grup", [&](model::Model& model) { moved = model::moveToParent(model, id, target); });
+    const model::DefinitionId body = model::carcassOfPiece(m_model, id);
+    runOnModel("Mută în grup", [&](model::Model& model) {
+        moved = model::moveToParent(model, id, target);
+        if (moved && body) {
+            model::makePlainBody(model, body); // corpul nu se mai reface (piesa lui a plecat)
+        }
+    });
     if (!moved) {
         setError(
             QStringLiteral("Obiectul nu poate fi mutat acolo (ar intra în el însuși sau ținta are copii)."));
     }
+}
+
+bool Document::moveBreaksCarcass(double instanceId, double targetInstance) const
+{
+    const model::InstanceId id = toInstanceId(instanceId);
+    const model::DefinitionId body = model::carcassOfPiece(m_model, id);
+    if (!body) {
+        return false;
+    }
+    const model::DefinitionId target
+        = targetInstance > 0 && m_model.instances().contains(toInstanceId(targetInstance))
+        ? m_model.instance(toInstanceId(targetInstance)).definition
+        : m_model.root();
+    return target != m_model.instance(id).parent;
 }
 
 void Document::selectByTag(double tagId)
@@ -3241,6 +3266,23 @@ std::optional<model::Color> Document::displayColor(model::InstanceId instance) c
 }
 
 // --- Modurile de lucru ---
+
+const model::Model& Document::doorsOpenModel() const
+{
+    if (!m_doorsOpenModel || m_doorsOpenRevision != m_modelRevision) {
+        m_doorsOpenModel = m_model;
+        for (std::size_t i = 0; i < m_model.instances().size(); ++i) {
+            const model::InstanceId id = m_model.instances().keys()[i];
+            if (const auto open = model::doorOpenTransform(m_model, id)) {
+                model::Instance inst = m_doorsOpenModel->instance(id);
+                inst.transform = *open;
+                m_doorsOpenModel->setInstance(id, inst);
+            }
+        }
+        m_doorsOpenRevision = m_modelRevision;
+    }
+    return *m_doorsOpenModel;
+}
 
 model::Model& Document::pose() const
 {

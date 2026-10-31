@@ -2,6 +2,7 @@
 #include "aion/core/model/Carcass.h"
 #include "aion/core/model/Copying.h"
 #include "aion/core/model/Furniture.h"
+#include "aion/core/model/Operations.h"
 #include "aion/core/model/Parametric.h"
 #include "aion/core/model/Quantities.h"
 #include "aion/core/model/Transfer.h"
@@ -598,4 +599,27 @@ TEST_CASE("Cant: rotunjit, în lista de debitare și în CSV", "[core][carcass][
     REQUIRE(list.parts.size() == 1);
     CHECK(list.parts[0].bandRounded[0]);
     CHECK(model::toCsv(list, model::CutListOptions {}).find("ABS 2 mm rotunjit") != std::string::npos);
+}
+
+TEST_CASE("Corpuri: ștergerea unui corp îi șterge și animațiile ușilor", "[core][carcass]")
+{
+    Body b = makeBody("wardrobe");
+    REQUIRE(b.m.animations().size() == 2);
+    CHECK(model::pruneDoorAnimations(b.m) == 0); // corpul e în model
+    model::eraseInstance(b.m, b.placed); // corpul (o componentă) rămâne ca definiție fără apariții
+    CHECK(model::pruneDoorAnimations(b.m) == 2);
+    CHECK(b.m.animations().empty());
+}
+
+TEST_CASE("Corpuri: o piesă mutată în alt părinte își pierde rolul", "[core][carcass]")
+{
+    Body b = makeBody("wardrobe");
+    const model::InstanceId side = role(b.m, b.def, "side.left");
+    const model::InstanceId hinge = role(b.m, b.def, "door.1.hinge.1");
+    CHECK(model::carcassOfPiece(b.m, side) == b.def);
+    CHECK(model::carcassOfPiece(b.m, hinge) == b.def); // prin grupul ușii
+    CHECK_FALSE(model::carcassOfPiece(b.m, b.placed));
+    REQUIRE(model::moveToParent(b.m, side, b.m.root()));
+    CHECK(b.m.instance(side).roleKey.empty());
+    CHECK_FALSE(model::carcassOfPiece(b.m, side));
 }

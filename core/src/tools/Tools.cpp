@@ -2,6 +2,7 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/math/Intersect.h"
 #include "aion/core/math/Tolerance.h"
+#include "aion/core/model/Carcass.h"
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/Operations.h"
 #include "aion/core/model/PenCurves.h"
@@ -103,6 +104,7 @@ bool deleteSelection(ToolContext& ctx, bool keepFaces)
                 model::eraseInstance(model, i);
             }
         }
+        model::pruneDoorAnimations(model); // ușile corpurilor șterse nu-și lasă animațiile în listă
     });
 }
 
@@ -141,8 +143,9 @@ public:
             const bool crossing = e.screen.x < m_press->x;
             picked = view::pickInRectangle(ctx.mesh, ctx.camera, *m_press, e.screen, crossing);
             if (ctx.model != nullptr) {
-                picked.instances = view::pickInstancesInRectangle(
-                    *ctx.model, ctx.context, ctx.camera, *m_press, e.screen, crossing);
+                picked.instances
+                    = view::pickInstancesInRectangle(ctx.pickModel != nullptr ? *ctx.pickModel : *ctx.model,
+                        ctx.context, ctx.camera, *m_press, e.screen, crossing);
             }
         } else {
             picked = clickSelection(ctx, e);

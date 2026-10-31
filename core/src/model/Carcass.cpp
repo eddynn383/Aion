@@ -741,6 +741,66 @@ std::optional<math::Transform> doorOpenTransform(const Model& model, InstanceId 
     return evaluateInstance(*track, animation.duration, inst.transform, *inst.pivot);
 }
 
+int pruneDoorAnimations(Model& model)
+{
+    // Instanțele din arborele modelului (cele din definiții fără apariții nu se văd și nu se deschid).
+    std::set<InstanceId> reachable;
+    const auto visit = [&](auto&& self, DefinitionId parent) -> void {
+        for (InstanceId id : model.childrenOf(parent)) {
+            if (reachable.insert(id).second) {
+                self(self, model.instance(id).definition);
+            }
+        }
+    };
+    visit(visit, model.root());
+    std::set<AnimationId> doomed;
+    std::set<AnimationId> used;
+    for (std::size_t i = 0; i < model.instances().size(); ++i) {
+        const InstanceId id = model.instances().keys()[i];
+        if (const AnimationId a = doorAnimation(model, model.instances().values()[i])) {
+            (reachable.contains(id) ? used : doomed).insert(a);
+        }
+    }
+    // O animație de ușă a cărei ușă a fost ștearsă de tot: o singură pistă, doar rotirea pe Z, pe o instanță
+    // care nu mai există.
+    for (std::size_t i = 0; i < model.animations().size(); ++i) {
+        const Animation& a = model.animations().values()[i];
+        if (a.tracks.size() == 1 && !model.instances().contains(a.tracks[0].instance) && a.camera.empty()
+            && a.tracks[0].channels.size() == 1 && a.tracks[0].channels[0].property == Property::RotationZ
+            && std::abs(a.duration - kDoorSeconds) < 1e-9) {
+            doomed.insert(model.animations().keys()[i]);
+        }
+    }
+    int removed = 0;
+    for (const AnimationId id : doomed) {
+        if (!used.contains(id) && model.animations().contains(id)) {
+            model.removeAnimation(id);
+            ++removed;
+        }
+    }
+    return removed;
+}
+
+DefinitionId carcassOfPiece(const Model& model, InstanceId piece)
+{
+    if (!model.instances().contains(piece) || model.instance(piece).roleKey.empty()) {
+        return {};
+    }
+    DefinitionId parent = model.instance(piece).parent;
+    for (int depth = 0; depth < 2 && parent; ++depth) {
+        if (isCarcassGenerator(model.definition(parent).generator)) {
+            return parent;
+        }
+        // Un nivel mai sus: grupul ușii e într-un corp.
+        const std::vector<InstanceId> owners = model.instancesOf(parent);
+        if (owners.empty() || model.instance(owners.front()).roleKey.empty()) {
+            return {};
+        }
+        parent = model.instance(owners.front()).parent;
+    }
+    return {};
+}
+
 bool hasDoors(const Model& model)
 {
     for (const Instance& inst : model.instances().values()) {
