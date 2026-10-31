@@ -173,8 +173,8 @@ Column {
                 width: parametersBox.width
                 label: modelData.label
                 unit: modelData.unit
-                from: modelData.min
-                to: modelData.max
+                // Fără from / to: o valoare în afara limitelor ajunge la document, care o aduce în limite și spune
+                // de ce (în loc să fie tăiată în tăcere).
                 step: modelData.step
                 decimals: 0
                 value: modelData.value

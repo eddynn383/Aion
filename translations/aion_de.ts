@@ -11,6 +11,10 @@
         <source>decor ca placa</source>
         <translation type="unfinished"></translation>
     </message>
+    <message id="BandPicker.drept">
+        <source>Drept</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message id="BandPicker.fara">
         <source>Fără</source>
         <translation type="unfinished"></translation>
@@ -25,6 +29,10 @@
     </message>
     <message id="BandPicker.presetari">
         <source>Presetări</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message id="BandPicker.rotunjit">
+        <source>Rotunjit</source>
         <translation type="unfinished"></translation>
     </message>
     <message id="BandPicker.salveaza_ca_presetare">

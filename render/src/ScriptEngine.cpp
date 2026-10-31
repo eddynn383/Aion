@@ -200,13 +200,13 @@ bool ScriptApi::setBoardValue(double id, const QString& key, const QVariant& val
     return true;
 }
 
-bool ScriptApi::setBand(double id, int side, const QString& bandKey, const QString& decor)
+bool ScriptApi::setBand(double id, int side, const QString& bandKey, const QString& decor, bool rounded)
 {
     if (!m_document) {
         return false;
     }
     m_document->selectInstances({ id });
-    m_document->setBand(side, bandKey, decor);
+    m_document->setBand(side, bandKey, decor, rounded);
     return true;
 }
 

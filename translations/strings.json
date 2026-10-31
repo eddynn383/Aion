@@ -1,10 +1,12 @@
 {
  "BandPicker.ca_placa": "Ca placa",
  "BandPicker.decor_ca_placa": "decor ca placa",
+ "BandPicker.drept": "Drept",
  "BandPicker.fara": "Fără",
  "BandPicker.fara_cant": "fără cant",
  "BandPicker.presetarea_mea": "Presetarea mea ",
  "BandPicker.presetari": "Presetări",
+ "BandPicker.rotunjit": "Rotunjit",
  "BandPicker.salveaza_ca_presetare": "+ Salvează ca presetare",
  "EntityInfo.actualizeaza": "Actualizează",
  "EntityInfo.actualizeaza_keyframe_ul_la_momentul_curent": "Actualizează keyframe-ul la momentul curent",

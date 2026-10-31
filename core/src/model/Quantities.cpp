@@ -437,6 +437,7 @@ CutList cutList(const Model& model, const CutListOptions& options)
                 const BandSide& side
                     = spec.bands[static_cast<std::size_t>(slots[static_cast<std::size_t>(k)])];
                 part.bands[static_cast<std::size_t>(k)] = side.bandKey;
+                part.bandRounded[static_cast<std::size_t>(k)] = side.rounded;
                 if (side.bandKey.empty()) {
                     continue;
                 }
@@ -457,7 +458,8 @@ CutList cutList(const Model& model, const CutListOptions& options)
             identity = spec.typeKey + "|" + roundKey(spec.nominalThickness);
             for (int k = 0; k < 4; ++k) {
                 identity += "|" + part.bands[static_cast<std::size_t>(k)] + "/"
-                    + part.bandDecors[static_cast<std::size_t>(k)];
+                    + part.bandDecors[static_cast<std::size_t>(k)]
+                    + (part.bandRounded[static_cast<std::size_t>(k)] ? "/R" : "");
             }
         } else {
             // Fără date de piesă: după categoria materialului (D10), altfel regula din ADR 0017.
@@ -684,8 +686,9 @@ std::string toCsv(const CutList& list, const CutListOptions& options, CsvFormat 
             csv.text("").text("").text("");
         }
         csv.number(p.count, 0).text(p.material);
-        for (const std::string& b : p.bands) {
-            csv.text(b.empty() ? "" : bandLabel(b));
+        for (std::size_t k = 0; k < 4; ++k) {
+            const std::string& b = p.bands[k];
+            csv.text(b.empty() ? "" : bandLabel(b) + (p.bandRounded[k] ? " rotunjit" : ""));
         }
         if (measured) {
             csv.number(p.cutLength, 1).number(p.cutWidth, 1);

@@ -46,6 +46,10 @@ class Document : public QObject, private model::ModelObserver {
     // activă.
     Q_PROPERTY(QString activeTool READ activeTool WRITE setActiveTool NOTIFY activeToolChanged)
     Q_PROPERTY(QString toolStatus READ toolStatus NOTIFY toolStatusChanged)
+    // Modelare: ușile corpurilor din bibliotecă desenate deschise (doar afișarea; modelul rămâne cu ele
+    // închise).
+    Q_PROPERTY(bool doorsOpen READ doorsOpen WRITE setDoorsOpen NOTIFY doorsOpenChanged)
+    Q_PROPERTY(bool hasDoors READ hasDoors NOTIFY changed)
     // Latura de cant (0–3 = L1…W2) de sub cursor în Inspector, evidențiată pe placa selectată; −1 = niciuna.
     Q_PROPERTY(
         int hoveredBandSide READ hoveredBandSide WRITE setHoveredBandSide NOTIFY hoveredBandSideChanged)
@@ -433,7 +437,7 @@ public:
     Q_INVOKABLE void setBoardValue(const QString& key, const QVariant& value);
     // Cantul plăcii selectate (pasul 7): o latură (`bandKey` "" = fără, `decor` = cheia unui material inclus,
     // "" = ca placa) sau toate patru (o presetare: listă de { bandKey, decor } pe L1, L2, W1, W2).
-    Q_INVOKABLE void setBand(int side, const QString& bandKey, const QString& decor);
+    Q_INVOKABLE void setBand(int side, const QString& bandKey, const QString& decor, bool rounded = false);
     Q_INVOKABLE void setBands(const QVariantList& sides);
     // Altă variantă a feroneriei selectate (toate aparițiile ei legate).
     Q_INVOKABLE void setHardwareVariant(const QString& typeKey);
@@ -446,6 +450,9 @@ public:
     // Toate tipurile de cant: { key, label }.
     Q_INVOKABLE QVariantList allBandTypes() const;
     [[nodiscard]] int hoveredBandSide() const { return m_hoveredBandSide; }
+    [[nodiscard]] bool doorsOpen() const { return m_doorsOpen; }
+    void setDoorsOpen(bool open);
+    [[nodiscard]] bool hasDoors() const;
     void setHoveredBandSide(int side);
     Q_INVOKABLE void restoreBoard();
     // O placă nouă cu colțul minim în `corner` (coordonatele contextului); întoarce id-ul obiectului.
@@ -699,6 +706,7 @@ public:
 
 signals:
     void activeToolChanged();
+    void doorsOpenChanged();
     void boardDefaultsChanged();
     void hoveredBandSideChanged();
     void toolStatusChanged();
@@ -887,6 +895,7 @@ private:
     std::optional<tools::PlaceSource> m_place; // lipirea în curs (unealta „place”)
     bool m_dividerActive = false;
     int m_hoveredBandSide = -1;
+    bool m_doorsOpen = false;
     tools::BoardDefaults m_boardDefaults; // „Adaugă separator” în curs (unealta „divider”)
     model::PenCurveId m_editCurve; // curba Pen editată (cu `penedit`), dacă există
     model::MotionPathId m_editPath; // sau calea editată

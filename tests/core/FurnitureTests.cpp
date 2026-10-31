@@ -706,7 +706,7 @@ TEST_CASE("Placa parametrică: tipul nou aduce grosimea permisă și scoate cant
     BoardDoc d;
     d.stack.run("Cant", [&](Model& m) {
         model::Definition def = m.definition(d.def());
-        def.part->bands[0] = { "abs.2", "" };
+        def.part->bands[0] = { "abs.2", "", false };
         m.setDefinition(d.def(), def);
     });
     d.stack.run("Tip", [&](Model& m) { model::setBoardType(m, d.def(), "hdf"); });

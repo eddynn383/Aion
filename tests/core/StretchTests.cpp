@@ -107,7 +107,7 @@ TEST_CASE("Întinde: corpul din plăci de 600 devine 800 în 2 locuri egale", "[
     checkBoardsMatch(u.m, u.def);
     // Feroneria doar se mută: balamalele ușii 1 (stânga) rămân, mânerul ușii 2 (stânga ei) se mută cu 100.
     const auto hinge = spanX(u.m, u.def, role(u.m, u.def, "door.1.hinge.1"));
-    CHECK(hinge.first == Approx(5.0));
+    CHECK(hinge.first == Approx(20.0)); // după fața interioară a lateralei (18) + 2
 }
 
 TEST_CASE("Întinde: un plan prin grosimea unei plăci e refuzat, modelul neschimbat", "[core][stretch]")

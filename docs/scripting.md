@@ -28,7 +28,7 @@ Aion rulează JavaScript (motorul QJSEngine din Qt, la fel pe macOS, Windows și
 | `cutList(options)` | Lista de debitare (doar citire): `{ parts, sheets, bands, hardware, hiddenPieces }`; `options` ca în fereastră (`excluded`, `cutDimensions`, `sheetLength`…). |
 | `board(type, thickness, length, width, x, y, z)` | O placă parametrică (`"pal"`, `"mdf"`, `"hdf"`, `"plywood"`, `"solid"`) cu colțul minim în (x, y, z); întoarce id-ul (0 la un tip necunoscut). |
 | `setBoardValue(id, key, value)` | Schimbă `"length"`, `"width"`, `"thickness"` sau `"type"` pe placa `id`. |
-| `setBand(id, side, bandKey, decor)` | Cantul pe latura `side` (0–3 = L1, L2, W1, W2): `"abs.0.4"`, `"abs.1"`, `"abs.2"`, `"melamine.0.4"` sau `""` (fără); `decor` = cheia unui material inclus (`"nuc-decor"`), `""` = ca placa. |
+| `setBand(id, side, bandKey, decor, rounded)` | Cantul pe latura `side` (0–3 = L1, L2, W1, W2): `"abs.0.4"`, `"abs.1"`, `"abs.2"`, `"melamine.0.4"` sau `""` (fără); `decor` = cheia unui material inclus (`"nuc-decor"`), `""` = ca placa; `rounded` = muchiile cantului rotunjite. |
 | `selection()` / `select([id…])` | Obiectele selectate / selectează. |
 | `command(id)` | O comandă din palette (de exemplu `"view.top"`, `"view.extents"`). |
 | `message(text)` | Un mesaj scurt (toast). |

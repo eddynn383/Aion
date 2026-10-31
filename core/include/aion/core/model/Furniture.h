@@ -100,8 +100,8 @@ struct PartMeasure {
 [[nodiscard]] std::string_view bandSideName(int side);
 // Cantul pe latura `side` (L1…W2) a plăcii `definition`: `bandKey` gol = fără; `decor` = cheia unui material
 // inclus, gol = „ca placa”. False dacă definiția nu e o placă sau cantul nu se potrivește tipului plăcii.
-bool setBand(
-    Model& model, DefinitionId definition, int side, std::string_view bandKey, std::string_view decor = {});
+bool setBand(Model& model, DefinitionId definition, int side, std::string_view bandKey,
+    std::string_view decor = {}, bool rounded = false);
 // Cantul plăcii, în ordinea L1, L2, W1, W2.
 [[nodiscard]] std::array<BandSide, 4> boardBands(const Model& model, DefinitionId definition);
 

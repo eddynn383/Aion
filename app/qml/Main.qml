@@ -117,6 +117,7 @@ Window {
             { id: "org.makeUnique", title: "Fă unic (separă de copii)", category: "Organizare", shortcut: "", icon: "component" },
             { id: "furniture.makeBoard", title: "Fă placă (PAL, pentru lista de debitare)", category: "Mobilier", shortcut: "", icon: "box" },
             { id: "furniture.addDivider", title: "Adaugă separator (clic în corp)", category: "Mobilier", shortcut: "", icon: "box" },
+            { id: "view.doorsOpen", title: "Ușile corpurilor: deschise / închise (afișare)", category: "Mobilier", shortcut: "", icon: "door-open" },
             { id: "furniture.makePlain", title: "Transformă în corp obișnuit", category: "Mobilier", shortcut: "", icon: "box" },
             { id: "org.enter", title: "Editează grupul sau obiectul selectat", category: "Organizare", shortcut: "", icon: "box" },
             { id: "org.exit", title: "Ieși din grupul sau obiectul editat", category: "Organizare", shortcut: "", icon: "arrow-left" },
@@ -430,6 +431,7 @@ Window {
         case "edit.createFaces": doc.createFacesFromSelection(); break
         case "edit.reverseFaces": doc.reverseSelectedFaces(); break
         case "view.zoomSelection": viewport.zoomToSelection(); break
+        case "view.doorsOpen": doc.doorsOpen = !doc.doorsOpen; break
         case "edit.intersectModel": doc.intersectSelection(true); break
         case "edit.intersectSelection": doc.intersectSelection(false); break
         case "solid.union": doc.booleanSelection("union"); break

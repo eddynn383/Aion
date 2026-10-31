@@ -3961,6 +3961,12 @@ bool Document::advanceInteractions(double dt)
 
 std::optional<math::Transform> Document::displayTransform(model::InstanceId instance) const
 {
+    // „Uși deschise” (Modelare): ușile corpurilor la finalul animației lor.
+    if (m_doorsOpen && m_workMode == Modeling && !m_runtime) {
+        if (auto open = model::doorOpenTransform(m_model, instance)) {
+            return open;
+        }
+    }
     if (m_previewing && currentAnimation() != nullptr) {
         if (const math::Transform* onPath = pathPoseOf(instance)) {
             return *onPath;
@@ -5637,12 +5643,49 @@ void Document::setParameter(const QString& key, double value)
     if (m_model.definition(def).generator.empty()) {
         return;
     }
-    const auto it = m_model.definition(def).parameters.find(key.toStdString());
-    if (it != m_model.definition(def).parameters.end() && std::abs(it->second - value) < 1e-9) {
+    // O valoare în afara limitelor câmpului (sau o grosime care nu există pentru tipul plăcii) se aduce la
+    // cea permisă, cu un mesaj.
+    double applied = value;
+    QString why;
+    const model::Definition& definition = m_model.definition(def);
+    if (const model::GeneratorInfo* g = model::findGenerator(definition.generator)) {
+        for (const model::ParameterSpec& spec : g->parameters) {
+            if (spec.key != key.toStdString()) {
+                continue;
+            }
+            const QString unit = QString::fromStdString(spec.unit);
+            if (model::isCarcassGenerator(g->id)
+                && (key == QLatin1String("board") || key == QLatin1String("back"))) {
+                const std::string type = key == QLatin1String("board") ? "pal" : "hdf";
+                applied = model::nearestThickness(type, value);
+                QStringList allowed;
+                for (const double t : model::findBoardType(type)->thicknesses) {
+                    allowed.append(QString::number(t));
+                }
+                why = QStringLiteral("grosimile %1 sunt %2 mm")
+                          .arg(QString::fromStdString(model::findBoardType(type)->label),
+                              allowed.join(QStringLiteral(", ")));
+            } else if (value < spec.min) {
+                applied = spec.min;
+                why = QStringLiteral("minimul e %1 %2").arg(spec.min).arg(unit);
+            } else if (value > spec.max) {
+                applied = spec.max;
+                why = QStringLiteral("maximul e %1 %2").arg(spec.max).arg(unit);
+            }
+            if (std::abs(applied - value) > 1e-9) {
+                setError(QStringLiteral("„%1”: %2 %3 nu se poate (%4); s-a folosit %5 %3.")
+                        .arg(QString::fromStdString(spec.label), QString::number(value), unit, why,
+                            QString::number(applied)));
+            }
+        }
+    }
+    const auto it = definition.parameters.find(key.toStdString());
+    if (it != definition.parameters.end() && std::abs(it->second - applied) < 1e-9) {
+        emit selectionChanged(); // câmpul revine la valoarea de acum
         return;
     }
-    runOnModel(
-        "Parametru", [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), value); });
+    runOnModel("Parametru",
+        [&](model::Model& model) { model::setParameter(model, def, key.toStdString(), applied); });
 }
 
 void Document::setBoardValue(const QString& key, const QVariant& value)
@@ -5691,7 +5734,7 @@ QVariantList Document::boardBandsInfo(model::DefinitionId definition) const
             { QStringLiteral("bandKey"), QString::fromStdString(b.bandKey) },
             { QStringLiteral("label"), type ? QString::fromStdString(type->label) : QString() },
             { QStringLiteral("decor"), QString::fromStdString(b.decor) },
-            { QStringLiteral("decorName"), decorName } });
+            { QStringLiteral("decorName"), decorName }, { QStringLiteral("rounded"), b.rounded } });
     }
     return out;
 }
@@ -5740,7 +5783,8 @@ QVariantList Document::bandPresets() const
         QVariantList sides;
         for (const model::BandSide& s : p.sides) {
             sides.append(QVariantMap { { QStringLiteral("bandKey"), QString::fromStdString(s.bandKey) },
-                { QStringLiteral("decor"), QString::fromStdString(s.decor) } });
+                { QStringLiteral("decor"), QString::fromStdString(s.decor) },
+                { QStringLiteral("rounded"), s.rounded } });
         }
         out.append(QVariantMap {
             { QStringLiteral("name"), QString::fromStdString(p.name) }, { QStringLiteral("sides"), sides } });
@@ -5748,7 +5792,7 @@ QVariantList Document::bandPresets() const
     return out;
 }
 
-void Document::setBand(int side, const QString& bandKey, const QString& decor)
+void Document::setBand(int side, const QString& bandKey, const QString& decor, bool rounded)
 {
     if (!require(Modeling) || m_selection.instances.size() != 1) {
         return;
@@ -5756,7 +5800,7 @@ void Document::setBand(int side, const QString& bandKey, const QString& decor)
     const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
     bool ok = true;
     runOnModel("Cant", [&](model::Model& model) {
-        ok = model::setBand(model, def, side, bandKey.toStdString(), decor.toStdString());
+        ok = model::setBand(model, def, side, bandKey.toStdString(), decor.toStdString(), rounded);
     });
     if (!ok) {
         setError(QStringLiteral("Cantul ales nu se pune pe acest tip de placă."));
@@ -5773,7 +5817,8 @@ void Document::setBands(const QVariantList& sides)
     for (int k = 0; k < 4; ++k) {
         const QVariantMap s = sides[k].toMap();
         bands[static_cast<std::size_t>(k)] = { s.value(QStringLiteral("bandKey")).toString().toStdString(),
-            s.value(QStringLiteral("decor")).toString().toStdString() };
+            s.value(QStringLiteral("decor")).toString().toStdString(),
+            s.value(QStringLiteral("rounded")).toBool() };
     }
     const model::DefinitionId def = m_model.instance(*m_selection.instances.begin()).definition;
     int skipped = 0;
@@ -5820,6 +5865,21 @@ void Document::setBoardDefaults(const QString& type, double thickness)
     m_boardDefaults.type = type.toStdString();
     m_boardDefaults.thickness = model::nearestThickness(m_boardDefaults.type, thickness);
     emit boardDefaultsChanged();
+}
+
+void Document::setDoorsOpen(bool open)
+{
+    if (open != m_doorsOpen) {
+        m_doorsOpen = open;
+        ++m_interactionRevision; // desenul modelului se reface
+        emit doorsOpenChanged();
+        touch();
+    }
+}
+
+bool Document::hasDoors() const
+{
+    return model::hasDoors(m_model);
 }
 
 void Document::setHoveredBandSide(int side)

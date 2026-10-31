@@ -11,6 +11,10 @@
         <source>decor ca placa</source>
         <translation>decor like the board</translation>
     </message>
+    <message id="BandPicker.drept">
+        <source>Drept</source>
+        <translation>Square</translation>
+    </message>
     <message id="BandPicker.fara">
         <source>Fără</source>
         <translation>None</translation>
@@ -26,6 +30,10 @@
     <message id="BandPicker.presetari">
         <source>Presetări</source>
         <translation>Presets</translation>
+    </message>
+    <message id="BandPicker.rotunjit">
+        <source>Rotunjit</source>
+        <translation>Rounded</translation>
     </message>
     <message id="BandPicker.salveaza_ca_presetare">
         <source>+ Salvează ca presetare</source>
@@ -349,7 +357,7 @@
     </message>
     <message id="EntityInfo.se_schimba_si_celelalte">
         <source>Se schimbă și celelalte </source>
-        <translation>The other </translation>
+        <translation>Also changes the other </translation>
     </message>
     <message id="EntityInfo.segmente">
         <source>Segmente</source>

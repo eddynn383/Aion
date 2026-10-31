@@ -1,20 +1,19 @@
 #include "aion/core/io/AionFile.h"
 
-#include "aion/core/model/Furniture.h"
-
 #include "aion/core/Version.h"
 #include "aion/core/model/AnimationEval.h"
 #include "aion/core/model/CameraLens.h"
+#include "aion/core/model/Furniture.h"
 #include "aion/core/model/Operations.h"
 
-#include <miniz.h>
-#include <nlohmann/json.hpp>
 #include <glm/trigonometric.hpp>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <miniz.h>
 #include <system_error>
 
 namespace aion::io {
@@ -26,14 +25,14 @@ using nlohmann::json;
 constexpr const char* kModelEntry = "model.json";
 constexpr const char* kThumbnailEntry = "thumbnail.png";
 
-template <class IdT, class T>
-std::vector<std::size_t> sortedIndices(const geom::SlotMap<IdT, T>& map)
+template <class IdT, class T> std::vector<std::size_t> sortedIndices(const geom::SlotMap<IdT, T>& map)
 {
     std::vector<std::size_t> order(map.size());
     for (std::size_t i = 0; i < order.size(); ++i) {
         order[i] = i;
     }
-    std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return map.keys()[a] < map.keys()[b]; });
+    std::sort(order.begin(), order.end(),
+        [&](std::size_t a, std::size_t b) { return map.keys()[a] < map.keys()[b]; });
     return order;
 }
 
@@ -82,7 +81,8 @@ json meshToJson(const geom::Mesh& mesh)
         };
         if (!f.texture.isIdentity()) {
             // [deplasare X, deplasare Y, rotație, scară X, scară Y]
-            face["uv"] = { f.texture.offset.x, f.texture.offset.y, f.texture.rotation, f.texture.scale.x, f.texture.scale.y };
+            face["uv"] = { f.texture.offset.x, f.texture.offset.y, f.texture.rotation, f.texture.scale.x,
+                f.texture.scale.y };
         }
         faces.push_back(std::move(face));
     }
@@ -99,7 +99,8 @@ geom::Loop loopFromJson(const json& j)
     return loop;
 }
 
-// Geometria unei definiții, ca ChangeSet de creare (ID-urile păstrate); vecinătățile se refac din muchii și fețe.
+// Geometria unei definiții, ca ChangeSet de creare (ID-urile păstrate); vecinătățile se refac din muchii și
+// fețe.
 geom::ChangeSet meshFromJson(const json& j)
 {
     std::map<geom::VertexId, geom::Vertex> vertices;
@@ -124,7 +125,8 @@ geom::ChangeSet meshFromJson(const json& j)
     for (const json& f : j.at("faces")) {
         const json& p = f.at("plane");
         geom::Face face;
-        face.plane = { { p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>() }, p.at(3).get<double>() };
+        face.plane = { { p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>() },
+            p.at(3).get<double>() };
         face.outer = loopFromJson(f.at("outer"));
         face.material = model::MaterialId { f.value("material", std::uint64_t { 0 }) };
         face.backMaterial = model::MaterialId { f.value("backMaterial", std::uint64_t { 0 }) };
@@ -186,12 +188,15 @@ json camerasToJson(const model::Model& model)
     json out = json::array();
     for (std::size_t i = 0; i < model.cameras().size(); ++i) {
         const model::CameraObject& c = model.cameras().values()[i];
-        out.push_back({ { "id", model.cameras().keys()[i].value }, { "name", c.name }, { "position", vec(c.position) },
-            { "target", vec(c.target) }, { "focalLength", c.focalLength }, { "sensorWidth", c.sensorWidth },
-            { "format", json { c.formatWidth, c.formatHeight } }, { "shift", json { c.shift.x, c.shift.y } },
-            { "roll", c.roll }, { "orthographic", c.orthographic }, { "orthoScale", c.orthoScale },
-            { "near", c.nearClip }, { "far", c.farClip },
-            { "dof", { { "enabled", c.dof.enabled }, { "focus", c.dof.focusDistance }, { "fStop", c.dof.fStop } } },
+        out.push_back({ { "id", model.cameras().keys()[i].value }, { "name", c.name },
+            { "position", vec(c.position) }, { "target", vec(c.target) }, { "focalLength", c.focalLength },
+            { "sensorWidth", c.sensorWidth }, { "format", json { c.formatWidth, c.formatHeight } },
+            { "shift", json { c.shift.x, c.shift.y } }, { "roll", c.roll },
+            { "orthographic", c.orthographic }, { "orthoScale", c.orthoScale }, { "near", c.nearClip },
+            { "far", c.farClip },
+            { "dof",
+                { { "enabled", c.dof.enabled }, { "focus", c.dof.focusDistance },
+                    { "fStop", c.dof.fStop } } },
             { "displaySize", c.displaySize }, { "visible", c.visible } });
     }
     return out;
@@ -202,8 +207,8 @@ json bezierToJson(const geom::BezierPath& path)
 {
     json points = json::array();
     for (const geom::BezierPoint& p : path.points) {
-        points.push_back(json { p.point.x, p.point.y, p.point.z, p.in.x, p.in.y, p.in.z, p.out.x, p.out.y, p.out.z,
-            p.smooth ? 1 : 0 });
+        points.push_back(json { p.point.x, p.point.y, p.point.z, p.in.x, p.in.y, p.in.z, p.out.x, p.out.y,
+            p.out.z, p.smooth ? 1 : 0 });
     }
     return { { "closed", path.closed }, { "points", points } };
 }
@@ -214,7 +219,8 @@ geom::BezierPath bezierFromJson(const json& j)
     path.closed = j.value("closed", false);
     for (const json& p : j.value("points", json::array())) {
         const auto at = [&](std::size_t i) { return p.at(i).get<double>(); };
-        path.points.push_back({ { at(0), at(1), at(2) }, { at(3), at(4), at(5) }, { at(6), at(7), at(8) }, at(9) != 0.0 });
+        path.points.push_back(
+            { { at(0), at(1), at(2) }, { at(3), at(4), at(5) }, { at(6), at(7), at(8) }, at(9) != 0.0 });
     }
     return path;
 }
@@ -251,8 +257,9 @@ json lightsToJson(const model::Model& model)
     for (std::size_t i = 0; i < model.lights().size(); ++i) {
         const model::Light& l = model.lights().values()[i];
         out.push_back({ { "id", model.lights().keys()[i].value }, { "name", l.name },
-            { "kind", static_cast<int>(l.kind) }, { "position", vec(l.position) }, { "direction", vec(l.direction) },
-            { "color", colorToJson(l.color) }, { "intensity", l.intensity }, { "range", l.range }, { "cone", l.cone },
+            { "kind", static_cast<int>(l.kind) }, { "position", vec(l.position) },
+            { "direction", vec(l.direction) }, { "color", colorToJson(l.color) },
+            { "intensity", l.intensity }, { "range", l.range }, { "cone", l.cone },
             { "softness", l.softness }, { "width", l.width }, { "height", l.height },
             { "castShadows", l.castShadows }, { "enabled", l.enabled }, { "visible", l.visible } });
     }
@@ -262,8 +269,9 @@ json lightsToJson(const model::Model& model)
 void camerasAndLightsFromJson(const json& doc, model::ChangeSet& changes)
 {
     const auto vec = [](const json& v, math::Vec3d fallback) {
-        return v.is_array() && v.size() == 3 ? math::Vec3d { v.at(0).get<double>(), v.at(1).get<double>(), v.at(2).get<double>() }
-                                             : fallback;
+        return v.is_array() && v.size() == 3
+            ? math::Vec3d { v.at(0).get<double>(), v.at(1).get<double>(), v.at(2).get<double>() }
+            : fallback;
     };
     for (const json& j : doc.value("cameras", json::array())) {
         model::CameraObject c;
@@ -305,8 +313,8 @@ void camerasAndLightsFromJson(const json& doc, model::ChangeSet& changes)
         l.position = vec(j.value("position", json()), l.position);
         l.direction = vec(j.value("direction", json()), l.direction);
         if (const auto c = j.find("color"); c != j.end() && c->is_array() && c->size() == 4) {
-            l.color = { c->at(0).get<std::uint8_t>(), c->at(1).get<std::uint8_t>(), c->at(2).get<std::uint8_t>(),
-                c->at(3).get<std::uint8_t>() };
+            l.color = { c->at(0).get<std::uint8_t>(), c->at(1).get<std::uint8_t>(),
+                c->at(2).get<std::uint8_t>(), c->at(3).get<std::uint8_t>() };
         }
         l.intensity = j.value("intensity", l.intensity);
         l.range = j.value("range", l.range);
@@ -327,7 +335,8 @@ json easingToJson(const model::Easing& e)
     if (const auto preset = model::easingPreset(e.name); preset && *preset == e) {
         return e.name;
     }
-    return { { "name", e.name }, { "x1", e.x1 }, { "y1", e.y1 }, { "x2", e.x2 }, { "y2", e.y2 }, { "step", e.step } };
+    return { { "name", e.name }, { "x1", e.x1 }, { "y1", e.y1 }, { "x2", e.x2 }, { "y2", e.y2 },
+        { "step", e.step } };
 }
 
 model::Easing easingFromJson(const json& j)
@@ -349,7 +358,8 @@ model::Easing easingFromJson(const json& j)
     return e;
 }
 
-// Animațiile: canalele, cu cheile ca liste compacte [timp, valoare, easing] (culoarea: [timp, r, g, b, a, easing]).
+// Animațiile: canalele, cu cheile ca liste compacte [timp, valoare, easing] (culoarea: [timp, r, g, b, a,
+// easing]).
 json animationsToJson(const model::Model& model)
 {
     json out = json::array();
@@ -362,7 +372,8 @@ json animationsToJson(const model::Model& model)
                 json keys = json::array();
                 for (const model::Key& k : c.keys) {
                     if (c.property == model::Property::Color) {
-                        keys.push_back({ k.time, k.color.r, k.color.g, k.color.b, k.color.a, easingToJson(k.easing) });
+                        keys.push_back(
+                            { k.time, k.color.r, k.color.g, k.color.b, k.color.a, easingToJson(k.easing) });
                     } else {
                         keys.push_back({ k.time, k.value, easingToJson(k.easing) });
                     }
@@ -373,12 +384,12 @@ json animationsToJson(const model::Model& model)
         }
         json camera = json::array();
         for (const model::CameraKey& k : a.camera) {
-            camera.push_back({ k.time, easingToJson(k.easing), k.target.x, k.target.y, k.target.z, k.yaw, k.pitch,
-                k.distance });
+            camera.push_back({ k.time, easingToJson(k.easing), k.target.x, k.target.y, k.target.z, k.yaw,
+                k.pitch, k.distance });
         }
-        out.push_back({ { "id", model.animations().keys()[i].value }, { "name", a.name }, { "duration", a.duration },
-            { "fps", a.fps }, { "loop", a.loop }, { "defaultEasing", easingToJson(a.defaultEasing) }, { "tracks", tracks },
-            { "camera", camera } });
+        out.push_back({ { "id", model.animations().keys()[i].value }, { "name", a.name },
+            { "duration", a.duration }, { "fps", a.fps }, { "loop", a.loop },
+            { "defaultEasing", easingToJson(a.defaultEasing) }, { "tracks", tracks }, { "camera", camera } });
     }
     return out;
 }
@@ -446,8 +457,8 @@ void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector
                     model::Key key;
                     key.time = k.at(0).get<double>();
                     key.easing = easingFromJson(k.at(1));
-                    key.color = { k.at(2).get<std::uint8_t>(), k.at(3).get<std::uint8_t>(), k.at(4).get<std::uint8_t>(),
-                        k.at(5).get<std::uint8_t>() };
+                    key.color = { k.at(2).get<std::uint8_t>(), k.at(3).get<std::uint8_t>(),
+                        k.at(4).get<std::uint8_t>(), k.at(5).get<std::uint8_t>() };
                     channel.keys.push_back(std::move(key));
                 }
                 track.channels.push_back(std::move(channel));
@@ -457,8 +468,10 @@ void animationsFromJson(const json& list, model::ChangeSet& changes, std::vector
             }
         }
         for (const json& k : j.at("camera")) {
-            a.camera.push_back({ k.at(0).get<double>(), { k.at(2).get<double>(), k.at(3).get<double>(), k.at(4).get<double>() },
-                k.at(5).get<double>(), k.at(6).get<double>(), k.at(7).get<double>(), easingFromJson(k.at(1)) });
+            a.camera.push_back({ k.at(0).get<double>(),
+                { k.at(2).get<double>(), k.at(3).get<double>(), k.at(4).get<double>() },
+                k.at(5).get<double>(), k.at(6).get<double>(), k.at(7).get<double>(),
+                easingFromJson(k.at(1)) });
         }
         changes.animations[id].after = std::move(a);
     }
@@ -493,14 +506,15 @@ json motionPathsToJson(const model::Model& model)
         const model::MotionPath& p = model.motionPaths().values()[i];
         json anchors = json::array();
         for (const model::PathAnchor& a : p.anchors) {
-            anchors.push_back({ { "instance", a.instance.value }, { "along", a.along }, { "lateral", a.lateral },
-                { "up", a.up }, { "yaw", a.yaw }, { "front", a.front }, { "before", matrixToJson(a.before) } });
+            anchors.push_back({ { "instance", a.instance.value }, { "along", a.along },
+                { "lateral", a.lateral }, { "up", a.up }, { "yaw", a.yaw }, { "front", a.front },
+                { "before", matrixToJson(a.before) } });
         }
         out.push_back({ { "id", model.motionPaths().keys()[i].value }, { "name", p.name },
-            { "transform", matrixToJson(p.transform) }, { "normal", json { p.normal.x, p.normal.y, p.normal.z } },
-            { "path", bezierToJson(p.curve) }, { "animation", p.animation.value }, { "start", p.start },
-            { "duration", p.duration }, { "easing", easingToJson(p.easing) }, { "visible", p.visible },
-            { "anchors", anchors } });
+            { "transform", matrixToJson(p.transform) },
+            { "normal", json { p.normal.x, p.normal.y, p.normal.z } }, { "path", bezierToJson(p.curve) },
+            { "animation", p.animation.value }, { "start", p.start }, { "duration", p.duration },
+            { "easing", easingToJson(p.easing) }, { "visible", p.visible }, { "anchors", anchors } });
     }
     return out;
 }
@@ -542,21 +556,22 @@ void migrateMoveToRules(model::Model& model)
         const model::InstanceId self = model.instances().keys()[i];
         model::Instance inst = model.instances().values()[i];
         bool any = false;
-        const std::function<void(std::vector<model::Action>&)> fix = [&](std::vector<model::Action>& actions) {
-            for (model::Action& a : actions) {
-                const model::InstanceId target = a.target ? a.target : self;
-                if (a.kind == model::ActionKind::MoveTo && model.instances().contains(target)) {
-                    const model::Instance& t = model.instance(target);
-                    const auto [lo, hi] = model::bounds(model, t.definition);
-                    if (lo.x <= hi.x) {
-                        a.vector += model::pivotPoint(model, target) - t.transform.applyToPoint(lo);
-                        any = true;
-                    }
-                }
-                fix(a.first);
-                fix(a.second);
-            }
-        };
+        const std::function<void(std::vector<model::Action>&)> fix
+            = [&](std::vector<model::Action>& actions) {
+                  for (model::Action& a : actions) {
+                      const model::InstanceId target = a.target ? a.target : self;
+                      if (a.kind == model::ActionKind::MoveTo && model.instances().contains(target)) {
+                          const model::Instance& t = model.instance(target);
+                          const auto [lo, hi] = model::bounds(model, t.definition);
+                          if (lo.x <= hi.x) {
+                              a.vector += model::pivotPoint(model, target) - t.transform.applyToPoint(lo);
+                              any = true;
+                          }
+                      }
+                      fix(a.first);
+                      fix(a.second);
+                  }
+              };
         for (model::Rule& r : inst.rules) {
             fix(r.actions);
         }
@@ -584,7 +599,6 @@ void migrateLegacyTracks(model::Model& model, const std::vector<LegacyTrack>& le
         model.setAnimation(lt.animation, a);
     }
 }
-
 
 json actionToJson(const model::Action& a)
 {
@@ -636,10 +650,13 @@ json partToJson(const model::PartSpec& p)
     json bands = json::array();
     for (const model::BandSide& b : p.bands) {
         bands.push_back({ { "band", b.bandKey }, { "decor", b.decor } });
+        if (b.rounded) {
+            bands.back()["rounded"] = true; // opțional: lipsește în fișierele scrise înainte (tot v6)
+        }
     }
-    const std::string kind = !p.rawKind.empty() ? p.rawKind
+    const std::string kind = !p.rawKind.empty()     ? p.rawKind
         : p.kind == model::PartSpec::Kind::Hardware ? std::string("hardware")
-                                                     : std::string("board");
+                                                    : std::string("board");
     return { { "kind", kind }, { "type", p.typeKey }, { "thickness", p.nominalThickness },
         { "thicknessAxis", p.thicknessAxis }, { "grainAxis", p.grainAxis }, { "bands", bands } };
 }
@@ -663,6 +680,7 @@ model::PartSpec partFromJson(const json& j)
     for (std::size_t k = 0; k < p.bands.size() && k < bands.size(); ++k) {
         p.bands[k].bandKey = bands[k].value("band", std::string());
         p.bands[k].decor = bands[k].value("decor", std::string());
+        p.bands[k].rounded = bands[k].value("rounded", false);
     }
     return p;
 }
@@ -732,7 +750,8 @@ std::string toJson(const model::Model& model)
                 for (const model::Action& a : r.actions) {
                     actions.push_back(actionToJson(a));
                 }
-                rules.push_back({ { "trigger", static_cast<int>(r.trigger) }, { "key", r.key }, { "actions", actions } });
+                rules.push_back(
+                    { { "trigger", static_cast<int>(r.trigger) }, { "key", r.key }, { "actions", actions } });
             }
             instances.back()["rules"] = rules;
         }
@@ -780,7 +799,8 @@ std::string toJson(const model::Model& model)
     for (std::size_t i : sortedIndices(model.textures())) {
         const model::Texture& t = model.textures().values()[i];
         const std::uint64_t id = model.textures().keys()[i].value;
-        textures.push_back({ { "id", id }, { "name", t.name }, { "source", t.source }, { "file", textureEntry(id, t) } });
+        textures.push_back(
+            { { "id", id }, { "name", t.name }, { "source", t.source }, { "file", textureEntry(id, t) } });
     }
     const auto vec = [](const math::Vec3d& v) { return json { v.x, v.y, v.z }; };
     json guides = json::array();
@@ -793,21 +813,22 @@ std::string toJson(const model::Model& model)
     for (std::size_t i : sortedIndices(model.annotations())) {
         const model::Annotation& a = model.annotations().values()[i];
         annotations.push_back({ { "id", model.annotations().keys()[i].value },
-            { "kind", a.kind == model::Annotation::Kind::Text ? "text" : "dimension" }, { "context", a.context.value },
-            { "a", vec(a.a) }, { "b", vec(a.b) }, { "offset", vec(a.offset) }, { "text", a.text } });
+            { "kind", a.kind == model::Annotation::Kind::Text ? "text" : "dimension" },
+            { "context", a.context.value }, { "a", vec(a.a) }, { "b", vec(a.b) }, { "offset", vec(a.offset) },
+            { "text", a.text } });
     }
     json sections = json::array();
     for (std::size_t i : sortedIndices(model.sections())) {
         const model::SectionPlane& s = model.sections().values()[i];
-        sections.push_back({ { "id", model.sections().keys()[i].value }, { "name", s.name }, { "point", vec(s.point) },
-            { "normal", vec(s.normal) }, { "active", s.active } });
+        sections.push_back({ { "id", model.sections().keys()[i].value }, { "name", s.name },
+            { "point", vec(s.point) }, { "normal", vec(s.normal) }, { "active", s.active } });
     }
     json scenes = json::array();
     for (std::size_t i : sortedIndices(model.scenes())) {
         const model::Scene& s = model.scenes().values()[i];
-        scenes.push_back({ { "id", model.scenes().keys()[i].value }, { "name", s.name }, { "target", vec(s.target) },
-            { "yaw", s.yaw }, { "pitch", s.pitch }, { "distance", s.distance }, { "orthographic", s.orthographic },
-            { "style", s.style } });
+        scenes.push_back({ { "id", model.scenes().keys()[i].value }, { "name", s.name },
+            { "target", vec(s.target) }, { "yaw", s.yaw }, { "pitch", s.pitch }, { "distance", s.distance },
+            { "orthographic", s.orthographic }, { "style", s.style } });
         if (s.hasState) {
             json transforms = json::array();
             for (const auto& [id, t] : s.transforms) {
@@ -827,7 +848,8 @@ std::string toJson(const model::Model& model)
             for (model::TagId id : s.hiddenTags) {
                 hiddenTags.push_back(id.value);
             }
-            scenes.back()["state"] = { { "transforms", transforms }, { "hidden", hidden }, { "hiddenTags", hiddenTags } };
+            scenes.back()["state"]
+                = { { "transforms", transforms }, { "hidden", hidden }, { "hiddenTags", hiddenTags } };
         }
     }
     const json doc {
@@ -880,7 +902,8 @@ LoadResult fromJson(std::string_view text)
         for (const json& d : doc.at("definitions")) {
             const model::DefinitionId id { d.at("id").get<std::uint64_t>() };
             model::Definition def { d.at("name").get<std::string>(), d.at("group").get<bool>(),
-                d.value("collection", false), d.value("shape", std::string()), d.value("generator", std::string()),
+                d.value("collection", false), d.value("shape", std::string()),
+                d.value("generator", std::string()),
                 d.value("parameters", std::map<std::string, double> {}) };
             if (const auto pj = d.find("part"); pj != d.end() && pj->is_object()) {
                 def.part = partFromJson(*pj);
@@ -911,7 +934,8 @@ LoadResult fromJson(std::string_view text)
             inst.locked = i.value("locked", false);
             inst.placementLocks = i.value("locks", std::uint16_t { 0 });
             if (const auto pv = i.find("pivot"); pv != i.end() && pv->is_array() && pv->size() == 3) {
-                inst.pivot = math::Vec3d { (*pv)[0].get<double>(), (*pv)[1].get<double>(), (*pv)[2].get<double>() };
+                inst.pivot
+                    = math::Vec3d { (*pv)[0].get<double>(), (*pv)[1].get<double>(), (*pv)[2].get<double>() };
             }
             inst.material = model::MaterialId { i.value("material", std::uint64_t { 0 }) };
             inst.roleKey = i.value("roleKey", std::string());
@@ -929,8 +953,10 @@ LoadResult fromJson(std::string_view text)
                 inst.rules.push_back(std::move(rule));
             }
             if (const auto b = i.find("behavior"); b != i.end()) {
-                inst.behavior.kind = static_cast<model::Behavior::Kind>(std::clamp(b->value("kind", 0), 0, 2));
-                inst.behavior.anchor = static_cast<model::Behavior::Anchor>(std::clamp(b->value("anchor", 0), 0, 5));
+                inst.behavior.kind
+                    = static_cast<model::Behavior::Kind>(std::clamp(b->value("kind", 0), 0, 2));
+                inst.behavior.anchor
+                    = static_cast<model::Behavior::Anchor>(std::clamp(b->value("anchor", 0), 0, 5));
                 inst.behavior.amount = b->value("amount", 90.0);
                 inst.behavior.duration = b->value("duration", 0.6);
                 inst.behavior.open = b->value("open", false);
@@ -949,7 +975,8 @@ LoadResult fromJson(std::string_view text)
             model::Texture texture;
             texture.name = tj.value("name", std::string());
             texture.source = tj.value("source", std::string());
-            changes.textures[model::TextureId { tj.at("id").get<std::uint64_t>() }].after = std::move(texture);
+            changes.textures[model::TextureId { tj.at("id").get<std::uint64_t>() }].after
+                = std::move(texture);
         }
         for (const json& mj : doc.value("materials", json::array())) {
             const json& c = mj.at("color");
@@ -963,29 +990,33 @@ LoadResult fromJson(std::string_view text)
             }
             material.category = mj.value("category", std::string());
             material.libraryKey = mj.value("libraryKey", std::string());
-            changes.materials[model::MaterialId { mj.at("id").get<std::uint64_t>() }].after = std::move(material);
+            changes.materials[model::MaterialId { mj.at("id").get<std::uint64_t>() }].after
+                = std::move(material);
         }
         const auto vec = [](const json& v) {
             return math::Vec3d { v.at(0).get<double>(), v.at(1).get<double>(), v.at(2).get<double>() };
         };
         for (const json& g : doc.value("guides", json::array())) {
-            changes.guides[model::GuideId { g.at("id").get<std::uint64_t>() }].after = model::Guide {
-                model::DefinitionId { g.at("context").get<std::uint64_t>() }, vec(g.at("point")), vec(g.at("direction")) };
+            changes.guides[model::GuideId { g.at("id").get<std::uint64_t>() }].after
+                = model::Guide { model::DefinitionId { g.at("context").get<std::uint64_t>() },
+                      vec(g.at("point")), vec(g.at("direction")) };
         }
         for (const json& a : doc.value("annotations", json::array())) {
             model::Annotation annotation;
             annotation.kind = a.value("kind", std::string()) == "text" ? model::Annotation::Kind::Text
-                                                                      : model::Annotation::Kind::Dimension;
+                                                                       : model::Annotation::Kind::Dimension;
             annotation.context = model::DefinitionId { a.at("context").get<std::uint64_t>() };
             annotation.a = vec(a.at("a"));
             annotation.b = vec(a.at("b"));
             annotation.offset = vec(a.at("offset"));
             annotation.text = a.value("text", std::string());
-            changes.annotations[model::AnnotationId { a.at("id").get<std::uint64_t>() }].after = std::move(annotation);
+            changes.annotations[model::AnnotationId { a.at("id").get<std::uint64_t>() }].after
+                = std::move(annotation);
         }
         for (const json& s : doc.value("sections", json::array())) {
-            changes.sections[model::SectionId { s.at("id").get<std::uint64_t>() }].after = model::SectionPlane {
-                s.value("name", std::string()), vec(s.at("point")), vec(s.at("normal")), s.value("active", true) };
+            changes.sections[model::SectionId { s.at("id").get<std::uint64_t>() }].after
+                = model::SectionPlane { s.value("name", std::string()), vec(s.at("point")),
+                      vec(s.at("normal")), s.value("active", true) };
         }
         std::vector<LegacyTrack> legacy;
         animationsFromJson(doc.value("animations", json::array()), changes, legacy);
@@ -1010,7 +1041,8 @@ LoadResult fromJson(std::string_view text)
                             m[c][r] = entry.at(static_cast<std::size_t>(1 + c * 4 + r)).get<double>();
                         }
                     }
-                    scene.transforms[model::InstanceId { entry.at(0).get<std::uint64_t>() }] = math::Transform(m);
+                    scene.transforms[model::InstanceId { entry.at(0).get<std::uint64_t>() }]
+                        = math::Transform(m);
                 }
                 for (const json& id : st->at("hidden")) {
                     scene.hiddenInstances.insert(model::InstanceId { id.get<std::uint64_t>() });
@@ -1050,7 +1082,8 @@ std::vector<std::uint8_t> writeArchive(const model::Model& model, std::span<cons
     }
     bool ok = mz_zip_writer_add_mem(&zip, kModelEntry, text.data(), text.size(), MZ_BEST_COMPRESSION);
     if (ok && !thumbnailPng.empty()) {
-        ok = mz_zip_writer_add_mem(&zip, kThumbnailEntry, thumbnailPng.data(), thumbnailPng.size(), MZ_NO_COMPRESSION);
+        ok = mz_zip_writer_add_mem(
+            &zip, kThumbnailEntry, thumbnailPng.data(), thumbnailPng.size(), MZ_NO_COMPRESSION);
     }
     for (std::size_t i = 0; ok && i < model.textures().size(); ++i) {
         const model::Texture& t = model.textures().values()[i];
@@ -1126,8 +1159,8 @@ std::vector<std::uint8_t> readThumbnail(std::span<const std::uint8_t> bytes)
     return extract(bytes, kThumbnailEntry).value_or(std::vector<std::uint8_t> {});
 }
 
-bool saveFile(const std::filesystem::path& path, const model::Model& model, std::span<const std::uint8_t> thumbnailPng,
-    std::string* error)
+bool saveFile(const std::filesystem::path& path, const model::Model& model,
+    std::span<const std::uint8_t> thumbnailPng, std::string* error)
 {
     const std::vector<std::uint8_t> bytes = writeArchive(model, thumbnailPng);
     if (bytes.empty()) {
@@ -1168,7 +1201,8 @@ LoadResult loadFile(const std::filesystem::path& path)
         r.error = "Fișierul nu poate fi deschis.";
         return r;
     }
-    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const std::vector<std::uint8_t> bytes(
+        (std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     return readArchive(bytes);
 }
 

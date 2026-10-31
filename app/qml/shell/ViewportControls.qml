@@ -78,6 +78,18 @@ Row {
         }
     }
 
+    // --- Ușile corpurilor de mobilier: închise / deschise (doar afișarea, în Modelare) ---
+    Group {
+        visible: root.document && root.document.hasDoors && root.document.workMode === 0
+        ShadeButton {
+            iconName: "door-open"
+            tooltip: root.document && root.document.doorsOpen ? "Ușile deschise (click: închise)"
+                                                              : "Ușile închise (click: deschise, ca să vezi interiorul)"
+            checked: root.document && root.document.doorsOpen
+            onClicked: root.document.doorsOpen = !root.document.doorsOpen
+        }
+    }
+
     // --- Secțiuni (doar când există) ---
     Group {
         visible: root.document && root.document.sections.length > 0

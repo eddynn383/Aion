@@ -11,6 +11,10 @@
         <source>decor ca placa</source>
         <translation>decor ca placa</translation>
     </message>
+    <message id="BandPicker.drept">
+        <source>Drept</source>
+        <translation>Drept</translation>
+    </message>
     <message id="BandPicker.fara">
         <source>Fără</source>
         <translation>Fără</translation>
@@ -26,6 +30,10 @@
     <message id="BandPicker.presetari">
         <source>Presetări</source>
         <translation>Presetări</translation>
+    </message>
+    <message id="BandPicker.rotunjit">
+        <source>Rotunjit</source>
+        <translation>Rotunjit</translation>
     </message>
     <message id="BandPicker.salveaza_ca_presetare">
         <source>+ Salvează ca presetare</source>

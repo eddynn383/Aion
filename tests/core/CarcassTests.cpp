@@ -161,7 +161,7 @@ TEST_CASE("Corpuri: refacerea păstrează decorul, cantul și separatorul", "[co
     inst.material = nutId;
     b.m.setInstance(panel, inst);
     model::Definition panelDef = b.m.definition(inst.definition);
-    panelDef.part->bands[0] = { "abs.2", "" };
+    panelDef.part->bands[0] = { "abs.2", "", false };
     b.m.setDefinition(inst.definition, panelDef);
     // Un separator la 1/3 din lățimea interioară (564).
     REQUIRE(model::addDivider(b.m, b.def, { 18 + 564.0 / 3, 100, 300 }, true) == model::DividerResult::Added);
@@ -571,4 +571,31 @@ TEST_CASE("Feronerie: altă variantă pe o balama schimbă toate aparițiile", "
     CHECK_FALSE(model::replaceHardwareVariant(
         b.m, b.m.instance(role(b.m, b.def, "side.left")).definition, "handle.128"));
     CHECK(model::hardwareFamily("hinge.inset.165") == "hinge");
+}
+
+TEST_CASE("Corpuri: fără maxime la dimensiuni și la numărul de piese", "[core][carcass]")
+{
+    Body b = makeBody("base");
+    REQUIRE(model::setParameter(b.m, b.def, "width", 5000));
+    CHECK(b.m.definition(b.def).parameters.at("width") == Approx(5000.0));
+    REQUIRE(model::setParameter(b.m, b.def, "shelves", 12));
+    CHECK(countRoles(b.m, b.def, "space.1.shelf.") == 12);
+    REQUIRE(model::setParameter(b.m, b.def, "width", 10)); // sub minimul de construcție
+    CHECK(b.m.definition(b.def).parameters.at("width") == Approx(100.0));
+}
+
+TEST_CASE("Cant: rotunjit, în lista de debitare și în CSV", "[core][carcass][bands]")
+{
+    Model m;
+    const model::InstanceId a = model::createBoard(m, m.root(), "pal", 18, 600, 400, Transform {});
+    const model::DefinitionId d = m.instance(a).definition;
+    REQUIRE(model::setBand(m, d, 0, "abs.2", "", true));
+    CHECK(model::boardBands(m, d)[0].rounded);
+    // Fără cant, nici rotunjire.
+    REQUIRE(model::setBand(m, d, 1, "", "", true));
+    CHECK_FALSE(model::boardBands(m, d)[1].rounded);
+    const model::CutList list = model::cutList(m);
+    REQUIRE(list.parts.size() == 1);
+    CHECK(list.parts[0].bandRounded[0]);
+    CHECK(model::toCsv(list, model::CutListOptions {}).find("ABS 2 mm rotunjit") != std::string::npos);
 }

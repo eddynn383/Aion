@@ -8,7 +8,6 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-
 #include <glm/geometric.hpp>
 
 #include <cmath>
@@ -56,7 +55,8 @@ Model sampleModel()
     geom::transformVertices(root,
         { root.findVertexNear({ 0, 2000, 2700 }, 1e-6), root.findVertexNear({ 6000, 2000, 2700 }, 1e-6) },
         Transform::translation({ 0, 0, 1500 }));
-    geom::drawPolygon(root, { { 6000, 1400, 1000 }, { 6000, 2600, 1000 }, { 6000, 2600, 2000 }, { 6000, 1400, 2000 } });
+    geom::drawPolygon(
+        root, { { 6000, 1400, 1000 }, { 6000, 2600, 1000 }, { 6000, 2600, 2000 }, { 6000, 1400, 2000 } });
     geom::pushPull(root, faceAt(root, { 6000, 2000, 1500 }), -6000);
 
     // Un cilindru ca obiect cu două copii, pe un tag.
@@ -88,7 +88,8 @@ Model sampleModel()
     const model::MaterialId glass = m.addMaterial({ "Sticlă", { 170, 205, 225, 90 }, 0.05f, 0.0f });
     root.setFaceMaterial(faceAt(root, { 0, 1000, 1000 }), brick);
     // O textură (octeții unei imagini) pe cărămidă, cu poziționarea ei pe față.
-    const model::TextureId texture = m.addTexture({ "Cărămidă", "procedural:brick", { 0x89, 'P', 'N', 'G', 9, 8, 7 } });
+    const model::TextureId texture
+        = m.addTexture({ "Cărămidă", "procedural:brick", { 0x89, 'P', 'N', 'G', 9, 8, 7 } });
     model::Material textured = m.material(brick);
     textured.texture = texture;
     textured.textureSize = { 600, 300 };
@@ -104,8 +105,10 @@ Model sampleModel()
     // Ghidaje, adnotări, o secțiune și o scenă.
     m.addGuide({ m.root(), { 0, 0, 0 }, { 1, 0, 0 } });
     m.addGuide({ m.root(), { 1000, 1000, 0 }, { 0, 0, 0 } });
-    m.addAnnotation({ model::Annotation::Kind::Dimension, m.root(), { 0, 0, 0 }, { 6000, 0, 0 }, { 0, -500, 0 }, "" });
-    m.addAnnotation({ model::Annotation::Kind::Text, m.root(), { 3000, 0, 1000 }, {}, { 0, -800, 600 }, "Ușa" });
+    m.addAnnotation(
+        { model::Annotation::Kind::Dimension, m.root(), { 0, 0, 0 }, { 6000, 0, 0 }, { 0, -500, 0 }, "" });
+    m.addAnnotation(
+        { model::Annotation::Kind::Text, m.root(), { 3000, 0, 1000 }, {}, { 0, -800, 600 }, "Ușa" });
     m.addSection({ "Secțiune 1", { 3000, 2000, 1200 }, { 0, 0, 1 }, false });
     m.addScene({ "Fațada", { 3000, 2000, 1000 }, 0.4, 0.2, 15000, false, "clay", false, {}, {}, {} });
     // O cameră și două lumini.
@@ -216,8 +219,8 @@ TEST_CASE("OBJ: export și import înapoi păstrează forma (fețele coplanare s
 TEST_CASE("glTF: export GLB și import înapoi; copiile unui obiect rămân legate", "[core][io]")
 {
     Model original = sampleModel();
-    // Copiile unui obiect rămân un singur mesh doar dacă au același material (materialul obiectului se exportă
-    // în mesh): le dăm taburetelor același material.
+    // Copiile unui obiect rămân un singur mesh doar dacă au același material (materialul obiectului se
+    // exportă în mesh): le dăm taburetelor același material.
     model::MaterialId glass;
     for (const model::Instance& inst : original.instances().values()) {
         glass = inst.material ? inst.material : glass;
@@ -355,8 +358,8 @@ Model furnitureModel()
     spec.typeKey = "pal";
     spec.nominalThickness = 18.0;
     spec.grainAxis = 0;
-    spec.bands[0] = { "abs.2", "" };
-    spec.bands[3] = { "abs.0.4", "alb-decor" };
+    spec.bands[0] = { "abs.2", "", true };
+    spec.bands[3] = { "abs.0.4", "alb-decor", false };
     board.part = spec;
     const model::DefinitionId boardId = m.addDefinition(board);
     geom::buildPrimitive(m.mesh(boardId), geom::Primitive::Box, { 600, 400, 18 }, 4);

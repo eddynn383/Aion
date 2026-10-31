@@ -53,7 +53,7 @@ std::span<const HardwareType> hardwareTypes()
             for (const int angle : { 110, 165 }) {
                 types.push_back({ std::string("hinge.") + kind + "." + std::to_string(angle),
                     std::string("Balama ") + label + " " + std::to_string(angle) + "°", Unit::Piece,
-                    { 50.0, 35.0, 12.0 } });
+                    { 50.0, 12.0, 35.0 } }); // pe spatele ușii: lată 50, groasă 12, înaltă 35 (cupa)
             }
         }
         for (int length = 300; length <= 600; length += 50) {
@@ -369,8 +369,8 @@ bool isBoardPart(const Model& model, DefinitionId definition)
 
 } // namespace
 
-bool setBand(
-    Model& model, DefinitionId definition, int side, std::string_view bandKey, std::string_view decor)
+bool setBand(Model& model, DefinitionId definition, int side, std::string_view bandKey,
+    std::string_view decor, bool rounded)
 {
     if (side < 0 || side > 3 || !isBoardPart(model, definition)) {
         return false;
@@ -381,7 +381,8 @@ bool setBand(
     }
     const int slot = bandSlot(model, definition, side);
     BandSide& target = def.part->bands[static_cast<std::size_t>(slot)];
-    const BandSide next { std::string(bandKey), bandKey.empty() ? std::string() : std::string(decor) };
+    const BandSide next { std::string(bandKey), bandKey.empty() ? std::string() : std::string(decor),
+        !bandKey.empty() && rounded };
     if (target == next) {
         return true;
     }
@@ -408,9 +409,12 @@ std::span<const BandPreset> builtinBandPresets()
 {
     static const std::array<BandPreset, 3> kPresets { {
         { "Fără", {} },
-        { "Toate 2 mm", { { { "abs.2", "" }, { "abs.2", "" }, { "abs.2", "" }, { "abs.2", "" } } } },
+        { "Toate 2 mm",
+            { { { "abs.2", "", false }, { "abs.2", "", false }, { "abs.2", "", false },
+                { "abs.2", "", false } } } },
         { "L1 2 mm, restul 0,4 mm",
-            { { { "abs.2", "" }, { "abs.0.4", "" }, { "abs.0.4", "" }, { "abs.0.4", "" } } } },
+            { { { "abs.2", "", false }, { "abs.0.4", "", false }, { "abs.0.4", "", false },
+                { "abs.0.4", "", false } } } },
     } };
     return kPresets;
 }
@@ -423,7 +427,7 @@ int applyBandPreset(Model& model, DefinitionId definition, const std::array<Band
     int skipped = 0;
     for (int k = 0; k < 4; ++k) {
         const BandSide& side = sides[static_cast<std::size_t>(k)];
-        if (!setBand(model, definition, k, side.bandKey, side.decor)) {
+        if (!setBand(model, definition, k, side.bandKey, side.decor, side.rounded)) {
             setBand(model, definition, k, {}, {});
             ++skipped;
         }

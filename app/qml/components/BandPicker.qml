@@ -133,7 +133,8 @@ Column {
                 required property var modelData
                 label: modelData.label
                 current: root.current !== null && root.current.bandKey === modelData.key
-                onClicked: root.document.setBand(root.side, modelData.key, root.current ? root.current.decor : "")
+                onClicked: root.document.setBand(root.side, modelData.key, root.current ? root.current.decor : "",
+                                                  root.current ? root.current.rounded : false)
             }
         }
     }
@@ -144,7 +145,7 @@ Column {
         Chip {
             label: qsTrId("BandPicker.ca_placa")
             current: root.current !== null && !root.current.decor
-            onClicked: root.document.setBand(root.side, root.current.bandKey, "")
+            onClicked: root.document.setBand(root.side, root.current.bandKey, "", root.current.rounded)
         }
         Repeater {
             model: root.board ? root.board.bandDecors : []
@@ -153,8 +154,24 @@ Column {
                 label: modelData.name
                 swatch: modelData.color
                 current: root.current !== null && root.current.decor === modelData.key
-                onClicked: root.document.setBand(root.side, root.current.bandKey, modelData.key)
+                onClicked: root.document.setBand(root.side, root.current.bandKey, modelData.key, root.current.rounded)
             }
+        }
+    }
+    // Muchiile cantului rotunjite (raza ≈ grosimea cantului): se vede pe placă și apare în lista de debitare.
+    Flow {
+        width: root.width
+        spacing: 4
+        visible: root.current !== null && root.current.bandKey !== ""
+        Chip {
+            label: qsTrId("BandPicker.drept")
+            current: root.current !== null && !root.current.rounded
+            onClicked: root.document.setBand(root.side, root.current.bandKey, root.current.decor, false)
+        }
+        Chip {
+            label: qsTrId("BandPicker.rotunjit")
+            current: root.current !== null && root.current.rounded
+            onClicked: root.document.setBand(root.side, root.current.bandKey, root.current.decor, true)
         }
     }
     Text {
@@ -178,7 +195,7 @@ Column {
             onClicked: {
                 const list = root.userPresets.slice()
                 list.push({ name: qsTrId("BandPicker.presetarea_mea") + (list.length + 1),
-                            sides: root.bands.map(b => ({ bandKey: b.bandKey, decor: b.decor })) })
+                            sides: root.bands.map(b => ({ bandKey: b.bandKey, decor: b.decor, rounded: b.rounded })) })
                 UserPrefs.bandPresets = JSON.stringify(list)
             }
         }

@@ -111,9 +111,12 @@ void door(std::vector<DesiredPiece>& out, const std::string& role, double x0, do
     panel.parentRole = role;
     out.push_back(panel);
 
+    // Balamalele: pe spatele ușii, în interiorul corpului (dincolo de fața interioară a lateralei, pe care
+    // ușa o acoperă), ca să nu treacă prin laterală.
     const int hinges = hingeCount(h);
     const HardwareType* hinge = findHardwareType(kHinge);
-    const double hx = hingesLeft ? hinge->size.x / 2 + 5.0 : w - hinge->size.x / 2 - 5.0;
+    const double inset = thickness + 2.0 + hinge->size.x / 2;
+    const double hx = hingesLeft ? inset : w - inset;
     for (int k = 0; k < hinges; ++k) {
         const double zc = hinges == 1 ? h / 2 : kHingeInset + k * (h - 2 * kHingeInset) / (hinges - 1);
         out.push_back(hardware(role + ".hinge." + std::to_string(k + 1), role, kHinge,
@@ -718,6 +721,34 @@ DividerResult addDivider(
         *created = id;
     }
     return DividerResult::Added;
+}
+
+std::optional<math::Transform> doorOpenTransform(const Model& model, InstanceId instance)
+{
+    if (!model.instances().contains(instance)) {
+        return std::nullopt;
+    }
+    const Instance& inst = model.instance(instance);
+    const AnimationId id = doorAnimation(model, inst);
+    if (!id || !inst.pivot) {
+        return std::nullopt;
+    }
+    const Animation& animation = *model.animations().find(id);
+    const ObjectTrack* track = findTrack(animation, instance);
+    if (track == nullptr) {
+        return std::nullopt;
+    }
+    return evaluateInstance(*track, animation.duration, inst.transform, *inst.pivot);
+}
+
+bool hasDoors(const Model& model)
+{
+    for (const Instance& inst : model.instances().values()) {
+        if (inst.roleKey.starts_with("door.") && inst.rules.size() == 1 && isDoorRule(inst.rules[0])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 InstanceId carcassInPath(const Model& model, std::span<const InstanceId> path)

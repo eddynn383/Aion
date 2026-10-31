@@ -18,19 +18,24 @@ namespace {
 
 // Câmpurile unui corp (docs/plans/mobilier-pe-corp.md, §4): dimensiunile, ușile, polițele pe spațiu,
 // separatoarele, grosimea corpului (PAL) și a spatelui (HDF).
-std::vector<ParameterSpec> carcass(double w, double wMin, double wMax, double h, double hMin, double hMax,
-    double d, double dMin, double dMax, double doors, double doorsMax, double shelves, double shelvesMax,
-    double dividers, double dividersMax)
+// Fără maxime la corpuri (autorul: „nu ar trebui să existe limite”); minimele doar cât corpul să se poată
+// construi (două laterale, bază și capac). Uși / separatoare < 0 = câmpul lipsește.
+constexpr double kNoMax = 100000.0;
+constexpr double kMaxCount = 50.0;
+
+std::vector<ParameterSpec> carcass(
+    double w, double h, double d, double doors, double shelves, double dividers)
 {
-    std::vector<ParameterSpec> specs { { "width", "Lățime", "mm", w, wMin, wMax, 1 },
-        { "height", "Înălțime", "mm", h, hMin, hMax, 1 }, { "depth", "Adâncime", "mm", d, dMin, dMax, 1 } };
-    if (doorsMax > 0) {
-        specs.push_back({ "doors", "Uși", "buc.", doors, 0, doorsMax, 1 });
+    std::vector<ParameterSpec> specs { { "width", "Lățime", "mm", w, 100, kNoMax, 1 },
+        { "height", "Înălțime", "mm", h, 100, kNoMax, 1 }, { "depth", "Adâncime", "mm", d, 50, kNoMax, 1 } };
+    if (doors >= 0) {
+        specs.push_back({ "doors", "Uși", "buc.", doors, 0, kMaxCount, 1 });
     }
-    specs.push_back({ "shelves", "Polițe (pe spațiu)", "buc.", shelves, 0, shelvesMax, 1 });
-    if (dividersMax > 0) {
-        specs.push_back({ "dividers", "Separatoare", "buc.", dividers, 0, dividersMax, 1 });
+    specs.push_back({ "shelves", "Polițe (pe spațiu)", "buc.", shelves, 0, kMaxCount, 1 });
+    if (dividers >= 0) {
+        specs.push_back({ "dividers", "Separatoare", "buc.", dividers, 0, kMaxCount, 1 });
     }
+    // Grosimile: cele permise ale tipului (PAL, HDF); o valoare scrisă se aduce la cea mai apropiată.
     specs.push_back({ "board", "Grosimea corpului", "mm", 18, 16, 25, 1 });
     specs.push_back({ "back", "Grosimea spatelui", "mm", 3, 3, 4, 1 });
     return specs;
@@ -38,10 +43,9 @@ std::vector<ParameterSpec> carcass(double w, double wMin, double wMax, double h,
 
 std::vector<ParameterSpec> appliance()
 {
-    std::vector<ParameterSpec> specs
-        = carcass(600, 450, 900, 2100, 1200, 2600, 560, 450, 700, 0, 0, 1, 4, 0, 0);
-    specs.insert(specs.end() - 2, { "nicheBottom", "Nișa de la", "mm", 850, 0, 1500, 1 });
-    specs.insert(specs.end() - 2, { "nicheHeight", "Înălțimea nișei", "mm", 600, 300, 900, 1 });
+    std::vector<ParameterSpec> specs = carcass(600, 2100, 560, -1, 1, -1);
+    specs.insert(specs.end() - 2, { "nicheBottom", "Nișa de la", "mm", 850, 0, kNoMax, 1 });
+    specs.insert(specs.end() - 2, { "nicheHeight", "Înălțimea nișei", "mm", 600, 50, kNoMax, 1 });
     return specs;
 }
 
@@ -79,17 +83,12 @@ const std::vector<GeneratorInfo>& registry()
                 { "depth", "Adâncime", "mm", 600, 300, 900, 10 }, { "doors", "Uși", "buc.", 2, 1, 6, 1 },
                 { "board", "Grosimea plăcii", "mm", 18, 10, 50, 1 } },
             true },
-        { "base", "Corp la sol", "Corpuri",
-            carcass(600, 150, 1200, 720, 300, 1000, 560, 300, 700, 1, 4, 1, 6, 0, 4) },
-        { "wall", "Corp suspendat", "Corpuri",
-            carcass(600, 150, 1200, 720, 300, 1000, 320, 200, 450, 1, 4, 1, 6, 0, 4) },
-        { "tall", "Soldat", "Corpuri",
-            carcass(600, 300, 900, 2100, 1200, 2600, 560, 300, 700, 1, 2, 4, 10, 0, 2) },
+        { "base", "Corp la sol", "Corpuri", carcass(600, 720, 560, 1, 1, 0) },
+        { "wall", "Corp suspendat", "Corpuri", carcass(600, 720, 320, 1, 1, 0) },
+        { "tall", "Soldat", "Corpuri", carcass(600, 2100, 560, 1, 4, 0) },
         { "appliance", "Corp pentru electrocasnice", "Corpuri", appliance() },
-        { "wardrobe", "Dulap cu uși", "Corpuri",
-            carcass(1000, 400, 3000, 2000, 500, 2700, 600, 300, 700, 2, 6, 0, 8, 0, 5) },
-        { "rack", "Raft", "Corpuri",
-            carcass(800, 300, 2000, 1800, 300, 2700, 300, 150, 600, 0, 4, 4, 12, 0, 5) },
+        { "wardrobe", "Dulap cu uși", "Corpuri", carcass(1000, 2000, 600, 2, 0, 0) },
+        { "rack", "Raft", "Corpuri", carcass(800, 1800, 300, 0, 4, 0) },
         { "stairs", "Scară dreaptă", "Scări",
             { { "width", "Lățime", "mm", 1000, 600, 3000, 10 },
                 { "height", "Înălțime totală", "mm", 2800, 300, 6000, 10 },

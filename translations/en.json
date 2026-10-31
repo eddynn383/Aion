@@ -1,10 +1,12 @@
 {
  "BandPicker.ca_placa": "Like the board",
  "BandPicker.decor_ca_placa": "decor like the board",
+ "BandPicker.drept": "Square",
  "BandPicker.fara": "None",
  "BandPicker.fara_cant": "no edge banding",
  "BandPicker.presetarea_mea": "My preset ",
  "BandPicker.presetari": "Presets",
+ "BandPicker.rotunjit": "Rounded",
  "BandPicker.salveaza_ca_presetare": "+ Save as preset",
  "EntityInfo.actualizeaza": "Update",
  "EntityInfo.actualizeaza_keyframe_ul_la_momentul_curent": "Update the keyframe at the current time",

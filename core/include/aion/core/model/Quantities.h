@@ -9,9 +9,9 @@
 #include <vector>
 
 // Rapoarte de cantități: unul general (arii, volume, materiale) și lista de debitare pentru mobilier
-// (piese cu lungime × lățime × grosime, grupate, plus o estimare a numărului de plăci). Raportul general numără doar ce
-// e vizibil; lista de debitare arată și piesele ascunse, separat (ADR 0044).
-// Toate lungimile sunt în mm, ariile în mm², volumele în mm³ (conversia pentru afișare o face interfața sau CSV-ul).
+// (piese cu lungime × lățime × grosime, grupate, plus o estimare a numărului de plăci). Raportul general
+// numără doar ce e vizibil; lista de debitare arată și piesele ascunse, separat (ADR 0044). Toate lungimile
+// sunt în mm, ariile în mm², volumele în mm³ (conversia pentru afișare o face interfața sau CSV-ul).
 namespace aion::model {
 
 // --- Raportul general ---
@@ -83,6 +83,7 @@ struct CutPart {
     double cutWidth = 0.0;
     std::array<std::string, 4> bands {}; // cantul pe L1, L2, W1, W2 (cheia tipului)
     std::array<std::string, 4> bandDecors {}; // decorul cantului pe L1, L2, W1, W2 (numele materialului)
+    std::array<bool, 4> bandRounded {}; // cantul rotunjit pe L1, L2, W1, W2
     bool hidden = false; // o piesă ascunsă (ea, tag-ul ei sau un părinte)
     std::string rowKey; // cheia stabilă a rândului (pentru bife)
     std::vector<std::string> usedIn; // numele pieselor din rând
@@ -122,9 +123,9 @@ struct CutList {
     int hiddenPieces = 0; // piese ascunse neincluse (pentru mesajul din fereastră)
 };
 
-// Lista de debitare v1.5 (ADR 0044): plăcile cu date (tip, grosime, cant, fibră), feroneria pe bucăți, celelalte
-// obiecte după categoria materialului; piesele ascunse apar pe rânduri separate. Piesele fără date: regula din ADR 0017
-// (fața cea mai mare). Totalurile iau doar rândurile care nu sunt în `options.excluded`.
+// Lista de debitare v1.5 (ADR 0044): plăcile cu date (tip, grosime, cant, fibră), feroneria pe bucăți,
+// celelalte obiecte după categoria materialului; piesele ascunse apar pe rânduri separate. Piesele fără date:
+// regula din ADR 0017 (fața cea mai mare). Totalurile iau doar rândurile care nu sunt în `options.excluded`.
 [[nodiscard]] CutList cutList(const Model& model, const CutListOptions& options = {});
 
 // --- CSV ---

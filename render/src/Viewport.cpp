@@ -77,6 +77,16 @@ struct BandSegment {
     glm::dvec3 b;
     glm::dvec3 lo;
     glm::dvec3 hi;
+    // Pentru cantul rotunjit: axele (de-a lungul laturii, peste ea, grosimea plăcii), fața plăcii și sensul
+    // ei spre exterior, intervalele plăcii pe lungime și pe grosime, grosimea cantului.
+    int along = 0;
+    int across = 1;
+    int thickAxis = 2;
+    double face = 0.0;
+    double outward = 1.0;
+    std::pair<double, double> length { 0.0, 0.0 };
+    std::pair<double, double> depth { 0.0, 0.0 };
+    double bandThickness = 0.0;
     int side = 0; // L1, L2, W1, W2
     const model::BandSide* band = nullptr;
 };
@@ -117,7 +127,18 @@ std::vector<BandSegment> bandSegments(const model::Model& model, model::Definiti
         } else {
             slabLo[across] = hi[across] - thick;
         }
-        out.push_back({ a, b, slabLo, slabHi, side, &band });
+        BandSegment seg { a, b, slabLo, slabHi };
+        seg.along = along;
+        seg.across = across;
+        seg.thickAxis = t;
+        seg.face = slot % 2 == 0 ? lo[across] : hi[across];
+        seg.outward = slot % 2 == 0 ? -1.0 : 1.0;
+        seg.length = { lo[along], hi[along] };
+        seg.depth = { lo[t], hi[t] };
+        seg.bandThickness = thick;
+        seg.side = side;
+        seg.band = &band;
+        out.push_back(seg);
     }
     return out;
 }
@@ -127,11 +148,103 @@ glm::vec4 colorOf(const model::Color& c, float darken = 1.0f)
     return { c.r / 255.0f * darken, c.g / 255.0f * darken, c.b / 255.0f * darken, 1.0f };
 }
 
+// Cantul rotunjit: un profil cu colțurile exterioare rotunde (raza = grosimea cantului), ieșit cât grosimea
+// cantului în afara feței, ca să acopere colțul ascuțit al plăcii; extrudat pe lungimea laturii.
+template <class Pass>
+void appendRoundedBand(
+    Pass& f, const BandSegment& s, const math::Transform& t, const glm::vec4& color, const glm::vec4& edge)
+{
+    constexpr double kOver = 0.3;
+    constexpr int kArc = 6;
+    const double r = std::clamp(s.bandThickness, 0.4, (s.depth.second - s.depth.first) / 2);
+    const double outer = s.face + s.outward * s.bandThickness;
+    const double inner = s.face - s.outward * kOver;
+    const double t0 = s.depth.first - kOver;
+    const double t1 = s.depth.second + kOver;
+    // Profilul (peste latură, pe grosime): interior jos → arcul de jos → arcul de sus → interior sus.
+    std::vector<glm::dvec2> profile { { inner, t0 } };
+    const auto arc = [&](double centerT, double fromDeg, double toDeg) {
+        for (int i = 0; i <= kArc; ++i) {
+            const double a = glm::radians(fromDeg + (toDeg - fromDeg) * i / kArc);
+            profile.push_back(
+                { outer - s.outward * r + s.outward * r * std::cos(a), centerT + r * std::sin(a) });
+        }
+    };
+    arc(t0 + r, -90.0, 0.0);
+    arc(t1 - r, 0.0, 90.0);
+    profile.push_back({ inner, t1 });
+    const auto point = [&](const glm::dvec2& p, double l) {
+        glm::dvec3 v { 0.0 };
+        v[s.along] = l;
+        v[s.across] = p.x;
+        v[s.thickAxis] = p.y;
+        return glm::vec3(t.applyToPoint(v));
+    };
+    const auto normal = [&](const glm::dvec2& n2, double nl) {
+        glm::dvec3 n { 0.0 };
+        n[s.across] = n2.x;
+        n[s.thickAxis] = n2.y;
+        n[s.along] = nl;
+        return glm::vec3(glm::normalize(t.applyToNormal(n)));
+    };
+    const auto vertex = [&](const glm::vec3& p, const glm::vec3& n) {
+        MeshVertex v;
+        v.position = p;
+        v.normal = n;
+        v.color = color;
+        v.material = { 0.6f, 0.0f };
+        f.triangles.push_back(v);
+    };
+    const double l0 = s.length.first - kOver;
+    const double l1 = s.length.second + kOver;
+    const glm::dvec2 center { (inner + outer) / 2, (t0 + t1) / 2 };
+    for (std::size_t i = 0; i < profile.size(); ++i) {
+        const glm::dvec2 a = profile[i];
+        const glm::dvec2 b = profile[(i + 1) % profile.size()];
+        const glm::dvec2 d = b - a;
+        if (glm::length(d) < 1e-9) {
+            continue;
+        }
+        // Normala spre exteriorul profilului.
+        glm::dvec2 n = glm::normalize(glm::dvec2(d.y, -d.x));
+        if (glm::dot(n, (a + b) * 0.5 - center) < 0.0) {
+            n = -n;
+        }
+        const glm::vec3 nn = normal(n, 0.0);
+        const glm::vec3 p00 = point(a, l0);
+        const glm::vec3 p01 = point(a, l1);
+        const glm::vec3 p10 = point(b, l0);
+        const glm::vec3 p11 = point(b, l1);
+        for (const glm::vec3& p : { p00, p10, p11, p00, p11, p01 }) {
+            vertex(p, nn);
+        }
+        if (i == 0 || i + 2 == profile.size()) {
+            f.lines.push_back(
+                { p10, p11, edge, { 1.0f, 0.0f } }); // muchiile unde începe și se termină rotunjirea
+        }
+        f.lines.push_back({ p00, p10, edge, { 1.0f, 0.0f } });
+        f.lines.push_back({ p01, p11, edge, { 1.0f, 0.0f } });
+    }
+    // Capetele: evantai din primul punct (profilul e convex).
+    for (std::size_t i = 1; i + 1 < profile.size(); ++i) {
+        for (const double l : { l0, l1 }) {
+            const glm::vec3 n = normal({ 0.0, 0.0 }, l == l0 ? -1.0 : 1.0);
+            vertex(point(profile[0], l), n);
+            vertex(point(profile[i], l), n);
+            vertex(point(profile[i + 1], l), n);
+        }
+    }
+}
+
 // Fâșia unui cant ca o cutie subțire (6 fețe) în culoarea decorului, cu muchiile ei.
 template <class Pass>
 void appendBandSlab(
     Pass& f, const BandSegment& s, const math::Transform& t, const glm::vec4& color, const glm::vec4& edge)
 {
+    if (s.band != nullptr && s.band->rounded) {
+        appendRoundedBand(f, s, t, color, edge);
+        return;
+    }
     std::array<glm::vec3, 8> c {};
     for (std::size_t k = 0; k < 8; ++k) {
         c[k] = glm::vec3(t.applyToPoint(
