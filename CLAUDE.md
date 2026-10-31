@@ -291,7 +291,15 @@ Pe acest Mac, Homebrew e instalat în `~/homebrew`.
   `debug.geometry` arată și titlul selecției.
 
 ## Următorii pași
-0. **În lucru (din 2026-10-30): mobilier pe corp** — `docs/plans/mobilier-pe-corp.md`, ADR 0043 / 0044, `PLAN.md` →
+0. **Mobilier pe corp (pașii 0–11 și 12a făcuți pe `feature/mobilier`):** plăci parametrice (`model/Furniture.h`),
+   corpuri din bibliotecă cu roluri (`model/Carcass.h`), cant, componente legate („În model”, `model/Transfer.h`),
+   variante de feronerie, unealta `board` („Placă pe față”), „Întinde” (`model/Stretch.h`, unealta `stretch`),
+   unealta internă `divider`. Traducerea: `qsTrId` în QML cu cheile din `translations/strings.json` (scriptul
+   `tools/extract_strings.py <fișiere.qml>` le transformă și reface `.ts`; traducerile în `translations/<limbă>.json`);
+   `AION_LANG=en` pentru o rulare în engleză. Acțiuni de script: `debug.board`, `debug.components`, `furniture.addDivider`,
+   `furniture.makePlain`, `tool.board`, `tool.stretch`; API: `aion.board`, `aion.setBoardValue`, `aion.setBand`.
+   Valorile alese provizoriu, de verificat de autor: `docs/plans/mobilier-de-verificat.md`.
+   **În lucru (din 2026-10-30): mobilier pe corp** — `docs/plans/mobilier-pe-corp.md`, ADR 0043 / 0044, `PLAN.md` →
    Etapa 8, ramura `feature/mobilier`. Animația, interacțiunile și asistentul AI sunt înghețate (funcționale, fără
    funcții noi); funcțiile rămase din planul de animație sunt amânate (`PLAN.md`, Etapa 8).
 1. Faza 20 (import `.skp`): **suspendată**. Termenii Trimble (developer-terms §2.3, §2.5(d), §2.7) interzic

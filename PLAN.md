@@ -730,6 +730,11 @@ Designul aprobat: [`docs/plans/mobilier-pe-corp.md`](docs/plans/mobilier-pe-corp
 - [x] Pasul 10: unealta „Placă pe față”
 - [x] Pasul 11: „Întinde”
 - [ ] Pasul 12: traducerea (RO, EN complete; DE, PL, IT, FR, ES, PT beta)
+  - [x] 12a (M): infrastructura (`tools/extract_strings.py`, `translations/`, `qt_add_translations`, alegerea limbii în
+    `main.cpp` și Preferințe → General → Limbă), lista de debitare, Inspector-ul și cantul în RO + EN
+  - [ ] 12b (L): restul interfeței (~1 300 de texte din QML), textele din core / render (`AION_TR`, `qtTrId`, numele
+    pieselor din `nameKey`), pluralele, cele 6 limbi beta, `tools/check_translations.py` în CI; apoi implicit limba
+    sistemului
 
 **Înghețate în această etapă** (funcționale, reparate, fără funcții noi; primesc doar traducerea): animația,
 timeline-ul, regulile, Modul Interacțiune, DOF, video, asistentul AI, colaborarea, importurile. Funcțiile rămase din

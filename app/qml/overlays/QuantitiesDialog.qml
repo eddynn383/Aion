@@ -36,7 +36,7 @@ Popover {
                 out[p.rowKey] = true
         return out
     }
-    readonly property var sectionNames: ["Placă", "Feronerie", "Altele", "Nedefinit"]
+    readonly property var sectionNames: [qsTrId("QuantitiesDialog.placa"), qsTrId("QuantitiesDialog.feronerie"), qsTrId("QuantitiesDialog.altele"), qsTrId("QuantitiesDialog.nedefinit")]
 
     function refresh() {
         if (!root.document)
@@ -74,7 +74,7 @@ Popover {
             Text {
                 width: parent.width - closeButton.width
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Raport de cantități"
+                text: qsTrId("QuantitiesDialog.raport_de_cantitati")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeLg
                 font.weight: Font.DemiBold
@@ -82,7 +82,7 @@ Popover {
             IconButton {
                 id: closeButton
                 iconName: "x"
-                tooltip: "Închide"
+                tooltip: qsTrId("QuantitiesDialog.inchide")
                 onClicked: root.close()
             }
         }
@@ -92,7 +92,7 @@ Popover {
             anchors.top: header.bottom
             anchors.topMargin: Theme.space3
             width: 420
-            model: ["General", "Mobilier — listă de debitare"]
+            model: [qsTrId("QuantitiesDialog.general"), qsTrId("QuantitiesDialog.mobilier_lista_de_debitare")]
             currentIndex: root.tab
             onCurrentIndexChanged: root.tab = currentIndex
         }
@@ -113,11 +113,11 @@ Popover {
                 spacing: Theme.space3
                 Repeater {
                     model: [
-                        { label: "Arie totală", value: root.num(root.report.totalArea ?? 0, 2) + " m²" },
-                        { label: "Volum (solide)", value: root.num(root.report.totalVolume ?? 0, 3) + " m³" },
-                        { label: "Suprafețe orizontale", value: root.num(root.report.horizontalArea ?? 0, 2) + " m²" },
-                        { label: "Lungime muchii", value: root.num(root.report.edgeLength ?? 0, 1) + " m" },
-                        { label: "Fețe", value: String(root.report.faceCount ?? 0) }
+                        { label: qsTrId("QuantitiesDialog.arie_totala"), value: root.num(root.report.totalArea ?? 0, 2) + qsTrId("QuantitiesDialog.m2") },
+                        { label: qsTrId("QuantitiesDialog.volum_solide"), value: root.num(root.report.totalVolume ?? 0, 3) + qsTrId("QuantitiesDialog.m3") },
+                        { label: qsTrId("QuantitiesDialog.suprafete_orizontale"), value: root.num(root.report.horizontalArea ?? 0, 2) + qsTrId("QuantitiesDialog.m2") },
+                        { label: qsTrId("QuantitiesDialog.lungime_muchii"), value: root.num(root.report.edgeLength ?? 0, 1) + qsTrId("QuantitiesDialog.m") },
+                        { label: qsTrId("QuantitiesDialog.fete"), value: String(root.report.faceCount ?? 0) }
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -154,19 +154,19 @@ Popover {
                 anchors.bottom: parent.bottom
                 width: parent.width * 0.68
                 columns: [
-                    { title: "Obiect", width: 0.30 },
-                    { title: "Buc.", width: 0.07, align: "right" },
-                    { title: "Material", width: 0.15 },
-                    { title: "Dimensiuni X × Y × Z (mm)", width: 0.24, align: "right" },
-                    { title: "Arie (m²)", width: 0.12, align: "right" },
-                    { title: "Volum (m³)", width: 0.12, align: "right" }
+                    { title: qsTrId("QuantitiesDialog.obiect"), width: 0.30 },
+                    { title: qsTrId("QuantitiesDialog.buc"), width: 0.07, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.material"), width: 0.15 },
+                    { title: qsTrId("QuantitiesDialog.dimensiuni_x_y_z_mm"), width: 0.24, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.arie_m2"), width: 0.12, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.volum_m3"), width: 0.12, align: "right" }
                 ]
                 rows: (root.report.objects ?? []).map(o => [
                     o.name, String(o.count), o.material,
                     root.num(o.sizeX, 0) + " × " + root.num(o.sizeY, 0) + " × " + root.num(o.sizeZ, 0),
                     root.num(o.area, 3), o.solid ? root.num(o.volume, 4) : "—"
                 ])
-                emptyText: "Modelul e gol."
+                emptyText: qsTrId("QuantitiesDialog.modelul_e_gol")
             }
 
             Column {
@@ -179,13 +179,13 @@ Popover {
                 DataTable {
                     width: parent.width
                     height: (parent.height - Theme.space3) / 2
-                    columns: [{ title: "Material", width: 0.6 }, { title: "Arie (m²)", width: 0.4, align: "right" }]
+                    columns: [{ title: qsTrId("QuantitiesDialog.material"), width: 0.6 }, { title: qsTrId("QuantitiesDialog.arie_m2"), width: 0.4, align: "right" }]
                     rows: (root.report.materials ?? []).map(m => [m.name, root.num(m.area, 3)])
                 }
                 DataTable {
                     width: parent.width
                     height: (parent.height - Theme.space3) / 2
-                    columns: [{ title: "Tag", width: 0.6 }, { title: "Arie (m²)", width: 0.4, align: "right" }]
+                    columns: [{ title: qsTrId("QuantitiesDialog.tag"), width: 0.6 }, { title: qsTrId("QuantitiesDialog.arie_m2"), width: 0.4, align: "right" }]
                     rows: (root.report.tags ?? []).map(t => [t.name, root.num(t.area, 3)])
                 }
             }
@@ -207,7 +207,7 @@ Popover {
                 spacing: Theme.space2
                 NumberField {
                     width: 180
-                    label: "Placă L"
+                    label: qsTrId("QuantitiesDialog.placa_l")
                     unit: "mm"
                     from: 100
                     to: 10000
@@ -216,7 +216,7 @@ Popover {
                 }
                 NumberField {
                     width: 180
-                    label: "Placă l"
+                    label: qsTrId("QuantitiesDialog.placa_l_2")
                     unit: "mm"
                     from: 100
                     to: 10000
@@ -225,7 +225,7 @@ Popover {
                 }
                 NumberField {
                     width: 150
-                    label: "Pierderi"
+                    label: qsTrId("QuantitiesDialog.pierderi")
                     unit: "%"
                     from: 0
                     to: 80
@@ -234,7 +234,7 @@ Popover {
                 }
                 NumberField {
                     width: 200
-                    label: "Placă până la"
+                    label: qsTrId("QuantitiesDialog.placa_pana_la")
                     unit: "mm"
                     from: 1
                     to: 1000
@@ -248,10 +248,7 @@ Popover {
                 anchors.topMargin: Theme.space2
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Plăcile cu tip (din Bibliotecă sau „Fă placă”) se măsoară pe axele lor și se grupează după tip, "
-                      + "grosime, dimensiuni, decor și cant; feroneria se numără pe bucăți. Obiectele fără tip apar după "
-                      + "categoria materialului; cele de lemn sau decor, marcate „tip nedefinit”. Debifează rândurile "
-                      + "care nu intră în deviz și în CSV."
+                text: qsTrId("QuantitiesDialog.placile_cu_tip_din_biblioteca_sau_fa_placa_")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }
@@ -269,7 +266,7 @@ Popover {
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.space3
                     anchors.verticalCenter: parent.verticalCenter
-                    text: (root.cuts.hiddenPieces ?? 0) + " piese ascunse nu sunt incluse."
+                    text: (root.cuts.hiddenPieces ?? 0) + qsTrId("QuantitiesDialog.piese_ascunse_nu_sunt_incluse")
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeSm
                 }
@@ -277,7 +274,7 @@ Popover {
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.space2
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Include toate"
+                    text: qsTrId("QuantitiesDialog.include_toate")
                     onClicked: root.excludedKeys = []
                 }
             }
@@ -298,15 +295,15 @@ Popover {
                 }
                 onRowToggled: (key, checked) => root.setIncluded(key, checked)
                 columns: [
-                    { title: "Secț.", width: 0.08 },
-                    { title: "Piesă", width: 0.21 },
-                    { title: "Tip", width: 0.07 },
-                    { title: "Decor", width: 0.12 },
-                    { title: "L (mm)", width: 0.11, align: "right" },
-                    { title: "l (mm)", width: 0.09, align: "right" },
-                    { title: "g (mm)", width: 0.08, align: "right" },
-                    { title: "Buc.", width: 0.05, align: "right" },
-                    { title: "Motiv", width: 0.19 }
+                    { title: qsTrId("QuantitiesDialog.sect"), width: 0.08 },
+                    { title: qsTrId("QuantitiesDialog.piesa"), width: 0.21 },
+                    { title: qsTrId("QuantitiesDialog.tip"), width: 0.07 },
+                    { title: qsTrId("QuantitiesDialog.decor"), width: 0.12 },
+                    { title: qsTrId("QuantitiesDialog.l_mm"), width: 0.11, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.l_mm_2"), width: 0.09, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.g_mm"), width: 0.08, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.buc"), width: 0.05, align: "right" },
+                    { title: qsTrId("QuantitiesDialog.motiv"), width: 0.19 }
                 ]
                 rows: (root.cuts.parts ?? []).map(p => {
                     const measured = p.section !== 1
@@ -316,7 +313,7 @@ Popover {
                             measured ? root.num(length, 1) : "", measured ? root.num(width, 1) : "",
                             measured ? root.num(p.thickness, 1) : "", String(p.count), p.flags]
                 })
-                emptyText: "Nicio piesă. Adaugă plăci din Bibliotecă sau grupează fiecare panou (⌘G) și folosește „Fă placă”."
+                emptyText: qsTrId("QuantitiesDialog.nicio_piesa_adauga_placi_din_biblioteca_sau")
             }
 
             Column {
@@ -330,36 +327,36 @@ Popover {
                     width: parent.width
                     height: (parent.height - Theme.space3 * 2) * 0.4
                     columns: [
-                        { title: "Plăci brute", width: 0.3 },
-                        { title: "g (mm)", width: 0.16, align: "right" },
-                        { title: "Arie (m²)", width: 0.2, align: "right" },
-                        { title: "Plăci", width: 0.14, align: "right" },
-                        { title: "Format", width: 0.2, align: "right" }
+                        { title: qsTrId("QuantitiesDialog.placi_brute"), width: 0.3 },
+                        { title: qsTrId("QuantitiesDialog.g_mm"), width: 0.16, align: "right" },
+                        { title: qsTrId("QuantitiesDialog.arie_m2"), width: 0.2, align: "right" },
+                        { title: qsTrId("QuantitiesDialog.placi"), width: 0.14, align: "right" },
+                        { title: qsTrId("QuantitiesDialog.format"), width: 0.2, align: "right" }
                     ]
                     rows: (root.cuts.sheets ?? []).map(s => [s.material, root.num(s.thickness, 1), root.num(s.area, 2),
                                                               String(s.sheets), s.sheetSize])
-                    emptyText: "Nicio placă inclusă."
+                    emptyText: qsTrId("QuantitiesDialog.nicio_placa_inclusa")
                 }
                 DataTable {
                     width: parent.width
                     height: (parent.height - Theme.space3 * 2) * 0.3
                     columns: [
-                        { title: "Cant", width: 0.34 },
-                        { title: "Decor", width: 0.3 },
-                        { title: "Muchii", width: 0.16, align: "right" },
+                        { title: qsTrId("QuantitiesDialog.cant"), width: 0.34 },
+                        { title: qsTrId("QuantitiesDialog.decor"), width: 0.3 },
+                        { title: qsTrId("QuantitiesDialog.muchii"), width: 0.16, align: "right" },
                         { title: "m", width: 0.2, align: "right" }
                     ]
                     rows: (root.cuts.bands ?? []).map(b => [b.band, b.decor, String(b.edges), root.num(b.meters, 2)])
                         .concat((root.cuts.edgeBanding ?? 0) > 0
-                                ? [["Estimat, fără tip", "", "", root.num(root.cuts.edgeBanding, 2)]] : [])
-                    emptyText: "Fără cant."
+                                ? [[qsTrId("QuantitiesDialog.estimat_fara_tip"), "", "", root.num(root.cuts.edgeBanding, 2)]] : [])
+                    emptyText: qsTrId("QuantitiesDialog.fara_cant")
                 }
                 DataTable {
                     width: parent.width
                     height: (parent.height - Theme.space3 * 2) * 0.3
-                    columns: [{ title: "Feronerie", width: 0.75 }, { title: "Buc.", width: 0.25, align: "right" }]
+                    columns: [{ title: qsTrId("QuantitiesDialog.feronerie"), width: 0.75 }, { title: qsTrId("QuantitiesDialog.buc"), width: 0.25, align: "right" }]
                     rows: (root.cuts.hardware ?? []).map(h => [h.label, String(h.count)])
-                    emptyText: "Fără feronerie."
+                    emptyText: qsTrId("QuantitiesDialog.fara_feronerie")
                 }
             }
         }
@@ -376,15 +373,15 @@ Popover {
                 Toggle {
                     visible: root.tab === 1
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Dimensiuni de tăiere (fără cantul care se scade)"
+                    text: qsTrId("QuantitiesDialog.dimensiuni_de_taiere_fara_cantul_care_se_sc")
                     checked: root.cutDimensions
                     onToggled: root.cutDimensions = checked
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.tab === 1 && (root.cuts.hiddenPieces ?? 0) > 0
-                          ? "Piesele ascunse debifate nu intră în CSV."
-                          : "CSV pentru Excel: separator „;”, virgulă zecimală, UTF-8."
+                          ? qsTrId("QuantitiesDialog.piesele_ascunse_debifate_nu_intra_in_csv")
+                          : qsTrId("QuantitiesDialog.csv_pentru_excel_separator_virgula_zecimala")
                     color: Theme.textTertiary
                     font.pixelSize: Theme.fontSizeXs
                 }
@@ -393,13 +390,13 @@ Popover {
                 anchors.right: parent.right
                 spacing: Theme.space2
                 Button {
-                    text: "Recalculează"
+                    text: qsTrId("QuantitiesDialog.recalculeaza")
                     iconName: "rotate-ccw"
                     onClicked: root.refresh()
                 }
                 Button {
                     variant: "primary"
-                    text: "Exportă CSV"
+                    text: qsTrId("QuantitiesDialog.exporta_csv")
                     iconName: "arrow-up"
                     onClicked: root.exportRequested(root.tab === 0 ? "general" : "cutlist", root.cutOptions)
                 }

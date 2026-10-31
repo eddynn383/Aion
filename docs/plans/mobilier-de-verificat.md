@@ -29,3 +29,5 @@ Valorile implicite alese de autor în [`mobilier-pe-corp.md`](mobilier-pe-corp.m
 | Decorul plăcilor desenate cu „Placă pe față” | Fără decor (Implicit), ca plăcile din scripturi; cele din corpuri primesc „Alb (decor)” | Pasul 10 | |
 | „Întinde”: unde e planul implicit | La mijlocul corpului (un plan) sau la mijlocul a N zone egale („200/2”); planul nu se mută încă cu cursorul | Pasul 11 | |
 | „Întinde”: ghidul animat | Text da, scenă animată nu (amânată) | Pasul 11 | |
+| Limba implicită | Româna (nu limba sistemului) cât traducerea acoperă doar lista de debitare și Inspector-ul | Pasul 12a | |
+| Propozițiile cu numere în traducere | Lipite din bucăți („Afectează ” + N + „ apariții legate.”), fără plural `%n` încă | Pasul 12a | |

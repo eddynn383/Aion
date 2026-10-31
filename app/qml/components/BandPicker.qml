@@ -114,7 +114,7 @@ Column {
         wrapMode: Text.Wrap
         text: root.current
               ? root.current.name + ": " + (root.current.bandKey ? root.current.label + " · "
-                    + (root.current.decor ? root.current.decorName : "decor ca placa") : "fără cant")
+                    + (root.current.decor ? root.current.decorName : qsTrId("BandPicker.decor_ca_placa")) : qsTrId("BandPicker.fara_cant"))
               : ""
         color: Theme.textSecondary
         font.pixelSize: Theme.fontSizeXs
@@ -123,7 +123,7 @@ Column {
         width: root.width
         spacing: 4
         Chip {
-            label: "Fără"
+            label: qsTrId("BandPicker.fara")
             current: root.current !== null && !root.current.bandKey
             onClicked: root.document.setBand(root.side, "", "")
         }
@@ -142,7 +142,7 @@ Column {
         spacing: 4
         visible: root.current !== null && root.current.bandKey !== ""
         Chip {
-            label: "Ca placa"
+            label: qsTrId("BandPicker.ca_placa")
             current: root.current !== null && !root.current.decor
             onClicked: root.document.setBand(root.side, root.current.bandKey, "")
         }
@@ -158,7 +158,7 @@ Column {
         }
     }
     Text {
-        text: "Presetări"
+        text: qsTrId("BandPicker.presetari")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeXs
     }
@@ -174,10 +174,10 @@ Column {
             }
         }
         Chip {
-            label: "+ Salvează ca presetare"
+            label: qsTrId("BandPicker.salveaza_ca_presetare")
             onClicked: {
                 const list = root.userPresets.slice()
-                list.push({ name: "Presetarea mea " + (list.length + 1),
+                list.push({ name: qsTrId("BandPicker.presetarea_mea") + (list.length + 1),
                             sides: root.bands.map(b => ({ bandKey: b.bandKey, decor: b.decor })) })
                 UserPrefs.bandPresets = JSON.stringify(list)
             }

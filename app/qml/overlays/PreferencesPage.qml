@@ -233,6 +233,32 @@ Item {
                     spacing: Theme.space6
                     SettingsGroup {
                         width: parent.width
+                        title: "Limbă"
+                        SettingsRow {
+                            stacked: true
+                            title: "Limba interfeței"
+                            description: "Se aplică după repornire. Traducerea e în lucru: deocamdată sunt traduse lista de debitare și Inspector-ul; restul rămâne în română. Limbile „beta” cad pe engleză unde nu au traducere."
+                            Flow {
+                                width: parent.width
+                                spacing: Theme.space2
+                                Repeater {
+                                    model: [{ key: "ro", name: "Română" }, { key: "en", name: "English" },
+                                        { key: "de", name: "Deutsch (beta)" }, { key: "pl", name: "Polski (beta)" },
+                                        { key: "it", name: "Italiano (beta)" }, { key: "fr", name: "Français (beta)" },
+                                        { key: "es", name: "Español (beta)" }, { key: "pt", name: "Português (beta)" }]
+                                    delegate: Button {
+                                        required property var modelData
+                                        small: true
+                                        text: modelData.name
+                                        variant: UserPrefs.language === modelData.key ? "primary" : "secondary"
+                                        onClicked: UserPrefs.language = modelData.key
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    SettingsGroup {
+                        width: parent.width
                         title: "Ajutor"
                         SettingsRow {
                             title: "Ghiduri animate"
