@@ -6,7 +6,7 @@ import Aion
 Rectangle {
     id: root
 
-    property string documentName: "Fără titlu"
+    property string documentName: qsTrId("TitleBar.fara_titlu")
     // Documentul are modificări nesalvate: un punct după nume (ca în Figma).
     property bool modified: false
     property bool leftPanelVisible: true
@@ -47,7 +47,7 @@ Rectangle {
             implicitHeight: 28
             iconName: "panel-left"
             iconSize: Theme.iconSizeMd
-            tooltip: "Panoul din stânga"
+            tooltip: qsTrId("TitleBar.panoul_din_stanga")
             checked: root.leftPanelVisible
             solidChecked: false
             onClicked: root.toggleLeftPanel()
@@ -57,7 +57,7 @@ Rectangle {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "Aion"
+            text: qsTrId("TitleBar.aion")
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
@@ -111,7 +111,7 @@ Rectangle {
             anchors.left: searchIcon.right
             anchors.leftMargin: Theme.space2
             anchors.verticalCenter: parent.verticalCenter
-            text: "Caută comenzi…"
+            text: qsTrId("TitleBar.cauta_comenzi")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeMd
         }
@@ -137,7 +137,7 @@ Rectangle {
             implicitHeight: 28
             iconName: Theme.mode === 0 ? "monitor" : Theme.dark ? "moon" : "sun"
             iconSize: Theme.iconSizeMd
-            tooltip: "Temă: " + Theme.modeLabel
+            tooltip: qsTrId("TitleBar.tema") + Theme.modeLabel
             onClicked: Theme.cycleMode()
         }
         IconButton {
@@ -145,7 +145,7 @@ Rectangle {
             implicitHeight: 28
             iconName: "panel-right"
             iconSize: Theme.iconSizeMd
-            tooltip: "Panoul din dreapta"
+            tooltip: qsTrId("TitleBar.panoul_din_dreapta")
             checked: root.rightPanelVisible
             solidChecked: false
             onClicked: root.toggleRightPanel()

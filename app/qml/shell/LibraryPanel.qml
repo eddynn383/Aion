@@ -52,7 +52,7 @@ Item {
                 id: search
                 width: parent.width
                 iconName: "search"
-                placeholderText: "Caută (ușă, masă, raft…)"
+                placeholderText: qsTrId("LibraryPanel.cauta_usa_masa_raft")
             }
 
             // Filtrul pe categorii.
@@ -73,7 +73,7 @@ Item {
                         Text {
                             id: chipText
                             anchors.centerIn: parent
-                            text: chip.modelData.length > 0 ? chip.modelData : "Toate"
+                            text: chip.modelData.length > 0 ? chip.modelData : qsTrId("LibraryPanel.toate")
                             color: chip.current ? Theme.textPrimary : Theme.textSecondary
                             font.pixelSize: Theme.fontSizeXs
                         }
@@ -178,14 +178,14 @@ Item {
                 visible: root.items.length === 0
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Nimic găsit."
+                text: qsTrId("LibraryPanel.nimic_gasit")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeSm
             }
             Text {
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: "Obiectele tale: selectează un obiect și apasă + din antet („Salvează în bibliotecă”)."
+                text: qsTrId("LibraryPanel.obiectele_tale_selecteaza_un_obiect_si_apasa_di")
                 color: Theme.textTertiary
                 font.pixelSize: Theme.fontSizeXs
             }

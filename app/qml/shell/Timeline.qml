@@ -129,7 +129,7 @@ Rectangle {
         if (!hasAnimation)
             return out
         if ((tl.camera ?? []).length > 0)
-            out.push({ kind: "camera", instance: 0, property: "", name: "Cameră", icon: "video", keys: tl.camera, selected: false })
+            out.push({ kind: "camera", instance: 0, property: "", name: qsTrId("Timeline.camera"), icon: "video", keys: tl.camera, selected: false })
         // Căile de parcurgere: câte o bară (startul și durata), fără chei.
         for (const p of (tl.paths ?? []))
             out.push({ kind: "path", instance: 0, property: "", name: p.name, icon: "route", keys: [], selected: p.selected, path: p })
@@ -290,14 +290,14 @@ Rectangle {
     function segmentClicked(row, index, item) {
         const key = row.keys[index]
         editEasing({ refs: [{ instance: row.instance, property: row.property, time: key.time }] }, key.easing,
-                   row.kind === "object" ? row.name + " · toate proprietățile" : row.name, item)
+                   row.kind === "object" ? row.name + qsTrId("Timeline.toate_proprietatile") : row.name, item)
     }
     // Tot canalul (sau toate canalele obiectului): click dreapta pe numele lui.
     function editRowEasing(row, item) {
         if (row.keys.length === 0)
             return
         editEasing({ refs: row.keys.map(k => ({ instance: row.instance, property: row.property, time: k.time })) },
-                   row.keys[0].easing, row.name + " · " + row.keys.length + (row.keys.length === 1 ? " cheie" : " chei"), item)
+                   row.keys[0].easing, row.name + " · " + row.keys.length + (row.keys.length === 1 ? qsTrId("Timeline.cheie") : qsTrId("Timeline.chei")), item)
     }
     function editSelectedEasing(item) {
         if (selectedKeys.length === 0)
@@ -306,7 +306,7 @@ Rectangle {
         const row = rows.find(r => r.instance === first.instance && r.property === first.property)
         const key = row ? row.keys.find(k => sameTime(k.time, first.time)) : null
         editEasing({ refs: selectedKeys }, key ? key.easing : null,
-                   selectedKeys.length === 1 ? "1 cheie" : selectedKeys.length + " chei", item)
+                   selectedKeys.length === 1 ? qsTrId("Timeline.1_cheie") : selectedKeys.length + qsTrId("Timeline.chei"), item)
     }
 
     function keyDoubleClicked(item) {
@@ -363,7 +363,7 @@ Rectangle {
                     anchors.leftMargin: Theme.space2
                     anchors.right: animChevron.left
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.hasAnimation ? (root.tl.name ?? "") : "Nicio animație"
+                    text: root.hasAnimation ? (root.tl.name ?? "") : qsTrId("Timeline.nicio_animatie")
                     elide: Text.ElideRight
                     color: root.hasAnimation ? Theme.textPrimary : Theme.textTertiary
                     font.pixelSize: Theme.fontSizeSm
@@ -442,7 +442,7 @@ Rectangle {
                                     visible: !animRow.editing && (animRowArea.containsMouse || hovered || deleteButton.hovered)
                                     width: 22; height: 22; iconSize: 13
                                     iconName: "pencil"
-                                    tooltip: "Redenumește animația"
+                                    tooltip: qsTrId("Timeline.redenumeste_animatia")
                                     onClicked: animRow.editing = true
                                 }
                                 IconButton {
@@ -452,14 +452,14 @@ Rectangle {
                                     visible: animRowArea.containsMouse || hovered || renameButton.hovered
                                     width: 22; height: 22; iconSize: 13
                                     iconName: "trash-2"
-                                    tooltip: "Șterge animația"
+                                    tooltip: qsTrId("Timeline.sterge_animatia")
                                     onClicked: root.document.removeAnimation(animRow.modelData.id)
                                 }
                             }
                         }
                         Button {
                             width: 224
-                            text: "Animație nouă"
+                            text: qsTrId("Timeline.animatie_noua")
                             iconName: "plus"
                             onClicked: { root.document.createAnimation(); animPicker.close() }
                         }
@@ -501,7 +501,7 @@ Rectangle {
                         clockInput.selectAll()
                     }
                 }
-                Tooltip { visible: clockArea.containsMouse && !clockInput.visible; text: "Tastează un timp: 1.5 · 36f · 00:02.50" }
+                Tooltip { visible: clockArea.containsMouse && !clockInput.visible; text: qsTrId("Timeline.tasteaza_un_timp_1_5_36f_00_02_50") }
                 TextInput {
                     id: clockInput
                     visible: false
@@ -558,7 +558,7 @@ Rectangle {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Auto-key"
+                        text: qsTrId("Timeline.auto_key")
                         color: autoKeyButton.on ? Theme.textPrimary : Theme.textSecondary
                         font.pixelSize: Theme.fontSizeSm
                     }
@@ -571,8 +571,8 @@ Rectangle {
                 }
                 Tooltip {
                     visible: autoKeyArea.containsMouse
-                    text: autoKeyButton.on ? "Auto-key pornit: Move, Rotate, Scale și Inspector-ul pun keyframe-uri"
-                                           : "Auto-key oprit: schimbările ajustează poza de bază (și toată animația proprietăților animate)"
+                    text: autoKeyButton.on ? qsTrId("Timeline.auto_key_pornit_move_rotate_scale_si_inspector_ul_p")
+                                           : qsTrId("Timeline.auto_key_oprit_schimbarile_ajusteaza_poza_de_baza_s")
                 }
             }
 
@@ -585,7 +585,7 @@ Rectangle {
                 IconButton {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "skip-back"
-                    tooltip: "La început"
+                    tooltip: qsTrId("Timeline.la_inceput")
                     shortcut: "Home"
                     enabled: root.hasAnimation
                     onClicked: root.document.jumpToEdge(false)
@@ -593,7 +593,7 @@ Rectangle {
                 IconButton {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "arrow-left"
-                    tooltip: "Cheia anterioară"
+                    tooltip: qsTrId("Timeline.cheia_anterioara")
                     shortcut: "Alt+Left"
                     enabled: root.hasAnimation
                     onClicked: root.document.jumpToKey(-1)
@@ -601,7 +601,7 @@ Rectangle {
                 IconButton {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: root.document && root.document.playing ? "pause" : "play"
-                    tooltip: root.document && root.document.playing ? "Pauză" : "Redă"
+                    tooltip: root.document && root.document.playing ? qsTrId("Timeline.pauza") : qsTrId("Timeline.reda")
                     shortcut: "Space"
                     enabled: root.hasAnimation
                     checked: root.document && root.document.playing
@@ -610,7 +610,7 @@ Rectangle {
                 IconButton {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "arrow-right"
-                    tooltip: "Cheia următoare"
+                    tooltip: qsTrId("Timeline.cheia_urmatoare")
                     shortcut: "Alt+Right"
                     enabled: root.hasAnimation
                     onClicked: root.document.jumpToKey(1)
@@ -619,7 +619,7 @@ Rectangle {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "skip-back"
                     rotation: 180
-                    tooltip: "La sfârșit"
+                    tooltip: qsTrId("Timeline.la_sfarsit")
                     shortcut: "End"
                     enabled: root.hasAnimation
                     onClicked: root.document.jumpToEdge(true)
@@ -627,7 +627,7 @@ Rectangle {
                 IconButton {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "repeat"
-                    tooltip: "În buclă"
+                    tooltip: qsTrId("Timeline.in_bucla")
                     enabled: root.hasAnimation
                     checked: root.tl.loop === true
                     solidChecked: false
@@ -644,7 +644,7 @@ Rectangle {
                 IconButton {
                     width: 28; height: 28; iconSize: Theme.iconSizeSm
                     iconName: "diamond"
-                    tooltip: "Keyframe pe selecție: poziție, rotație, scară"
+                    tooltip: qsTrId("Timeline.keyframe_pe_selectie_pozitie_rotatie_scara")
                     shortcut: "K"
                     enabled: root.hasAnimation
                     onClicked: root.document.keySelection()
@@ -653,7 +653,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 20; height: Theme.controlHeightSm; iconSize: 12
                     iconName: "chevron-down"
-                    tooltip: "Alte keyframe-uri: culoare, cameră"
+                    tooltip: qsTrId("Timeline.alte_keyframe_uri_culoare_camera")
                     enabled: root.hasAnimation
                     onClicked: keyKindMenu.openAt(mapToItem(root, 0, 0).x, header.y + header.height)
                 }
@@ -668,14 +668,14 @@ Rectangle {
             IconButton {
                 width: 28; height: 28; iconSize: Theme.iconSizeSm
                 iconName: "scan"
-                tooltip: "Încadrează toată animația"
+                tooltip: qsTrId("Timeline.incadreaza_toata_animatia")
                 enabled: root.hasAnimation
                 onClicked: root.fitAll()
             }
             IconButton {
                 width: 28; height: 28; iconSize: Theme.iconSizeSm
                 iconName: "settings"
-                tooltip: "Durată și fps"
+                tooltip: qsTrId("Timeline.durata_si_fps")
                 enabled: root.hasAnimation
                 checked: settingsPopup.opened
                 solidChecked: false
@@ -710,7 +710,7 @@ Rectangle {
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 elide: Text.ElideRight
-                                text: "Implicit: " + EasingMath.title(root.tl.defaultEasing)
+                                text: qsTrId("Timeline.implicit") + EasingMath.title(root.tl.defaultEasing)
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontSizeSm
                             }
@@ -720,13 +720,13 @@ Rectangle {
                                 hoverEnabled: true
                                 onClicked: {
                                     settingsPopup.close()
-                                    root.editEasing({ defaultEasing: true }, root.tl.defaultEasing, "cheile noi", defaultEasingButton)
+                                    root.editEasing({ defaultEasing: true }, root.tl.defaultEasing, qsTrId("Timeline.cheile_noi"), defaultEasingButton)
                                 }
                             }
                         }
                         NumberField {
                             width: 174
-                            label: "Durată"
+                            label: qsTrId("Timeline.durata")
                             unit: "s"
                             from: 0.1
                             to: 3600
@@ -748,9 +748,9 @@ Rectangle {
             }
             Button {
                 small: true
-                text: root.wide ? "Exportă video" : ""
+                text: root.wide ? qsTrId("Timeline.exporta_video") : ""
                 iconName: "film"
-                Tooltip { visible: parent.hovered && !root.wide; text: "Exportă video (MP4)" }
+                Tooltip { visible: parent.hovered && !root.wide; text: qsTrId("Timeline.exporta_video_mp4") }
                 enabled: root.hasAnimation && !(root.viewport && root.viewport.exporting)
                 onClicked: root.exportRequested()
             }
@@ -971,10 +971,8 @@ Rectangle {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             text: !root.hasAnimation
-                  ? "Creează o animație (meniul din stânga sus), apoi: așază obiectul, apasă ◆ (K), mută playhead-ul, "
-                    + "schimbă poziția obiectului și apasă din nou ◆."
-                  : "Selectează un obiect și mută-l, rotește-l sau apasă ◆ (K): fiecare proprietate schimbată "
-                    + "devine un canal, vizibil când deschizi obiectul (▸)."
+                  ? qsTrId("Timeline.creeaza_o_animatie_meniul_din_stanga_sus_apoi_asaza")
+                  : qsTrId("Timeline.selecteaza_un_obiect_si_muta_l_roteste_l_sau_apasa_")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -1056,9 +1054,9 @@ Rectangle {
     ContextMenu {
         id: keyKindMenu
         items: [
-            { id: "transform", name: "Poziție, rotație, scară", shortcut: "K" },
-            { id: "color", name: "Culoare" },
-            { id: "camera", name: "Cameră (vederea curentă)" }
+            { id: "transform", name: qsTrId("Timeline.pozitie_rotatie_scara"), shortcut: "K" },
+            { id: "color", name: qsTrId("Timeline.culoare") },
+            { id: "camera", name: qsTrId("Timeline.camera_vederea_curenta") }
         ]
         onTriggered: (id) => {
             if (id === "transform")
@@ -1075,19 +1073,19 @@ Rectangle {
         id: keyMenu
         property var anchorItem: null
         items: [
-            { id: "curve", name: "Editează curba…" },
+            { id: "curve", name: qsTrId("Timeline.editeaza_curba") },
             { separator: true },
-            { id: "easing:linear", name: "Easing: liniar" },
-            { id: "easing:easeInOut", name: "Easing: lin (in-out)" },
-            { id: "easing:easeIn", name: "Easing: accelerează (in)" },
-            { id: "easing:easeOut", name: "Easing: încetinește (out)" },
-            { id: "easing:step", name: "Easing: salt (step)" },
+            { id: "easing:linear", name: qsTrId("Timeline.easing_liniar") },
+            { id: "easing:easeInOut", name: qsTrId("Timeline.easing_lin_in_out") },
+            { id: "easing:easeIn", name: qsTrId("Timeline.easing_accelereaza_in") },
+            { id: "easing:easeOut", name: qsTrId("Timeline.easing_incetineste_out") },
+            { id: "easing:step", name: qsTrId("Timeline.easing_salt_step") },
             { separator: true },
-            { id: "goto", name: "Mergi la cheie" },
-            { id: "copy", name: "Copiază", shortcut: "⌘C" },
-            { id: "paste", name: "Lipește la playhead", shortcut: "⌘V", enabled: root.document ? root.document.hasCopiedKeys() : false },
+            { id: "goto", name: qsTrId("Timeline.mergi_la_cheie") },
+            { id: "copy", name: qsTrId("Timeline.copiaza"), shortcut: "⌘C" },
+            { id: "paste", name: qsTrId("Timeline.lipeste_la_playhead"), shortcut: "⌘V", enabled: root.document ? root.document.hasCopiedKeys() : false },
             { separator: true },
-            { id: "delete", name: root.selectedKeys.length > 1 ? "Șterge keyframe-urile" : "Șterge keyframe-ul",
+            { id: "delete", name: root.selectedKeys.length > 1 ? qsTrId("Timeline.sterge_keyframe_urile") : qsTrId("Timeline.sterge_keyframe_ul"),
               shortcut: "⌫", destructive: true }
         ]
         onTriggered: (id) => {

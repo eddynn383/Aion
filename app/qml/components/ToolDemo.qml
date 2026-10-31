@@ -307,13 +307,13 @@ Canvas {
                 d.line(A, t > 0.8 ? B : cur, t > 0.8 ? c.freeEdge : c.text, 1.6)
                 if (t < 0.8) {
                     d.line(cur, [cur[0] + 1, cur[1], 0], c.x, 1, true)
-                    if (t > 0.4) d.pill(cur, "Pe axa roșie", c.x)
+                    if (t > 0.4) d.pill(cur, qsTrId("ToolDemo.pe_axa_rosie"), c.x)
                 }
             }
-            if (t > 0.6) d.vcb("Lungime", t > 0.62 ? (t > 0.68 ? "3m" : "3") : "")
+            if (t > 0.6) d.vcb(qsTrId("ToolDemo.lungime"), t > 0.62 ? (t > 0.68 ? "3m" : "3") : "")
             d.dot(A, c.y, t < 0.28 ? 3.5 : 3)
             if (t < 0.28) {
-                d.pill(A, "Capăt", c.y)
+                d.pill(A, qsTrId("ToolDemo.capat"), c.y)
                 d.cursor(approach(d, t, A, 0.24), 0)
             } else {
                 d.cursor(t > 0.8 ? d.p(B[0], B[1], B[2]) : cur, Math.max(d.clickK(t, 0.28), d.clickK(t, 0.78)))
@@ -339,7 +339,7 @@ Canvas {
                 d.path(pts)
                 d.ctx.stroke()
                 d.ctx.restore()
-                if (t > 0.45 && t < 0.8) d.pill([0, -0.6 + bulge, 0], "Săgeată " + Math.round(bulge * 714) + " mm", c.magenta)
+                if (t > 0.45 && t < 0.8) d.pill([0, -0.6 + bulge, 0], qsTrId("ToolDemo.sageata") + Math.round(bulge * 714) + qsTrId("ToolDemo.mm"), c.magenta)
             }
             d.dot(A, c.y, 3)
             const mid = [0, -0.6 + bulge, 0]
@@ -356,9 +356,9 @@ Canvas {
                 const pts = [A, [A[0] + w, A[1], 0], [A[0] + w, A[1] + h, 0], [A[0], A[1] + h, 0]]
                 d.polygon(pts, t > 0.82 ? d.shade([0, 0, 1], c.face) : Qt.rgba(0.23, 0.51, 0.96, 0.10),
                           t > 0.82 ? c.edge : c.text, 1.4)
-                if (t < 0.82 && k > 0.2) d.label([A[0] + w / 2, A[1] - 0.3, 0], Math.round(w * 1000) + " mm")
+                if (t < 0.82 && k > 0.2) d.label([A[0] + w / 2, A[1] - 0.3, 0], Math.round(w * 1000) + qsTrId("ToolDemo.mm"))
             }
-            if (t > 0.64) d.vcb("Dimensiuni", t > 0.7 ? "3000,2200" : "3000,")
+            if (t > 0.64) d.vcb(qsTrId("ToolDemo.dimensiuni"), t > 0.7 ? "3000,2200" : "3000,")
             const cur = t < 0.28 ? approach(d, t, A, 0.24) : d.p(A[0] + w, A[1] + h, 0)
             d.cursor(cur, Math.max(d.clickK(t, 0.28), d.clickK(t, 0.8)))
         },
@@ -372,7 +372,7 @@ Canvas {
                 d.polygon(pts, t > 0.82 ? d.shade([0, 0, 1], c.face) : Qt.rgba(0.23, 0.51, 0.96, 0.10), t > 0.82 ? c.edge : c.text, 1.4)
                 if (t < 0.82) d.line(C, [r, 0, 0], c.x, 1, true)
             }
-            if (t > 0.68) d.vcb("Rază", "1600")
+            if (t > 0.68) d.vcb(qsTrId("ToolDemo.raza"), "1600")
             d.dot(C, c.cyan, 3)
             d.cursor(t < 0.28 ? approach(d, t, C, 0.24) : d.p(r, 0, 0), Math.max(d.clickK(t, 0.28), d.clickK(t, 0.8)))
         },
@@ -384,7 +384,7 @@ Canvas {
                 for (let i = 0; i < 6; ++i) pts.push([Math.cos(i / 6 * 2 * Math.PI) * r, Math.sin(i / 6 * 2 * Math.PI) * r, 0])
                 d.polygon(pts, t > 0.82 ? d.shade([0, 0, 1], c.face) : Qt.rgba(0.23, 0.51, 0.96, 0.10), t > 0.82 ? c.edge : c.text, 1.4)
             }
-            if (t > 0.68) d.vcb("Laturi", "6s")
+            if (t > 0.68) d.vcb(qsTrId("ToolDemo.laturi"), "6s")
             d.dot([0, 0, 0], c.cyan, 3)
             d.cursor(t < 0.28 ? approach(d, t, [0, 0, 0], 0.24) : d.p(r, 0, 0), Math.max(d.clickK(t, 0.28), d.clickK(t, 0.8)))
         },
@@ -397,14 +397,14 @@ Canvas {
                 if (h < 0.02) {
                     d.polygon([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]],
                               Qt.rgba(0.23, 0.51, 0.96, 0.10), c.accent, 1.6)
-                    d.label([0, -half - 0.3, 0], Math.round(2 * half * 1000) + " mm")
+                    d.label([0, -half - 0.3, 0], Math.round(2 * half * 1000) + qsTrId("ToolDemo.mm"))
                 } else {
                     d.box([-half, -half, 0], [2 * half, 2 * half, h], { highlight: t > 0.88 })
-                    if (t < 0.88) d.label([half + 0.2, -half, h / 2], Math.round(h * 1000) + " mm")
+                    if (t < 0.88) d.label([half + 0.2, -half, h / 2], Math.round(h * 1000) + qsTrId("ToolDemo.mm"))
                 }
             }
-            if (t > 0.58) d.vcb("Înălțime", "2200")
-            else if (t > 0.3) d.vcb("Lățime", "2200")
+            if (t > 0.58) d.vcb(qsTrId("ToolDemo.inaltime"), "2200")
+            else if (t > 0.3) d.vcb(qsTrId("ToolDemo.latime"), "2200")
             d.dot([0, 0, 0], c.cyan, 3)
             const cur = t < 0.2 ? approach(d, t, [0, 0, 0], 0.18)
                       : t < 0.54 ? d.p(half, 0, 0) : d.p(half, 0, h)
@@ -426,7 +426,7 @@ Canvas {
                     d.polygon(ring(a => [Math.cos(a) * r, Math.sin(a) * r, r]), null, c.accent, 1.1)
                     d.polygon(ring(a => [Math.cos(a) * r, 0, r + Math.sin(a) * r]), null, c.accent, 1.1)
                     d.polygon(ring(a => [0, Math.cos(a) * r, r + Math.sin(a) * r]), null, c.accent, 1.1)
-                    d.label([0, -r - 0.3, 0], Math.round(2 * r * 1000) + " mm")
+                    d.label([0, -r - 0.3, 0], Math.round(2 * r * 1000) + qsTrId("ToolDemo.mm"))
                 } else {
                     // Sfera gata: conturul de pe ecran (proiecția unei sfere e un disc).
                     const o = d.p(0, 0, r)
@@ -447,7 +447,7 @@ Canvas {
                     d.polygon(ring(a => [Math.cos(a) * r, Math.sin(a) * r, r]), null, c.edge, 0.8)
                 }
             }
-            if (t > 0.3) d.vcb("Lățime", "2200")
+            if (t > 0.3) d.vcb(qsTrId("ToolDemo.latime"), "2200")
             d.dot([0, 0, 0], c.cyan, 3)
             d.cursor(t < 0.2 ? approach(d, t, [0, 0, 0], 0.18) : d.p(r, 0, 0), Math.max(d.clickK(t, 0.2), d.clickK(t, 0.6)))
         },
@@ -459,9 +459,9 @@ Canvas {
                           t > 0.2 ? c.accent : c.edge, t > 0.2 ? 2 : 1.1)
             } else {
                 d.box([-1.2, -1, 0], [2.4, 2, h], { highlight: t < 0.8 ? "top" : false })
-                if (t < 0.8) d.label([1.5, -1, h / 2], Math.round(h * 1000) + " mm")
+                if (t < 0.8) d.label([1.5, -1, h / 2], Math.round(h * 1000) + qsTrId("ToolDemo.mm"))
             }
-            if (t > 0.72) d.vcb("Distanță", "1.5m")
+            if (t > 0.72) d.vcb(qsTrId("ToolDemo.distanta"), "1.5m")
             const top = [0, 0, h]
             d.cursor(t < 0.3 ? approach(d, t, top, 0.26) : d.p(top[0], top[1], top[2]), Math.max(d.clickK(t, 0.3), d.clickK(t, 0.8)))
         },
@@ -472,9 +472,9 @@ Canvas {
             if (t > 0.3) {
                 d.polygon([[-1.3 + k, -1.1 + k, 0.8], [1.3 - k, -1.1 + k, 0.8], [1.3 - k, 1.1 - k, 0.8], [-1.3 + k, 1.1 - k, 0.8]],
                           null, t > 0.8 ? c.edge : c.accent, 1.5)
-                if (t < 0.8) d.label([0, -1.1 + k, 0.8], Math.round(k * 1000) + " mm")
+                if (t < 0.8) d.label([0, -1.1 + k, 0.8], Math.round(k * 1000) + qsTrId("ToolDemo.mm"))
             }
-            if (t > 0.72) d.vcb("Distanță", "450")
+            if (t > 0.72) d.vcb(qsTrId("ToolDemo.distanta"), "450")
             d.cursor(t < 0.3 ? approach(d, t, [1.3, 0, 0.8], 0.26) : d.p(1.3 - k, 0, 0.8), Math.max(d.clickK(t, 0.3), d.clickK(t, 0.8)))
         },
         followme: function(d, t, c) {
@@ -489,9 +489,9 @@ Canvas {
             const corner = [-2 + dx, -0.8, 0]
             if (t > 0.3 && t < 0.82) {
                 d.line([-2, -0.8, 0], corner, c.x, 1.2, true)
-                if (dx > 0.3) d.pill(corner, "Pe axa roșie", c.x)
+                if (dx > 0.3) d.pill(corner, qsTrId("ToolDemo.pe_axa_rosie"), c.x)
             }
-            if (t > 0.74) d.vcb("Distanță", "2m")
+            if (t > 0.74) d.vcb(qsTrId("ToolDemo.distanta"), "2m")
             d.dot(corner, c.y, 3)
             d.cursor(t < 0.3 ? approach(d, t, corner, 0.26) : d.p(...corner), Math.max(d.clickK(t, 0.3), d.clickK(t, 0.8)))
         },
@@ -514,7 +514,7 @@ Canvas {
                     d.pill([pivot[0] + 1.4, pivot[1] + 0.6, 0], Math.round(angle * 180 / Math.PI) + "°", c.z)
                 }
             }
-            if (t > 0.78) d.vcb("Unghi", "30")
+            if (t > 0.78) d.vcb(qsTrId("ToolDemo.unghi"), "30")
             const handle = t < 0.42 ? [pivot[0] + 1.4 * phase(t, 0.26, 0.4), pivot[1], 0]
                                     : [pivot[0] + 1.4 * Math.cos(angle), pivot[1] + 1.4 * Math.sin(angle), 0]
             d.cursor(t < 0.24 ? approach(d, t, pivot, 0.2) : d.p(...handle),
@@ -530,7 +530,7 @@ Canvas {
             for (const h of handles) d.dot(h, c.y, 2.6)
             const grip = [-1 + size[0], -1, size[2]]
             if (t > 0.32 && t < 0.82) d.pill(grip, "× " + s.toFixed(2), c.y)
-            if (t > 0.74) d.vcb("Factor", "1.5")
+            if (t > 0.74) d.vcb(qsTrId("ToolDemo.factor"), "1.5")
             d.cursor(t < 0.3 ? approach(d, t, grip, 0.26) : d.p(...grip), Math.max(d.clickK(t, 0.3), d.clickK(t, 0.8)))
         },
         eraser: function(d, t, c) {
@@ -561,9 +561,9 @@ Canvas {
             if (t > 0.3) {
                 d.line([-3, y, 0], [3, y, 0], c.textTertiary || c.freeEdge, 1, true)
                 d.line([0, -0.6, 0], [0, y, 0], c.text, 1)
-                if (t < 0.86) d.label([0.4, y - 0.15, 0], Math.round(off * 1000) + " mm")
+                if (t < 0.86) d.label([0.4, y - 0.15, 0], Math.round(off * 1000) + qsTrId("ToolDemo.mm"))
             }
-            if (t > 0.74) d.vcb("Distanță", "900")
+            if (t > 0.74) d.vcb(qsTrId("ToolDemo.distanta"), "900")
             d.cursor(t < 0.3 ? approach(d, t, [0, -0.6, 0], 0.26) : d.p(0, y, 0), Math.max(d.clickK(t, 0.3), d.clickK(t, 0.8)))
         },
         protractor: function(d, t, c) {
@@ -580,7 +580,7 @@ Canvas {
                 d.line(V, [V[0] + 4 * Math.cos(angle), V[1] + 4 * Math.sin(angle), 0], c.freeEdge, 1, true)
                 d.pill([V[0] + 1.1, V[1] + 0.3, 0], Math.round(angle * 180 / Math.PI) + "°", c.z)
             }
-            if (t > 0.78) d.vcb("Unghi", "30")
+            if (t > 0.78) d.vcb(qsTrId("ToolDemo.unghi"), "30")
             const handle = t < 0.42 ? [V[0] + 1.1 * phase(t, 0.24, 0.4), V[1], 0] : [V[0] + 1.1 * Math.cos(angle), V[1] + 1.1 * Math.sin(angle), 0]
             d.cursor(t < 0.22 ? approach(d, t, V, 0.18) : d.p(...handle), Math.max(d.clickK(t, 0.22), d.clickK(t, 0.42), d.clickK(t, 0.8)))
         },
@@ -593,7 +593,7 @@ Canvas {
                 const a = [A[0], A[1] - off, 0], b = [B[0], B[1] - off, 0]
                 d.line(A, a, c.text, 0.8); d.line(B, b, c.text, 0.8); d.line(a, b, c.text, 1.2)
                 d.dot(a, c.text, 1.8); d.dot(b, c.text, 1.8)
-                d.label([0, -0.5 - off, 0], "2000 mm")
+                d.label([0, -0.5 - off, 0], qsTrId("ToolDemo.2000_mm"))
             }
             d.dot(A, c.y, t > 0.18 ? 3 : 0.1)
             if (t > 0.38) d.dot(B, c.y, 3)
@@ -610,7 +610,7 @@ Canvas {
                 d.dot(P, c.text, 2)
             }
             if (t > 0.5) {
-                const full = "Ușa"
+                const full = qsTrId("ToolDemo.usa")
                 const n = Math.min(full.length, Math.floor(phase(t, 0.52, 0.72) * full.length + 0.999))
                 d.label(L, full.slice(0, n) + (t < 0.76 ? "|" : ""))
             }

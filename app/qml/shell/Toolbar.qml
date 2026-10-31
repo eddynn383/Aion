@@ -17,54 +17,54 @@ Item {
 
     readonly property var groups: [
         { id: "select", tools: [
-            { id: "select", icon: "mouse-pointer-2", name: "Select", key: "Space", alias: "V", phase: 3 },
-            { id: "interact", icon: "hand-pointer", name: "Interact", key: "I", phase: 0, modes: [2] },
-            { id: "orbit", icon: "orbit", name: "Orbit", key: "O", phase: 0, section: "Navigare" },
-            { id: "pan", icon: "hand", name: "Pan", key: "H", phase: 0 },
-            { id: "zoom", icon: "zoom-in", name: "Zoom", key: "Z", phase: 0 } ] },
+            { id: "select", icon: "mouse-pointer-2", name: qsTrId("Toolbar.select"), key: "Space", alias: "V", phase: 3 },
+            { id: "interact", icon: "hand-pointer", name: qsTrId("Toolbar.interact"), key: "I", phase: 0, modes: [2] },
+            { id: "orbit", icon: "orbit", name: qsTrId("Toolbar.orbit"), key: "O", phase: 0, section: qsTrId("Toolbar.navigare") },
+            { id: "pan", icon: "hand", name: qsTrId("Toolbar.pan"), key: "H", phase: 0 },
+            { id: "zoom", icon: "zoom-in", name: qsTrId("Toolbar.zoom"), key: "Z", phase: 0 } ] },
         // Primitive, după dimensiune: 1D (curbe deschise: linie, arc), 2D (contururi închise care fac o față) și 3D
         // (corpuri create direct ca obiecte). Corpurile au Shift + forma din care „cresc” (dreptunghi → cub, cerc →
         // cilindru), sfera ⇧O, conul ⇧V.
         { id: "primitives", modes: [0], tools: [
-            { id: "line", icon: "line-segment", name: "Line", key: "L", phase: 3, section: "1D" },
-            { id: "arc",  icon: "spline",   name: "Arc",  key: "A", phase: 5 },
-            { id: "rectangle", icon: "square",   name: "Rectangle", key: "R", phase: 3, section: "2D" },
-            { id: "circle",    icon: "circle",   name: "Circle",    key: "C", phase: 5 },
-            { id: "polygon",   icon: "pentagon", name: "Polygon",   key: "N", phase: 5 },
-            { id: "cube",     icon: "prim-cube",     name: "Cub",      key: "Shift+R", phase: 13, section: "3D" },
-            { id: "sphere",   icon: "prim-sphere",   name: "Sferă",    key: "Shift+O", phase: 13 },
-            { id: "cone",     icon: "prim-cone",     name: "Con",      key: "Shift+V", phase: 13 },
-            { id: "cylinder", icon: "prim-cylinder", name: "Cilindru", key: "Shift+C", phase: 13 } ] },
+            { id: "line", icon: "line-segment", name: qsTrId("Toolbar.line"), key: "L", phase: 3, section: "1D" },
+            { id: "arc",  icon: "spline",   name: qsTrId("Toolbar.arc"),  key: "A", phase: 5 },
+            { id: "rectangle", icon: "square",   name: qsTrId("Toolbar.rectangle"), key: "R", phase: 3, section: "2D" },
+            { id: "circle",    icon: "circle",   name: qsTrId("Toolbar.circle"),    key: "C", phase: 5 },
+            { id: "polygon",   icon: "pentagon", name: qsTrId("Toolbar.polygon"),   key: "N", phase: 5 },
+            { id: "cube",     icon: "prim-cube",     name: qsTrId("Toolbar.cub"),      key: "Shift+R", phase: 13, section: "3D" },
+            { id: "sphere",   icon: "prim-sphere",   name: qsTrId("Toolbar.sfera"),    key: "Shift+O", phase: 13 },
+            { id: "cone",     icon: "prim-cone",     name: qsTrId("Toolbar.con"),      key: "Shift+V", phase: 13 },
+            { id: "cylinder", icon: "prim-cylinder", name: qsTrId("Toolbar.cilindru"), key: "Shift+C", phase: 13 } ] },
         // Pen (ca în Figma): curbe Bézier editabile în Modelare, căi de parcurgere în Animare.
         { id: "pen", modes: [0, 1], tools: [
-            { id: "pen", icon: "pen-line", name: "Pen", key: "Shift+P", phase: 34 } ] },
+            { id: "pen", icon: "pen-line", name: qsTrId("Toolbar.pen"), key: "Shift+P", phase: 34 } ] },
         { id: "modify", modes: [0], tools: [
-            { id: "pushpull", icon: "arrow-up-from-line", name: "Push/Pull", key: "P", phase: 5 },
-            { id: "offset",   icon: "square-dashed",      name: "Offset",    key: "F", phase: 5 },
-            { id: "followme", icon: "route",              name: "Follow Me", key: "",  phase: 5 } ] },
+            { id: "pushpull", icon: "arrow-up-from-line", name: qsTrId("Toolbar.push_pull"), key: "P", phase: 5 },
+            { id: "offset",   icon: "square-dashed",      name: qsTrId("Toolbar.offset"),    key: "F", phase: 5 },
+            { id: "followme", icon: "route",              name: qsTrId("Toolbar.follow_me"), key: "",  phase: 5 } ] },
         { id: "transform", modes: [0, 1], tools: [
-            { id: "move",   icon: "move",      name: "Move",   key: "M", phase: 5 },
-            { id: "rotate", icon: "rotate-cw", name: "Rotate", key: "Q", phase: 5 },
-            { id: "scale",  icon: "scale-3d",  name: "Scale",  key: "S", phase: 5 } ] },
+            { id: "move",   icon: "move",      name: qsTrId("Toolbar.move"),   key: "M", phase: 5 },
+            { id: "rotate", icon: "rotate-cw", name: qsTrId("Toolbar.rotate"), key: "Q", phase: 5 },
+            { id: "scale",  icon: "scale-3d",  name: qsTrId("Toolbar.scale"),  key: "S", phase: 5 } ] },
         { id: "measure", modes: [0], tools: [
-            { id: "tape", icon: "ruler", name: "Tape Measure", key: "T", phase: 9 },
-            { id: "protractor", icon: "protractor", name: "Protractor", key: "", phase: 9 },
-            { id: "dimension", icon: "dimension", name: "Dimension", key: "", phase: 9 },
-            { id: "text", icon: "type", name: "Text", key: "", phase: 9 },
-            { id: "section", icon: "section", name: "Section Plane", key: "", phase: 9 } ] },
+            { id: "tape", icon: "ruler", name: qsTrId("Toolbar.tape_measure"), key: "T", phase: 9 },
+            { id: "protractor", icon: "protractor", name: qsTrId("Toolbar.protractor"), key: "", phase: 9 },
+            { id: "dimension", icon: "dimension", name: qsTrId("Toolbar.dimension"), key: "", phase: 9 },
+            { id: "text", icon: "type", name: qsTrId("Toolbar.text"), key: "", phase: 9 },
+            { id: "section", icon: "section", name: qsTrId("Toolbar.section_plane"), key: "", phase: 9 } ] },
         // Mobilier: plăci desenate direct pe fețe.
         { id: "furniture", modes: [0], tools: [
-            { id: "board", icon: "board", name: "Placă pe față", key: "", phase: 35 },
-            { id: "stretch", icon: "stretch", name: "Întinde", key: "", phase: 35 } ] },
+            { id: "board", icon: "board", name: qsTrId("Toolbar.placa_pe_fata"), key: "", phase: 35 },
+            { id: "stretch", icon: "stretch", name: qsTrId("Toolbar.intinde"), key: "", phase: 35 } ] },
         { id: "erase", modes: [0], tools: [
-            { id: "eraser", icon: "eraser", name: "Eraser", key: "E", phase: 3 } ] }
+            { id: "eraser", icon: "eraser", name: qsTrId("Toolbar.eraser"), key: "E", phase: 3 } ] }
     ]
     // Navigarea e acum în primul grup (păstrat pentru cine o caută după id).
     readonly property var navigation: groups[0].tools.filter(t => ["orbit", "pan", "zoom"].includes(t.id))
     // Unelte fără buton în toolbar (pornesc din alt loc): Paint Bucket — din panoul Materiale sau cu tasta B.
     readonly property var hiddenTools: [
-        { id: "paint", icon: "paint-bucket", name: "Paint Bucket", key: "B", phase: 8 },
-        { id: "texture", icon: "image", name: "Poziționează textura", key: "", phase: 24 }
+        { id: "paint", icon: "paint-bucket", name: qsTrId("Toolbar.paint_bucket"), key: "B", phase: 8 },
+        { id: "texture", icon: "image", name: qsTrId("Toolbar.pozitioneaza_textura"), key: "", phase: 24 }
     ]
     readonly property var allTools: groups.reduce((all, g) => all.concat(g.tools), []).concat(hiddenTools)
     // Grupurile modului curent, cu uneltele lui.

@@ -27,12 +27,12 @@ Item {
     function depthOf(axis) { return -axis.dotProduct(cameraForward) }
 
     readonly property var axes: [
-        { axis: Qt.vector3d(1, 0, 0),  color: Theme.axisX, label: "X", view: "Right",  positive: true },
-        { axis: Qt.vector3d(0, 1, 0),  color: Theme.axisY, label: "Y", view: "Back",   positive: true },
-        { axis: Qt.vector3d(0, 0, 1),  color: Theme.axisZ, label: "Z", view: "Top",    positive: true },
+        { axis: Qt.vector3d(1, 0, 0),  color: Theme.axisX, label: qsTrId("NavigationGizmo.x"), view: "Right",  positive: true },
+        { axis: Qt.vector3d(0, 1, 0),  color: Theme.axisY, label: qsTrId("NavigationGizmo.y"), view: qsTrId("NavigationGizmo.back"),   positive: true },
+        { axis: Qt.vector3d(0, 0, 1),  color: Theme.axisZ, label: qsTrId("NavigationGizmo.z"), view: qsTrId("NavigationGizmo.top"),    positive: true },
         { axis: Qt.vector3d(-1, 0, 0), color: Theme.axisX, label: "",  view: "Left",   positive: false },
-        { axis: Qt.vector3d(0, -1, 0), color: Theme.axisY, label: "",  view: "Front",  positive: false },
-        { axis: Qt.vector3d(0, 0, -1), color: Theme.axisZ, label: "",  view: "Bottom", positive: false }
+        { axis: Qt.vector3d(0, -1, 0), color: Theme.axisY, label: "",  view: qsTrId("NavigationGizmo.front"),  positive: false },
+        { axis: Qt.vector3d(0, 0, -1), color: Theme.axisZ, label: "",  view: qsTrId("NavigationGizmo.bottom"), positive: false }
     ]
 
     Rectangle {
@@ -109,6 +109,6 @@ Item {
         radius: 4
         color: centerHover.hovered ? Theme.textPrimary : Theme.textTertiary
         HoverHandler { id: centerHover; cursorShape: Qt.PointingHandCursor; margin: 4 }
-        TapHandler { margin: 4; onTapped: root.viewRequested("Iso") }
+        TapHandler { margin: 4; onTapped: root.viewRequested(qsTrId("NavigationGizmo.iso")) }
     }
 }

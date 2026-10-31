@@ -31,7 +31,7 @@ Item {
                 out.push(Object.assign({}, o, { lightKind: o.kind, kind: kind, depth: 0,
                     hasChildren: false, copies: 1, hidden: !o.visible, locked: false,
                     // O cale a altei animații: estompată, cu numele animației ei.
-                    otherAnimation: kind === "path" && !o.active ? (o.animationName || "altă animație") : "",
+                    otherAnimation: kind === "path" && !o.active ? (o.animationName || qsTrId("Outliner.alta_animatie")) : "",
                     selected: selected.id === o.id && selected.kind === kind }))
             }
         }
@@ -100,7 +100,7 @@ Item {
                 Text {
                     visible: rootDrop.containsDrag
                     anchors.centerIn: parent
-                    text: "Scoate din grup"
+                    text: qsTrId("Outliner.scoate_din_grup")
                     color: Theme.textSecondary
                     font.pixelSize: Theme.fontSizeXs
                 }
@@ -272,7 +272,7 @@ Item {
                     visible: row.modelData.kind === "camera"
                     shown: rowHover.hovered
                     iconName: "video"
-                    tooltip: "Privește prin cameră"
+                    tooltip: qsTrId("Outliner.priveste_prin_camera")
                     onClicked: root.viewport.animateToCamera(root.document.cameraView(row.modelData.id), 0.8)
                 }
                 // Lumina: aprinsă / stinsă (stinsă se vede mereu).
@@ -281,7 +281,7 @@ Item {
                     shown: rowHover.hovered
                     active: row.modelData.enabled === false
                     iconName: row.modelData.enabled ? "lightbulb" : "lightbulb-off"
-                    tooltip: row.modelData.enabled ? "Stinge" : "Aprinde"
+                    tooltip: row.modelData.enabled ? qsTrId("Outliner.stinge") : qsTrId("Outliner.aprinde")
                     onClicked: {
                         root.document.selectObject("light", row.modelData.id)
                         root.document.setObjectProperties({ enabled: !row.modelData.enabled })
@@ -292,7 +292,7 @@ Item {
                     visible: !row.isSceneObject && row.modelData.canMakeUnique === true
                     shown: rowHover.hovered
                     iconName: "component"
-                    tooltip: "Fă unic (separă de copii)"
+                    tooltip: qsTrId("Outliner.fa_unic_separa_de_copii")
                     onClicked: root.document.makeUnique(row.modelData.id)
                 }
                 // Obiectele și grupurile: blocat (se vede mereu când e blocat).
@@ -301,15 +301,15 @@ Item {
                     shown: rowHover.hovered
                     active: row.modelData.locked
                     iconName: row.modelData.locked ? "lock" : "lock-open"
-                    tooltip: row.modelData.locked ? "Deblochează" : "Blochează"
+                    tooltip: row.modelData.locked ? qsTrId("Outliner.deblocheaza") : qsTrId("Outliner.blocheaza")
                     onClicked: root.document.setInstanceLocked(row.modelData.id, !row.modelData.locked)
                 }
                 RowAction {
                     shown: rowHover.hovered
                     active: row.modelData.hidden
                     iconName: row.modelData.hidden ? "eye-off" : "eye"
-                    tooltip: row.isSceneObject ? (row.modelData.hidden ? "Arată marcajul" : "Ascunde marcajul din viewport")
-                                               : (row.modelData.hidden ? "Arată" : "Ascunde")
+                    tooltip: row.isSceneObject ? (row.modelData.hidden ? qsTrId("Outliner.arata_marcajul") : qsTrId("Outliner.ascunde_marcajul_din_viewport"))
+                                               : (row.modelData.hidden ? qsTrId("Outliner.arata") : qsTrId("Outliner.ascunde"))
                     onClicked: {
                         if (row.isSceneObject) {
                             root.document.selectObject(row.modelData.kind, row.modelData.id)
@@ -328,8 +328,7 @@ Item {
         anchors.top: parent.top
         width: parent.width
         wrapMode: Text.Wrap
-        text: AppInfo.platformText("Niciun obiect. Selectează forme și apasă ⌘G ca să faci un obiect; obiectele se "
-              + "grupează cu ⌥⌘G. Sau creează direct un cub, o sferă… din toolbar.")
+        text: AppInfo.platformText(qsTrId("Outliner.niciun_obiect_selecteaza_forme_si_apasa_g_ca_sa_fac"))
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeSm
     }

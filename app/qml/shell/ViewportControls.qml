@@ -15,11 +15,11 @@ Row {
     spacing: Theme.space2
 
     readonly property var styles: [
-        { id: "wireframe", icon: "style-wireframe", name: "Wireframe" },
-        { id: "hiddenline", icon: "style-hiddenline", name: "Linii ascunse" },
-        { id: "clay", icon: "style-clay", name: "Clay (alb mat)" },
-        { id: "shaded", icon: "style-shaded", name: "Materiale" },
-        { id: "xray", icon: "style-xray", name: "X-Ray" }
+        { id: "wireframe", icon: "style-wireframe", name: qsTrId("ViewportControls.wireframe") },
+        { id: "hiddenline", icon: "style-hiddenline", name: qsTrId("ViewportControls.linii_ascunse") },
+        { id: "clay", icon: "style-clay", name: qsTrId("ViewportControls.clay_alb_mat") },
+        { id: "shaded", icon: "style-shaded", name: qsTrId("ViewportControls.materiale") },
+        { id: "xray", icon: "style-xray", name: qsTrId("ViewportControls.x_ray") }
     ]
 
     // Un grup de butoane lipite, pe fundalul comun (ca în Blender).
@@ -59,19 +59,19 @@ Row {
     Group {
         ShadeButton {
             iconName: "scan"
-            tooltip: "Zoom Extents (⇧Z)"
+            tooltip: qsTrId("ViewportControls.zoom_extents_z")
             solidChecked: false
             onClicked: root.viewport.zoomExtents()
         }
         ShadeButton {
             iconName: root.viewport && root.viewport.orthographic ? "square" : "box"
-            tooltip: root.viewport && root.viewport.orthographic ? "Proiecție paralelă (click: perspectivă)"
-                                                                 : "Perspectivă (click: proiecție paralelă)"
+            tooltip: root.viewport && root.viewport.orthographic ? qsTrId("ViewportControls.proiectie_paralela_click_perspectiva")
+                                                                 : qsTrId("ViewportControls.perspectiva_click_proiectie_paralela")
             onClicked: root.viewport.toggleProjection()
         }
         ShadeButton {
             iconName: "grid-3x3"
-            tooltip: "Grid"
+            tooltip: qsTrId("ViewportControls.grid")
             checked: root.viewport && root.viewport.gridVisible
             solidChecked: false
             onClicked: root.viewport.gridVisible = !root.viewport.gridVisible
@@ -83,8 +83,8 @@ Row {
         visible: root.document && root.document.hasDoors && root.document.workMode === 0
         ShadeButton {
             iconName: "door-open"
-            tooltip: root.document && root.document.doorsOpen ? "Ușile deschise (click: închise)"
-                                                              : "Ușile închise (click: deschise, ca să vezi interiorul)"
+            tooltip: root.document && root.document.doorsOpen ? qsTrId("ViewportControls.usile_deschise_click_inchise")
+                                                              : qsTrId("ViewportControls.usile_inchise_click_deschise_ca_sa_vezi_int")
             checked: root.document && root.document.doorsOpen
             onClicked: root.document.doorsOpen = !root.document.doorsOpen
         }
@@ -95,7 +95,7 @@ Row {
         visible: root.document && root.document.sections.length > 0
         ShadeButton {
             iconName: "section"
-            tooltip: "Secțiuni"
+            tooltip: qsTrId("ViewportControls.sectiuni")
             checked: sectionsPopup.opened
             solidChecked: false
             onClicked: sectionsPopup.opened ? sectionsPopup.close() : sectionsPopup.open()
@@ -109,7 +109,7 @@ Row {
                 contentItem: Column {
                     spacing: Theme.space1
                     Text {
-                        text: "Secțiuni"
+                        text: qsTrId("ViewportControls.sectiuni")
                         color: Theme.textSecondary
                         font.pixelSize: Theme.fontSizeXs
                         font.weight: Font.DemiBold
@@ -135,17 +135,17 @@ Row {
                                 anchors.verticalCenter: parent.verticalCenter
                                 IconButton {
                                     width: 24; height: 24; iconSize: Theme.iconSizeSm
-                                    iconName: "arrow-down"; tooltip: "Mută 100 mm înapoi"
+                                    iconName: "arrow-down"; tooltip: qsTrId("ViewportControls.muta_100_mm_inapoi")
                                     onClicked: root.document.moveSection(sectionRow.modelData.id, -100)
                                 }
                                 IconButton {
                                     width: 24; height: 24; iconSize: Theme.iconSizeSm
-                                    iconName: "arrow-up"; tooltip: "Mută 100 mm înainte"
+                                    iconName: "arrow-up"; tooltip: qsTrId("ViewportControls.muta_100_mm_inainte")
                                     onClicked: root.document.moveSection(sectionRow.modelData.id, 100)
                                 }
                                 IconButton {
                                     width: 24; height: 24; iconSize: Theme.iconSizeSm
-                                    iconName: "trash-2"; tooltip: "Șterge secțiunea"
+                                    iconName: "trash-2"; tooltip: qsTrId("ViewportControls.sterge_sectiunea")
                                     onClicked: root.document.removeSection(sectionRow.modelData.id)
                                 }
                             }
@@ -160,14 +160,14 @@ Row {
     Group {
         ShadeButton {
             iconName: "sun-medium"
-            tooltip: "Umbre"
+            tooltip: qsTrId("ViewportControls.umbre")
             checked: root.viewport && root.viewport.shadows
             solidChecked: false
             onClicked: root.viewport.shadows = !root.viewport.shadows
         }
         Chevron {
             popup: sunPopup
-            tooltip: "Ora, luna, mediul"
+            tooltip: qsTrId("ViewportControls.ora_luna_mediul")
             Popover {
                 id: sunPopup
                 y: parent.height + Theme.space2
@@ -178,13 +178,13 @@ Row {
                     spacing: Theme.space2
                     Toggle {
                         width: 228
-                        text: "Umbre"
+                        text: qsTrId("ViewportControls.umbre")
                         checked: root.viewport && root.viewport.shadows
                         onToggled: root.viewport.shadows = checked
                     }
                     Slider {
                         width: 228
-                        label: "Ora"
+                        label: qsTrId("ViewportControls.ora")
                         from: 5
                         to: 21
                         stepSize: 0.25
@@ -194,7 +194,7 @@ Row {
                     }
                     Slider {
                         width: 228
-                        label: "Luna"
+                        label: qsTrId("ViewportControls.luna")
                         from: 1
                         to: 12
                         stepSize: 1
@@ -203,14 +203,14 @@ Row {
                         onMoved: root.viewport.sunMonth = Math.round(value)
                     }
                     Text {
-                        text: "Mediu"
+                        text: qsTrId("ViewportControls.mediu")
                         color: Theme.textSecondary
                         font.pixelSize: Theme.fontSizeSm
                     }
                     Tabs {
                         width: 228
                         readonly property var keys: ["simplu", "studio", "exterior", "innorat"]
-                        model: ["Simplu", "Studio", "Ext.", "Înnorat"]
+                        model: [qsTrId("ViewportControls.simplu"), qsTrId("ViewportControls.studio"), qsTrId("ViewportControls.ext"), qsTrId("ViewportControls.innorat")]
                         currentIndex: root.viewport ? Math.max(0, keys.indexOf(root.viewport.environment)) : 0
                         onCurrentIndexChanged: if (root.viewport && keys[currentIndex] !== root.viewport.environment)
                             root.environmentChosen(keys[currentIndex])
@@ -218,7 +218,7 @@ Row {
                     Text {
                         width: 228
                         wrapMode: Text.Wrap
-                        text: "Latitudinea, umbrirea ambientală și calitatea se schimbă din Preferințe (⌘,)."
+                        text: qsTrId("ViewportControls.latitudinea_umbrirea_ambientala_si_calitate")
                         color: Theme.textTertiary
                         font.pixelSize: Theme.fontSizeXs
                     }
@@ -241,7 +241,7 @@ Row {
         }
         Chevron {
             popup: stylePopup
-            tooltip: "Opțiunile stilului"
+            tooltip: qsTrId("ViewportControls.optiunile_stilului")
             Popover {
                 id: stylePopup
                 y: parent.height + Theme.space2
@@ -252,13 +252,13 @@ Row {
                     spacing: Theme.space2
                     Toggle {
                         width: 208
-                        text: "Profile (contururi)"
+                        text: qsTrId("ViewportControls.profile_contururi")
                         checked: root.viewport && root.viewport.profiles
                         onToggled: root.viewport.profiles = checked
                     }
                     Toggle {
                         width: 208
-                        text: "Ceață"
+                        text: qsTrId("ViewportControls.ceata")
                         checked: root.viewport && root.viewport.fog
                         onToggled: root.viewport.fog = checked
                     }

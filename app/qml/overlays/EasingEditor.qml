@@ -115,7 +115,7 @@ Popover {
                 id: renameButton
                 width: 16; height: 16; iconSize: 10
                 iconName: "pencil"
-                tooltip: "Redenumește"
+                tooltip: qsTrId("EasingEditor.redenumeste")
                 onClicked: {
                     editor.renaming = thumb.slot
                     nameField.text = thumb.preset.name
@@ -127,7 +127,7 @@ Popover {
                 id: deleteButton
                 width: 16; height: 16; iconSize: 10
                 iconName: "x"
-                tooltip: "Șterge presetarea"
+                tooltip: qsTrId("EasingEditor.sterge_presetarea")
                 onClicked: editor.userPresetsEdited(editor.userPresets.filter((p, i) => i !== thumb.slot))
             }
         }
@@ -139,7 +139,7 @@ Popover {
         Row {
             spacing: Theme.space2
             Text {
-                text: "Curba tranziției"
+                text: qsTrId("EasingEditor.curba_tranzitiei")
                 color: Theme.textPrimary
                 font.pixelSize: Theme.fontSizeMd
                 font.weight: Font.Medium
@@ -346,7 +346,7 @@ Popover {
             }
         }
         Toggle {
-            text: "Salt la final (step)"
+            text: qsTrId("EasingEditor.salt_la_final_step")
             checked: editor.easing.step
             onToggled: {
                 const e = editor.copy(editor.easing)
@@ -357,7 +357,7 @@ Popover {
         }
 
         // --- Presetările ---
-        Text { text: "Presetări"; color: Theme.textTertiary; font.pixelSize: Theme.fontSizeXs }
+        Text { text: qsTrId("EasingEditor.presetari"); color: Theme.textTertiary; font.pixelSize: Theme.fontSizeXs }
         Flow {
             width: parent.width
             spacing: Theme.space1
@@ -371,7 +371,7 @@ Popover {
         }
         Text {
             visible: editor.userPresets.length > 0
-            text: "Ale mele"
+            text: qsTrId("EasingEditor.ale_mele")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -398,14 +398,14 @@ Popover {
                 id: nameField
                 width: 340 - Theme.space3 * 2 - Theme.space2 - saveButton.width
                 height: Theme.controlHeightSm
-                placeholderText: editor.renaming >= 0 ? "Numele nou al presetării" : "Numele curbei (de exemplu „Ușa mea”)"
+                placeholderText: editor.renaming >= 0 ? qsTrId("EasingEditor.numele_nou_al_presetarii") : qsTrId("EasingEditor.numele_curbei_de_exemplu_usa_mea")
                 font.pixelSize: Theme.fontSizeSm
                 onAccepted: editor.savePreset()
             }
             Button {
                 id: saveButton
                 small: true
-                text: editor.renaming >= 0 ? "Redenumește" : "Salvează"
+                text: editor.renaming >= 0 ? qsTrId("EasingEditor.redenumeste") : qsTrId("EasingEditor.salveaza")
                 iconName: editor.renaming >= 0 ? "pencil" : "plus"
                 enabled: nameField.text.trim().length > 0
                 onClicked: editor.savePreset()

@@ -9,17 +9,17 @@ Item {
     property var document
     signal editRequested(double instanceId, string name)
 
-    readonly property var triggerLabels: ({ click: "Click", rightClick: "Click dreapta", doubleClick: "Dublu-click",
-        hoverEnter: "Cursorul intră", hoverLeave: "Cursorul iese", longPress: "Apăsare lungă", drag: "Tragere",
+    readonly property var triggerLabels: ({ click: qsTrId("InteractionsPanel.click"), rightClick: qsTrId("InteractionsPanel.click_dreapta"), doubleClick: qsTrId("InteractionsPanel.dublu_click"),
+        hoverEnter: qsTrId("InteractionsPanel.cursorul_intra"), hoverLeave: qsTrId("InteractionsPanel.cursorul_iese"), longPress: qsTrId("InteractionsPanel.apasare_lunga"), drag: qsTrId("InteractionsPanel.tragere"),
         key: "Tasta" })
-    readonly property var actionLabels: ({ moveBy: "Mută", moveTo: "Mută la", rotateBy: "Rotește", scaleTo: "Scalează",
-        show: "Arată", hide: "Ascunde", toggleVisible: "Comută vizibilitatea", setMaterial: "Schimbă materialul",
-        playAnimation: "Pornește animația", goToScene: "Mergi la scenă", wait: "Așteaptă", alternate: "Alternează" })
+    readonly property var actionLabels: ({ moveBy: qsTrId("InteractionsPanel.muta"), moveTo: qsTrId("InteractionsPanel.muta_la"), rotateBy: qsTrId("InteractionsPanel.roteste"), scaleTo: qsTrId("InteractionsPanel.scaleaza"),
+        show: qsTrId("InteractionsPanel.arata"), hide: qsTrId("InteractionsPanel.ascunde"), toggleVisible: qsTrId("InteractionsPanel.comuta_vizibilitatea"), setMaterial: qsTrId("InteractionsPanel.schimba_materialul"),
+        playAnimation: qsTrId("InteractionsPanel.porneste_animatia"), goToScene: qsTrId("InteractionsPanel.mergi_la_scena"), wait: qsTrId("InteractionsPanel.asteapta"), alternate: qsTrId("InteractionsPanel.alterneaza") })
     readonly property var shapeIcons: ({ box: "prim-cube", cylinder: "prim-cylinder", cone: "prim-cone", sphere: "prim-sphere" })
 
     function summary(rule) {
         const trigger = (root.triggerLabels[rule.trigger] ?? rule.trigger) + (rule.trigger === "key" && rule.key ? " " + rule.key : "")
-        const actions = rule.actions.length > 0 ? rule.actions.map(a => root.actionLabels[a] ?? a).join(", ") : "(nicio acțiune)"
+        const actions = rule.actions.length > 0 ? rule.actions.map(a => root.actionLabels[a] ?? a).join(", ") : qsTrId("InteractionsPanel.nicio_actiune")
         return trigger + " → " + actions
     }
 
@@ -49,13 +49,13 @@ Item {
                 RowAction {
                     shown: itemHover.hovered
                     iconName: "trash-2"
-                    tooltip: "Șterge interacțiunile obiectului"
+                    tooltip: qsTrId("InteractionsPanel.sterge_interactiunile_obiectului")
                     onClicked: root.document.setRules(item.modelData.id, [])
                 }
                 RowAction {
                     shown: itemHover.hovered
                     iconName: "pencil"
-                    tooltip: "Editează cu blocuri"
+                    tooltip: qsTrId("InteractionsPanel.editeaza_cu_blocuri")
                     onClicked: {
                         root.document.selectInstance(item.modelData.id)
                         root.editRequested(item.modelData.id, item.modelData.name)
@@ -113,9 +113,8 @@ Item {
             width: list.width
             topPadding: list.count > 0 ? Theme.space2 : 0
             wrapMode: Text.Wrap
-            text: list.count > 0 ? "F5 rulează interacțiunile (Modul interacțiune)."
-                                 : "Nicio interacțiune. Selectează un obiect și apasă + ca să-i adaugi reguli cu blocuri "
-                                   + "(„Când dau click → Mută…”)."
+            text: list.count > 0 ? qsTrId("InteractionsPanel.f5_ruleaza_interactiunile_modul_interactiu")
+                                 : qsTrId("InteractionsPanel.nicio_interactiune_selecteaza_un_obiect_si")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }

@@ -29,14 +29,14 @@ Popover {
     contentItem: Column {
         spacing: Theme.space3
         Text {
-            text: "Subdivide"
+            text: qsTrId("SubdividePanel.subdivide")
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
         }
         Slider {
             width: parent.width
-            label: "Niveluri"
+            label: qsTrId("SubdividePanel.niveluri")
             from: 1
             to: 3
             stepSize: 1
@@ -53,15 +53,14 @@ Popover {
             width: parent.width
             wrapMode: Text.Wrap
             visible: root.result.faces !== undefined
-            text: root.result.error ? root.result.error : root.result.faces + " fețe după subdivizare."
+            text: root.result.error ? root.result.error : root.result.faces + qsTrId("SubdividePanel.fete_dupa_subdivizare")
             color: root.result.error ? Theme.danger : Theme.textSecondary
             font.pixelSize: Theme.fontSizeSm
         }
         Text {
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Fiecare nivel împarte fețele în patru și rotunjește forma: un cub devine o pernă, o sferă devine mai fină. "
-                + "Pentru muchii drepte păstrate, folosește întâi Bevel pe ele."
+            text: qsTrId("SubdividePanel.fiecare_nivel_imparte_fetele_in_patru_si_rotu")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -69,12 +68,12 @@ Popover {
             anchors.right: parent.right
             spacing: Theme.space2
             Button {
-                text: "Anulează"
+                text: qsTrId("SubdividePanel.anuleaza")
                 onClicked: { root.document.cancelOperation(); root.close() }
             }
             Button {
                 variant: "primary"
-                text: "Gata"
+                text: qsTrId("SubdividePanel.gata")
                 onClicked: { root.document.commitOperation(); root.close() }
             }
         }

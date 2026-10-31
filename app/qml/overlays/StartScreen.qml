@@ -27,11 +27,11 @@ Popover {
     readonly property int listRows: Math.max(2, Math.min(5, Math.floor((windowHeight - 420 - recoveryCard.height) / rowHeight)))
 
     readonly property var tips: [
-        "⌘K caută orice comandă, unealtă sau document recent.",
-        "Ține cursorul pe o unealtă din toolbar: un ghid animat îți arată cum se folosește.",
-        "⌥1, ⌥2 și ⌥3 trec între Modelare, Animare și Interacțiune.",
-        "Tastează o lungime în timp ce desenezi (de exemplu 2.4m) și apasă Enter.",
-        "Fișierele .aion păstrează și o miniatură: o vezi aici, în lista recentelor."
+        qsTrId("StartScreen.k_cauta_orice_comanda_unealta_sau_document_recen"),
+        qsTrId("StartScreen.tine_cursorul_pe_o_unealta_din_toolbar_un_ghid_a"),
+        qsTrId("StartScreen.1_2_si_3_trec_intre_modelare_animare_si_interact"),
+        qsTrId("StartScreen.tasteaza_o_lungime_in_timp_ce_desenezi_de_exempl"),
+        qsTrId("StartScreen.fisierele_aion_pastreaza_si_o_miniatura_o_vezi_a")
     ]
     property string tip: ""
 
@@ -170,13 +170,13 @@ Popover {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
                         Text {
-                            text: "Aion"
+                            text: qsTrId("StartScreen.aion")
                             color: Theme.textPrimary
                             font.pixelSize: 26
                             font.weight: Font.DemiBold
                         }
                         Text {
-                            text: "Modelează ce rămâne."
+                            text: qsTrId("StartScreen.modeleaza_ce_ramane")
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSizeMd
                         }
@@ -227,15 +227,15 @@ Popover {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 2
                                 Text {
-                                    text: "Aion s-a închis neașteptat"
+                                    text: qsTrId("StartScreen.aion_s_a_inchis_neasteptat")
                                     color: Theme.textPrimary
                                     font.pixelSize: Theme.fontSizeMd
                                     font.weight: Font.DemiBold
                                 }
                                 Text {
                                     text: root.recoveries.length === 1
-                                          ? "Am păstrat ultima copie salvată automat a documentului la care lucrai."
-                                          : "Am păstrat copiile salvate automat ale documentelor la care lucrai."
+                                          ? qsTrId("StartScreen.am_pastrat_ultima_copie_salvata_automat_a_docume")
+                                          : qsTrId("StartScreen.am_pastrat_copiile_salvate_automat_ale_documente")
                                     color: Theme.textSecondary
                                     font.pixelSize: Theme.fontSizeSm
                                 }
@@ -277,14 +277,14 @@ Popover {
                                     Button {
                                         small: true
                                         variant: "ghost"
-                                        text: "Renunță"
+                                        text: qsTrId("StartScreen.renunta")
                                         onClicked: root.document.discardRecovery(recoveryRow.modelData.session)
                                     }
                                     Button {
                                         small: true
                                         variant: "primary"
                                         iconName: "history"
-                                        text: "Recuperează"
+                                        text: qsTrId("StartScreen.recupereaza")
                                         onClicked: root.recoverRequested(recoveryRow.modelData.session)
                                     }
                                 }
@@ -312,23 +312,23 @@ Popover {
                         width: parent.width
                         spacing: 2
 
-                        SectionLabel { text: "Începe" }
+                        SectionLabel { text: qsTrId("StartScreen.incepe") }
                         ActionRow {
                             iconName: "file-plus"
-                            text: "Document nou"
+                            text: qsTrId("StartScreen.document_nou")
                             shortcut: "Ctrl+N"
                             onClicked: { root.close(); root.newRequested() }
                         }
                         ActionRow {
                             iconName: "folder-open"
-                            text: "Deschide…"
+                            text: qsTrId("StartScreen.deschide")
                             shortcut: "Ctrl+O"
                             onClicked: { root.close(); root.openRequested() }
                         }
                         ActionRow {
                             visible: root.recent.length > 0
                             iconName: "history"
-                            text: root.recent.length > 0 ? "Redeschide „" + root.recent[0].name + "”" : ""
+                            text: root.recent.length > 0 ? qsTrId("StartScreen.redeschide") + root.recent[0].name + "”" : ""
                             shortcut: "Return"
                             onClicked: root.openRecent(0)
                         }
@@ -382,7 +382,7 @@ Popover {
                     width: parent.width - x - Theme.space6
                     spacing: 2
 
-                    SectionLabel { text: "Recente" }
+                    SectionLabel { text: qsTrId("StartScreen.recente") }
                     ListView {
                         id: recentList
                         width: parent.width
@@ -483,13 +483,13 @@ Popover {
                             }
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                text: "Niciun document recent"
+                                text: qsTrId("StartScreen.niciun_document_recent")
                                 color: Theme.textSecondary
                                 font.pixelSize: Theme.fontSizeMd
                             }
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                text: "Documentele pe care le salvezi sau le deschizi apar aici."
+                                text: qsTrId("StartScreen.documentele_pe_care_le_salvezi_sau_le_deschizi_a")
                                 color: Theme.textTertiary
                                 font.pixelSize: Theme.fontSizeSm
                             }
@@ -511,7 +511,7 @@ Popover {
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.space6
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Arată la pornire"
+                    text: qsTrId("StartScreen.arata_la_pornire")
                     checked: UserPrefs.startScreen
                     onToggled: UserPrefs.startScreen = checked
                 }
@@ -524,14 +524,14 @@ Popover {
                         small: true
                         variant: "ghost"
                         iconName: "info"
-                        text: "Turul uneltelor"
+                        text: qsTrId("StartScreen.turul_uneltelor")
                         onClicked: { root.close(); root.tourRequested() }
                     }
                     Button {
                         small: true
                         variant: "ghost"
                         iconName: "settings"
-                        text: "Preferințe…"
+                        text: qsTrId("StartScreen.preferinte")
                         onClicked: { root.close(); root.preferencesRequested() }
                     }
                 }

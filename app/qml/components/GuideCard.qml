@@ -95,7 +95,7 @@ Column {
         visible: root.guide !== null && root.guide.tip.length > 0
         width: parent.width
         wrapMode: Text.Wrap
-        text: root.guide ? "Sfat: " + AppInfo.platformText(root.guide.tip) : ""
+        text: root.guide ? qsTrId("GuideCard.sfat") + AppInfo.platformText(root.guide.tip) : ""
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeXs
         lineHeight: 1.2

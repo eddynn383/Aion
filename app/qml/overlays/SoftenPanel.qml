@@ -30,14 +30,14 @@ Popover {
     contentItem: Column {
         spacing: Theme.space3
         Text {
-            text: "Muchii netede"
+            text: qsTrId("SoftenPanel.muchii_netede")
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
         }
         Slider {
             width: parent.width
-            label: "Unghi maxim între fețe"
+            label: qsTrId("SoftenPanel.unghi_maxim_intre_fete")
             from: 0
             to: 180
             stepSize: 1
@@ -47,7 +47,7 @@ Popover {
         }
         Toggle {
             width: parent.width
-            text: "Și muchiile dintre fețe coplanare"
+            text: qsTrId("SoftenPanel.si_muchiile_dintre_fete_coplanare")
             checked: root.coplanar
             onToggled: { root.coplanar = checked; root.update() }
         }
@@ -55,17 +55,16 @@ Popover {
             width: parent.width
             wrapMode: Text.Wrap
             visible: root.result.total !== undefined
-            text: root.result.total === 0 ? "Selecția nu are muchii între două fețe."
-                : root.result.soft > 0 ? root.result.soft + " din " + root.result.total + " muchii sunt netezite."
-                : "Nicio muchie nu e sub prag. Muchiile unui cub au 90°: ridică pragul peste 90°."
+            text: root.result.total === 0 ? qsTrId("SoftenPanel.selectia_nu_are_muchii_intre_doua_fete")
+                : root.result.soft > 0 ? root.result.soft + qsTrId("SoftenPanel.din") + root.result.total + qsTrId("SoftenPanel.muchii_sunt_netezite")
+                : qsTrId("SoftenPanel.nicio_muchie_nu_e_sub_prag_muchiile_unui_cub_au_")
             color: root.result.soft > 0 ? Theme.textSecondary : Theme.textPrimary
             font.pixelSize: Theme.fontSizeSm
         }
         Text {
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Sub prag, muchia dispare și umbrirea trece lin peste ea (ca la un cilindru). Nu adaugă fețe: ca obiectul să devină "
-                + "mai rotund, folosește Subdivide. 0° = toate muchiile vizibile."
+            text: qsTrId("SoftenPanel.sub_prag_muchia_dispare_si_umbrirea_trece_lin_pe")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -73,12 +72,12 @@ Popover {
             anchors.right: parent.right
             spacing: Theme.space2
             Button {
-                text: "Anulează"
+                text: qsTrId("SoftenPanel.anuleaza")
                 onClicked: { root.document.cancelOperation(); root.close() }
             }
             Button {
                 variant: "primary"
-                text: "Gata"
+                text: qsTrId("SoftenPanel.gata")
                 onClicked: { root.document.commitOperation(); root.close() }
             }
         }

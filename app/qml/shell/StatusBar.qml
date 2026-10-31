@@ -4,7 +4,7 @@ import Aion
 Rectangle {
     id: root
 
-    property string message: "Gata"
+    property string message: qsTrId("StatusBar.gata")
     property int framesPerSecond: 0
     property bool orthographic: false
     property string selectionText: ""
@@ -57,7 +57,7 @@ Rectangle {
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.snapToGrid ? "Snap " + root.gridText : "Snap oprit"
+                    text: root.snapToGrid ? qsTrId("StatusBar.snap") + root.gridText : qsTrId("StatusBar.snap_oprit")
                     color: root.snapToGrid ? Theme.textPrimary : Theme.textTertiary
                     font.pixelSize: Theme.fontSizeXs
                 }
@@ -74,10 +74,10 @@ Rectangle {
         Repeater {
             model: [
                 root.selectionText,
-                "Unități: " + root.unitText,
-                root.orthographic ? "Paralelă" : "Perspectivă",
+                qsTrId("StatusBar.unitati") + root.unitText,
+                root.orthographic ? qsTrId("StatusBar.paralela") : qsTrId("StatusBar.perspectiva"),
                 AppInfo.graphicsApi,
-                root.framesPerSecond > 0 ? root.framesPerSecond + " fps" : "",
+                root.framesPerSecond > 0 ? root.framesPerSecond + qsTrId("StatusBar.fps") : "",
                 "v" + AppInfo.version
             ]
             delegate: Text {

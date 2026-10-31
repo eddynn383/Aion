@@ -27,9 +27,8 @@ TRANSLATIONS = ROOT / "translations"
 STRINGS = TRANSLATIONS / "strings.json"
 LANGUAGES = ["ro", "en", "de", "pl", "it", "fr", "es", "pt"]
 
-LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
 TECHNICAL = re.compile(
-    r"(font\.family|shortcut|defaultShortcut|key|source|objectName|iconName|icon|category|id|format|"
+    r"(font\.family|shortcut|defaultShortcut|alias|key|source|objectName|iconName|icon|category|id|format|"
     r"sequence|sequences|kind|variant)\s*:\s*$")
 COMPARISON = re.compile(r"(===|!==|==|!=|case)\s*$")
 
@@ -45,26 +44,14 @@ def is_visible(text: str) -> bool:
         return False
     if re.fullmatch(r"[A-Za-z]+\+[A-Za-z0-9+]+", text):  # scurtături („Ctrl+G”)
         return False
+    if re.fullmatch(r"Space|Return|Enter|Escape|Esc|Tab|Backspace|Delete|Left|Right|Up|Down|Home|End|PgUp|PgDown|"
+                    r"F[0-9]{1,2}", text):  # numele tastelor (secvențe de scurtături)
+        return False
     if re.fullmatch(r"[a-z0-9_.:\-/]+", text):  # id-uri, chei, nume de iconițe
         return False
+    if re.search(r"\d+px\b|\.qml$|\.js$", text):  # fonturi pentru Canvas, fișiere încărcate dinamic
+        return False
     return " " in text or any(ord(c) > 127 for c in text) or text[0].isupper()
-
-
-def code_part(line: str) -> str:
-    """Linia fără comentariul de la sfârșit (`//` în afara unui literal)."""
-    inside = False
-    i = 0
-    while i < len(line):
-        c = line[i]
-        if c == "\\":
-            i += 2
-            continue
-        if c == '"':
-            inside = not inside
-        elif not inside and line.startswith("//", i):
-            return line[:i]
-        i += 1
-    return line
 
 
 class Keys:
@@ -90,45 +77,74 @@ class Keys:
                            encoding="utf-8")
 
 
-# Două literale lipite cu „+” (o propoziție ruptă pe două rânduri) devin unul, ca să aibă o singură cheie.
-JOINED = re.compile(r'"((?:[^"\\\n]|\\.)*)"[ \t]*\n?[ \t]*\+[ \t]*\n?[ \t]*"((?:[^"\\\n]|\\.)*)"')
+def literal_spans(source: str):
+    """Pozițiile (început, sfârșit) ale literalelor cu ghilimele duble, citind textul ca un parser: comentariile și
+    literalele cu ghilimele simple sau `…` se sar, iar „\\"” nu închide un literal."""
+    spans = []
+    i = 0
+    n = len(source)
+    while i < n:
+        c = source[i]
+        if source.startswith("//", i):
+            i = source.find("\n", i)
+            i = n if i < 0 else i
+            continue
+        if source.startswith("/*", i):
+            i = source.find("*/", i + 2)
+            i = n if i < 0 else i + 2
+            continue
+        if c in "\"'`":
+            start = i
+            i += 1
+            while i < n and source[i] != c:
+                if source[i] == "\\":
+                    i += 1
+                elif c != "`" and source[i] == "\n":
+                    break  # literal neterminat pe rând: nu e un literal
+                i += 1
+            if c == '"' and i < n and source[i] == '"':
+                spans.append((start, i + 1))
+            i += 1
+            continue
+        i += 1
+    return spans
 
 
 def join_literals(source: str) -> str:
+    """Două literale lipite cu „+” (o propoziție ruptă pe două rânduri) devin unul, ca să aibă o singură cheie."""
     while True:
-        merged = JOINED.sub(lambda m: '"' + m.group(1) + m.group(2) + '"', source)
-        if merged == source:
+        spans = literal_spans(source)
+        for (a0, a1), (b0, b1) in zip(spans, spans[1:]):
+            if re.fullmatch(r"\s*\+\s*", source[a1:b0]):
+                source = source[:a1 - 1] + source[b0 + 1:]
+                break
+        else:
             return source
-        source = merged
 
 
 def convert(path: Path, keys: Keys) -> int:
     stem = path.stem
-    out = []
+    source = join_literals(path.read_text(encoding="utf-8"))
+    pieces = []
+    last = 0
     count = 0
-    for line in join_literals(path.read_text(encoding="utf-8")).split("\n"):
-        code = code_part(line)
-        if code.lstrip().startswith(("//", "*", "import ")) or "console." in code or "qsTrId(" in code:
-            out.append(line)
+    for start, end in literal_spans(source):
+        line_start = source.rfind("\n", 0, start) + 1
+        line_end = source.find("\n", end)
+        line = source[line_start:len(source) if line_end < 0 else line_end]
+        before = source[line_start:start]
+        text = source[start + 1:end - 1].replace('\\"', '"')
+        if (line.lstrip().startswith(("import ", ".import", ".pragma")) or "console." in line or "Qt.Key_" in line
+                or re.search(r"sequences?\s*:\s*\[[^\]]*$", before)
+                or not is_visible(text) or TECHNICAL.search(before) or COMPARISON.search(before)
+                or re.search(r"(startsWith|endsWith|includes|indexOf|setStandardView|runCommand|command)\($",
+                             before.rstrip())):
             continue
-        pieces = []
-        last = 0
-        for m in LITERAL.finditer(code):
-            before = code[:m.start()]
-            text = m.group(1).replace('\\"', '"')
-            if (not is_visible(text) or TECHNICAL.search(before) or COMPARISON.search(before)
-                    or before.rstrip().endswith("(") and re.search(r"(startsWith|endsWith|includes|indexOf|"
-                                                                   r"setStandardView|runCommand|command)\($",
-                                                                   before.rstrip())):
-                continue
-            key = keys.key_for(stem, text)
-            pieces.append(code[last:m.start()] + f'qsTrId("{key}")')
-            last = m.end()
-            count += 1
-        if pieces:
-            line = "".join(pieces) + code[last:] + line[len(code):]
-        out.append(line)
-    path.write_text("\n".join(out), encoding="utf-8")
+        key = keys.key_for(stem, text)
+        pieces.append(source[last:start] + f'qsTrId("{key}")')
+        last = end
+        count += 1
+    path.write_text("".join(pieces) + source[last:], encoding="utf-8")
     return count
 
 

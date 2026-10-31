@@ -71,7 +71,7 @@ Column {
     Text {
         visible: root.actions.length === 0
         width: root.width
-        text: "Trage aici blocuri din paletă"
+        text: qsTrId("RulesActionList.trage_aici_blocuri_din_paleta")
         color: Theme.textTertiary
         font.pixelSize: Theme.fontSizeXs
         horizontalAlignment: Text.AlignHCenter

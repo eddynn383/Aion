@@ -73,7 +73,7 @@ Popover {
                 anchors.leftMargin: field.leftPadding
                 verticalAlignment: Text.AlignVCenter
                 visible: field.text.length === 0
-                text: "Caută o comandă…"
+                text: qsTrId("CommandPalette.cauta_o_comanda")
                 color: Theme.textTertiary
                 font: field.font
             }
@@ -170,7 +170,7 @@ Popover {
             height: 72
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            text: "Nicio comandă pentru „" + field.text + "”"
+            text: qsTrId("CommandPalette.nicio_comanda_pentru") + field.text + "”"
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeMd
         }
@@ -182,7 +182,7 @@ Popover {
             leftPadding: Theme.space4
             spacing: Theme.space4
             Repeater {
-                model: [["↑↓", "navighează"], ["↵", "execută"], ["esc", "închide"]]
+                model: [["↑↓", qsTrId("CommandPalette.navigheaza")], ["↵", qsTrId("CommandPalette.executa")], ["esc", qsTrId("CommandPalette.inchide")]]
                 delegate: Row {
                     required property var modelData
                     anchors.verticalCenter: parent.verticalCenter

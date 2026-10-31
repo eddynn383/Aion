@@ -33,20 +33,20 @@ Popover {
     contentItem: Column {
         spacing: Theme.space3
         Text {
-            text: root.mode === 1 ? "Bevel" : "Chamfer"
+            text: root.mode === 1 ? qsTrId("BevelPanel.bevel") : qsTrId("BevelPanel.chamfer")
             color: Theme.textPrimary
             font.pixelSize: Theme.fontSizeMd
             font.weight: Font.DemiBold
         }
         Tabs {
             width: parent.width
-            model: ["Chamfer (plat)", "Bevel (rotunjit)"]
+            model: [qsTrId("BevelPanel.chamfer_plat"), qsTrId("BevelPanel.bevel_rotunjit")]
             currentIndex: root.mode
             onCurrentIndexChanged: root.mode = currentIndex
         }
         NumberField {
             width: parent.width
-            label: "Distanță"
+            label: qsTrId("BevelPanel.distanta")
             unit: "mm"
             from: 0.1
             to: 100000
@@ -57,7 +57,7 @@ Popover {
         Slider {
             width: parent.width
             visible: root.mode === 1
-            label: "Segmente"
+            label: qsTrId("BevelPanel.segmente")
             from: 2
             to: 24
             stepSize: 1
@@ -68,7 +68,7 @@ Popover {
         Text {
             width: parent.width
             wrapMode: Text.Wrap
-            text: "Merge pe muchii convexe dintre două fețe plane (ca la o cutie). Pe o față se teșesc toate laturile ei."
+            text: qsTrId("BevelPanel.merge_pe_muchii_convexe_dintre_doua_fete_plane_ca")
             color: Theme.textTertiary
             font.pixelSize: Theme.fontSizeXs
         }
@@ -76,12 +76,12 @@ Popover {
             anchors.right: parent.right
             spacing: Theme.space2
             Button {
-                text: "Anulează"
+                text: qsTrId("BevelPanel.anuleaza")
                 onClicked: { root.document.cancelOperation(); root.close() }
             }
             Button {
                 variant: "primary"
-                text: "Gata"
+                text: qsTrId("BevelPanel.gata")
                 onClicked: { root.document.commitOperation(); root.close() }
             }
         }

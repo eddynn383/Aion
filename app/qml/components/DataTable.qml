@@ -11,7 +11,7 @@ Item {
 
     property var columns: []
     property var rows: []
-    property string emptyText: "Nimic de afișat."
+    property string emptyText: qsTrId("DataTable.nimic_de_afisat")
     property bool checkColumn: false
     property var rowKeys: []
     property var checkedKeys: ({})
