@@ -5,11 +5,14 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
-// „Întinde” (mobilier, pasul 11): clic pe o față a corpului alege axa (normala ei); cursorul dă distanța, cu
-// previzualizare; al doilea clic confirmă. VCB: „200” (un plan, la mijloc) sau „200/2” (în 2 locuri egale).
+// „Întinde” (mobilier, pasul 11): clic pe o față a corpului alege axa (normala ei); planul de tăiere urmează
+// cursorul, iar al doilea clic îl fixează; cursorul dă apoi distanța, cu previzualizare; al treilea clic
+// confirmă. VCB, oricând după primul clic: „200” (planul ales, sau la mijloc) ori „200/2” (în 2 locuri
+// egale).
 namespace aion::tools {
 
 namespace {
@@ -20,6 +23,13 @@ public:
 
     void pointerMove(ToolContext& ctx, const PointerEvent& e) override
     {
+        if (m_placing) {
+            m_inference = inferAt(m_engine, ctx, e.screen, std::nullopt);
+            if (m_inference.valid()) {
+                placePlane(ctx, m_inference.point);
+            }
+            return;
+        }
         m_inference = inferAt(m_engine, ctx, e.screen, m_start);
         if (m_body && m_inference.valid()) {
             preview(ctx, glm::dot(m_inference.point - *m_start, m_direction));
@@ -28,6 +38,14 @@ public:
 
     void pointerDown(ToolContext& ctx, const PointerEvent& e) override
     {
+        if (m_placing) {
+            // Planul rămâne unde e; de aici cursorul dă distanța.
+            m_placing = false;
+            m_inference = inferAt(m_engine, ctx, e.screen, std::nullopt);
+            m_start = m_inference.valid() ? m_inference.point : m_start;
+            m_engine.restartFrom(*m_start);
+            return;
+        }
         m_inference = inferAt(m_engine, ctx, e.screen, m_start);
         if (m_body) {
             finish(ctx);
@@ -54,6 +72,8 @@ public:
         }
         m_body = {};
         m_start.reset();
+        m_placing = false;
+        m_planeLines.clear();
         m_distance = 0.0;
         m_refusal = model::StretchRefusal::None;
         m_engine.reset();
@@ -86,6 +106,9 @@ public:
         default:
             break;
         }
+        if (m_placing) {
+            return "Mută planul unde tai, clic îl fixează · sau tastează 200/2 (în 2 locuri egale) · Esc";
+        }
         return "Mișcă pentru distanță, clic confirmă · tastează 200 sau 200/2 (în 2 locuri egale) · Esc";
     }
 
@@ -102,18 +125,17 @@ public:
         if (!m_body) {
             return false;
         }
-        // „200/2”: distanța și numărul de locuri egale.
+        // „200/2”: distanța și numărul de locuri egale; fără „/N”, planul ales (sau cel de la mijloc).
         std::string_view length = text;
-        int places = 1;
         if (const auto slash = text.find('/'); slash != std::string_view::npos) {
             length = text.substr(0, slash);
-            places = std::max(1, std::atoi(std::string(text.substr(slash + 1)).c_str()));
+            const int places = std::max(1, std::atoi(std::string(text.substr(slash + 1)).c_str()));
+            m_planes = model::equalPlanes(*ctx.model, m_body, m_axis, places);
         }
         const auto value = units::parseLength(length);
         if (!value) {
             return false;
         }
-        m_planes = model::equalPlanes(*ctx.model, m_body, m_axis, places);
         preview(ctx, *value);
         return finish(ctx);
     }
@@ -142,7 +164,17 @@ private:
         m_body = body;
         m_start = m_inference.point;
         m_planes = model::equalPlanes(*ctx.model, body, m_axis, 1);
-        m_engine.restartFrom(m_inference.point);
+        m_placing = true;
+        updatePlaneLines(ctx);
+    }
+
+    // Planul de tăiere la poziția punctului de sub cursor (pe axa corpului), în interiorul corpului.
+    void placePlane(const ToolContext& ctx, const Vec3d& point)
+    {
+        const model::Instance& inst = ctx.model->instance(m_body);
+        const auto [lo, hi] = model::bounds(*ctx.model, inst.definition);
+        const double at = inst.transform.inverse().applyToPoint(point)[m_axis];
+        m_planes = { std::clamp(at, lo[m_axis] + 1.0, hi[m_axis] - 1.0) };
         updatePlaneLines(ctx);
     }
 
@@ -183,6 +215,7 @@ private:
         }
         m_body = {};
         m_start.reset();
+        m_placing = false;
         m_planeLines.clear();
         m_engine.reset();
         return ok;
@@ -216,6 +249,7 @@ private:
     double m_sign = 1.0;
     Vec3d m_direction { 1.0, 0.0, 0.0 };
     std::optional<Vec3d> m_start;
+    bool m_placing = false; // planul urmează cursorul (între primul și al doilea clic)
     std::vector<double> m_planes;
     std::vector<std::pair<Vec3d, Vec3d>> m_planeLines;
     double m_distance = 0.0;

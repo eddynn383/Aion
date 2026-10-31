@@ -41,8 +41,8 @@ const guides = {
     stretch: {
         title: "Întinde",
         summary: "Lățește (sau înalță) un corp făcut din plăci: plăcile tăiate de plan se lungesc, cele de dincolo se mută.",
-        steps: ["Click pe o față a corpului: axa e normala ei", "Mișcă mouse-ul pentru distanță și dă click",
-                "Sau tastează 200 (un plan, la mijloc) ori 200/2 (în 2 locuri egale: două uși cresc fiecare cu 100)"],
+        steps: ["Click pe o față a corpului: axa e normala ei", "Mută planul de tăiere cu mouse-ul și dă click",
+                "Mișcă mouse-ul pentru distanță și dă click, sau tastează 200 (ori 200/2: în 2 locuri egale)"],
         tip: "Un corp din bibliotecă își schimbă doar câmpul; o placă modificată de mână oprește întinderea"
     },
     circle: {

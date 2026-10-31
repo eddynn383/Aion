@@ -1,7 +1,9 @@
 #include "aion/core/geom/Operations.h"
 #include "aion/core/geom/Primitives.h"
+#include "aion/core/model/Carcass.h"
 #include "aion/core/model/Furniture.h"
 #include "aion/core/model/Operations.h"
+#include "aion/core/model/Parametric.h"
 #include "aion/core/model/SnapSources.h"
 #include "aion/core/model/Texturing.h"
 #include "aion/core/tools/Tool.h"
@@ -1992,4 +1994,59 @@ TEST_CASE(
     const math::Transform& t = m.instance(board).transform;
     CHECK(t.applyToVector({ 0, 0, 1 }).y == Approx(-1.0)); // grosimea spre exterior (−Y)
     CHECK(model::boardState(m, board, t).state == model::BoardState::Matches);
+}
+
+TEST_CASE("Întinde: planul urmează cursorul, apoi distanța din VCB", "[core][tools][model][furniture]")
+{
+    model::Model m;
+    commands::CommandStack stack { m };
+    geom::Selection selection;
+    view::Camera camera;
+    camera.setViewportSize(1000, 800);
+    camera.setPose(view::standardViewPose(view::StandardView::Iso, { { 300, 280, 360 }, 0, 0, 4000 }));
+    tools::ToolContext ctx { m.mesh(m.root()), stack, selection, camera };
+    ctx.model = &m;
+    ctx.context = m.root();
+    const model::InstanceId body = model::createParametric(
+        m, m.root(), "base", { { "doors", 2 }, { "shelves", 0 } }, math::Transform {});
+    model::makePlainBody(m, m.instance(body).definition);
+    const inference::SnapScene scene = model::snapScene(m, {}, {});
+    ctx.snap = &scene;
+    const auto at = [&](Vec3d p) {
+        const auto s = camera.project(p);
+        REQUIRE(s);
+        return *s;
+    };
+    auto tool = tools::makeTool("stretch");
+    REQUIRE(tool);
+    const auto click = [&](Vec3d p) {
+        const tools::PointerEvent e { at(p), {}, 1 };
+        tool->pointerMove(ctx, e);
+        tool->pointerDown(ctx, e);
+        tool->pointerUp(ctx, e);
+    };
+    // Fața de sus (normala Z) ar alege înălțimea; pentru lățime, fața din dreapta sau din stânga.
+    const Vec3d side = camera.forward().x < 0.0 ? Vec3d { 600, 280, 360 } : Vec3d { 0, 280, 360 };
+    click(side);
+    // Planul, mutat cu cursorul pe capac la x = 150, apoi fixat.
+    const Vec3d onTop { 150, 280, 720 };
+    tool->pointerMove(ctx, { at(onTop), {}, 1 });
+    click(onTop);
+    REQUIRE(tool->applyMeasurement(ctx, "200"));
+    const model::DefinitionId def = m.instance(body).definition;
+    double bottom = 0.0;
+    double door1 = 0.0;
+    for (model::InstanceId id : m.childrenOf(def)) {
+        const model::Instance& inst = m.instance(id);
+        if (inst.roleKey == "bottom") {
+            bottom = m.definition(inst.definition).parameters.at("length");
+        }
+        for (model::InstanceId inner : m.childrenOf(inst.definition)) {
+            if (m.instance(inner).roleKey == "door.1.panel") {
+                door1 = m.definition(m.instance(inner).definition).parameters.at("width");
+            }
+        }
+    }
+    CHECK(bottom == Approx(764.0));
+    CHECK(door1 == Approx(298.5 + 200.0)); // planul trece prin ușa 1
 }
